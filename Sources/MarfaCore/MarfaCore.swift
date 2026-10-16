@@ -2384,20 +2384,24 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * `confirm_first_sync` lets it go. The answer says why the directory is
      * in cloud-synced or network storage, where it is; the folder is added
      * all the same. Reads the file system, so it can wait on a mount that
-     * does not answer.
+     * does not answer. Over a folder a watch holds, asks the watch to let it
+     * go and waits up to 10 seconds, as every call that works a folder does:
+     * past that, it is refused with `ReadingHandle`, naming the folder.
      */
     func add(dir: String, folder: String) throws  -> AddedFolder
     
     /**
      * Lets a paused large removal go: its deletes are queued, and files
      * whose items left elsewhere are taken away. Refused while the first
-     * sync waits.
+     * sync waits. Asks a watch that holds the folder to let it go, as `add`
+     * does.
      */
     func confirm(dir: String) throws  -> ConfirmedRemoval
     
     /**
      * Lets a folder's first sync go, at the next sync or watch. Answers
-     * whether it was waiting. A paused removal is not touched.
+     * whether it was waiting. A paused removal is not touched. Asks a watch
+     * that holds the folder to let it go, as `add` does.
      */
     func confirmFirstSync(dir: String) throws  -> Bool
     
@@ -2415,13 +2419,15 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * registry lists. Where that path is
      * gone, passes through a link, or holds state the registry does not
      * show to be the folder's own, the folder is only taken off the
-     * registry.
+     * registry. Asks a watch that holds the folder to let it go, as `add`
+     * does; that watch then ends with `Removed` or `Unlisted`.
      */
     func remove(dir: String) throws 
     
     /**
      * Cancels a paused large removal: files gone from the disk are written
-     * back, and items that left elsewhere are restored.
+     * back, and items that left elsewhere are restored. Asks a watch that
+     * holds the folder to let it go, as `add` does.
      */
     func restore(dir: String) throws  -> RestoredRemoval
     
@@ -2435,15 +2441,24 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * Everything a folder does, once: sends what changed on disk, catches
      * up with the server and writes out what its search matches. A folder
      * whose first sync waits to be confirmed is only read, and `Waiting`
-     * says what the sync will do.
+     * says what the sync will do. Asks a watch that holds the folder to let
+     * it go, as `add` does.
      */
     func sync(dir: String) throws  -> FolderSyncOutcome
     
     /**
      * Keeps the folder in step on a thread of its own, as the command
      * line's watch does, until the subscription is stopped or let go. The
-     * folder is held while it runs, so another process cannot work it. A
-     * pass under way when it is stopped finishes before `ended` is called.
+     * folder is held while it runs, so another process cannot work it
+     * unasked; a watch does not ask for a folder another process holds, and
+     * is refused at once with `ReadingHandle`.
+     *
+     * A call of `Folders`, or a command, that works the folder asks for it.
+     * The watch lets it go at the end of the step of its pass under way and
+     * tells `HandedOver`, then takes the folder back once the call ends and
+     * tells `TakenBack`. A folder removed or taken off the registry meanwhile
+     * ends the watch, after `Removed` or `Unlisted`. A pass under way when
+     * it is stopped finishes before `ended` is called.
      */
     func watch(dir: String, listener: FolderListener) throws  -> Subscription
     
@@ -2525,7 +2540,9 @@ public convenience init(url: String?, key: String?)throws  {
      * `confirm_first_sync` lets it go. The answer says why the directory is
      * in cloud-synced or network storage, where it is; the folder is added
      * all the same. Reads the file system, so it can wait on a mount that
-     * does not answer.
+     * does not answer. Over a folder a watch holds, asks the watch to let it
+     * go and waits up to 10 seconds, as every call that works a folder does:
+     * past that, it is refused with `ReadingHandle`, naming the folder.
      */
 open func add(dir: String, folder: String)throws  -> AddedFolder  {
     return try  FfiConverterTypeAddedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2540,7 +2557,8 @@ open func add(dir: String, folder: String)throws  -> AddedFolder  {
     /**
      * Lets a paused large removal go: its deletes are queued, and files
      * whose items left elsewhere are taken away. Refused while the first
-     * sync waits.
+     * sync waits. Asks a watch that holds the folder to let it go, as `add`
+     * does.
      */
 open func confirm(dir: String)throws  -> ConfirmedRemoval  {
     return try  FfiConverterTypeConfirmedRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2553,7 +2571,8 @@ open func confirm(dir: String)throws  -> ConfirmedRemoval  {
     
     /**
      * Lets a folder's first sync go, at the next sync or watch. Answers
-     * whether it was waiting. A paused removal is not touched.
+     * whether it was waiting. A paused removal is not touched. Asks a watch
+     * that holds the folder to let it go, as `add` does.
      */
 open func confirmFirstSync(dir: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2584,7 +2603,8 @@ open func list()throws  -> [ListedFolder]  {
      * registry lists. Where that path is
      * gone, passes through a link, or holds state the registry does not
      * show to be the folder's own, the folder is only taken off the
-     * registry.
+     * registry. Asks a watch that holds the folder to let it go, as `add`
+     * does; that watch then ends with `Removed` or `Unlisted`.
      */
 open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_remove(
@@ -2596,7 +2616,8 @@ open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMar
     
     /**
      * Cancels a paused large removal: files gone from the disk are written
-     * back, and items that left elsewhere are restored.
+     * back, and items that left elsewhere are restored. Asks a watch that
+     * holds the folder to let it go, as `add` does.
      */
 open func restore(dir: String)throws  -> RestoredRemoval  {
     return try  FfiConverterTypeRestoredRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2624,7 +2645,8 @@ open func status(dir: String)throws  -> FolderStatus  {
      * Everything a folder does, once: sends what changed on disk, catches
      * up with the server and writes out what its search matches. A folder
      * whose first sync waits to be confirmed is only read, and `Waiting`
-     * says what the sync will do.
+     * says what the sync will do. Asks a watch that holds the folder to let
+     * it go, as `add` does.
      */
 open func sync(dir: String)throws  -> FolderSyncOutcome  {
     return try  FfiConverterTypeFolderSyncOutcome_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2638,8 +2660,16 @@ open func sync(dir: String)throws  -> FolderSyncOutcome  {
     /**
      * Keeps the folder in step on a thread of its own, as the command
      * line's watch does, until the subscription is stopped or let go. The
-     * folder is held while it runs, so another process cannot work it. A
-     * pass under way when it is stopped finishes before `ended` is called.
+     * folder is held while it runs, so another process cannot work it
+     * unasked; a watch does not ask for a folder another process holds, and
+     * is refused at once with `ReadingHandle`.
+     *
+     * A call of `Folders`, or a command, that works the folder asks for it.
+     * The watch lets it go at the end of the step of its pass under way and
+     * tells `HandedOver`, then takes the folder back once the call ends and
+     * tells `TakenBack`. A folder removed or taken off the registry meanwhile
+     * ends the watch, after `Removed` or `Unlisted`. A pass under way when
+     * it is stopped finishes before `ended` is called.
      */
 open func watch(dir: String, listener: FolderListener)throws  -> Subscription  {
     return try  FfiConverterTypeSubscription_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -8248,6 +8278,34 @@ public enum FolderEvent: Equatable, Hashable {
      */
     case passed(pass: FolderPass
     )
+    /**
+     * A command or another call asked for the folder, and the watch let it
+     * go at the end of the step of its pass under way. The watch waits, and
+     * takes the folder back once the folder is free: `TakenBack` says so.
+     */
+    case handedOver
+    /**
+     * The folder was let go, and another process keeps it past the time a
+     * caller waits, with no command or call asking for it. Told once; the
+     * watch takes the folder back once that process lets it go.
+     */
+    case heldElsewhere
+    /**
+     * The watch took the folder back and keeps it in step again. It follows
+     * `HandedOver` or `HeldElsewhere`, and stands in for a second `Watching`.
+     */
+    case takenBack
+    /**
+     * The call the folder was let go to removed the folder from this
+     * machine, so there is nothing to watch. The watch ends.
+     */
+    case removed
+    /**
+     * The call the folder was let go to took the folder off the machine's
+     * registry and left its state, so the watch ends and the folder stays
+     * off the registry.
+     */
+    case unlisted
 
 
 
@@ -8288,6 +8346,16 @@ public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
         
         case 7: return .passed(pass: try FfiConverterTypeFolderPass.read(from: &buf)
         )
+        
+        case 8: return .handedOver
+        
+        case 9: return .heldElsewhere
+        
+        case 10: return .takenBack
+        
+        case 11: return .removed
+        
+        case 12: return .unlisted
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -8332,6 +8400,26 @@ public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(7))
             FfiConverterTypeFolderPass.write(pass, into: &buf)
             
+        
+        case .handedOver:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .heldElsewhere:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .takenBack:
+            writeInt(&buf, Int32(10))
+        
+        
+        case .removed:
+            writeInt(&buf, Int32(11))
+        
+        
+        case .unlisted:
+            writeInt(&buf, Int32(12))
+        
         }
     }
 }
@@ -11383,31 +11471,31 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folderlistener_ended() != 28733) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 9043) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 37317) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 13317) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 15775) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm_first_sync() != 16667) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm_first_sync() != 5573) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 14669) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 10975) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 37532) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 57957) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_status() != 56073) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 4778) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 49305) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 22567) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 17682) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 16044) {
