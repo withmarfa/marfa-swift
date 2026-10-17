@@ -7009,9 +7009,9 @@ public func FfiConverterTypeRestoredRemoval_lower(_ value: RestoredRemoval) -> R
  * the list reads it.
  */
 public struct SearchFilters: Equatable, Hashable {
+    public var type: String?
     public var state: ItemState?
     public var allStates: Bool
-    public var type: String?
     public var tags: [String]
     /**
      * An expression in the server's listing grammar, answered as the server
@@ -7027,7 +7027,7 @@ public struct SearchFilters: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(state: ItemState? = nil, allStates: Bool = false, type: String? = nil, tags: [String] = [], 
+    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tags: [String] = [], 
         /**
          * An expression in the server's listing grammar, answered as the server
          * answers `filter` and refused `validation_error` where it refuses it.
@@ -7037,9 +7037,9 @@ public struct SearchFilters: Equatable, Hashable {
          * An item id: that item and every item it reaches along `parent-of`
          * edges, as far as the copy holds them.
          */beneath: String? = nil) {
+        self.type = type
         self.state = state
         self.allStates = allStates
-        self.type = type
         self.tags = tags
         self.filter = filter
         self.beneath = beneath
@@ -7061,9 +7061,9 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchFilters {
         return
             try SearchFilters(
+                type: FfiConverterOptionString.read(from: &buf), 
                 state: FfiConverterOptionTypeItemState.read(from: &buf), 
                 allStates: FfiConverterBool.read(from: &buf), 
-                type: FfiConverterOptionString.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 filter: FfiConverterOptionString.read(from: &buf), 
                 beneath: FfiConverterOptionString.read(from: &buf)
@@ -7071,9 +7071,9 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: SearchFilters, into buf: inout [UInt8]) {
+        FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterOptionTypeItemState.write(value.state, into: &buf)
         FfiConverterBool.write(value.allStates, into: &buf)
-        FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionString.write(value.filter, into: &buf)
         FfiConverterOptionString.write(value.beneath, into: &buf)
