@@ -222,6 +222,64 @@ struct PropertyValues {
         await reopened.close()
     }
 
+    /// The server refuses a request body nested more than 64 levels.
+    ///
+    /// An item's or an edge's properties sit one level down in it, so a value
+    /// in a property may nest 62 levels; an extension's body is the object
+    /// itself.
+    @Test func aWriteNestedPastWhatTheServerReadsIsRefusedInvalidAndOneAtTheLimitIsQueued() async throws {
+        @Sendable func nested(_ levels: Int) -> JSONObject {
+            ["deep": (0..<levels).reduce(JSONValue.null) { inner, _ in .array([inner]) }]
+        }
+        let copy = try await Self.open()
+        let id = try await Self.create(copy, ["title": "t"])
+        let other = try await Self.create(copy, ["title": "other"])
+        let version = try #require(try await copy.items.get(id)).version
+        let made = try await copy.edges.create(from: id, to: other, type: "references", properties: [:])
+        let edgeId = try #require(made.edgeId)
+        let queued = try await copy.queue.all().count
+
+        func refused(_ levels: Int) async throws {
+            let writes: [(String, @Sendable () async throws -> Void)] = [
+                (
+                    "create",
+                    { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: nested(levels))) }
+                ),
+                (
+                    "update",
+                    { _ = try await copy.items.update(id, Edit(properties: nested(levels), baseVersion: version)) }
+                ),
+                (
+                    "edge",
+                    {
+                        _ = try await copy.edges.create(
+                            from: id, to: other, type: "references", properties: nested(levels))
+                    }
+                ),
+                ("edge update", { _ = try await copy.edges.update(edgeId, EdgeEdit(nested(levels), baseVersion: 0)) }),
+                ("extension", { _ = try await copy.extensions.write("acme.x", nested(levels + 1), on: id) }),
+            ]
+            for (_, write) in writes {
+                await #expect {
+                    try await write()
+                } throws: { error in
+                    if case MarfaError.invalid = error { true } else { false }
+                }
+            }
+        }
+        try await refused(63)
+        try await refused(200)
+        #expect(try await copy.queue.all().count == queued, "a refused write was queued")
+
+        _ = try await copy.items.create(Draft(type: "app.test.entry", properties: nested(62)))
+        _ = try await copy.items.create(Draft(type: "app.test.entry", properties: nested(61)))
+        _ = try await copy.items.update(id, Edit(properties: nested(62), baseVersion: version))
+        _ = try await copy.edges.update(edgeId, EdgeEdit(nested(62), baseVersion: 0))
+        _ = try await copy.extensions.write("acme.x", nested(63), on: id)
+        #expect(try await copy.queue.all().count == queued + 5)
+        await copy.close()
+    }
+
     /// Writes to the store behind the copy's back, as something else that holds
     /// the file would.
     static func damage(_ store: URL, _ statement: String) throws {

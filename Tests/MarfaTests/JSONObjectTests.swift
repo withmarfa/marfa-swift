@@ -45,6 +45,34 @@ struct JSONObjectTests {
             #expect(object.values == ["two", 5, 6])
         }
 
+        /// A large object is built, and decoded, in time linear in its size.
+        @Test func buildingAndDecodingALargeObjectIsLinear() throws {
+            let count = 100_000
+            let pairs = (0..<count).map { ("key\($0)", JSONValue.integer(Int64($0))) }
+            let clock = ContinuousClock()
+            let built = clock.measure {
+                let object = JSONObject(pairs)
+                #expect(object.count == count)
+            }
+            #expect(built < .seconds(5), "\(built)")
+
+            let literal = clock.measure {
+                let object = JSONObject(dictionaryLiteral: pairs[0], pairs[1], pairs[0])
+                #expect(object.keys == ["key0", "key1"])
+            }
+            #expect(literal < .seconds(1))
+
+            let text = "{" + pairs.map { "\"\($0.0)\":\($0.0.dropFirst(3))" }.joined(separator: ",") + "}"
+            var decoded = JSONObject()
+            let decoding = try clock.measure {
+                decoded = try JSONDecoder().decode(JSONObject.self, from: Data(text.utf8))
+            }
+            #expect(decoded.count == count)
+            #expect(decoding < .seconds(10), "\(decoding)")
+            let read = try clock.measure { _ = try JSONObject(json: text) }
+            #expect(read < .seconds(5))
+        }
+
         @Test func pairsMakeTheSameObjectAgain() {
             let object: JSONObject = ["z": 1, "a": 2]
             #expect(JSONObject(object.map { ($0.key, $0.value) }) == object)

@@ -61,6 +61,37 @@ extension LiveWorkingCopies {
             await reopened.close()
         }
 
+        @Test func aHydrationReplacesAnEdgeWhoseStoredPropertiesCannotBeReadAndNothingEditsItMeanwhile() async throws {
+            let store = Live.store()
+            let copy = try await Live.hydrated(store)
+            let from = try #require(try await copy.items.create(Live.note("from \(Self.suffix())")).itemId)
+            let to = try #require(try await copy.items.create(Live.note("to \(Self.suffix())")).itemId)
+            let edgeId = try #require(
+                try await copy.edges.create(from: from, to: to, type: "references", properties: [:]).edgeId)
+            _ = try await copy.queue.drain()
+            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+            await copy.close()
+
+            var database: OpaquePointer?
+            try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
+            try #require(
+                sqlite3_exec(database, "UPDATE edges SET properties = '{\"a\":' WHERE id = '\(edgeId)'", nil, nil, nil)
+                    == SQLITE_OK)
+            sqlite3_close(database)
+
+            let reopened = try await WorkingCopy.open(store: store, server: Live.server)
+            let damaged = try #require(try await reopened.edges.from(from).first)
+            #expect(damaged.unreadableProperties != nil)
+            await #expect(throws: (any Error).self) {
+                _ = try await reopened.edges.update(edgeId, EdgeEdit(["a": 1], baseVersion: damaged.version))
+            }
+            #expect(try await reopened.queue.all().filter { $0.kind == .updateEdge }.isEmpty)
+            _ = try await reopened.hydrate(types: ["core.note"], tier: .feed)
+            let healed = try #require(try await reopened.edges.from(from).first)
+            #expect(healed.unreadableProperties == nil)
+            await reopened.close()
+        }
+
         static func suffix() -> String {
             UUID().uuidString.lowercased().filter(\.isLetter).prefix(12).description
         }

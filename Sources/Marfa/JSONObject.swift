@@ -16,8 +16,14 @@ extension JSONObject {
     /// its last value.
     public init(_ pairs: some Sequence<(String, JSONValue)>) {
         self.init()
+        var positions: [Name: Int] = [:]
         for (key, value) in pairs {
-            self[key] = value
+            if let position = positions[Name(key)] {
+                members[position].value = value
+            } else {
+                positions[Name(key)] = members.count
+                members.append(JSONMember(key: key, value: value))
+            }
         }
     }
 
@@ -41,7 +47,7 @@ extension JSONObject {
 
     public var values: [JSONValue] { members.map(\.value) }
 
-    /// Looks a key up by its bytes.
+    /// Looks a key up by its bytes, scanning the keys in order.
     ///
     /// Setting a key that is there replaces its value in place, a new key goes
     /// last, and `nil` removes it.
@@ -115,11 +121,9 @@ extension JSONObject: Codable {
     }
 
     public init(from decoder: any Decoder) throws {
-        self.init()
         let container = try decoder.container(keyedBy: CodingName.self)
-        for key in container.allKeys.sorted(by: { $0.stringValue < $1.stringValue }) {
-            self[key.stringValue] = try container.decode(JSONValue.self, forKey: key)
-        }
+        let keys = container.allKeys.sorted(by: { $0.stringValue < $1.stringValue })
+        self.init(try keys.map { ($0.stringValue, try container.decode(JSONValue.self, forKey: $0)) })
     }
 
     public func encode(to encoder: any Encoder) throws {

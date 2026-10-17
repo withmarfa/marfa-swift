@@ -36,6 +36,28 @@ import Testing
         #expect(edge.targetId == "item")
     }
 
+    /// The labels in the order the package has always taken them, since a call
+    /// that names them in another order does not compile.
+    @Test func theRecordsTheCoreDefinesTakeTheirLabelsInTheOrderTheyAlwaysDid() {
+        let search = SearchFilters(type: "core.note", state: .archived)
+        #expect(search.type == "core.note" && search.state == .archived)
+        let everywhere = SearchFilters(type: "core.note", allStates: true, tags: ["a"], filter: "x", beneath: "r")
+        #expect(everywhere.allStates && everywhere.tags == ["a"] && everywhere.beneath == "r")
+        let list = ListFilters(
+            type: "core.note", state: .active, allStates: false, tier: .feed, tags: ["a"], occurredAfter: "a",
+            occurredBefore: "b", filter: "f", beneath: "r", limit: 5, offset: 1)
+        #expect(list.limit == 5 && list.offset == 1 && list.tier == .feed)
+        let draft = Draft(
+            type: "core.note", properties: ["title": "t"], tags: ["a"], tier: .feed, id: "i", source: "s",
+            sourceId: "k", occurredAt: "o", baseVersion: 2)
+        #expect(draft.baseVersion == 2 && draft.sourceId == "k")
+        let page = BinPage(items: [], nextCursor: "c")
+        #expect(page.nextCursor == "c")
+        let edit = Edit(
+            properties: ["a": 1], replaceProperties: true, baseVersion: 3, sourceId: "k", type: "t", tier: .library)
+        #expect(edit.replaceProperties && edit.baseVersion == 3)
+    }
+
     /// Each enum's cases as default arguments, and each value type made, with
     /// only `Marfa` imported: none of it names the glue.
     @Test func anAppUsesEveryValueTypeAsItsOwn() {
