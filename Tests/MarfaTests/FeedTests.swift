@@ -214,7 +214,7 @@ struct Changes {
     }
 
     /// Only a fault in the core ends a place with an error; its stream is told
-    /// and gets nothing more.
+    /// and hears nothing more from that place.
     @Test func aFaultInTheCoreEndsTheStreamWithTheErrorAndNothingMore() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)

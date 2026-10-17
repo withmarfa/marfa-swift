@@ -7,9 +7,10 @@ import Synchronization
 ///
 /// The app decides when to hydrate, catch up, drain and `forgetAnswered()`;
 /// only a held `changes()` stream drains on its own, once when its server is
-/// back. Every call that can wait on the store or the network runs off the
-/// caller's thread, except a reader's first `changes()`, which reads the store
-/// before it returns and so can wait behind the copy's other reads.
+/// back and once after a drain left a write undelivered. Every call that can
+/// wait on the store or the network runs off the caller's thread, except a
+/// reader's `changes()`, which reads the store before it returns and so can
+/// wait behind the copy's other reads.
 public final class WorkingCopy: Sendable {
     let holder: CoreHolder
     let feed: Feed
@@ -170,9 +171,9 @@ public final class WorkingCopy: Sendable {
     /// unreachable is told so first. A copy that reaches its server at once
     /// says neither.
     ///
-    /// A held stream drains the writes queued meanwhile, once, the first time
-    /// the server is reached after it was lost and after a drain left a write
-    /// undelivered, even one the app started or one from an earlier launch.
+    /// A held stream drains the writes queued meanwhile once, when its follow
+    /// next has its stream after the server was lost or after a drain left a
+    /// write undelivered, even one the app started or one from an earlier launch.
     /// The app has nothing to start on `.serverReachable`. The drain ends in
     /// `.queueDrained` with its report, or in `.queueNotDrained` with why it
     /// stopped, and the answers it had recorded stay recorded. For
@@ -187,13 +188,15 @@ public final class WorkingCopy: Sendable {
     /// is told each save the writer makes.
     ///
     /// When the follow stops with an error, every stream is told `.stopped`
-    /// and it stays stopped until the app's next hydration or catch-up. On a
+    /// and it stays stopped until the app's next hydration or catch-up, or
+    /// until a stream is asked for while none is held. On a
     /// store that holds no completed hydration the follow waits, asking the
     /// server nothing, until one completes. Local writes and declarations
     /// still notify the writer's streams. `status().hydration` says which.
     /// A reader keeps reading and tells `.saved` once it reads a changed
     /// SQLite data version. A stream the core's own fault ended is told
-    /// `.stopped` and told nothing more: ask for a new one.
+    /// `.stopped`, and no hydration or catch-up starts it again: ask for a new
+    /// one.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
         // Set before the stream is added: one finished in between would keep
@@ -674,8 +677,9 @@ public struct Queue: Sendable {
 
     /// Sends what the queue holds once, and records each verdict.
     ///
-    /// A held `changes()` stream also drains once when its server is back;
-    /// otherwise nothing drains on its own.
+    /// A held `changes()` stream also drains once when its server is back,
+    /// and once after a drain left a write undelivered; otherwise nothing
+    /// drains on its own.
     public func drain() async throws -> DrainReport {
         let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
         for change in report.changes() { feed.announce(change) }
