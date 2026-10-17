@@ -116,14 +116,12 @@ final class Heard: Sendable {
 
 /// For what a real core cannot be made to do on cue.
 ///
-/// A follow that ends late, fails, or speaks after it was replaced. It keeps
-/// the core's rules: one stream at a time, let go only as the follow ends,
-/// `ended` told a moment after `stop`, and hydration and catch-up refused
-/// while a follow holds the stream.
+/// A watch that ends late, ends on a fault, or speaks after the listener was
+/// replaced. It keeps the core's rules: a listener is told `ended` a moment
+/// after `stop`, and once.
 final class FakeCore: Core, @unchecked Sendable {
-    struct Follow {
+    struct Place {
         let listener: any MarfaCore.ChangeListener
-        let holdsStream: Bool
         let toldUnreachable: Bool
         var stopped = false
         var ended = false
@@ -131,8 +129,8 @@ final class FakeCore: Core, @unchecked Sendable {
 
     struct State {
         var handle = MarfaCore.Handle.writer
-        var follows: [Follow] = []
-        var streamHeld = false
+        var places: [Place] = []
+        var watchRefused: MarfaCore.MarfaError?
         var caughtUp = MarfaCore.CatchUpReport(applied: 0, skipped: 0, cursor: "1", catalogChanged: false)
         var drained = MarfaCore.DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
@@ -140,7 +138,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var dataVersion: Int64 = 0
         var gate: DispatchSemaphore?
         var gated = false
-        var readsFail: MarfaCore.MarfaError?
+        var watchGate: DispatchSemaphore?
+        var watchGated = false
         var withdrawable: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
@@ -177,41 +176,46 @@ final class FakeCore: Core, @unchecked Sendable {
         probe.gate.wait()
     }
 
-    var follows: [Follow] { state.withLock { $0.follows } }
+    /// Every place a listener took in the watch, in order.
+    var places: [Place] { state.withLock { $0.places } }
 
     override func heldHandle() -> MarfaCore.Handle {
         state.withLock { $0.handle }
     }
 
-    override func follow(toldUnreachable: Bool, listener: any MarfaCore.ChangeListener) -> MarfaCore.Subscription {
+    override func watch(toldUnreachable: Bool, listener: any MarfaCore.ChangeListener) throws -> MarfaCore.Subscription
+    {
+        let held = state.withLock { state in
+            defer { state.watchGate = nil }
+            state.watchGated = state.watchGate != nil
+            return state.watchGate
+        }
+        held?.wait()
         let (index, refused) = state.withLock { state in
-            let refused = state.streamHeld
-            state.follows.append(Follow(listener: listener, holdsStream: !refused, toldUnreachable: toldUnreachable))
-            state.streamHeld = true
-            return (state.follows.count - 1, refused)
-        }
-        if refused {
-            later {
-                self.end(index, with: .Invalid(message: Self.refusal))
+            if state.watchRefused == nil {
+                state.places.append(Place(listener: listener, toldUnreachable: toldUnreachable))
             }
+            return (state.places.count - 1, state.watchRefused)
         }
+        if let refused { throw refused }
         return FakeSubscription { [self] in
-            state.withLock { $0.follows[index].stopped = true }
+            state.withLock { $0.places[index].stopped = true }
             later { self.end(index, with: nil) }
         }
     }
 
+    /// The core ends the listener on a fault of its own.
     func fail(_ index: Int, with error: MarfaCore.MarfaError) {
         end(index, with: error)
     }
 
-    /// No real core ends a follow twice; the feed must ignore it.
+    /// No real core ends a listener twice; the feed must ignore it.
     func endAgain(_ index: Int, with error: MarfaCore.MarfaError?) {
-        state.withLock { $0.follows[index].listener }.ended(error: error)
+        state.withLock { $0.places[index].listener }.ended(error: error)
     }
 
     func change(_ index: Int, _ change: MarfaCore.Change) {
-        state.withLock { $0.follows[index].listener }.changed(change: change)
+        state.withLock { $0.places[index].listener }.changed(change: change)
     }
 
     override func hydrateWith(
@@ -219,7 +223,6 @@ final class FakeCore: Core, @unchecked Sendable {
     ) throws
         -> MarfaCore.HydrateReport
     {
-        try refreshing()
         state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
         return MarfaCore.HydrateReport(
             types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "1",
@@ -245,8 +248,7 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
-        try refreshing()
-        return try state.withLock { state in
+        try state.withLock { state in
             if let failure = state.catchUpFails {
                 throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: state.catchUpChangesCatalog)
             }
@@ -278,10 +280,7 @@ final class FakeCore: Core, @unchecked Sendable {
             return state.gate
         }
         gate?.wait()
-        return try state.withLock { state in
-            if let error = state.readsFail { throw error }
-            return state.dataVersion
-        }
+        return state.withLock { $0.dataVersion }
     }
 
     func save() {
@@ -296,22 +295,19 @@ final class FakeCore: Core, @unchecked Sendable {
 
     var aReadWasHeld: Bool { state.withLock { $0.gated } }
 
-    static let refusal =
-        "this working copy is already hydrating, catching up or following; one at a time moves its cursor"
-
-    private func refreshing() throws {
-        let held = state.withLock { $0.streamHeld }
-        if held {
-            throw MarfaCore.MarfaError.Invalid(message: Self.refusal)
-        }
+    func holdNextWatch() -> DispatchSemaphore {
+        let gate = DispatchSemaphore(value: 0)
+        state.withLock { $0.watchGate = gate }
+        return gate
     }
+
+    var aWatchWasHeld: Bool { state.withLock { $0.watchGated } }
 
     private func end(_ index: Int, with error: MarfaCore.MarfaError?) {
         let listener = state.withLock { state -> (any MarfaCore.ChangeListener)? in
-            guard !state.follows[index].ended else { return nil }
-            state.follows[index].ended = true
-            if state.follows[index].holdsStream { state.streamHeld = false }
-            return state.follows[index].listener
+            guard !state.places[index].ended else { return nil }
+            state.places[index].ended = true
+            return state.places[index].listener
         }
         listener?.ended(error: error)
     }

@@ -6,8 +6,8 @@ import Synchronization
 /// for that server.
 ///
 /// The app decides when to hydrate, catch up, drain and `forgetAnswered()`;
-/// only a held `changes()` stream drains on its own, once each time its server
-/// is back. Every call that can wait on the store or the network runs off the
+/// only a held `changes()` stream drains on its own, once when its server is
+/// back. Every call that can wait on the store or the network runs off the
 /// caller's thread, except a reader's first `changes()`, which reads the store
 /// before it returns and so can wait behind the copy's other reads.
 public final class WorkingCopy: Sendable {
@@ -25,7 +25,7 @@ public final class WorkingCopy: Sendable {
 
     init(holder: CoreHolder, hasServer: Bool) {
         self.holder = holder
-        feed = Feed(holder: holder, source: Feed.Source(handle: holder.handle, hasServer: hasServer))
+        feed = Feed(holder: holder, watched: hasServer || holder.handle == .reader)
         items = Items(holder: holder, feed: feed)
         edges = Edges(holder: holder, feed: feed)
         tags = Tags(holder: holder, feed: feed)
@@ -81,13 +81,10 @@ public final class WorkingCopy: Sendable {
     /// `edgeTypes` also holds each named edge type whole, whichever of its
     /// endpoints the item slice holds.
     public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = []) async throws -> HydrateReport {
-        await feed.pause()
-        defer { feed.unpause() }
         let report = HydrateReport(
             try await holder.runUntilCanceled { core, stop in
                 try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes, stop: stop)
             })
-        feed.recovered()
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }
@@ -128,8 +125,6 @@ public final class WorkingCopy: Sendable {
     /// Reads the type catalog again, then applies every event since the
     /// last hydration or catch-up.
     public func catchUp() async throws -> CatchUpReport {
-        await feed.pause()
-        defer { feed.unpause() }
         // The core commits a new catalog before it applies anything, so a
         // catch-up that then fails has still changed it, and says so.
         let (caughtUp, catalogChanged) = try await holder.runUntilCanceled { core, stop in
@@ -144,7 +139,6 @@ public final class WorkingCopy: Sendable {
             feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
         }
         let report = try caughtUp.get()
-        feed.recovered()
         if report.applied > 0 {
             feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
@@ -169,16 +163,16 @@ public final class WorkingCopy: Sendable {
     ///
     /// The copy says what became of the server: `.serverUnreachable` with
     /// the failure when the follow cannot have its stream, and
-    /// `.serverReachable` when it has one again, or a drain reaches the
-    /// server. A hydration or catch-up that reaches the server tells it only
-    /// while no stream is held; with one held, the follow the call restarts
-    /// tells it when it has its stream. Each is told once for each change,
-    /// however often the follow starts again, and a stream added while the
-    /// server is unreachable is told so first. A copy that reaches its server
-    /// at once says neither.
+    /// `.serverReachable` as soon as a request reaches the server again: the
+    /// follow's, a hydration's or catch-up's that succeeded, or a drain's that
+    /// answered a write. Each is told once for each change, however often the
+    /// follow starts again, and a stream added while the server is
+    /// unreachable is told so first. A copy that reaches its server at once
+    /// says neither.
     ///
-    /// A held stream drains the writes queued meanwhile, once each time the
-    /// follow has its stream again, after any drain the app started has ended.
+    /// A held stream drains the writes queued meanwhile, once, the first time
+    /// the server is reached after it was lost and after a drain left a write
+    /// undelivered, even one the app started or one from an earlier launch.
     /// The app has nothing to start on `.serverReachable`. The drain ends in
     /// `.queueDrained` with its report, or in `.queueNotDrained` with why it
     /// stopped, and the answers it had recorded stay recorded. For
@@ -188,16 +182,18 @@ public final class WorkingCopy: Sendable {
     /// the error. A copy opened without a server, and a reader, drain nothing.
     ///
     /// A writer with a server follows the server's events only while at least
-    /// one stream is held, and pauses the follow during a hydration or
-    /// catch-up. A reader is told each save the writer makes.
+    /// one stream is held. A hydration or catch-up takes the stream for its
+    /// duration and gives it back, and no stream is told of the gap. A reader
+    /// is told each save the writer makes.
     ///
     /// When the follow stops with an error, every stream is told `.stopped`
     /// and it stays stopped until the app's next hydration or catch-up. On a
     /// store that holds no completed hydration the follow waits, asking the
     /// server nothing, until one completes. Local writes and declarations
     /// still notify the writer's streams. `status().hydration` says which.
-    /// A reader's watch keeps retrying and tells `.saved` once it reads a
-    /// changed SQLite data version.
+    /// A reader keeps reading and tells `.saved` once it reads a changed
+    /// SQLite data version. A stream the core's own fault ended is told
+    /// `.stopped` and told nothing more: ask for a new one.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
         // Set before the stream is added: one finished in between would keep
@@ -245,14 +241,14 @@ public final class WorkingCopy: Sendable {
     public func useKey(_ key: String) async throws {
         try holder.checkKeyCanChange()
         try await feed.suspend()
-        defer { feed.resume() }
         do {
             try await holder.replace(key: key)
         } catch {
             if holder.isClosed { await feed.close() }
+            feed.resume(readsOnly: false)
             throw error
         }
-        feed.retarget(Feed.Source(handle: holder.handle, hasServer: true))
+        feed.resume(readsOnly: holder.handle == .reader)
     }
 }
 
@@ -278,8 +274,10 @@ public struct Change: Sendable, Hashable {
         /// It keeps asking, at a falling rate, and is told once however many
         /// attempts fail.
         case serverUnreachable(MarfaError)
-        /// The follow has its stream again after `.serverUnreachable`. A held
-        /// stream drains the queue now, and tells how it ended.
+        /// A request reached the server after `.serverUnreachable`: the follow
+        /// has its stream, or a hydration, catch-up or drain was answered. A held
+        /// stream whose follow has its stream drains the queue now, and tells
+        /// how it ended.
         case serverReachable
         /// The drain the follow ran when the server came back ended, and this
         /// is what it did. Told after the `.answered` and `.refreshed(.drained)`
@@ -676,11 +674,10 @@ public struct Queue: Sendable {
 
     /// Sends what the queue holds once, and records each verdict.
     ///
-    /// A held `changes()` stream also drains once each time its server is back;
+    /// A held `changes()` stream also drains once when its server is back;
     /// otherwise nothing drains on its own.
     public func drain() async throws -> DrainReport {
         let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
-        if report.answered > 0 { feed.reached() }
         for change in report.changes() { feed.announce(change) }
         return report
     }
@@ -786,459 +783,5 @@ func translated<T>(_ work: () throws -> T) throws -> T {
         return try work()
     } catch let error as MarfaCore.MarfaError {
         throw MarfaError(error)
-    }
-}
-
-/// One source for however many streams are held, because the core lets one
-/// stream at a time move a store's cursor.
-final class Feed: Sendable {
-    enum Source {
-        case none, follow, watch
-
-        init(handle: Handle, hasServer: Bool) {
-            self = handle == .reader ? .watch : hasServer ? .follow : .none
-        }
-    }
-
-    private enum Phase {
-        case idle
-        case following(generation: Int, MarfaCore.Subscription)
-        /// The core lets go of its stream only as the follow ends, so nothing
-        /// that takes the stream may start until then.
-        case stopping(generation: Int)
-        case watching(generation: Int, Task<Void, Never>)
-
-        func runs(_ generation: Int) -> Bool {
-            switch self {
-            case .idle: false
-            case .following(let current, _), .stopping(let current), .watching(let current, _):
-                current == generation
-            }
-        }
-    }
-
-    private struct State {
-        var streams: [UUID: AsyncStream<Change>.Continuation] = [:]
-        var phase = Phase.idle
-        /// A source that was stopped or replaced may still speak late.
-        var generation = 0
-        var pauses = 0
-        /// Only the next hydration or catch-up restarts a follow that ended
-        /// on its own: it ended on something asking again does not clear.
-        var halted = false
-        var failure: MarfaError?
-        /// What the streams were last told of the server, kept across
-        /// follows: a new follow is told it, and a stream added is told it.
-        var unreachable: MarfaError?
-        var closed = false
-        var source: Source
-        /// Holds every source off, as a key change does while the core is
-        /// replaced; a pause holds off only a follow.
-        var suspends = 0
-        /// Streams added while a key change held the feed off: a reader's
-        /// baseline cannot be read until the new core is held.
-        var addedWhileSuspended: Set<UUID> = []
-        /// Told once the lock is let go.
-        var told: [(AsyncStream<Change>.Continuation, Change)] = []
-        var waitingForStop: [CheckedContinuation<Void, Never>] = []
-    }
-
-    let holder: CoreHolder
-    private let state: Mutex<State>
-
-    /// Runs `body` under the lock, then tells what it queued to stream
-    /// continuations, outside the lock.
-    private func locked<T: Sendable>(_ body: (inout State) throws -> T) rethrows -> T {
-        let (result, told) = try state.withLock { state -> (T, [(AsyncStream<Change>.Continuation, Change)]) in
-            let result = try body(&state)
-            return (result, state.told.drain())
-        }
-        for (continuation, change) in told { continuation.yield(change) }
-        return result
-    }
-
-    init(holder: CoreHolder, source: Source) {
-        self.holder = holder
-        state = Mutex(State(source: source))
-    }
-
-    var count: Int { locked { $0.streams.count } }
-
-    var watchTask: Task<Void, Never>? {
-        locked { state in
-            if case .watching(_, let task) = state.phase { task } else { nil }
-        }
-    }
-
-    func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
-        // Read before the caller goes on, so a save it makes next is told, and
-        // outside the lock, since the read can wait on the store.
-        let starts = locked { state in
-            guard state.source == .watch, case .idle = state.phase else { return false }
-            return !state.closed && !state.halted && state.suspends == 0
-        }
-        let seen = starts ? Result { try holder.with { try $0.dataVersion() } } : nil
-        let (added, failure, unreachable) = locked { state -> (Bool, MarfaError?, MarfaError?) in
-            guard !state.closed else { return (false, nil, nil) }
-            state.streams[token] = continuation
-            if state.suspends > 0 { state.addedWhileSuspended.insert(token) }
-            settle(&state, seen: seen)
-            return (true, state.failure, state.unreachable)
-        }
-        guard added else {
-            continuation.finish()
-            return nil
-        }
-        if let unreachable {
-            continuation.yield(Change(origin: .serverUnreachable(unreachable), itemId: nil, edgeId: nil))
-        }
-        if let failure {
-            continuation.yield(Change(origin: .stopped(failure), itemId: nil, edgeId: nil))
-        }
-        return token
-    }
-
-    func remove(_ token: UUID) {
-        locked { state in
-            state.streams.removeValue(forKey: token)
-            state.addedWhileSuspended.remove(token)
-            settle(&state)
-        }
-    }
-
-    /// A watch moves no cursor, so a pause leaves it running.
-    func pause() async {
-        locked { state in
-            state.pauses += 1
-            settle(&state)
-        }
-        await untilStopped()
-    }
-
-    func unpause() {
-        locked { state in
-            state.pauses -= 1
-            if state.source == .follow {
-                state.halted = false
-                state.failure = nil
-            }
-            settle(&state)
-        }
-    }
-
-    /// Stops whatever feeds the streams, whichever source, until `resume()`.
-    ///
-    /// The streams stay held. Throws `closed` once the feed is.
-    func suspend() async throws {
-        let refused = locked { state -> Bool in
-            guard !state.closed else { return true }
-            state.suspends += 1
-            settle(&state)
-            return false
-        }
-        if refused { throw MarfaError.closed(message: CoreHolder.closedMessage) }
-        await untilStopped()
-    }
-
-    func resume() {
-        locked { state in
-            state.suspends -= 1
-            if state.suspends == 0 { state.addedWhileSuspended = [] }
-            if state.source == .follow {
-                state.halted = false
-                state.failure = nil
-            }
-            settle(&state)
-        }
-    }
-
-    /// For the core's role changing under a suspended feed.
-    ///
-    /// A reader's stream added meanwhile could take no baseline, and a save
-    /// since may have gone unseen, so each is told one `.saved` to read again.
-    func retarget(_ source: Source) {
-        let late = locked { state -> [AsyncStream<Change>.Continuation] in
-            state.source = source
-            state.halted = false
-            state.failure = nil
-            let late = source == .watch ? state.addedWhileSuspended.compactMap { state.streams[$0] } : []
-            state.addedWhileSuspended = []
-            settle(&state)
-            return late
-        }
-        guard !late.isEmpty, let now = try? holder.with({ try $0.dataVersion() }) else { return }
-        for continuation in late {
-            continuation.yield(Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil))
-        }
-    }
-
-    func close() async {
-        let (streams, watch) = locked { state in
-            state.closed = true
-            var watch: Task<Void, Never>?
-            if case .watching(_, let task) = state.phase { watch = task }
-            settle(&state)
-            let streams = Array(state.streams.values)
-            state.streams = [:]
-            return (streams, watch)
-        }
-        for continuation in streams { continuation.finish() }
-        await untilStopped()
-        await watch?.value
-    }
-
-    func announce(_ write: QueuedWrite) {
-        announce(Change(origin: .local(write.kind), itemId: write.itemId, edgeId: write.edgeId))
-    }
-
-    func announce(_ change: Change) {
-        for continuation in locked({ Array($0.streams.values) }) {
-            continuation.yield(change)
-        }
-    }
-
-    /// The follow's word on the server, told once for each change of it
-    /// however many follows the feed starts.
-    func reach(_ unreachable: MarfaError?, from generation: Int) {
-        locked { state in
-            guard state.phase.runs(generation) else { return }
-            tell(&state, unreachable)
-        }
-    }
-
-    /// A drain that read the server says it can be reached.
-    func reached() {
-        locked { state in tell(&state, nil) }
-    }
-
-    /// A hydration or catch-up that read the server says it can be reached,
-    /// unless a held stream was last told it was not.
-    ///
-    /// The follow the call restarts then starts told so, and tells the server
-    /// is back when it has its stream, and drains what waited.
-    func recovered() {
-        locked { state in
-            if state.unreachable != nil, state.source == .follow, !state.streams.isEmpty { return }
-            tell(&state, nil)
-        }
-    }
-
-    private func tell(_ state: inout State, _ unreachable: MarfaError?) {
-        switch (state.unreachable, unreachable) {
-        case (nil, nil), (.some, .some): return
-        default: break
-        }
-        state.unreachable = unreachable
-        let origin: Change.Origin = unreachable.map { .serverUnreachable($0) } ?? .serverReachable
-        let change = Change(origin: origin, itemId: nil, edgeId: nil)
-        state.told += state.streams.values.map { ($0, change) }
-    }
-
-    func announce(_ change: Change, from generation: Int) {
-        let streams = locked { state in
-            state.phase.runs(generation) ? Array(state.streams.values) : []
-        }
-        for continuation in streams { continuation.yield(change) }
-    }
-
-    /// Returns the waiters for the caller to resume outside the lock.
-    func ended(generation: Int, error: MarfaError?) -> [CheckedContinuation<Void, Never>] {
-        typealias Ended = (told: [AsyncStream<Change>.Continuation], waiting: [CheckedContinuation<Void, Never>])
-        let ended = locked { state -> Ended in
-            switch state.phase {
-            case .stopping(let current) where current == generation:
-                state.phase = .idle
-                let waiting = state.waitingForStop
-                state.waitingForStop = []
-                settle(&state)
-                return ([], waiting)
-            case .following(let current, _) where current == generation:
-                state.phase = .idle
-                state.halted = true
-                state.failure = error
-                return (error == nil ? [] : Array(state.streams.values), [])
-            default:
-                return ([], [])
-            }
-        }
-        if let error {
-            for continuation in ended.told {
-                continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
-            }
-        }
-        return ended.waiting
-    }
-
-    private func untilStopped() async {
-        await withCheckedContinuation { continuation in
-            let stopped = locked { state -> Bool in
-                guard case .stopping = state.phase else { return true }
-                state.waitingForStop.append(continuation)
-                return false
-            }
-            if stopped { continuation.resume() }
-        }
-    }
-
-    private func settle(_ state: inout State, seen: Result<Int64, any Error>? = nil) {
-        let wanted =
-            state.source != .none && !state.streams.isEmpty && !state.halted && !state.closed
-            && state.suspends == 0 && (state.source == .watch || state.pauses == 0)
-        switch state.phase {
-        case .idle where wanted:
-            state.generation += 1
-            do {
-                state.phase = try start(state, generation: state.generation, seen: seen)
-            } catch {
-                // Stays stopped, as a follow that ended on an error does, until
-                // the next hydration or catch-up.
-                let error = error as? MarfaError ?? .store(message: "\(error)")
-                state.halted = true
-                state.failure = error
-                let stopped = Change(origin: .stopped(error), itemId: nil, edgeId: nil)
-                state.told += state.streams.values.map { ($0, stopped) }
-            }
-        case .following(let generation, let subscription) where !wanted:
-            subscription.stop()
-            state.phase = .stopping(generation: generation)
-        case .watching(_, let task) where !wanted:
-            task.cancel()
-            state.phase = .idle
-            state.failure = nil
-        default:
-            break
-        }
-    }
-
-    private func start(_ state: State, generation: Int, seen: Result<Int64, any Error>?) throws -> Phase {
-        switch state.source {
-        case .none:
-            return .idle
-        case .follow:
-            let subscription = try holder.with {
-                $0.follow(
-                    toldUnreachable: state.unreachable != nil,
-                    listener: Listener(feed: self, generation: generation))
-            }
-            return .following(generation: generation, subscription)
-        case .watch:
-            // Read under the lock where the watch stopped between `add`'s look
-            // and this call.
-            let seen = seen ?? Result { try holder.with { try $0.dataVersion() } }
-            return .watching(
-                generation: generation,
-                Task { await self.watch(from: seen, generation: generation) })
-        }
-    }
-
-    static let watchInterval = Duration.milliseconds(250)
-    static let longestWatchRetry = Duration.seconds(2)
-
-    private func watch(from first: Result<Int64, any Error>, generation: Int) async {
-        var read = first
-        var seen: Int64?
-        var failing = false
-        var wait = Self.watchInterval
-        while true {
-            switch read {
-            case .success(let now):
-                let saved = Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil)
-                if failing {
-                    recovered(generation: generation, telling: saved)
-                } else if seen.map({ now != $0 }) == true {
-                    announce(saved, from: generation)
-                }
-                seen = now
-                failing = false
-                wait = Self.watchInterval
-            case .failure(let error):
-                if !failing {
-                    failing = true
-                    failed(generation: generation, error: error as? MarfaError ?? .store(message: "\(error)"))
-                }
-                wait = min(wait * 2, Self.longestWatchRetry)
-            }
-            do {
-                try await Task.sleep(for: wait)
-                read = .success(try await holder.run { try $0.dataVersion() })
-            } catch is CancellationError {
-                return
-            } catch {
-                read = .failure(error)
-            }
-        }
-    }
-
-    private func failed(generation: Int, error: MarfaError) {
-        let streams = locked { state -> [AsyncStream<Change>.Continuation] in
-            guard state.phase.runs(generation) else { return [] }
-            state.failure = error
-            return Array(state.streams.values)
-        }
-        for continuation in streams {
-            continuation.yield(Change(origin: .stopped(error), itemId: nil, edgeId: nil))
-        }
-    }
-
-    /// Clears the failure under the lock that takes the streams, so a stream
-    /// added in between is not left told only `.stopped`.
-    private func recovered(generation: Int, telling change: Change) {
-        let streams = locked { state -> [AsyncStream<Change>.Continuation] in
-            guard state.phase.runs(generation) else { return [] }
-            state.failure = nil
-            return Array(state.streams.values)
-        }
-        for continuation in streams { continuation.yield(change) }
-    }
-}
-
-/// Weak on the feed, which holds the core holder and with it the writer's claim on
-/// the store: the core's thread holds the listener until `ended` returns.
-final class Listener: MarfaCore.ChangeListener, Sendable {
-    private struct Weak {
-        weak var feed: Feed?
-    }
-
-    private let held: Mutex<Weak>
-    let generation: Int
-
-    init(feed: Feed, generation: Int) {
-        held = Mutex(Weak(feed: feed))
-        self.generation = generation
-    }
-
-    private var feed: Feed? { held.withLock { $0.feed } }
-
-    func changed(change: MarfaCore.Change) {
-        switch change {
-        case .applied(let event, let itemId, let edgeId, let cursor):
-            feed?.announce(
-                Change(origin: .server(event: event, cursor: cursor), itemId: itemId, edgeId: edgeId),
-                from: generation)
-        case .catalogChanged:
-            feed?.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil), from: generation)
-        case .serverUnreachable(let reason, _):
-            feed?.reach(MarfaError(reason), from: generation)
-        case .serverReachable:
-            feed?.reach(nil, from: generation)
-        case .queueDrained(let report, _):
-            let report = DrainReport(report)
-            for change in report.changes() + [Change(origin: .queueDrained(report), itemId: nil, edgeId: nil)] {
-                feed?.announce(change, from: generation)
-            }
-        case .queueNotDrained(let error, _):
-            feed?.announce(
-                Change(origin: .queueNotDrained(MarfaError(error)), itemId: nil, edgeId: nil), from: generation)
-        }
-    }
-
-    /// Resumes waiters only once nothing on this thread holds the feed, since
-    /// one may drop the working copy and open the store again at once.
-    func ended(error: MarfaCore.MarfaError?) {
-        for continuation in stop(error) { continuation.resume() }
-    }
-
-    private func stop(_ error: MarfaCore.MarfaError?) -> [CheckedContinuation<Void, Never>] {
-        feed?.ended(generation: generation, error: error.map(MarfaError.init)) ?? []
     }
 }
