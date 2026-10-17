@@ -141,6 +141,11 @@ struct PropertyValues {
         let hits = try await reopened.search("zebra")
         #expect(hits.count == 3)
         #expect(hits.filter { $0.item.unreadableProperties != nil }.count == 2)
+        // A damaged row matches no property condition, so a filtered list and
+        // a filtered search leave it out and still answer.
+        let filter = #"properties.title eq "kept zebra""#
+        #expect(try await reopened.items.list(ListFilters(filter: filter)).map(\.id) == [ids[0]])
+        #expect(try await reopened.search("zebra", filters: SearchFilters(filter: filter)).map(\.item.id) == [ids[0]])
         let torn = try #require(try await reopened.items.get(ids[1]))
         #expect(torn.unreadableProperties != nil)
         #expect(try await reopened.status().items == 3)
