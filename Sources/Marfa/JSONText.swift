@@ -1,3 +1,5 @@
+import MarfaCore
+
 /// A strict RFC 8259 reader that keeps object key order.
 ///
 /// It nests with an explicit stack rather than recursion, so hostile nesting
@@ -46,6 +48,7 @@ struct JSONReader {
         let isObject: Bool
         var elements: [JSONValue] = []
         var object = JSONObject()
+        var seen: Set<JSONObject.Name> = []
         var key = ""
     }
 
@@ -80,7 +83,7 @@ struct JSONReader {
                 skipWhitespace()
                 guard byte == UInt8(ascii: "}") else {
                     var frame = Frame(isObject: true)
-                    frame.key = try key(in: frame.object)
+                    frame.key = try key(in: &frame.seen)
                     frames.append(frame)
                     continue
                 }
@@ -108,11 +111,11 @@ struct JSONReader {
                 let top = frames.count - 1
                 skipWhitespace()
                 if frames[top].isObject {
-                    frames[top].object.append(frames[top].key, value)
+                    frames[top].object.members.append(JSONMember(key: frames[top].key, value: value))
                     if byte == UInt8(ascii: ",") {
                         offset += 1
                         skipWhitespace()
-                        frames[top].key = try key(in: frames[top].object)
+                        frames[top].key = try key(in: &frames[top].seen)
                         break
                     }
                     guard byte == UInt8(ascii: "}") else {
@@ -140,13 +143,13 @@ struct JSONReader {
     ///
     /// The core never writes a key twice in one object, so a repeated one
     /// means the text is corrupt.
-    private mutating func key(in object: JSONObject) throws -> String {
+    private mutating func key(in seen: inout Set<JSONObject.Name>) throws -> String {
         guard byte == UInt8(ascii: "\"") else {
             throw failure(atEnd ? "unexpected end of input" : "expected a string key")
         }
         let start = offset
         let key = try string()
-        guard !object.contains(key) else { throw failure("duplicate key", at: start) }
+        guard seen.insert(JSONObject.Name(key)).inserted else { throw failure("duplicate key", at: start) }
         skipWhitespace()
         guard byte == UInt8(ascii: ":") else {
             throw failure(atEnd ? "unexpected end of input" : "expected : after a key")
@@ -380,7 +383,7 @@ struct JSONWriter {
         var current: String {
             switch self {
             case .array(_, let next): String(next - 1)
-            case .object(let object, let next): object.keys[next - 1]
+            case .object(let object, let next): object.members[next - 1].key
             }
         }
     }
@@ -445,16 +448,16 @@ struct JSONWriter {
                 open[open.count - 1] = .array(elements, next: next + 1)
                 pending = elements[next]
             case .object(let object, let next):
-                guard next < object.count else {
+                guard next < object.members.count else {
                     output.append(UInt8(ascii: "}"))
                     open.removeLast()
                     continue
                 }
                 if next > 0 { output.append(UInt8(ascii: ",")) }
-                write(object.keys[next])
+                write(object.members[next].key)
                 output.append(UInt8(ascii: ":"))
                 open[open.count - 1] = .object(object, next: next + 1)
-                pending = object.values[next]
+                pending = object.members[next].value
             }
         }
     }

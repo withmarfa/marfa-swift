@@ -6,34 +6,15 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct Values {
-    @Test func filtersCarryEveryFieldTheCoreDeclares() {
+    @Test func reportsCarryEveryFieldTheCoreDeclares() {
         func fields(_ value: Any) -> Set<String> {
             Set(Mirror(reflecting: value).children.compactMap(\.label))
         }
-        #expect(fields(Marfa.ListFilters()) == fields(MarfaCore.ListFilters()))
-        #expect(fields(Marfa.SearchFilters()) == fields(MarfaCore.SearchFilters()))
         #expect(fields(Marfa.DrainReport()) == fields(Marfa.DrainReport().core))
         #expect(fields(Marfa.Status()) == fields(Marfa.Status().core))
     }
 
-    @Test func filterValuesCrossToTheCore() {
-        let list = Marfa.ListFilters(
-            type: "core.note", state: .archived, allStates: true, tier: .feed, tags: ["x"],
-            occurredAfter: "a", occurredBefore: "b", filter: "title=x", beneath: "root", limit: 7, offset: 2)
-        #expect(
-            list.core
-                == MarfaCore.ListFilters(
-                    type: "core.note", state: .archived, allStates: true, tier: .feed, tags: ["x"],
-                    occurredAfter: "a", occurredBefore: "b", filter: "title=x", beneath: "root", limit: 7, offset: 2))
-        let search = Marfa.SearchFilters(
-            type: "core.note", state: .trashed, allStates: true, tags: ["x"], filter: "title=x", beneath: "r")
-        #expect(
-            search.core
-                == MarfaCore.SearchFilters(
-                    state: .trashed, allStates: true, type: "core.note", tags: ["x"], filter: "title=x", beneath: "r"))
-    }
-
-    @Test func jsonRoundTripsThroughTheTextTheCoreTakes() throws {
+    @Test func jsonRoundTripsThroughItsText() throws {
         let properties: JSONObject = [
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
             "tags": ["a", "b"], "nested": ["key": "value"],
@@ -54,18 +35,6 @@ struct Values {
         #expect(read["b"] == .integer(100))
         #expect(read["c"] == .number(9_223_372_036_854_775_808))
         #expect(read["d"] == .number(1.5))
-    }
-
-    @Test func propertiesTheCoreCannotReadAreRefusedRatherThanEmptied() {
-        let unreadable = MarfaCore.Item(
-            id: "n1", type: "core.note", propertiesJson: "[1,2]", state: .active, tier: nil, version: 1,
-            schemaVersion: 1, source: "device", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "",
-            tags: [], title: nil, body: nil)
-        #expect {
-            try translated { try Marfa.Item(unreadable) }
-        } throws: { error in
-            if case Marfa.MarfaError.decoding = error { true } else { false }
-        }
     }
 
     @Test func aServerNeverShowsItsKey() {
@@ -161,7 +130,7 @@ struct Errors {
         let infinite: JSONObject = ["r": .number(-.infinity)]
         let writes: [(String, @Sendable () async throws -> Marfa.QueuedWrite?)] = [
             ("create", { try await copy.items.create(Marfa.Draft(type: "core.note", properties: unwritable)) }),
-            ("update", { try await copy.items.update("n1", Marfa.Edit(.merge(infinite), baseVersion: 1)) }),
+            ("update", { try await copy.items.update("n1", Marfa.Edit(properties: infinite, baseVersion: 1)) }),
             ("edge", { try await copy.edges.create(from: "a", to: "b", type: "references", properties: unwritable) }),
             ("edge update", { try await copy.edges.update("e1", Marfa.EdgeEdit(infinite, baseVersion: 1)) }),
             ("extension", { try await copy.extensions.write("ns", unwritable, on: "n1") }),
@@ -174,7 +143,7 @@ struct Errors {
                     Issue.record("\(name) threw \(error)")
                     return false
                 }
-                return message.contains("r cannot be written as JSON")
+                return message.contains("not finite")
             }
         }
         _ = try await copy.items.create(Marfa.Draft(type: "core.note", properties: ["title": "Writable", "body": ""]))
@@ -204,8 +173,6 @@ struct Opening {
 @Suite(.timeLimit(.minutes(1)))
 struct OwnValueTypes {
     @Test func everyEnumCaseCrossesToTheGlueAndBack() {
-        for tier in Marfa.Tier.allCases { #expect(Marfa.Tier(tier.core) == tier) }
-        for state in Marfa.ItemState.allCases { #expect(Marfa.ItemState(state.core) == state) }
         for kind in Marfa.WriteKind.allCases { #expect(Marfa.WriteKind(kind.core) == kind) }
         for reason in Marfa.BlockedReason.allCases { #expect(Marfa.BlockedReason(reason.core) == reason) }
         for handle in Marfa.Handle.allCases { #expect(Marfa.Handle(handle.core) == handle) }
@@ -240,15 +207,16 @@ struct OwnValueTypes {
         #expect(Marfa.Verdict(.refused(refusal: core)) == .refused(Self.refusal))
     }
 
-    @Test func recordsCrossToTheGlueAndBack() throws {
+    @Test func recordsCrossToTheGlueAndBack() {
         let write = Marfa.QueuedWrite(
             id: "q", kind: .uploadBlob, itemId: "i", targetId: "t", edgeId: "e", namespace: "n", tag: "g",
             blob: "b", baseVersion: 2, idempotencyKey: "k", dependsOn: ["d"], follows: "f",
-            verdict: .refused(Self.refusal), body: ["title": "kept", "n": 1], answer: "a", refusals: 3,
+            verdict: .refused(Self.refusal), body: ["title": "kept", "n": 1], answer: ["data": ["id": "i"]],
+            refusals: 3,
             queuedAt: "t0", answeredAt: "t1")
-        #expect(try Marfa.QueuedWrite(write.core()) == write)
+        #expect(Marfa.QueuedWrite(write.core) == write)
         let waiting = Marfa.QueuedWrite(id: "w", kind: .updateItem, idempotencyKey: "k", waiting: true, queuedAt: "t0")
-        #expect(try Marfa.QueuedWrite(waiting.core()) == waiting)
+        #expect(Marfa.QueuedWrite(waiting.core) == waiting)
         let report = Marfa.DrainReport(
             answered: 1, held: 2, undelivered: 3, unsent: 4, unmade: 5, unavailable: "network",
             verdicts: [
@@ -276,36 +244,24 @@ struct OwnValueTypes {
 }
 
 @Suite(.timeLimit(.minutes(1)))
-struct QueuedBodies {
-    @Test func aBodyTheCoreCannotReadIsRefusedRatherThanEmptied() throws {
-        var core = try Marfa.QueuedWrite(id: "q", kind: .createItem, idempotencyKey: "k", queuedAt: "t0").core()
-        core.bodyJson = "[1]"
-        #expect {
-            try translated { try Marfa.QueuedWrite(core) }
-        } throws: { error in
-            if case Marfa.MarfaError.decoding = error { true } else { false }
-        }
-    }
-}
-
-@Suite(.timeLimit(.minutes(1)))
 struct CatalogTypes {
-    static func field(_ name: String, declaredBy: String, json: String) -> MarfaCore.TypeField {
+    static func field(_ name: String, declaredBy: String, definition: JSONObject) -> MarfaCore.TypeField {
         MarfaCore.TypeField(
             name: name, fieldType: "string", required: true, description: "d", declaredBy: declaredBy,
-            definitionJson: json)
+            definition: definition)
     }
 
-    @Test func anItemTypeArrivesWithEachFieldAndWhereItIsDeclared() throws {
+    @Test func anItemTypeArrivesWithEachFieldAndWhereItIsDeclared() {
         let core = MarfaCore.ItemType(
             id: "user.recipe", label: "Recipe", description: "A dish", parent: "user.dish", version: 3,
             fields: [
-                Self.field("serves", declaredBy: "user.dish", json: #"{"type":"string","required":true,"x":[1,2]}"#),
-                Self.field("title", declaredBy: "user.recipe", json: #"{"type":"string"}"#),
+                Self.field(
+                    "serves", declaredBy: "user.dish", definition: ["type": "string", "required": true, "x": [1, 2]]),
+                Self.field("title", declaredBy: "user.recipe", definition: ["type": "string"]),
             ],
             titleField: "title", bodyField: "method", linkField: "vendor_id", roles: ["container"],
             compatibleWith: ["user.meal"])
-        let type = try Marfa.ItemType(core)
+        let type = Marfa.ItemType(core)
         #expect(
             type
                 == Marfa.ItemType(
@@ -322,13 +278,14 @@ struct CatalogTypes {
                     compatibleWith: ["user.meal"]))
     }
 
-    @Test func anEdgeTypeArrivesWithItsReverseNameAndTheEndThatWritesIt() throws {
+    @Test func anEdgeTypeArrivesWithItsReverseNameAndTheEndThatWritesIt() {
         let core = MarfaCore.EdgeType(
             id: "mentor-of", label: "Mentor of", description: nil, cardinality: "one-to-many",
             reverseName: "mentored-by", writtenAt: .target, sourceTypeConstraints: ["core.person"],
             targetTypeConstraints: ["*"], cascadeOnDelete: "block",
-            properties: [Self.field("since", declaredBy: "mentor-of", json: #"{"type":"string"}"#)], shipped: false)
-        let type = try Marfa.EdgeType(core)
+            properties: [Self.field("since", declaredBy: "mentor-of", definition: ["type": "string"])],
+            shipped: false)
+        let type = Marfa.EdgeType(core)
         #expect(
             type
                 == Marfa.EdgeType(
@@ -340,18 +297,6 @@ struct CatalogTypes {
                             name: "since", type: "string", required: true, description: "d",
                             declaredBy: "mentor-of", definition: ["type": "string"])
                     ]))
-    }
-
-    @Test func aDefinitionThatIsNoObjectIsRefusedRatherThanEmptied() {
-        let core = MarfaCore.ItemType(
-            id: "t", label: nil, description: nil, parent: nil, version: 0,
-            fields: [Self.field("f", declaredBy: "t", json: "[1]")], titleField: nil, bodyField: nil,
-            linkField: nil, roles: [], compatibleWith: [])
-        #expect {
-            try translated { try Marfa.ItemType(core) }
-        } throws: { error in
-            if case Marfa.MarfaError.decoding = error { true } else { false }
-        }
     }
 
     @Test func aFreshCopyReadsTheBuiltInCatalogWithoutHydration() async throws {

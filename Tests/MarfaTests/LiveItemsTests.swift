@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 
 @testable import Marfa
@@ -31,6 +32,33 @@ extension LiveWorkingCopies {
             let (status, body) = try await send("GET", "items/\(id)")
             guard status == 200 else { return nil }
             return try JSONObject(json: body)["item"]?.object
+        }
+
+        @Test func aHydrationReplacesARowWhoseStoredPropertiesCannotBeRead() async throws {
+            let store = Live.store()
+            let copy = try await Live.hydrated(store)
+            let title = "healed \(Self.suffix())"
+            let id = try #require(try await copy.items.create(Live.note(title)).itemId)
+            _ = try await copy.queue.drain()
+            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+            await copy.close()
+
+            var database: OpaquePointer?
+            try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
+            try #require(
+                sqlite3_exec(database, "UPDATE items SET properties = '{' WHERE id = '\(id)'", nil, nil, nil)
+                    == SQLITE_OK)
+            sqlite3_close(database)
+
+            let reopened = try await WorkingCopy.open(store: store, server: Live.server)
+            let damaged = try #require(try await reopened.items.get(id))
+            #expect(damaged.unreadableProperties != nil)
+            #expect(damaged.properties.isEmpty)
+            _ = try await reopened.hydrate(types: ["core.note"], tier: .feed)
+            let healed = try #require(try await reopened.items.get(id))
+            #expect(healed.unreadableProperties == nil)
+            #expect(healed.properties["title"] == .string(title))
+            await reopened.close()
         }
 
         static func suffix() -> String {
@@ -101,7 +129,8 @@ extension LiveWorkingCopies {
 
             // An edit not yet sent moves no key, and adds after them.
             let held = try #require(try await copy.items.get(id))
-            _ = try await copy.items.update(id, Edit(.merge(["new": "n", "zeta": "z2"]), baseVersion: held.version))
+            _ = try await copy.items.update(
+                id, Edit(properties: ["new": "n", "zeta": "z2"], baseVersion: held.version))
             let edited = order + ["new"]
             #expect(try await copy.items.get(id)?.properties.keys == edited)
             #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
@@ -118,7 +147,8 @@ extension LiveWorkingCopies {
                 ).itemId)
             _ = try await copy.queue.drain()
             let held = try #require(try await copy.items.get(id))
-            _ = try await copy.items.update(id, Edit(.replace(["body": "only"]), baseVersion: held.version))
+            _ = try await copy.items.update(
+                id, Edit(properties: ["body": "only"], replaceProperties: true, baseVersion: held.version))
             #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
             #expect(try await Self.answered(id)?["properties"] == .object(["body": "only"]))
 
@@ -134,7 +164,7 @@ extension LiveWorkingCopies {
             #expect(try await copy.queue.all().count == queued)
 
             _ = try await copy.items.update(
-                id, Edit(.merge(["title": "a task"]), baseVersion: now.version, type: "core.task", tier: .feed))
+                id, Edit(properties: ["title": "a task"], baseVersion: now.version, type: "core.task", tier: .feed))
             // A retype changes what the copy's read view covers, so the read
             // after the answer expires the copy (`device/view-changed`): the
             // write is answered, and the app hydrates again.

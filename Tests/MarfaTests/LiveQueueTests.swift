@@ -17,6 +17,22 @@ extension LiveWorkingCopies {
             return (first, second)
         }
 
+        @Test func anAnswerArrivesAsTheJSONTheServerSentAndAnUnansweredWriteHasNone() async throws {
+            let copy = try await Live.hydrated()
+            let title = "answered \(UUID())"
+            let queued = try await copy.items.create(Live.note(title))
+            #expect(queued.answer == nil)
+            _ = try await copy.queue.drain()
+            let row = try #require(try await copy.queue.all().first { $0.id == queued.id })
+            let answer = try #require(row.answer?.object)
+            let item = try #require(answer["item"]?.object)
+            #expect(item["id"] == .string(try #require(queued.itemId)))
+            #expect(item["properties"]?.object?["title"] == .string(title))
+            #expect(item["version"] == .integer(1))
+            #expect(answer["metadata"]?.object?["tags"] == [])
+            await copy.close()
+        }
+
         @Test func aNamedAnsweredWriteIsForgottenAndAnotherAnsweredWriteStays() async throws {
             let copy = try await Live.hydrated()
             let (first, second) = try await Self.answeredPair(copy)

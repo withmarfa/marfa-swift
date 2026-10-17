@@ -63,7 +63,7 @@ struct LiveRestart {
             // Saved and queued while the server is away; a drain cannot send it.
             let id = try #require(made.itemId)
             let held = try #require(try await copy.items.get(id))
-            _ = try await copy.items.update(id, Edit(.merge(["title": "while away"]), baseVersion: held.version))
+            _ = try await copy.items.update(id, Edit(properties: ["title": "while away"], baseVersion: held.version))
             let away = try await copy.queue.drain()
             #expect(away.undelivered == 1)
             #expect(away.verdicts.isEmpty)
@@ -118,7 +118,7 @@ struct LiveRestart {
             }
             let id = try #require(made.itemId)
             let held = try #require(try await copy.items.get(id))
-            _ = try await copy.items.update(id, Edit(.merge(["title": "while away"]), baseVersion: held.version))
+            _ = try await copy.items.update(id, Edit(properties: ["title": "while away"], baseVersion: held.version))
 
             // The follow asks again at a falling rate, so that after this wait its next
             // ask is far off: the app reaches the server first, and is told it is back.
@@ -177,11 +177,11 @@ struct LiveRestart {
             try await own.stop()
             let wholeRead = try #require(try await copy.items.get(whole))
             _ = try await copy.items.update(
-                whole, Edit(.replace(["body": "only this"]), baseVersion: wholeRead.version))
+                whole, Edit(properties: ["body": "only this"], replaceProperties: true, baseVersion: wholeRead.version))
             #expect(try await copy.items.get(whole)?.properties == ["body": "only this"])
             let movedRead = try #require(try await copy.items.get(moved))
             _ = try await copy.items.update(
-                moved, Edit(.merge(["status": "open"]), baseVersion: movedRead.version, type: "core.task"))
+                moved, Edit(properties: ["status": "open"], baseVersion: movedRead.version, type: "core.task"))
             let pinnedRead = try #require(try await copy.items.get(pinned))
             _ = try await copy.items.update(pinned, Edit(baseVersion: pinnedRead.version, tier: .feed))
             // Shown before it is sent.

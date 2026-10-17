@@ -10,11 +10,11 @@ public struct Folder: Sendable, Hashable, Identifiable {
     public let state: ItemState
     public let settings: FolderSettings
 
-    init(_ core: MarfaCore.FolderRow) throws {
+    init(_ core: MarfaCore.FolderRow) {
         id = core.id
         version = core.version
-        state = ItemState(core.state)
-        settings = try FolderSettings(core.settings)
+        state = core.state
+        settings = FolderSettings(core.settings)
     }
 }
 
@@ -46,16 +46,16 @@ public struct FolderSettings: Sendable, Hashable {
         self.removalThreshold = removalThreshold
     }
 
-    init(_ core: MarfaCore.FolderSettings) throws {
+    init(_ core: MarfaCore.FolderSettings) {
         self.init(
-            title: core.title, search: FolderSearch(core.search), defaults: try FolderDefaults(core.defaults),
+            title: core.title, search: FolderSearch(core.search), defaults: FolderDefaults(core.defaults),
             include: core.include, ignore: core.ignore, firstPlacement: core.firstPlacement,
             removalThreshold: RemovalThreshold(core.removalThreshold))
     }
 
-    func core() throws -> MarfaCore.FolderSettings {
+    var core: MarfaCore.FolderSettings {
         MarfaCore.FolderSettings(
-            title: title, search: search.core, defaults: try defaults.core(), include: include, ignore: ignore,
+            title: title, search: search.core, defaults: defaults.core, include: include, ignore: ignore,
             firstPlacement: firstPlacement, removalThreshold: removalThreshold.core)
     }
 }
@@ -86,13 +86,13 @@ public struct FolderSearch: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderSearch) {
         self.init(
-            types: core.types, tier: core.tier.map(Tier.init), states: core.states?.map(ItemState.init),
+            types: core.types, tier: core.tier, states: core.states,
             filter: core.filter, beneath: core.beneath)
     }
 
     var core: MarfaCore.FolderSearch {
         MarfaCore.FolderSearch(
-            types: types, tier: tier?.core, states: states?.map(\.core), filter: filter, beneath: beneath)
+            types: types, tier: tier, states: states, filter: filter, beneath: beneath)
     }
 }
 
@@ -116,15 +116,14 @@ public struct FolderDefaults: Sendable, Hashable {
         self.edges = edges
     }
 
-    init(_ core: MarfaCore.FolderDefaults) throws {
+    init(_ core: MarfaCore.FolderDefaults) {
         self.init(
-            type: core.type, tier: core.tier.map(Tier.init), properties: try JSONObject(json: core.propertiesJson),
+            type: core.type, tier: core.tier, properties: core.properties,
             tags: core.tags, edges: core.edges)
     }
 
-    func core() throws -> MarfaCore.FolderDefaults {
-        MarfaCore.FolderDefaults(
-            type: type, tier: tier?.core, propertiesJson: try properties.json(), tags: tags, edges: edges)
+    var core: MarfaCore.FolderDefaults {
+        MarfaCore.FolderDefaults(type: type, tier: tier, properties: properties, tags: tags, edges: edges)
     }
 }
 
@@ -170,9 +169,9 @@ public struct FolderSettingsChange: Sendable, Hashable {
         self.removalThreshold = removalThreshold
     }
 
-    func core() throws -> MarfaCore.FolderSettingsChange {
+    var core: MarfaCore.FolderSettingsChange {
         MarfaCore.FolderSettingsChange(
-            title: title, search: search?.core, defaults: try defaults?.core(), include: include, ignore: ignore,
+            title: title, search: search?.core, defaults: defaults?.core, include: include, ignore: ignore,
             firstPlacement: firstPlacement, removalThreshold: removalThreshold?.core)
     }
 }
@@ -191,7 +190,7 @@ extension Items {
         offset: UInt32? = nil
     ) async throws -> [Item] {
         try await holder.run { core in
-            try core.listInFolder(id: id, sort: sort.core, limit: limit, offset: offset).map(Item.init)
+            try core.listInFolder(id: id, sort: sort.core, limit: limit, offset: offset)
         }
     }
 
@@ -208,7 +207,7 @@ extension WorkingCopy {
     /// A full-text search narrowed to what the folder holds; it throws as `items.list(inFolder:)` throws.
     public func search(_ query: String, inFolder id: String, limit: Int = 20) async throws -> [SearchHit] {
         try await holder.run { core in
-            try core.searchInFolder(query: query, id: id, limit: UInt32(clamping: limit)).map(SearchHit.init)
+            try core.searchInFolder(query: query, id: id, limit: UInt32(clamping: limit))
         }
     }
 
@@ -225,7 +224,7 @@ extension WorkingCopy {
     /// `idempotencyKey`, which answers the first folder, rather than creating a second.
     public func createFolder(_ settings: FolderSettings, idempotencyKey: String? = nil) async throws -> Folder {
         let folder = try await holder.run { core in
-            try Folder(core.createFolder(settings: try settings.core(), idempotencyKey: idempotencyKey))
+            Folder(try core.createFolder(settings: settings.core, idempotencyKey: idempotencyKey))
         }
         feed.announce(Change(origin: .refreshed(.folderWritten), itemId: folder.id, edgeId: nil))
         return folder
@@ -239,9 +238,9 @@ extension WorkingCopy {
         _ id: String, _ change: FolderSettingsChange, baseVersion: Int64, idempotencyKey: String? = nil
     ) async throws -> Folder {
         let folder = try await holder.run { core in
-            try Folder(
-                core.changeFolder(
-                    id: id, change: try change.core(), version: baseVersion, idempotencyKey: idempotencyKey))
+            Folder(
+                try core.changeFolder(
+                    id: id, change: change.core, version: baseVersion, idempotencyKey: idempotencyKey))
         }
         feed.announce(Change(origin: .refreshed(.folderWritten), itemId: id, edgeId: nil))
         return folder
@@ -253,7 +252,7 @@ extension WorkingCopy {
     /// `invalid_transition`.
     public func revokeFolder(_ id: String, idempotencyKey: String? = nil) async throws -> Folder {
         let folder = try await holder.run { core in
-            try Folder(core.revokeFolder(id: id, idempotencyKey: idempotencyKey))
+            Folder(try core.revokeFolder(id: id, idempotencyKey: idempotencyKey))
         }
         feed.announce(Change(origin: .refreshed(.folderWritten), itemId: id, edgeId: nil))
         return folder

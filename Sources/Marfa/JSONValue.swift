@@ -1,15 +1,28 @@
-public enum JSONValue: Sendable, Hashable {
-    case null
-    case bool(Bool)
-    /// Kept exact, where a `Double` holds integers exactly only up to 2^53.
-    /// `1.0` and `1e2` read as integers; an integer beyond `Int64` reads as an
-    /// inexact `number`.
-    case integer(Int64)
-    case number(Double)
-    case string(String)
-    case array([JSONValue])
-    case object(JSONObject)
+import MarfaCore
 
+/// One JSON value.
+///
+/// The core's own value, the one properties, bodies and answers cross the
+/// binding as; its cases and their documentation are the core's. An integer
+/// is kept exact, where a `Double` holds integers exactly only up to 2^53; an
+/// integer beyond `Int64` arrives as the nearest `number`.
+public typealias JSONValue = MarfaCore.JsonValue
+
+/// A JSON object that keeps its keys in order.
+///
+/// The server answers an item's properties in a defined order, which a
+/// document laid out from them follows, so the order is information.
+/// Equality and hashing are order-sensitive: two objects with the same pairs
+/// in a different order are different. They compare keys as Swift compares
+/// strings, so two keys that differ only in Unicode normalization compare
+/// equal, though a lookup tells them apart by their UTF-8 bytes, as the core
+/// and the server do.
+public typealias JSONObject = MarfaCore.JsonObject
+
+/// One key of a ``JSONObject`` and its value.
+public typealias JSONMember = MarfaCore.JsonMember
+
+extension JSONValue {
     /// The deepest nesting of arrays and objects that ``init(json:)`` and
     /// ``JSONObject/init(json:)`` read.
     public static let nestingLimit = 512
@@ -19,7 +32,9 @@ public enum JSONValue: Sendable, Hashable {
     /// Refuses, as `MarfaError.decoding`, anything else: comments, trailing
     /// commas, a number JSON does not allow or a `Double` cannot hold, an
     /// unescaped control character, a lone surrogate, invalid UTF-8, a key
-    /// repeated in one object, and nesting deeper than ``nestingLimit``.
+    /// repeated in one object, and nesting deeper than ``nestingLimit``. An
+    /// integer that `Int64` holds reads exact, whatever form the text gives
+    /// it, so `1.0` and `1e2` are integers.
     public init(json: String) throws {
         self = try JSONReader.value(json)
     }
@@ -103,8 +118,9 @@ extension JSONValue: Codable {
     }
 }
 
-extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, ExpressibleByIntegerLiteral,
-    ExpressibleByFloatLiteral, ExpressibleByStringLiteral, ExpressibleByArrayLiteral,
+extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral,
+    ExpressibleByIntegerLiteral, ExpressibleByFloatLiteral,
+    ExpressibleByStringLiteral, ExpressibleByArrayLiteral,
     ExpressibleByDictionaryLiteral
 {
     public init(nilLiteral: ()) { self = .null }

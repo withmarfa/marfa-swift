@@ -42,8 +42,8 @@ extension LiveWorkingCopies {
             )
         }
 
-        private func definition(_ id: String) -> String {
-            #"{"id":""# + id + #"","fields":{"title":{"type":"string","required":true}}}"#
+        private func definition(_ id: String) -> JSONObject {
+            ["id": .string(id), "fields": ["title": ["type": "string", "required": true]]]
         }
 
         @Test func aMinimalAppKeyRegistersAndDrainsAnOfflineCreate() async throws {

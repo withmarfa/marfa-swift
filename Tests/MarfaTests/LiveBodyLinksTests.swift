@@ -42,7 +42,7 @@ extension LiveWorkingCopies {
             let body = try #require(current.body)
             let linked = body + "\n\n[[\(unique)|shown]] [[\(twin)]] [[\(absent)]]"
             let edit = try await copy.items.update(
-                hostId, Edit(.merge(["body": .string(linked)]), baseVersion: current.version))
+                hostId, Edit(properties: ["body": .string(linked)], baseVersion: current.version))
             answered = Self.answers(try await copy.queue.drain())
             #expect(answered[edit.id] == .accepted)
 
@@ -79,14 +79,14 @@ extension LiveWorkingCopies {
 
             let held = try #require(try await copy.items.get(plan))
             _ = try await copy.items.update(
-                plan, Edit(.merge(["title": .string("\(title) v2")]), baseVersion: held.version))
+                plan, Edit(properties: ["title": .string("\(title) v2")], baseVersion: held.version))
             let taker = try #require(try await copy.items.create(Live.note(title)).itemId)
             _ = try await copy.queue.drain()
 
             let current = try #require(try await copy.items.get(host))
             _ = try await copy.items.update(
                 host,
-                Edit(.merge(["body": .string("see [[\(title)]] [[\(taker)]]")]), baseVersion: current.version))
+                Edit(properties: ["body": .string("see [[\(title)]] [[\(taker)]]")], baseVersion: current.version))
 
             let found = try await copy.items.links(in: host)
             #expect(found.links.map(\.name) == [title, taker])

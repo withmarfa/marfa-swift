@@ -1,24 +1,9 @@
 import Foundation
 import MarfaCore
 
-public enum Tier: Sendable, Hashable, CaseIterable {
-    case library
-    case feed
-
-    init(_ core: MarfaCore.Tier) {
-        switch core {
-        case .library: self = .library
-        case .feed: self = .feed
-        }
-    }
-
-    var core: MarfaCore.Tier {
-        switch self {
-        case .library: .library
-        case .feed: .feed
-        }
-    }
-}
+/// The tier an item is in: `library` for lasting material, `feed` for an
+/// incoming stream.
+public typealias Tier = MarfaCore.Tier
 
 /// The tiers a working copy's slice holds: one ``Tier``, or both.
 ///
@@ -55,30 +40,8 @@ public enum SliceTier: Sendable, Hashable, CaseIterable {
     }
 }
 
-public enum ItemState: Sendable, Hashable, CaseIterable {
-    case active
-    case archived
-    case trashed
-    case revoked
-
-    init(_ core: MarfaCore.ItemState) {
-        switch core {
-        case .active: self = .active
-        case .archived: self = .archived
-        case .trashed: self = .trashed
-        case .revoked: self = .revoked
-        }
-    }
-
-    var core: MarfaCore.ItemState {
-        switch self {
-        case .active: .active
-        case .archived: .archived
-        case .trashed: .trashed
-        case .revoked: .revoked
-        }
-    }
-}
+/// Where an item is in its life: `active`, `archived`, `trashed` or `revoked`.
+public typealias ItemState = MarfaCore.ItemState
 
 public enum WriteKind: Sendable, Hashable, CaseIterable {
     case createItem
@@ -445,8 +408,9 @@ public struct QueuedWrite: Sendable, Hashable {
     /// What the write sends, or sent; a refused write that carried content
     /// keeps it here, through `forgetAnswered()`, until `discard(_:)`.
     public var body: JSONObject
-    /// The server's answer, whole, as it arrived.
-    public var answer: String?
+    /// The server's answer, whole, as it arrived: the JSON it held, or, for
+    /// an answer that was not JSON, its text as a string.
+    public var answer: JSONValue?
     public var refusals: Int64
     public var queuedAt: String
     public var answeredAt: String?
@@ -455,7 +419,7 @@ public struct QueuedWrite: Sendable, Hashable {
         id: String, kind: WriteKind, itemId: String? = nil, targetId: String? = nil, edgeId: String? = nil,
         namespace: String? = nil, tag: String? = nil, blob: String? = nil, baseVersion: Int64? = nil,
         idempotencyKey: String, dependsOn: [String] = [], follows: String? = nil, verdict: Verdict? = nil,
-        waiting: Bool = false, body: JSONObject = [:], answer: String? = nil, refusals: Int64 = 0,
+        waiting: Bool = false, body: JSONObject = [:], answer: JSONValue? = nil, refusals: Int64 = 0,
         queuedAt: String, answeredAt: String? = nil
     ) {
         self.id = id
@@ -479,22 +443,22 @@ public struct QueuedWrite: Sendable, Hashable {
         self.answeredAt = answeredAt
     }
 
-    init(_ core: MarfaCore.QueuedWrite) throws {
+    init(_ core: MarfaCore.QueuedWrite) {
         self.init(
             id: core.id, kind: WriteKind(core.kind), itemId: core.itemId, targetId: core.targetId,
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,
             baseVersion: core.baseVersion, idempotencyKey: core.idempotencyKey, dependsOn: core.dependsOn,
             follows: core.follows, verdict: core.verdict.map(Verdict.init), waiting: core.waiting,
-            body: try JSONObject(json: core.bodyJson), answer: core.answer, refusals: core.refusals,
+            body: core.body, answer: core.answer, refusals: core.refusals,
             queuedAt: core.queuedAt, answeredAt: core.answeredAt)
     }
 
-    func core() throws -> MarfaCore.QueuedWrite {
+    var core: MarfaCore.QueuedWrite {
         MarfaCore.QueuedWrite(
             id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
-            bodyJson: try body.json(), answer: answer, refusals: refusals, queuedAt: queuedAt,
+            body: body, answer: answer, refusals: refusals, queuedAt: queuedAt,
             answeredAt: answeredAt)
     }
 }
@@ -756,7 +720,7 @@ public struct Attachment: Sendable, Hashable {
     }
 
     var core: MarfaCore.Attachment {
-        MarfaCore.Attachment(mimeType: mimeType, title: title, type: type, tier: tier?.core)
+        MarfaCore.Attachment(mimeType: mimeType, title: title, type: type, tier: tier)
     }
 }
 
@@ -776,9 +740,9 @@ public struct Attached: Sendable, Hashable {
         self.embed = embed
     }
 
-    init(_ core: MarfaCore.Attached) throws {
+    init(_ core: MarfaCore.Attached) {
         self.init(
-            upload: try QueuedWrite(core.upload), item: try QueuedWrite(core.item), edge: try QueuedWrite(core.edge),
+            upload: QueuedWrite(core.upload), item: QueuedWrite(core.item), edge: QueuedWrite(core.edge),
             embed: core.embed)
     }
 }

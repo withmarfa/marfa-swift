@@ -92,17 +92,18 @@ public final class WorkingCopy: Sendable {
         return report
     }
 
-    /// Replaces the app's declared types, each a JSON type definition.
+    /// Replaces the app's declared types, each a type definition.
     ///
     /// Offline creates are checked against them before the first hydration.
     /// Hydration registers any the instance lacks and reports refusals.
-    public func declareTypes(_ types: [String]) async throws {
+    public func declareTypes(_ types: [JSONObject]) async throws {
         try await holder.run { core in try core.declareTypes(types: types) }
         feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
     }
 
-    /// Reads the declarations stored in this copy, each as normalized JSON.
-    public func declaredTypes() async throws -> [String] {
+    /// Reads the declarations stored in this copy, each with the empty `fields` and the `version` a
+    /// registration needs filled in where the app left them out.
+    public func declaredTypes() async throws -> [JSONObject] {
         try await holder.run { core in try core.declaredTypes() }
     }
 
@@ -155,7 +156,7 @@ public final class WorkingCopy: Sendable {
         -> [SearchHit]
     {
         try await holder.run { core in
-            try core.search(query: query, filters: filters.core, limit: UInt32(clamping: limit)).map(SearchHit.init)
+            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit))
         }
     }
 
@@ -340,12 +341,12 @@ public struct Items: Sendable {
     )
         async throws -> [Item]
     {
-        try await holder.run { core in try core.list(filters: filters.core, sort: sort.core).map(Item.init) }
+        try await holder.run { core in try core.list(filters: filters, sort: sort.core) }
     }
 
     /// `nil` for an item in the bin or not held.
     public func get(_ id: String) async throws -> Item? {
-        try await holder.run { core in try core.get(id: id).map(Item.init) }
+        try await holder.run { core in try core.get(id: id) }
     }
 
     /// The ID of the item a conflicted copy was made from: the item its
@@ -363,7 +364,7 @@ public struct Items: Sendable {
     /// Copies in the bin are left out. Oldest link first. The item itself need
     /// not be held.
     public func conflictedCopies(of id: String) async throws -> [Item] {
-        try await holder.run { core in try core.conflictedCopiesOf(id: id).map(Item.init) }
+        try await holder.run { core in try core.conflictedCopiesOf(id: id) }
     }
 
     /// Read from the held row, with no request.
@@ -372,12 +373,12 @@ public struct Items: Sendable {
     }
 
     public func create(_ draft: Draft) async throws -> QueuedWrite {
-        try await write { core in try core.createItem(draft: draft.core()) }
+        try await write { core in try core.createItem(draft: draft) }
     }
 
     /// Refused unless `edit.baseVersion` is the version the copy holds.
     public func update(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
-        try await write { core in try core.updateItem(id: id, edit: edit.core()) }
+        try await write { core in try core.updateItem(id: id, edit: edit) }
     }
 
     /// Queues an edit based on a version older than the one the copy holds.
@@ -385,7 +386,7 @@ public struct Items: Sendable {
     /// The server merges it against what was read. An editor that held a row
     /// while the copy caught up saves this way.
     public func updateAsRead(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
-        try await write { core in try core.updateItemAsRead(id: id, edit: edit.core()) }
+        try await write { core in try core.updateItemAsRead(id: id, edit: edit) }
     }
 
     /// Moves an item to the bin, and queues the delete.
@@ -429,7 +430,7 @@ public struct Items: Sendable {
     /// ``restore(_:)`` and destroy it with ``purge(_:version:)``.
     public func bin(type: String? = nil, after cursor: String? = nil, limit: Int = 50) async throws -> BinPage {
         try await holder.run { core in
-            try BinPage(core.bin(type: type, cursor: cursor, limit: UInt32(clamping: limit)))
+            try core.bin(type: type, cursor: cursor, limit: UInt32(clamping: limit))
         }
     }
 
@@ -445,14 +446,14 @@ public struct Items: Sendable {
     }
 
     public func transition(_ id: String, to state: ItemState) async throws -> QueuedWrite {
-        try await write { core in try core.transitionItem(id: id, state: state.core) }
+        try await write { core in try core.transitionItem(id: id, state: state) }
     }
 
     /// Queues three writes, each with its own verdict: the upload, a file item
     /// naming the bytes, and an `attached-to` edge from the file to the item.
     public func attach(to id: String, file: URL, _ attachment: Attachment = Attachment()) async throws -> Attached {
         let attached = try await holder.run { core in
-            try Attached(core.attach(id: id, path: file.path, attachment: attachment.core))
+            Attached(try core.attach(id: id, path: file.path, attachment: attachment.core))
         }
         for write in [attached.upload, attached.item, attached.edge] {
             feed.announce(write)
@@ -481,7 +482,7 @@ public struct Items: Sendable {
     /// where it belongs.
     public func embed(file: URL, in id: String, _ attachment: Attachment = Attachment()) async throws -> Embedded {
         let (attached, body) = try await holder.run { core -> (Attached, Result<(QueuedWrite, String), any Error>) in
-            let attached = try Attached(core.attach(id: id, path: file.path, attachment: attachment.core))
+            let attached = Attached(try core.attach(id: id, path: file.path, attachment: attachment.core))
             return (attached, Result { try translated { try Self.writeEmbed(attached, into: id, core) } })
         }
         for write in [attached.upload, attached.item, attached.edge] {
@@ -505,11 +506,11 @@ public struct Items: Sendable {
             throw MarfaError.notFound(code: "item_not_found", message: "\(id) is not a row this copy holds")
         }
         let field = try core.itemType(id: host.type).bodyField ?? "body"
-        let body = try JSONObject(json: host.propertiesJson)[field]?.string ?? ""
+        let body = host.properties[field]?.string ?? ""
         let separator = String(
             repeating: "\n", count: body.isEmpty ? 0 : max(0, 2 - body.reversed().prefix(while: \.isNewline).count))
-        let edit = Edit(.merge([field: .string(body + separator + embed)]), baseVersion: host.version)
-        return (try QueuedWrite(core.updateItem(id: id, edit: edit.core())), embed)
+        let edit = Edit(properties: [field: .string(body + separator + embed)], baseVersion: host.version)
+        return (QueuedWrite(try core.updateItem(id: id, edit: edit)), embed)
     }
 
     /// Each link and each embed of a file in the item's body, in body order, read from the copy alone.
@@ -541,7 +542,7 @@ public struct Edges: Sendable {
     let feed: Feed
 
     public func from(_ id: String) async throws -> [Edge] {
-        try await holder.run { core in try core.edgesFrom(id: id).map(Edge.init) }
+        try await holder.run { core in try core.edgesFrom(id: id) }
     }
 
     /// The edges the copy holds to one item, unsent ones included.
@@ -550,13 +551,13 @@ public struct Edges: Sendable {
     /// edge from an item outside it is held only when its type was hydrated
     /// whole or the copy pinned its source item.
     public func to(_ id: String) async throws -> [Edge] {
-        try await holder.run { core in try core.edgesTo(id: id).map(Edge.init) }
+        try await holder.run { core in try core.edgesTo(id: id) }
     }
 
     /// Every edge of one type the copy holds, unsent ones included, oldest
     /// first: edges going out from held items and edge types hydrated whole.
     public func ofType(_ type: String) async throws -> [Edge] {
-        try await holder.run { core in try core.edgesOfType(edgeType: type).map(Edge.init) }
+        try await holder.run { core in try core.edgesOfType(edgeType: type) }
     }
 
     public func create(
@@ -567,7 +568,7 @@ public struct Edges: Sendable {
             try core.createEdge(
                 draft: MarfaCore.EdgeDraft(
                     sourceId: source, targetId: target, edgeType: type,
-                    propertiesJson: try properties.json(), id: id))
+                    properties: properties, id: id))
         }
     }
 
@@ -583,7 +584,7 @@ public struct Edges: Sendable {
     /// would raise the edge's version for a change that never happened.
     public func update(_ id: String, _ edit: EdgeEdit) async throws -> QueuedWrite? {
         let written = try await holder.run { core in
-            try core.updateEdge(id: id, edit: edit.core()).map { try QueuedWrite($0) }
+            try core.updateEdge(id: id, edit: edit.core).map(QueuedWrite.init)
         }
         if let written { feed.announce(written) }
         return written
@@ -630,7 +631,7 @@ public struct Extensions: Sendable {
 
     public func write(_ namespace: String, _ body: JSONObject, on id: String) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in
-            try core.writeExtension(id: id, namespace: namespace, bodyJson: try body.json())
+            try core.writeExtension(id: id, namespace: namespace, body: body)
         }
     }
 
@@ -749,7 +750,7 @@ public struct Queue: Sendable {
 func queued(_ holder: CoreHolder, _ feed: Feed, _ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite)
     async throws -> QueuedWrite
 {
-    let written = try await holder.run { try QueuedWrite(work($0)) }
+    let written = try await holder.run { QueuedWrite(try work($0)) }
     feed.announce(written)
     return written
 }

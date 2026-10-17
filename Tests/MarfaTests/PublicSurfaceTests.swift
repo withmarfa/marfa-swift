@@ -19,7 +19,8 @@ import Testing
             updatedAt: "2026-09-26T00:00:00.000Z", tags: [], title: "Standup", body: "Daily")
         #expect(titled.body == "Daily")
         let edits = [
-            Edit(.merge(["title": "a"]), baseVersion: 1), Edit(.replace(["body": "b"]), baseVersion: 1),
+            Edit(properties: ["title": "a"], baseVersion: 1),
+            Edit(properties: ["body": "b"], replaceProperties: true, baseVersion: 1),
             Edit(baseVersion: 1, type: "core.task", tier: .feed),
         ]
         #expect(Set(edits).count == 3)

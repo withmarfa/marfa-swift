@@ -5,8 +5,9 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct DeclaredTypes {
-    static let definition =
-        #"{"id":"app.readinglist.entry","fields":{"title":{"type":"string","required":true}}}"#
+    static let definition: JSONObject = [
+        "id": "app.readinglist.entry", "fields": ["title": ["type": "string", "required": true]],
+    ]
 
     @Test func declarationsPersistAndReplaceTheWholeSetOffline() async throws {
         let store = temporaryStore()
@@ -14,8 +15,7 @@ struct DeclaredTypes {
         #expect(try await copy.declaredTypes().isEmpty)
         try await copy.declareTypes([Self.definition])
         let held = try #require(try await copy.declaredTypes().first)
-        let object = try #require(JSONSerialization.jsonObject(with: Data(held.utf8)) as? [String: Any])
-        #expect(object["id"] as? String == "app.readinglist.entry")
+        #expect(held["id"] == "app.readinglist.entry")
         let write = try await copy.items.create(
             Draft(type: "app.readinglist.entry", properties: ["title": "Read this"]))
         #expect(write.verdict == nil)
@@ -46,7 +46,7 @@ struct DeclaredTypes {
         try await copy.declareTypes([Self.definition])
         let before = try await copy.declaredTypes()
         await #expect {
-            try await copy.declareTypes(["{"])
+            try await copy.declareTypes([["fields": [:]]])
         } throws: { error in
             if case MarfaError.invalid = error { true } else { false }
         }
@@ -68,7 +68,7 @@ struct DeclaredTypes {
         try await copy.declareTypes([Self.definition])
         let before = try await copy.declaredTypes()
         await #expect {
-            try await copy.declareTypes([#"{"id":""# + id + #"","fields":{}}"#])
+            try await copy.declareTypes([["id": .string(id), "fields": [:]]])
         } throws: { error in
             if case MarfaError.invalid = error { true } else { false }
         }
