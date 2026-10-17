@@ -144,7 +144,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var withdrawable: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
-        var declarations: [String] = []
+        var declarations: [JSONObject] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
         var hydrationOptions: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         var pins: Set<String> = []
@@ -226,11 +226,11 @@ final class FakeCore: Core, @unchecked Sendable {
             registeredTypes: [], unregisteredTypes: state.withLock { $0.registrationRefusals })
     }
 
-    override func declareTypes(types: [String]) {
+    override func declareTypes(types: [JSONObject]) {
         state.withLock { $0.declarations = types }
     }
 
-    override func declaredTypes() -> [String] {
+    override func declaredTypes() -> [JSONObject] {
         state.withLock { $0.declarations }
     }
 

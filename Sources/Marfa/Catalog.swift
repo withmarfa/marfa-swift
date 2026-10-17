@@ -23,7 +23,7 @@ public struct Catalog: Sendable {
     }
 
     public func itemType(_ id: String) async throws -> ItemType {
-        try await holder.run { core in try ItemType(core.itemType(id: id)) }
+        try await holder.run { core in ItemType(try core.itemType(id: id)) }
     }
 
     /// By id.
@@ -32,7 +32,7 @@ public struct Catalog: Sendable {
     }
 
     public func edgeType(_ id: String) async throws -> EdgeType {
-        try await holder.run { core in try EdgeType(core.edgeType(id: id)) }
+        try await holder.run { core in EdgeType(try core.edgeType(id: id)) }
     }
 }
 
@@ -76,10 +76,10 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.compatibleWith = compatibleWith
     }
 
-    init(_ core: MarfaCore.ItemType) throws {
+    init(_ core: MarfaCore.ItemType) {
         self.init(
             id: core.id, label: core.label, description: core.description, parent: core.parent,
-            version: core.version, fields: try core.fields.map(TypeField.init), titleField: core.titleField,
+            version: core.version, fields: core.fields.map(TypeField.init), titleField: core.titleField,
             bodyField: core.bodyField, linkField: core.linkField, roles: core.roles,
             compatibleWith: core.compatibleWith)
     }
@@ -113,10 +113,10 @@ public struct TypeField: Sendable, Hashable, Identifiable {
         self.definition = definition
     }
 
-    init(_ core: MarfaCore.TypeField) throws {
+    init(_ core: MarfaCore.TypeField) {
         self.init(
             name: core.name, type: core.fieldType, required: core.required, description: core.description,
-            declaredBy: core.declaredBy, definition: try JSONObject(json: core.definitionJson))
+            declaredBy: core.declaredBy, definition: core.definition)
     }
 }
 
@@ -180,12 +180,12 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
         self.shipped = shipped
     }
 
-    init(_ core: MarfaCore.EdgeType) throws {
+    init(_ core: MarfaCore.EdgeType) {
         self.init(
             id: core.id, label: core.label, description: core.description, cardinality: core.cardinality,
             reverseName: core.reverseName, writtenAt: EdgeEnd(core.writtenAt),
             sourceTypeConstraints: core.sourceTypeConstraints, targetTypeConstraints: core.targetTypeConstraints,
-            cascadeOnDelete: core.cascadeOnDelete, properties: try core.properties.map(TypeField.init),
+            cascadeOnDelete: core.cascadeOnDelete, properties: core.properties.map(TypeField.init),
             shipped: core.shipped)
     }
 }

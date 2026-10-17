@@ -61,7 +61,7 @@ Keep the returned key in the app's keychain with `Keychain.system.save(key:servi
 
 ## Declare and use an app type
 
-An app can declare its types before it reaches a server. Each declaration is a JSON type definition. The following definition can also be registered by the owner through the CLI:
+An app can declare its types before it reaches a server. Each declaration is a type definition, a `JSONObject`. The following definition can also be registered by the owner through the CLI:
 
 ```sh
 marfa types register --body '{"id":"app.readinglist.entry","fields":{"title":{"type":"string","required":true}}}'
@@ -74,14 +74,14 @@ import Marfa
 
 let copy = try await WorkingCopy.open(store: storeURL, server: Server(url: serverURL, key: key))
 try await copy.declareTypes([
-    #"{"id":"app.readinglist.entry","fields":{"title":{"type":"string","required":true}}}"#
+    ["id": "app.readinglist.entry", "fields": ["title": ["type": "string", "required": true]]]
 ])
 _ = try await copy.items.create(
     Draft(type: "app.readinglist.entry", properties: ["title": "Read this"], tier: .library))
 let hydrated = try await copy.hydrate(types: ["app.readinglist.entry"], tier: .library)
 let items = try await copy.items.list()
 if let item = items.first {
-    _ = try await copy.items.update(item.id, Edit(.merge(["title": "Read next"]), baseVersion: item.version))
+    _ = try await copy.items.update(item.id, Edit(properties: ["title": "Read next"], baseVersion: item.version))
 }
 let report = try await copy.queue.drain()
 // Present refused or blocked verdicts before deciding what to do with them.
@@ -93,7 +93,7 @@ for await change in copy.changes() {
 }
 ```
 
-`declareTypes(_:)` replaces the app's **whole declaration set**. Pass every type the app still declares on each call; an empty array clears the declarations. `declaredTypes()` reads the normalized JSON stored in the copy. Before the first hydration, declared types and the types Marfa ships validate queued creates offline. Reopening the store keeps the declarations and queued writes.
+`declareTypes(_:)` replaces the app's **whole declaration set**. Pass every type the app still declares on each call; an empty array clears the declarations. `declaredTypes()` reads the declarations stored in the copy, each as a `JSONObject`. Before the first hydration, declared types and the types Marfa ships validate queued creates offline. Reopening the store keeps the declarations and queued writes.
 
 Hydration registers declarations the instance does not hold when the key has write access to the type and `metadata.types:write`. A completed `HydrateReport` lists new registrations in `registeredTypes` and refusals in `unregisteredTypes`, each with its `id`, server `code`, and `message`. A refusal keeps the declaration and queued content. If the requested slice names an exact type the instance still lacks, hydration throws `unknownType`; register that type with the required permissions before requesting it again.
 
@@ -114,7 +114,7 @@ In a copy that holds one tier, the same item leaves the copy once the server ans
 
 The app decides when to `hydrate`, when to `catchUp`, when to `queue.drain()` its writes, and when to `queue.forgetAnswered()`; answered writes stay in the queue, with the server's answers, until it does (`queue.forgetAnswered(ids:)` clears just the writes you name, so an answer a drain recorded after your last read stays for the next one), and blocked or dead writes stay until released or withdrawn. A held `changes()` stream follows the server's events, and drains the queued writes once each time its server is back; if it stops with an error, the next hydration or catch-up starts it again.
 
-Each queued write carries its `verdict` once the server answers it. A write held behind another that has no answer yet is `waiting`, with no verdict, and goes once that write is answered; a `blocked` verdict is a stop the app may have to act on, by releasing or withdrawing it. A `refused` verdict carries a typed `Refusal`: the server's code and message, each property it would not take and why, whether the row is in the bin, and any permission the key lacks. A refused write that carried content keeps it in `body` through `forgetAnswered()`, so the app can offer it back to the person, until `queue.discard(_:)` takes it out. A drain's report lists each write it answered with the item or edge it wrote, and a held `changes()` stream is told each one as `.answered`. On a store that has never hydrated, the writer's stream receives local write and declaration notifications, and its follow waits for the first hydration before it follows server events.
+Each queued write carries its `verdict` once the server answers it. A write held behind another that has no answer yet is `waiting`, with no verdict, and goes once that write is answered; a `blocked` verdict is a stop the app may have to act on, by releasing or withdrawing it. A `refused` verdict carries a typed `Refusal`: the server's code and message, each property it would not take and why, whether the row is in the bin, and any permission the key lacks. A refused write that carried content keeps it in `body`, a `JSONObject`, through `forgetAnswered()`, so the app can offer it back to the person, until `queue.discard(_:)` takes it out. The server's answer is `answer`, a `JSONValue` parsed from what the server sent: the object a successful write returned, or the refusal's body; an answer that was not JSON, such as a gateway's page, is a string of its text. A drain's report lists each write it answered with the item or edge it wrote, and a held `changes()` stream is told each one as `.answered`. On a store that has never hydrated, the writer's stream receives local write and declaration notifications, and its follow waits for the first hydration before it follows server events.
 
 The drain report separates requests the server `answered`, writes still `undelivered`, writes settled `unsent`, and requests that were `unmade`. `unavailable` says why the pass ended without reaching the rest; `stopped` names a refused credential that parked the queue. A network outage leaves undelivered writes waiting without counting a refusal.
 
@@ -148,14 +148,19 @@ for item in try await copy.items.list(ListFilters(type: "core.event")) {
 }
 ```
 
-`properties` is a `JSONObject`, which keeps its keys in the order the server answers them. A create puts the fields the type declares first, in the type's order, then the rest in the order they were written. A `.merge` edit moves no key and adds each new one after them, and a `.replace` edit keeps the order it sends. Any key that is an array index, such as `2024`, comes first of all. The copy shows the same order before a write is sent as after the server answers it, unless another device's write reaches the item first. Iterate it, or read `keys`, to lay out an item as a document. `JSONObject(json:)` and `JSONValue(json:)` read JSON text in order, and `json()` writes it back in order; `JSONEncoder` and `JSONDecoder` do not keep key order.
+`properties` is a `JSONObject`, a value like the rest of the item, which keeps its keys in the order the server answers them. Its values are `JSONValue` cases, and an integer that `Int64` holds stays exact, beyond 2^53 too. A create puts the fields the type declares first, in the type's order, then the rest in the order they were written. A merging edit moves no key and adds each new one after them, and a replacing edit keeps the order it sends. Any key that is an array index, such as `2024`, comes first of all. The copy shows the same order before a write is sent as after the server answers it, unless another device's write reaches the item first. Like the server, the copy writes a number the way JavaScript does, so a float with no fraction, such as `2.0`, is read back as the integer `2`. Iterate the object, or read `keys`, to lay out an item as a document. `JSONObject(json:)` and `JSONValue(json:)` read JSON text in order, and `json()` writes it back in order; `JSONEncoder` and `JSONDecoder` do not keep key order.
 
-An `Edit` says how its properties meet the item's. `.merge` replaces each property it names and leaves the rest; `.replace` makes them the item's whole properties, so a property it leaves out is cleared. **`.replace` is the way to drop a property**: a `null` under `.merge` clears nothing, because the server drops it and the copy does too, and a `null` for an optional field in a `Draft` leaves the field out of the new item. A `.replace` sent through `updateAsRead(_:_:)`, at a version older than the one the copy holds, is merged as `.merge` is. An edit can also move the item to another type or tier:
+Sending a property the core cannot hold throws `invalid` and queues nothing: a number that is not finite, a key that appears twice in one object, or a write nested deeper than the server reads. The server refuses a request body nested more than 64 levels, so a value inside a property may nest 62 levels of arrays or objects, and an extension's body 63 inside its own object.
+
+A row of the copy whose stored properties are not one JSON object, which only something else writing to the store can cause, does not fail a list or a search. It comes back with empty `properties` and `unreadableProperties` naming why, and everything else about it as the copy holds it; an `Edge` has the same field. A damaged row matches no property condition, so a list or a search filtered on a property leaves it out. Check `unreadableProperties` before writing back from `properties`, because the empty object is not what is stored. A write to such an item, and to such an edge, throws until a hydration replaces the row from the server.
+
+An `Edit` says how its properties meet the item's. By default each property it names replaces its whole value and the rest stay; with `replaceProperties: true` they become the item's whole properties, so a property left out is cleared. **`replaceProperties: true` is the way to drop a property**: a `null` in a merge clears nothing, because the server drops it and the copy does too, and a `null` for an optional field in a `Draft` leaves the field out of the new item. A replacing edit sent through `updateAsRead(_:_:)`, at a version older than the one the copy holds, is merged. An edit can also move the item to another type or tier:
 
 ```swift
 guard let item = try await copy.items.get(id) else { return }
-_ = try await copy.items.update(id, Edit(.merge(["title": "Renamed"]), baseVersion: item.version))
-_ = try await copy.items.update(id, Edit(.replace(["body": "Only this"]), baseVersion: item.version))
+_ = try await copy.items.update(id, Edit(properties: ["title": "Renamed"], baseVersion: item.version))
+_ = try await copy.items.update(
+    id, Edit(properties: ["body": "Only this"], replaceProperties: true, baseVersion: item.version))
 _ = try await copy.items.update(id, Edit(baseVersion: item.version, type: "core.task", tier: .feed))
 ```
 

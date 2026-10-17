@@ -19,7 +19,8 @@ import Testing
             updatedAt: "2026-09-26T00:00:00.000Z", tags: [], title: "Standup", body: "Daily")
         #expect(titled.body == "Daily")
         let edits = [
-            Edit(.merge(["title": "a"]), baseVersion: 1), Edit(.replace(["body": "b"]), baseVersion: 1),
+            Edit(properties: ["title": "a"], baseVersion: 1),
+            Edit(properties: ["body": "b"], replaceProperties: true, baseVersion: 1),
             Edit(baseVersion: 1, type: "core.task", tier: .feed),
         ]
         #expect(Set(edits).count == 3)
@@ -33,6 +34,28 @@ import Testing
             id: "edge", sourceId: "reply", targetId: "item", edgeType: "in-thread", properties: ["position": 1],
             version: 1, createdAt: "2026-09-26T00:00:00.000Z", updatedAt: "2026-09-26T00:00:00.000Z")
         #expect(edge.targetId == "item")
+    }
+
+    /// The labels in the order the package has always taken them, since a call
+    /// that names them in another order does not compile.
+    @Test func theRecordsTheCoreDefinesTakeTheirLabelsInTheOrderTheyAlwaysDid() {
+        let search = SearchFilters(type: "core.note", state: .archived)
+        #expect(search.type == "core.note" && search.state == .archived)
+        let everywhere = SearchFilters(type: "core.note", allStates: true, tags: ["a"], filter: "x", beneath: "r")
+        #expect(everywhere.allStates && everywhere.tags == ["a"] && everywhere.beneath == "r")
+        let list = ListFilters(
+            type: "core.note", state: .active, allStates: false, tier: .feed, tags: ["a"], occurredAfter: "a",
+            occurredBefore: "b", filter: "f", beneath: "r", limit: 5, offset: 1)
+        #expect(list.limit == 5 && list.offset == 1 && list.tier == .feed)
+        let draft = Draft(
+            type: "core.note", properties: ["title": "t"], tags: ["a"], tier: .feed, id: "i", source: "s",
+            sourceId: "k", occurredAt: "o", baseVersion: 2)
+        #expect(draft.baseVersion == 2 && draft.sourceId == "k")
+        let page = BinPage(items: [], nextCursor: "c")
+        #expect(page.nextCursor == "c")
+        let edit = Edit(
+            properties: ["a": 1], replaceProperties: true, baseVersion: 3, sourceId: "k", type: "t", tier: .library)
+        #expect(edit.replaceProperties && edit.baseVersion == 3)
     }
 
     /// Each enum's cases as default arguments, and each value type made, with

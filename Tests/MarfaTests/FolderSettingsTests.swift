@@ -15,7 +15,7 @@ import Testing
                 edges: ["about": ["topic"]]),
             include: ["*.md"], ignore: ["drafts/"], firstPlacement: ["core.note": "Notes"],
             removalThreshold: RemovalThreshold(files: 4, fraction: 0.5))
-        let crossed = try FolderSettings(try settings.core())
+        let crossed = FolderSettings(settings.core)
         #expect(crossed == settings)
         #expect(crossed.defaults.properties.keys == ["rating", "cuisine"], "the defaults' key order")
     }

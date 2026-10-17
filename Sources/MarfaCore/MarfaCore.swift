@@ -899,20 +899,20 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func dataVersion() throws  -> Int64
     
     /**
-     * Declares the types this app saves, each a JSON object with its `id`,
-     * its `fields` and whatever else a type carries. A copy that has never
+     * Declares the types this app saves, each an object with its `id`, its
+     * `fields` and whatever else a type carries. A copy that has never
      * reached a server checks what it queues against them and the types
-     * Marfa ships, and a hydration registers the ones the instance
-     * lacks, where the key may. The call is the app's whole set and replaces every earlier declaration.
+     * Marfa ships, and a hydration registers the ones the instance lacks,
+     * where the key may. The call is the app's whole set and replaces every
+     * earlier declaration.
      */
-    func declareTypes(types: [String]) throws 
+    func declareTypes(types: [JsonObject]) throws 
     
     /**
-     * The declarations this copy holds, each as JSON, with the empty
-     * `fields` and the `version` a registration needs filled in where the app
-     * left them out.
+     * The declarations this copy holds, with the empty `fields` and the
+     * `version` a registration needs filled in where the app left them out.
      */
-    func declaredTypes() throws  -> [String]
+    func declaredTypes() throws  -> [JsonObject]
     
     func deleteEdge(id: String) throws  -> QueuedWrite
     
@@ -1146,10 +1146,9 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func withdraw(id: String) throws  -> Bool
     
     /**
-     * Writes one extension namespace, as its own write. The body is one
-     * JSON object.
+     * Writes one extension namespace, as its own write.
      */
-    func writeExtension(id: String, namespace: String, bodyJson: String) throws  -> QueuedWrite
+    func writeExtension(id: String, namespace: String, body: JsonObject) throws  -> QueuedWrite
     
     /**
      * Sent as `create_folder` is, based on `version`. A setting changed
@@ -1434,27 +1433,27 @@ open func dataVersion()throws  -> Int64  {
 }
     
     /**
-     * Declares the types this app saves, each a JSON object with its `id`,
-     * its `fields` and whatever else a type carries. A copy that has never
+     * Declares the types this app saves, each an object with its `id`, its
+     * `fields` and whatever else a type carries. A copy that has never
      * reached a server checks what it queues against them and the types
-     * Marfa ships, and a hydration registers the ones the instance
-     * lacks, where the key may. The call is the app's whole set and replaces every earlier declaration.
+     * Marfa ships, and a hydration registers the ones the instance lacks,
+     * where the key may. The call is the app's whole set and replaces every
+     * earlier declaration.
      */
-open func declareTypes(types: [String])throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func declareTypes(types: [JsonObject])throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_declare_types(
             self.uniffiCloneHandle(),
-        FfiConverterSequenceString.lower(types),$0
+        FfiConverterSequenceTypeJsonObject.lower(types),$0
     )
 }
 }
     
     /**
-     * The declarations this copy holds, each as JSON, with the empty
-     * `fields` and the `version` a registration needs filled in where the app
-     * left them out.
+     * The declarations this copy holds, with the empty `fields` and the
+     * `version` a registration needs filled in where the app left them out.
      */
-open func declaredTypes()throws  -> [String]  {
-    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func declaredTypes()throws  -> [JsonObject]  {
+    return try  FfiConverterSequenceTypeJsonObject.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_declared_types(
             self.uniffiCloneHandle(),$0
     )
@@ -2000,16 +1999,15 @@ open func withdraw(id: String)throws  -> Bool  {
 }
     
     /**
-     * Writes one extension namespace, as its own write. The body is one
-     * JSON object.
+     * Writes one extension namespace, as its own write.
      */
-open func writeExtension(id: String, namespace: String, bodyJson: String)throws  -> QueuedWrite  {
+open func writeExtension(id: String, namespace: String, body: JsonObject)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_write_extension(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(namespace),
-        FfiConverterString.lower(bodyJson),$0
+        FfiConverterTypeJsonObject_lower(body),$0
     )
 })
 }
@@ -3647,19 +3645,26 @@ public func FfiConverterTypeConfirmedRemoval_lower(_ value: ConfirmedRemoval) ->
 
 /**
  * A create, before it is queued.
+ *
+ * The tags are queued as writes of their own. Where `source_id` names a row
+ * the server already holds, the create lands on it, and `base_version` makes
+ * that conditional on the version it was read at. With no `tier`, the copy
+ * uses its slice's tier, `library` in a slice of both tiers, or `library`
+ * before its first hydration, and sends that tier explicitly, unless
+ * `source` and `source_id` name an item the copy holds, or the server's
+ * answer to a lookup of that natural key does not say that no row holds
+ * it. The create is then sent with no tier: a row keeps its own, and a new
+ * row takes the key's default. A create outside the slice is held as a pin.
  */
 public struct Draft: Equatable, Hashable {
     public var type: String
-    public var id: String?
-    /**
-     * The properties as one JSON object.
-     */
-    public var propertiesJson: String
+    public var properties: JsonObject
     /**
      * Each queued as a write of its own, waiting on the create.
      */
     public var tags: [String]
     public var tier: Tier?
+    public var id: String?
     public var source: String?
     public var sourceId: String?
     public var occurredAt: String?
@@ -3671,22 +3676,19 @@ public struct Draft: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String, id: String? = nil, 
-        /**
-         * The properties as one JSON object.
-         */propertiesJson: String = "{}", 
+    public init(type: String, properties: JsonObject = JsonObject(), 
         /**
          * Each queued as a write of its own, waiting on the create.
-         */tags: [String] = [], tier: Tier? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil, 
+         */tags: [String] = [], tier: Tier? = nil, id: String? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil, 
         /**
          * The version this create is conditional on, where its natural key
          * resolves a row the server holds.
          */baseVersion: Int64? = nil) {
         self.type = type
-        self.id = id
-        self.propertiesJson = propertiesJson
+        self.properties = properties
         self.tags = tags
         self.tier = tier
+        self.id = id
         self.source = source
         self.sourceId = sourceId
         self.occurredAt = occurredAt
@@ -3710,10 +3712,10 @@ public struct FfiConverterTypeDraft: FfiConverterRustBuffer {
         return
             try Draft(
                 type: FfiConverterString.read(from: &buf), 
-                id: FfiConverterOptionString.read(from: &buf), 
-                propertiesJson: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
+                id: FfiConverterOptionString.read(from: &buf), 
                 source: FfiConverterOptionString.read(from: &buf), 
                 sourceId: FfiConverterOptionString.read(from: &buf), 
                 occurredAt: FfiConverterOptionString.read(from: &buf), 
@@ -3723,10 +3725,10 @@ public struct FfiConverterTypeDraft: FfiConverterRustBuffer {
 
     public static func write(_ value: Draft, into buf: inout [UInt8]) {
         FfiConverterString.write(value.type, into: &buf)
-        FfiConverterOptionString.write(value.id, into: &buf)
-        FfiConverterString.write(value.propertiesJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
+        FfiConverterOptionString.write(value.id, into: &buf)
         FfiConverterOptionString.write(value.source, into: &buf)
         FfiConverterOptionString.write(value.sourceId, into: &buf)
         FfiConverterOptionString.write(value.occurredAt, into: &buf)
@@ -3990,27 +3992,46 @@ public func FfiConverterTypeDrainVerdict_lower(_ value: DrainVerdict) -> RustBuf
 }
 
 
+/**
+ * An edge as the copy holds it.
+ */
 public struct Edge: Equatable, Hashable {
     public var id: String
     public var sourceId: String
     public var targetId: String
     public var edgeType: String
-    public var propertiesJson: String
+    /**
+     * Empty where `unreadable_properties` is set.
+     */
+    public var properties: JsonObject
     public var version: Int64
     public var createdAt: String
     public var updatedAt: String
+    /**
+     * Why `properties` is empty where the copy holds the edge but its stored
+     * properties cannot be read.
+     */
+    public var unreadableProperties: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, sourceId: String, targetId: String, edgeType: String, propertiesJson: String, version: Int64, createdAt: String, updatedAt: String) {
+    public init(id: String, sourceId: String, targetId: String, edgeType: String, 
+        /**
+         * Empty where `unreadable_properties` is set.
+         */properties: JsonObject, version: Int64, createdAt: String, updatedAt: String, 
+        /**
+         * Why `properties` is empty where the copy holds the edge but its stored
+         * properties cannot be read.
+         */unreadableProperties: String? = nil) {
         self.id = id
         self.sourceId = sourceId
         self.targetId = targetId
         self.edgeType = edgeType
-        self.propertiesJson = propertiesJson
+        self.properties = properties
         self.version = version
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.unreadableProperties = unreadableProperties
     }
 
     
@@ -4033,10 +4054,11 @@ public struct FfiConverterTypeEdge: FfiConverterRustBuffer {
                 sourceId: FfiConverterString.read(from: &buf), 
                 targetId: FfiConverterString.read(from: &buf), 
                 edgeType: FfiConverterString.read(from: &buf), 
-                propertiesJson: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 version: FfiConverterInt64.read(from: &buf), 
                 createdAt: FfiConverterString.read(from: &buf), 
-                updatedAt: FfiConverterString.read(from: &buf)
+                updatedAt: FfiConverterString.read(from: &buf), 
+                unreadableProperties: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -4045,10 +4067,11 @@ public struct FfiConverterTypeEdge: FfiConverterRustBuffer {
         FfiConverterString.write(value.sourceId, into: &buf)
         FfiConverterString.write(value.targetId, into: &buf)
         FfiConverterString.write(value.edgeType, into: &buf)
-        FfiConverterString.write(value.propertiesJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterInt64.write(value.version, into: &buf)
         FfiConverterString.write(value.createdAt, into: &buf)
         FfiConverterString.write(value.updatedAt, into: &buf)
+        FfiConverterOptionString.write(value.unreadableProperties, into: &buf)
     }
 }
 
@@ -4075,16 +4098,16 @@ public struct EdgeDraft: Equatable, Hashable {
     public var sourceId: String
     public var targetId: String
     public var edgeType: String
-    public var propertiesJson: String
+    public var properties: JsonObject
     public var id: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(sourceId: String, targetId: String, edgeType: String, propertiesJson: String = "{}", id: String? = nil) {
+    public init(sourceId: String, targetId: String, edgeType: String, properties: JsonObject = JsonObject(), id: String? = nil) {
         self.sourceId = sourceId
         self.targetId = targetId
         self.edgeType = edgeType
-        self.propertiesJson = propertiesJson
+        self.properties = properties
         self.id = id
     }
 
@@ -4107,7 +4130,7 @@ public struct FfiConverterTypeEdgeDraft: FfiConverterRustBuffer {
                 sourceId: FfiConverterString.read(from: &buf), 
                 targetId: FfiConverterString.read(from: &buf), 
                 edgeType: FfiConverterString.read(from: &buf), 
-                propertiesJson: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 id: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -4116,7 +4139,7 @@ public struct FfiConverterTypeEdgeDraft: FfiConverterRustBuffer {
         FfiConverterString.write(value.sourceId, into: &buf)
         FfiConverterString.write(value.targetId, into: &buf)
         FfiConverterString.write(value.edgeType, into: &buf)
-        FfiConverterString.write(value.propertiesJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterOptionString.write(value.id, into: &buf)
     }
 }
@@ -4142,14 +4165,22 @@ public func FfiConverterTypeEdgeDraft_lower(_ value: EdgeDraft) -> RustBuffer {
  * and the version it was read at.
  */
 public struct EdgeEdit: Equatable, Hashable {
-    public var propertiesJson: String
-    public var baseVersion: Int64?
+    /**
+     * Each property given replaces its whole value; every other one stays as
+     * it is.
+     */
+    public var properties: JsonObject
+    public var baseVersion: Int64
     public var moves: EdgeMove?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(propertiesJson: String, baseVersion: Int64? = nil, moves: EdgeMove? = nil) {
-        self.propertiesJson = propertiesJson
+    public init(
+        /**
+         * Each property given replaces its whole value; every other one stays as
+         * it is.
+         */properties: JsonObject = JsonObject(), baseVersion: Int64, moves: EdgeMove? = nil) {
+        self.properties = properties
         self.baseVersion = baseVersion
         self.moves = moves
     }
@@ -4170,15 +4201,15 @@ public struct FfiConverterTypeEdgeEdit: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeEdit {
         return
             try EdgeEdit(
-                propertiesJson: FfiConverterString.read(from: &buf), 
-                baseVersion: FfiConverterOptionInt64.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
+                baseVersion: FfiConverterInt64.read(from: &buf), 
                 moves: FfiConverterOptionTypeEdgeMove.read(from: &buf)
         )
     }
 
     public static func write(_ value: EdgeEdit, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.propertiesJson, into: &buf)
-        FfiConverterOptionInt64.write(value.baseVersion, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
+        FfiConverterInt64.write(value.baseVersion, into: &buf)
         FfiConverterOptionTypeEdgeMove.write(value.moves, into: &buf)
     }
 }
@@ -4357,34 +4388,40 @@ public func FfiConverterTypeEdgeType_lower(_ value: EdgeType) -> RustBuffer {
 
 /**
  * A change to an item, and the version it was read at.
+ *
+ * A type or a tier the item already has moves nothing and is not sent. A
+ * `type` the copy's catalog does not hold is refused `UnknownType` before
+ * anything is queued.
  */
 public struct Edit: Equatable, Hashable {
     /**
-     * Whole field values, as one JSON object; a device never merges
-     * inside a field.
+     * Whole field values; a device never merges inside a field. Unless
+     * `replace_properties` is set, each property given replaces its value and
+     * the rest stay, and a `null` clears nothing: the server drops it, and
+     * so does the copy, so the property keeps its value.
      */
-    public var propertiesJson: String
+    public var properties: JsonObject
     /**
      * The properties are the item's whole properties: one left out is
-     * cleared. Otherwise each one given replaces its value and the rest stay.
+     * cleared. Sent at a version older than the one the copy holds, through
+     * `update_item_as_read`, it is merged as a merge is.
      */
     public var replaceProperties: Bool
     /**
-     * Required: an update naming no version is refused before it is sent.
+     * The version the change was made against.
      */
-    public var baseVersion: Int64?
+    public var baseVersion: Int64
     /**
      * The natural key to move the row to.
      */
     public var sourceId: String?
     /**
-     * The type to move the row to, sent as the server's retype. A type the
-     * copy's catalog does not hold is refused `UnknownType` before anything
-     * is queued; the type the row has already moves nothing.
+     * The type to move the row to, sent as the server's retype. The
+     * properties it ends up with are held to that type.
      */
     public var type: String?
     /**
-     * The tier to move the row to; the tier it has already moves nothing.
+     * The tier to move the row to.
      */
     public var tier: Tier?
 
@@ -4392,28 +4429,30 @@ public struct Edit: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * Whole field values, as one JSON object; a device never merges
-         * inside a field.
-         */propertiesJson: String, 
+         * Whole field values; a device never merges inside a field. Unless
+         * `replace_properties` is set, each property given replaces its value and
+         * the rest stay, and a `null` clears nothing: the server drops it, and
+         * so does the copy, so the property keeps its value.
+         */properties: JsonObject = JsonObject(), 
         /**
          * The properties are the item's whole properties: one left out is
-         * cleared. Otherwise each one given replaces its value and the rest stay.
+         * cleared. Sent at a version older than the one the copy holds, through
+         * `update_item_as_read`, it is merged as a merge is.
          */replaceProperties: Bool = false, 
         /**
-         * Required: an update naming no version is refused before it is sent.
-         */baseVersion: Int64? = nil, 
+         * The version the change was made against.
+         */baseVersion: Int64, 
         /**
          * The natural key to move the row to.
          */sourceId: String? = nil, 
         /**
-         * The type to move the row to, sent as the server's retype. A type the
-         * copy's catalog does not hold is refused `UnknownType` before anything
-         * is queued; the type the row has already moves nothing.
+         * The type to move the row to, sent as the server's retype. The
+         * properties it ends up with are held to that type.
          */type: String? = nil, 
         /**
-         * The tier to move the row to; the tier it has already moves nothing.
+         * The tier to move the row to.
          */tier: Tier? = nil) {
-        self.propertiesJson = propertiesJson
+        self.properties = properties
         self.replaceProperties = replaceProperties
         self.baseVersion = baseVersion
         self.sourceId = sourceId
@@ -4437,9 +4476,9 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Edit {
         return
             try Edit(
-                propertiesJson: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 replaceProperties: FfiConverterBool.read(from: &buf), 
-                baseVersion: FfiConverterOptionInt64.read(from: &buf), 
+                baseVersion: FfiConverterInt64.read(from: &buf), 
                 sourceId: FfiConverterOptionString.read(from: &buf), 
                 type: FfiConverterOptionString.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf)
@@ -4447,9 +4486,9 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: Edit, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.propertiesJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterBool.write(value.replaceProperties, into: &buf)
-        FfiConverterOptionInt64.write(value.baseVersion, into: &buf)
+        FfiConverterInt64.write(value.baseVersion, into: &buf)
         FfiConverterOptionString.write(value.sourceId, into: &buf)
         FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
@@ -4764,10 +4803,7 @@ public func FfiConverterTypeFlaggedFile_lower(_ value: FlaggedFile) -> RustBuffe
 public struct FolderDefaults: Equatable, Hashable {
     public var type: String?
     public var tier: Tier?
-    /**
-     * One JSON object.
-     */
-    public var propertiesJson: String
+    public var properties: JsonObject
     public var tags: [String]
     /**
      * From edge type to the ids of the items each new file is linked to.
@@ -4776,16 +4812,13 @@ public struct FolderDefaults: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String? = nil, tier: Tier? = nil, 
-        /**
-         * One JSON object.
-         */propertiesJson: String = "{}", tags: [String] = [], 
+    public init(type: String? = nil, tier: Tier? = nil, properties: JsonObject = JsonObject(), tags: [String] = [], 
         /**
          * From edge type to the ids of the items each new file is linked to.
          */edges: [String: [String]]) {
         self.type = type
         self.tier = tier
-        self.propertiesJson = propertiesJson
+        self.properties = properties
         self.tags = tags
         self.edges = edges
     }
@@ -4808,7 +4841,7 @@ public struct FfiConverterTypeFolderDefaults: FfiConverterRustBuffer {
             try FolderDefaults(
                 type: FfiConverterOptionString.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
-                propertiesJson: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 edges: FfiConverterDictionaryStringSequenceString.read(from: &buf)
         )
@@ -4817,7 +4850,7 @@ public struct FfiConverterTypeFolderDefaults: FfiConverterRustBuffer {
     public static func write(_ value: FolderDefaults, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
-        FfiConverterString.write(value.propertiesJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterDictionaryStringSequenceString.write(value.edges, into: &buf)
     }
@@ -5806,13 +5839,17 @@ public func FfiConverterTypeHydrateReport_lower(_ value: HydrateReport) -> RustB
 }
 
 
+/**
+ * An item as the copy holds it.
+ */
 public struct Item: Equatable, Hashable {
     public var id: String
     public var type: String
     /**
-     * The item's properties as one JSON object.
+     * The item's properties, in the order the server answers them. Empty
+     * where `unreadable_properties` is set.
      */
-    public var propertiesJson: String
+    public var properties: JsonObject
     public var state: ItemState
     public var tier: Tier?
     public var version: Int64
@@ -5835,26 +5872,40 @@ public struct Item: Equatable, Hashable {
      * string.
      */
     public var body: String?
+    /**
+     * Why `properties` is empty where the copy holds the item but its stored
+     * properties cannot be read, such as a store written to by something
+     * else. Every other field is as the copy holds it. A hydration replaces
+     * the stored properties from the server.
+     */
+    public var unreadableProperties: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(id: String, type: String, 
         /**
-         * The item's properties as one JSON object.
-         */propertiesJson: String, state: ItemState, tier: Tier?, version: Int64, schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String, updatedAt: String, tags: [String], 
+         * The item's properties, in the order the server answers them. Empty
+         * where `unreadable_properties` is set.
+         */properties: JsonObject, state: ItemState, tier: Tier?, version: Int64, schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String, updatedAt: String, tags: [String], 
         /**
          * The text under the property the type's display hints name as its
          * title, or `title` where they name none; none where that holds no
          * string.
-         */title: String?, 
+         */title: String? = nil, 
         /**
          * The text under the property the type's display hints name as its
          * body, or `body` where they name none; none where that holds no
          * string.
-         */body: String?) {
+         */body: String? = nil, 
+        /**
+         * Why `properties` is empty where the copy holds the item but its stored
+         * properties cannot be read, such as a store written to by something
+         * else. Every other field is as the copy holds it. A hydration replaces
+         * the stored properties from the server.
+         */unreadableProperties: String? = nil) {
         self.id = id
         self.type = type
-        self.propertiesJson = propertiesJson
+        self.properties = properties
         self.state = state
         self.tier = tier
         self.version = version
@@ -5867,6 +5918,7 @@ public struct Item: Equatable, Hashable {
         self.tags = tags
         self.title = title
         self.body = body
+        self.unreadableProperties = unreadableProperties
     }
 
     
@@ -5887,7 +5939,7 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
             try Item(
                 id: FfiConverterString.read(from: &buf), 
                 type: FfiConverterString.read(from: &buf), 
-                propertiesJson: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 state: FfiConverterTypeItemState.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
                 version: FfiConverterInt64.read(from: &buf), 
@@ -5899,14 +5951,15 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
                 updatedAt: FfiConverterString.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 title: FfiConverterOptionString.read(from: &buf), 
-                body: FfiConverterOptionString.read(from: &buf)
+                body: FfiConverterOptionString.read(from: &buf), 
+                unreadableProperties: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: Item, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
         FfiConverterString.write(value.type, into: &buf)
-        FfiConverterString.write(value.propertiesJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterTypeItemState.write(value.state, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
         FfiConverterInt64.write(value.version, into: &buf)
@@ -5919,6 +5972,7 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionString.write(value.title, into: &buf)
         FfiConverterOptionString.write(value.body, into: &buf)
+        FfiConverterOptionString.write(value.unreadableProperties, into: &buf)
     }
 }
 
@@ -6028,6 +6082,119 @@ public func FfiConverterTypeItemType_lift(_ buf: RustBuffer) throws -> ItemType 
 #endif
 public func FfiConverterTypeItemType_lower(_ value: ItemType) -> RustBuffer {
     return FfiConverterTypeItemType.lower(value)
+}
+
+
+public struct JsonMember: Equatable, Hashable {
+    public var key: String
+    public var value: JsonValue
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(key: String, value: JsonValue) {
+        self.key = key
+        self.value = value
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension JsonMember: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeJsonMember: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JsonMember {
+        return
+            try JsonMember(
+                key: FfiConverterString.read(from: &buf), 
+                value: FfiConverterTypeJsonValue.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: JsonMember, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.key, into: &buf)
+        FfiConverterTypeJsonValue.write(value.value, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJsonMember_lift(_ buf: RustBuffer) throws -> JsonMember {
+    return try FfiConverterTypeJsonMember.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJsonMember_lower(_ value: JsonMember) -> RustBuffer {
+    return FfiConverterTypeJsonMember.lower(value)
+}
+
+
+/**
+ * A JSON object that keeps its keys in order.
+ */
+public struct JsonObject: Equatable, Hashable {
+    /**
+     * In order; a key appears once, as the bytes of its UTF-8.
+     */
+    public var members: [JsonMember]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * In order; a key appears once, as the bytes of its UTF-8.
+         */members: [JsonMember] = []) {
+        self.members = members
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension JsonObject: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeJsonObject: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JsonObject {
+        return
+            try JsonObject(
+                members: FfiConverterSequenceTypeJsonMember.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: JsonObject, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeJsonMember.write(value.members, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJsonObject_lift(_ buf: RustBuffer) throws -> JsonObject {
+    return try FfiConverterTypeJsonObject.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJsonObject_lower(_ value: JsonObject) -> RustBuffer {
+    return FfiConverterTypeJsonObject.lower(value)
 }
 
 
@@ -6450,14 +6617,15 @@ public struct QueuedWrite: Equatable, Hashable {
      */
     public var waiting: Bool
     /**
-     * The body the write sends, or sent, as one JSON object: a refused
-     * write's content stays readable here until it is discarded.
+     * The body the write sends, or sent: a refused write's content stays
+     * readable here until it is discarded.
      */
-    public var bodyJson: String
+    public var body: JsonObject
     /**
-     * The server's answer, whole, as it arrived.
+     * The server's answer, whole, as it arrived: the JSON it held, or, for
+     * an answer that was not JSON, its text as a string.
      */
-    public var answer: String?
+    public var answer: JsonValue?
     public var refusals: Int64
     public var queuedAt: String
     public var answeredAt: String?
@@ -6483,12 +6651,13 @@ public struct QueuedWrite: Equatable, Hashable {
          * `follows` say which.
          */waiting: Bool, 
         /**
-         * The body the write sends, or sent, as one JSON object: a refused
-         * write's content stays readable here until it is discarded.
-         */bodyJson: String, 
+         * The body the write sends, or sent: a refused write's content stays
+         * readable here until it is discarded.
+         */body: JsonObject, 
         /**
-         * The server's answer, whole, as it arrived.
-         */answer: String?, refusals: Int64, queuedAt: String, answeredAt: String?) {
+         * The server's answer, whole, as it arrived: the JSON it held, or, for
+         * an answer that was not JSON, its text as a string.
+         */answer: JsonValue?, refusals: Int64, queuedAt: String, answeredAt: String?) {
         self.id = id
         self.kind = kind
         self.itemId = itemId
@@ -6503,7 +6672,7 @@ public struct QueuedWrite: Equatable, Hashable {
         self.follows = follows
         self.verdict = verdict
         self.waiting = waiting
-        self.bodyJson = bodyJson
+        self.body = body
         self.answer = answer
         self.refusals = refusals
         self.queuedAt = queuedAt
@@ -6540,8 +6709,8 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
                 follows: FfiConverterOptionString.read(from: &buf), 
                 verdict: FfiConverterOptionTypeVerdict.read(from: &buf), 
                 waiting: FfiConverterBool.read(from: &buf), 
-                bodyJson: FfiConverterString.read(from: &buf), 
-                answer: FfiConverterOptionString.read(from: &buf), 
+                body: FfiConverterTypeJsonObject.read(from: &buf), 
+                answer: FfiConverterOptionTypeJsonValue.read(from: &buf), 
                 refusals: FfiConverterInt64.read(from: &buf), 
                 queuedAt: FfiConverterString.read(from: &buf), 
                 answeredAt: FfiConverterOptionString.read(from: &buf)
@@ -6563,8 +6732,8 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.follows, into: &buf)
         FfiConverterOptionTypeVerdict.write(value.verdict, into: &buf)
         FfiConverterBool.write(value.waiting, into: &buf)
-        FfiConverterString.write(value.bodyJson, into: &buf)
-        FfiConverterOptionString.write(value.answer, into: &buf)
+        FfiConverterTypeJsonObject.write(value.body, into: &buf)
+        FfiConverterOptionTypeJsonValue.write(value.answer, into: &buf)
         FfiConverterInt64.write(value.refusals, into: &buf)
         FfiConverterString.write(value.queuedAt, into: &buf)
         FfiConverterOptionString.write(value.answeredAt, into: &buf)
@@ -6840,9 +7009,9 @@ public func FfiConverterTypeRestoredRemoval_lower(_ value: RestoredRemoval) -> R
  * the list reads it.
  */
 public struct SearchFilters: Equatable, Hashable {
+    public var type: String?
     public var state: ItemState?
     public var allStates: Bool
-    public var type: String?
     public var tags: [String]
     /**
      * An expression in the server's listing grammar, answered as the server
@@ -6858,7 +7027,7 @@ public struct SearchFilters: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(state: ItemState? = nil, allStates: Bool = false, type: String? = nil, tags: [String] = [], 
+    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tags: [String] = [], 
         /**
          * An expression in the server's listing grammar, answered as the server
          * answers `filter` and refused `validation_error` where it refuses it.
@@ -6868,9 +7037,9 @@ public struct SearchFilters: Equatable, Hashable {
          * An item id: that item and every item it reaches along `parent-of`
          * edges, as far as the copy holds them.
          */beneath: String? = nil) {
+        self.type = type
         self.state = state
         self.allStates = allStates
-        self.type = type
         self.tags = tags
         self.filter = filter
         self.beneath = beneath
@@ -6892,9 +7061,9 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchFilters {
         return
             try SearchFilters(
+                type: FfiConverterOptionString.read(from: &buf), 
                 state: FfiConverterOptionTypeItemState.read(from: &buf), 
                 allStates: FfiConverterBool.read(from: &buf), 
-                type: FfiConverterOptionString.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 filter: FfiConverterOptionString.read(from: &buf), 
                 beneath: FfiConverterOptionString.read(from: &buf)
@@ -6902,9 +7071,9 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: SearchFilters, into buf: inout [UInt8]) {
+        FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterOptionTypeItemState.write(value.state, into: &buf)
         FfiConverterBool.write(value.allStates, into: &buf)
-        FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionString.write(value.filter, into: &buf)
         FfiConverterOptionString.write(value.beneath, into: &buf)
@@ -6927,6 +7096,9 @@ public func FfiConverterTypeSearchFilters_lower(_ value: SearchFilters) -> RustB
 }
 
 
+/**
+ * One hit of a search, with the item it found.
+ */
 public struct SearchHit: Equatable, Hashable {
     public var item: Item
     /**
@@ -7387,9 +7559,9 @@ public struct TypeField: Equatable, Hashable {
      */
     public var declaredBy: String
     /**
-     * The definition whole, as the server answers it, as one JSON object.
+     * The definition whole, as the server answers it.
      */
-    public var definitionJson: String
+    public var definition: JsonObject
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -7402,14 +7574,14 @@ public struct TypeField: Equatable, Hashable {
          * inherits the field from.
          */declaredBy: String, 
         /**
-         * The definition whole, as the server answers it, as one JSON object.
-         */definitionJson: String) {
+         * The definition whole, as the server answers it.
+         */definition: JsonObject) {
         self.name = name
         self.fieldType = fieldType
         self.required = required
         self.description = description
         self.declaredBy = declaredBy
-        self.definitionJson = definitionJson
+        self.definition = definition
     }
 
     
@@ -7433,7 +7605,7 @@ public struct FfiConverterTypeTypeField: FfiConverterRustBuffer {
                 required: FfiConverterBool.read(from: &buf), 
                 description: FfiConverterOptionString.read(from: &buf), 
                 declaredBy: FfiConverterString.read(from: &buf), 
-                definitionJson: FfiConverterString.read(from: &buf)
+                definition: FfiConverterTypeJsonObject.read(from: &buf)
         )
     }
 
@@ -7443,7 +7615,7 @@ public struct FfiConverterTypeTypeField: FfiConverterRustBuffer {
         FfiConverterBool.write(value.required, into: &buf)
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterString.write(value.declaredBy, into: &buf)
-        FfiConverterString.write(value.definitionJson, into: &buf)
+        FfiConverterTypeJsonObject.write(value.definition, into: &buf)
     }
 }
 
@@ -7649,7 +7821,7 @@ public func FfiConverterTypeWaitingFirstSync_lower(_ value: WaitingFirstSync) ->
  * Why a `blocked` write has stopped.
  */
 
-public enum BlockedReason: Equatable, Hashable {
+public enum BlockedReason: Equatable, Hashable, CaseIterable {
     
     case credentialRefused
     case keySpent
@@ -8074,7 +8246,7 @@ public func FfiConverterTypeChange_lower(_ value: Change) -> RustBuffer {
  * One end of an edge.
  */
 
-public enum EdgeEnd: Equatable, Hashable {
+public enum EdgeEnd: Equatable, Hashable, CaseIterable {
     
     case source
     case target
@@ -8144,7 +8316,7 @@ public func FfiConverterTypeEdgeEnd_lower(_ value: EdgeEnd) -> RustBuffer {
  * Where one file stands, from the folder's own store.
  */
 
-public enum FileState: Equatable, Hashable {
+public enum FileState: Equatable, Hashable, CaseIterable {
     
     /**
      * The file and its item agree.
@@ -8550,7 +8722,7 @@ public func FfiConverterTypeFolderSyncOutcome_lower(_ value: FolderSyncOutcome) 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum GrantKind: Equatable, Hashable {
+public enum GrantKind: Equatable, Hashable, CaseIterable {
     
     case type
     case edgeType
@@ -8624,7 +8796,7 @@ public func FfiConverterTypeGrantKind_lower(_ value: GrantKind) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum GrantLevel: Equatable, Hashable {
+public enum GrantLevel: Equatable, Hashable, CaseIterable {
     
     case read
     case write
@@ -8694,7 +8866,7 @@ public func FfiConverterTypeGrantLevel_lower(_ value: GrantLevel) -> RustBuffer 
  * Which handle this process holds on the store.
  */
 
-public enum Handle: Equatable, Hashable {
+public enum Handle: Equatable, Hashable, CaseIterable {
     
     case writer
     case reader
@@ -8761,7 +8933,7 @@ public func FfiConverterTypeHandle_lower(_ value: Handle) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum Hydration: Equatable, Hashable {
+public enum Hydration: Equatable, Hashable, CaseIterable {
     
     case never
     case inProgress
@@ -8841,8 +9013,11 @@ public func FfiConverterTypeHydration_lower(_ value: Hydration) -> RustBuffer {
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Where an item is in its life.
+ */
 
-public enum ItemState: Equatable, Hashable {
+public enum ItemState: Equatable, Hashable, CaseIterable {
     
     case active
     case archived
@@ -8917,6 +9092,137 @@ public func FfiConverterTypeItemState_lift(_ buf: RustBuffer) throws -> ItemStat
 #endif
 public func FfiConverterTypeItemState_lower(_ value: ItemState) -> RustBuffer {
     return FfiConverterTypeItemState.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * One JSON value.
+ */
+
+public enum JsonValue: Equatable, Hashable {
+    
+    case null
+    case bool(Bool
+    )
+    /**
+     * A number with no fraction or exponent that fits 64 bits.
+     */
+    case integer(Int64
+    )
+    /**
+     * Any other number. An integer too large for `Integer` arrives here,
+     * rounded to the nearest `f64`; a number sent to the core must be
+     * finite.
+     */
+    case number(Double
+    )
+    case string(String
+    )
+    case array([JsonValue]
+    )
+    case object(JsonObject
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension JsonValue: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeJsonValue: FfiConverterRustBuffer {
+    typealias SwiftType = JsonValue
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JsonValue {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .null
+        
+        case 2: return .bool(try FfiConverterBool.read(from: &buf)
+        )
+        
+        case 3: return .integer(try FfiConverterInt64.read(from: &buf)
+        )
+        
+        case 4: return .number(try FfiConverterDouble.read(from: &buf)
+        )
+        
+        case 5: return .string(try FfiConverterString.read(from: &buf)
+        )
+        
+        case 6: return .array(try FfiConverterSequenceTypeJsonValue.read(from: &buf)
+        )
+        
+        case 7: return .object(try FfiConverterTypeJsonObject.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: JsonValue, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .null:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .bool(v1):
+            writeInt(&buf, Int32(2))
+            FfiConverterBool.write(v1, into: &buf)
+            
+        
+        case let .integer(v1):
+            writeInt(&buf, Int32(3))
+            FfiConverterInt64.write(v1, into: &buf)
+            
+        
+        case let .number(v1):
+            writeInt(&buf, Int32(4))
+            FfiConverterDouble.write(v1, into: &buf)
+            
+        
+        case let .string(v1):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(v1, into: &buf)
+            
+        
+        case let .array(v1):
+            writeInt(&buf, Int32(6))
+            FfiConverterSequenceTypeJsonValue.write(v1, into: &buf)
+            
+        
+        case let .object(v1):
+            writeInt(&buf, Int32(7))
+            FfiConverterTypeJsonObject.write(v1, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJsonValue_lift(_ buf: RustBuffer) throws -> JsonValue {
+    return try FfiConverterTypeJsonValue.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeJsonValue_lower(_ value: JsonValue) -> RustBuffer {
+    return FfiConverterTypeJsonValue.lower(value)
 }
 
 
@@ -9398,7 +9704,7 @@ public func FfiConverterTypeMarfaError_lower(_ value: MarfaError) -> RustBuffer 
  * The tiers a slice holds: one, or `All` for both.
  */
 
-public enum SliceTier: Equatable, Hashable {
+public enum SliceTier: Equatable, Hashable, CaseIterable {
     
     case library
     case feed
@@ -9472,7 +9778,7 @@ public func FfiConverterTypeSliceTier_lower(_ value: SliceTier) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum SortDirection: Equatable, Hashable {
+public enum SortDirection: Equatable, Hashable, CaseIterable {
     
     case ascending
     case descending
@@ -9539,7 +9845,7 @@ public func FfiConverterTypeSortDirection_lower(_ value: SortDirection) -> RustB
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum SortField: Equatable, Hashable {
+public enum SortField: Equatable, Hashable, CaseIterable {
     
     case createdAt
     case updatedAt
@@ -9721,8 +10027,12 @@ public func FfiConverterTypeStorageCause_lower(_ value: StorageCause) -> RustBuf
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The tier an item is in: `library` for lasting material, `feed` for an
+ * incoming stream.
+ */
 
-public enum Tier: Equatable, Hashable {
+public enum Tier: Equatable, Hashable, CaseIterable {
     
     case library
     case feed
@@ -9923,7 +10233,7 @@ public func FfiConverterTypeVerdict_lower(_ value: Verdict) -> RustBuffer {
  * The kinds of write a queue holds.
  */
 
-public enum WriteKind: Equatable, Hashable {
+public enum WriteKind: Equatable, Hashable, CaseIterable {
     
     case createItem
     case updateItem
@@ -10609,6 +10919,30 @@ fileprivate struct FfiConverterOptionTypeItemState: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeJsonValue: FfiConverterRustBuffer {
+    typealias SwiftType = JsonValue?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeJsonValue.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeJsonValue.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeMarfaError: FfiConverterRustBuffer {
     typealias SwiftType = MarfaError?
 
@@ -11051,6 +11385,56 @@ fileprivate struct FfiConverterSequenceTypeItemType: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeJsonMember: FfiConverterRustBuffer {
+    typealias SwiftType = [JsonMember]
+
+    public static func write(_ value: [JsonMember], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeJsonMember.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [JsonMember] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [JsonMember]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeJsonMember.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeJsonObject: FfiConverterRustBuffer {
+    typealias SwiftType = [JsonObject]
+
+    public static func write(_ value: [JsonObject], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeJsonObject.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [JsonObject] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [JsonObject]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeJsonObject.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeListedFolder: FfiConverterRustBuffer {
     typealias SwiftType = [ListedFolder]
 
@@ -11226,6 +11610,31 @@ fileprivate struct FfiConverterSequenceTypeItemState: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeJsonValue: FfiConverterRustBuffer {
+    typealias SwiftType = [JsonValue]
+
+    public static func write(_ value: [JsonValue], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeJsonValue.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [JsonValue] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [JsonValue]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeJsonValue.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterDictionaryStringString: FfiConverterRustBuffer {
     public static func write(_ value: [String: String], into buf: inout [UInt8]) {
         let len = Int32(value.count)
@@ -11332,10 +11741,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_data_version() != 13314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 64631) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 32035) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_declared_types() != 278) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_declared_types() != 51849) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_delete_edge() != 50291) {
@@ -11464,7 +11873,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 24491) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 22789) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_change_folder() != 57042) {

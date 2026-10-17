@@ -166,237 +166,41 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     }
 }
 
-public struct Item: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let type: String
-    public let properties: JSONObject
-    public let state: ItemState
-    public let tier: Tier?
-    public let version: Int64
-    public let schemaVersion: Int64
-    public let source: String
-    public let sourceId: String?
-    public let occurredAt: String
-    public let createdAt: String
-    public let updatedAt: String
-    public let tags: [String]
-    /// The text under the property the type's display hints name as its
-    /// title, or under `title` where they name none; `nil` where that
-    /// property holds no string.
-    ///
-    /// The core resolves it from the catalog the copy holds, by the rule a
-    /// folder names its files by.
-    public let title: String?
-    /// The text under the property the type's display hints name as its
-    /// body, such as `description` for `core.event`, or under `body` where
-    /// they name none; `nil` where that property holds no string.
-    public let body: String?
-
-    /// For an app's previews and tests.
-    public init(
-        id: String, type: String, properties: JSONObject, state: ItemState, tier: Tier?, version: Int64,
-        schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
-        updatedAt: String, tags: [String], title: String? = nil, body: String? = nil
-    ) {
-        self.id = id
-        self.type = type
-        self.properties = properties
-        self.state = state
-        self.tier = tier
-        self.version = version
-        self.schemaVersion = schemaVersion
-        self.source = source
-        self.sourceId = sourceId
-        self.occurredAt = occurredAt
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.tags = tags
-        self.title = title
-        self.body = body
-    }
-
-    init(_ item: MarfaCore.Item) throws {
-        id = item.id
-        type = item.type
-        properties = try JSONObject(json: item.propertiesJson)
-        state = ItemState(item.state)
-        tier = item.tier.map(Tier.init)
-        version = item.version
-        schemaVersion = item.schemaVersion
-        source = item.source
-        sourceId = item.sourceId
-        occurredAt = item.occurredAt
-        createdAt = item.createdAt
-        updatedAt = item.updatedAt
-        tags = item.tags
-        title = item.title
-        body = item.body
-    }
-}
+/// An item as the copy holds it.
+///
+/// The core's own record, so a field added to it reaches an app with no
+/// change here. `properties` holds the item's properties in the order the
+/// server answers them, and is empty where `unreadableProperties` says the
+/// stored properties could not be read.
+public typealias Item = MarfaCore.Item
 
 /// One page of the server's bin.
-public struct BinPage: Sendable, Hashable {
-    public let items: [Item]
-    /// Where the next page starts; `nil` on the last.
-    public let nextCursor: String?
+public typealias BinPage = MarfaCore.BinPage
 
-    public init(items: [Item], nextCursor: String?) {
-        self.items = items
-        self.nextCursor = nextCursor
-    }
+/// An edge as the copy holds it.
+public typealias Edge = MarfaCore.Edge
 
-    init(_ page: MarfaCore.BinPage) throws {
-        items = try page.items.map(Item.init)
-        nextCursor = page.nextCursor
-    }
-}
-
-public struct Edge: Sendable, Hashable, Identifiable {
-    public let id: String
-    public let sourceId: String
-    public let targetId: String
-    public let edgeType: String
-    public let properties: JSONObject
-    public let version: Int64
-    public let createdAt: String
-    public let updatedAt: String
-
-    /// For an app's previews and tests.
-    public init(
-        id: String, sourceId: String, targetId: String, edgeType: String, properties: JSONObject,
-        version: Int64, createdAt: String, updatedAt: String
-    ) {
-        self.id = id
-        self.sourceId = sourceId
-        self.targetId = targetId
-        self.edgeType = edgeType
-        self.properties = properties
-        self.version = version
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-    }
-
-    init(_ edge: MarfaCore.Edge) throws {
-        id = edge.id
-        sourceId = edge.sourceId
-        targetId = edge.targetId
-        edgeType = edge.edgeType
-        properties = try JSONObject(json: edge.propertiesJson)
-        version = edge.version
-        createdAt = edge.createdAt
-        updatedAt = edge.updatedAt
-    }
-}
-
-public struct SearchHit: Sendable, Hashable {
-    public let item: Item
-    public let score: Double
-    public let snippet: String
-
-    init(_ hit: MarfaCore.SearchHit) throws {
-        item = try Item(hit.item)
-        score = hit.score
-        snippet = hit.snippet
-    }
-}
+/// A hit of a search, with the item it found.
+public typealias SearchHit = MarfaCore.SearchHit
 
 /// A create, before it is queued.
 ///
-/// The tags are queued as writes of their own. Where `sourceId` names a row
-/// the server already holds, the create lands on it, and `baseVersion` makes
-/// that conditional on the version it was read at. With no `tier`, the copy
-/// uses its slice's tier, `library` in a slice of both tiers, or `library`
-/// before its first hydration, and sends that tier explicitly, unless
-/// `source` and `sourceId` name an item the copy holds, or the server's
-/// answer to a lookup of that natural key does not say that no row holds
-/// it. The create is then sent with no tier: a row keeps its own, and a new
-/// row takes the key's default. A create outside the slice is held as a pin.
-public struct Draft: Sendable, Hashable {
-    public var type: String
-    public var properties: JSONObject
-    public var tags: [String]
-    public var tier: Tier?
-    public var id: String?
-    public var source: String?
-    public var sourceId: String?
-    public var occurredAt: String?
-    public var baseVersion: Int64?
-
-    public init(
-        type: String, properties: JSONObject = [:], tags: [String] = [], tier: Tier? = nil,
-        id: String? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil,
-        baseVersion: Int64? = nil
-    ) {
-        self.type = type
-        self.properties = properties
-        self.tags = tags
-        self.tier = tier
-        self.id = id
-        self.source = source
-        self.sourceId = sourceId
-        self.occurredAt = occurredAt
-        self.baseVersion = baseVersion
-    }
-
-    func core() throws -> MarfaCore.Draft {
-        MarfaCore.Draft(
-            type: type, id: id, propertiesJson: try properties.json(), tags: tags, tier: tier?.core,
-            source: source, sourceId: sourceId, occurredAt: occurredAt, baseVersion: baseVersion)
-    }
-}
+/// The tags are queued as writes of their own. See the core's documentation of each field.
+public typealias Draft = MarfaCore.Draft
 
 /// A change to an item, and the version it was read at.
-///
-/// A type or a tier the item already has moves nothing and is not sent. A
-/// `type` the copy's catalog does not hold is refused `unknownType` before
-/// anything is queued.
-public struct Edit: Sendable, Hashable {
-    /// How the properties meet the item's.
-    public enum Properties: Sendable, Hashable {
-        /// Each property given replaces its whole value; every other one
-        /// stays as it is. A `null` clears nothing: the server drops it, and
-        /// so does the copy, so the property keeps its value. Use `.replace`
-        /// to drop a property.
-        case merge(JSONObject)
-        /// The item's whole properties: a property left out is cleared.
-        /// Sent at a version older than the one the copy holds, through
-        /// `updateAsRead(_:_:)`, it is merged as `merge` is.
-        case replace(JSONObject)
-    }
+public typealias Edit = MarfaCore.Edit
 
-    public var properties: Properties
-    public var baseVersion: Int64
-    /// The natural key to move the item to.
-    public var sourceId: String?
-    /// The type to move the item to, sent as the server's retype.
-    ///
-    /// The properties it ends up with are held to that type.
-    public var type: String?
-    /// The tier to move the item to.
-    public var tier: Tier?
+/// With `state` unset, a list answers active items only; `allStates` lifts
+/// that, and a named `state` wins over both.
+public typealias ListFilters = MarfaCore.ListFilters
 
-    public init(
-        _ properties: Properties = .merge([:]), baseVersion: Int64, sourceId: String? = nil, type: String? = nil,
-        tier: Tier? = nil
-    ) {
-        self.properties = properties
-        self.baseVersion = baseVersion
-        self.sourceId = sourceId
-        self.type = type
-        self.tier = tier
-    }
+/// `state` and `allStates` work as in ``ListFilters``. `type` includes its
+/// subtree, and every tag given must be present.
+public typealias SearchFilters = MarfaCore.SearchFilters
 
-    func core() throws -> MarfaCore.Edit {
-        let (properties, replace) =
-            switch self.properties {
-            case .merge(let properties): (properties, false)
-            case .replace(let properties): (properties, true)
-            }
-        return MarfaCore.Edit(
-            propertiesJson: try properties.json(), replaceProperties: replace, baseVersion: baseVersion,
-            sourceId: sourceId, type: type, tier: tier?.core)
-    }
-}
+extension MarfaCore.Item: Identifiable {}
+extension MarfaCore.Edge: Identifiable {}
 
 /// A change to an edge's properties, a move of one of its ends, or both, and
 /// the version it was read at.
@@ -439,84 +243,13 @@ public struct EdgeEdit: Sendable, Hashable {
         self.move = move
     }
 
-    func core() throws -> MarfaCore.EdgeEdit {
+    var core: MarfaCore.EdgeEdit {
         let moves: MarfaCore.EdgeMove? =
             switch move {
             case .source(let id): MarfaCore.EdgeMove(end: .source, to: id)
             case .target(let id): MarfaCore.EdgeMove(end: .target, to: id)
             case nil: nil
             }
-        return MarfaCore.EdgeEdit(propertiesJson: try properties.json(), baseVersion: baseVersion, moves: moves)
-    }
-}
-
-/// With `state` unset, a list answers active items only; `allStates` lifts
-/// that, and a named `state` wins over both.
-public struct ListFilters: Sendable, Hashable {
-    public var type: String?
-    public var state: ItemState?
-    public var allStates: Bool
-    public var tier: Tier?
-    public var tags: [String]
-    public var occurredAfter: String?
-    public var occurredBefore: String?
-    /// The server's listing grammar; back-reference conditions are not local.
-    public var filter: String?
-    /// This item and its held descendants through `parent-of` edges.
-    public var beneath: String?
-    public var limit: UInt32?
-    public var offset: UInt32?
-
-    public init(
-        type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil,
-        tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil,
-        filter: String? = nil, beneath: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil
-    ) {
-        self.type = type
-        self.state = state
-        self.allStates = allStates
-        self.tier = tier
-        self.tags = tags
-        self.occurredAfter = occurredAfter
-        self.occurredBefore = occurredBefore
-        self.filter = filter
-        self.beneath = beneath
-        self.limit = limit
-        self.offset = offset
-    }
-
-    var core: MarfaCore.ListFilters {
-        MarfaCore.ListFilters(
-            type: type, state: state?.core, allStates: allStates, tier: tier?.core, tags: tags,
-            occurredAfter: occurredAfter, occurredBefore: occurredBefore, filter: filter, beneath: beneath,
-            limit: limit, offset: offset)
-    }
-}
-
-/// `state` and `allStates` work as in `ListFilters`. `type` includes its
-/// subtree, and every tag given must be present.
-public struct SearchFilters: Sendable, Hashable {
-    public var type: String?
-    public var state: ItemState?
-    public var allStates: Bool
-    public var tags: [String]
-    public var filter: String?
-    public var beneath: String?
-
-    public init(
-        type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tags: [String] = [],
-        filter: String? = nil, beneath: String? = nil
-    ) {
-        self.type = type
-        self.state = state
-        self.allStates = allStates
-        self.tags = tags
-        self.filter = filter
-        self.beneath = beneath
-    }
-
-    var core: MarfaCore.SearchFilters {
-        MarfaCore.SearchFilters(
-            state: state?.core, allStates: allStates, type: type, tags: tags, filter: filter, beneath: beneath)
+        return MarfaCore.EdgeEdit(properties: properties, baseVersion: baseVersion, moves: moves)
     }
 }

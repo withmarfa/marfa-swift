@@ -1,23 +1,10 @@
-/// A JSON object that keeps its keys in order.
-///
-/// The server answers an item's properties in a defined order, which a
-/// document laid out from them follows, so the order is information.
-/// Equality and hashing are order-sensitive: two objects with the same pairs
-/// in a different order are different.
-///
-/// Where pairs repeat a key, as in a dictionary literal or the pairs given to
-/// ``init(_:)``, the last value wins at the key's first position.
-///
-/// Keys are told apart by their UTF-8 bytes, as the core and the server tell
-/// them apart, so two that differ only in Unicode normalization, which Swift
-/// compares as equal strings, are two keys here.
-public struct JSONObject: Sendable, Hashable {
-    public private(set) var keys: [String] = []
-    public private(set) var values: [JSONValue] = []
-    private var positions: [Name: Int] = [:]
+import MarfaCore
 
-    /// A key by its bytes.
-    private struct Name: Hashable, Sendable {
+extension JSONObject {
+    /// A key by its bytes, as the core and the server tell keys apart: two
+    /// that differ only in Unicode normalization, which Swift compares as
+    /// equal strings, are two keys.
+    struct Name: Hashable, Sendable {
         let bytes: [UInt8]
 
         init(_ key: String) {
@@ -25,13 +12,18 @@ public struct JSONObject: Sendable, Hashable {
         }
     }
 
-    public init() {}
-
     /// The pairs in order; a repeated key keeps its first position and takes
     /// its last value.
     public init(_ pairs: some Sequence<(String, JSONValue)>) {
+        self.init()
+        var positions: [Name: Int] = [:]
         for (key, value) in pairs {
-            self[key] = value
+            if let position = positions[Name(key)] {
+                members[position].value = value
+            } else {
+                positions[Name(key)] = members.count
+                members.append(JSONMember(key: key, value: value))
+            }
         }
     }
 
@@ -51,49 +43,37 @@ public struct JSONObject: Sendable, Hashable {
         try JSONWriter.text(.object(self))
     }
 
+    public var keys: [String] { members.map(\.key) }
+
+    public var values: [JSONValue] { members.map(\.value) }
+
+    /// Looks a key up by its bytes, scanning the keys in order.
+    ///
+    /// Setting a key that is there replaces its value in place, a new key goes
+    /// last, and `nil` removes it.
     public subscript(key: String) -> JSONValue? {
-        get { positions[Name(key)].map { values[$0] } }
+        get { position(of: key).map { members[$0].value } }
         set {
             guard let newValue else {
                 removeValue(forKey: key)
                 return
             }
-            if let position = positions[Name(key)] {
-                values[position] = newValue
+            if let position = position(of: key) {
+                members[position].value = newValue
             } else {
-                append(key, newValue)
+                members.append(JSONMember(key: key, value: newValue))
             }
         }
     }
 
     @discardableResult
     public mutating func removeValue(forKey key: String) -> JSONValue? {
-        guard let position = positions.removeValue(forKey: Name(key)) else { return nil }
-        keys.remove(at: position)
-        for later in keys[position...] {
-            positions[Name(later), default: 0] -= 1
-        }
-        return values.remove(at: position)
+        guard let position = position(of: key) else { return nil }
+        return members.remove(at: position).value
     }
 
-    func contains(_ key: String) -> Bool {
-        positions[Name(key)] != nil
-    }
-
-    /// For a key known to be new.
-    mutating func append(_ key: String, _ value: JSONValue) {
-        positions[Name(key)] = keys.count
-        keys.append(key)
-        values.append(value)
-    }
-
-    public static func == (lhs: JSONObject, rhs: JSONObject) -> Bool {
-        lhs.keys.elementsEqual(rhs.keys) { $0.utf8.elementsEqual($1.utf8) } && lhs.values == rhs.values
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        for key in keys { hasher.combine(Name(key)) }
-        hasher.combine(values)
+    private func position(of key: String) -> Int? {
+        members.firstIndex { $0.key.utf8.elementsEqual(key.utf8) }
     }
 }
 
@@ -101,10 +81,10 @@ extension JSONObject: RandomAccessCollection {
     public typealias Element = (key: String, value: JSONValue)
 
     public var startIndex: Int { 0 }
-    public var endIndex: Int { keys.count }
+    public var endIndex: Int { members.count }
 
     public subscript(position: Int) -> Element {
-        (keys[position], values[position])
+        (members[position].key, members[position].value)
     }
 }
 
@@ -142,9 +122,8 @@ extension JSONObject: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingName.self)
-        for key in container.allKeys.sorted(by: { $0.stringValue < $1.stringValue }) {
-            self[key.stringValue] = try container.decode(JSONValue.self, forKey: key)
-        }
+        let keys = container.allKeys.sorted(by: { $0.stringValue < $1.stringValue })
+        self.init(try keys.map { ($0.stringValue, try container.decode(JSONValue.self, forKey: $0)) })
     }
 
     public func encode(to encoder: any Encoder) throws {
