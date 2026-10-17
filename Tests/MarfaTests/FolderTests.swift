@@ -1,8 +1,26 @@
 #if os(macOS)
 import Foundation
+import Synchronization
 import Testing
 
 @testable import Marfa
+
+/// Set once a watch has told that it is watching.
+///
+/// A call made before that finds no watch holding the folder: the core hands the folder over at once to a call
+/// that asks as a watch starts, and the watch never tells `watching`. A test of a call over a folder a watch
+/// holds waits for the event first.
+final class WatchStarted: Sendable {
+    private let started = Mutex(false)
+
+    func hear(_ event: FolderEvent) {
+        if case .watching = event { started.withLock { $0 = true } }
+    }
+
+    func wait() async throws {
+        try await eventually("the watch is watching", within: 30) { started.withLock { $0 } }
+    }
+}
 
 /// Every folder these tests add is listed in a registry under the temporary directory, never the Mac's own.
 enum FolderFixture {
@@ -398,14 +416,17 @@ extension LiveWorkingCopies {
         @Test func aWatchKeepsTheFolderInStepHoldsItAndLetsItGoWhenStopped() async throws {
             let directory = try await FolderFixture.synced()
             let watch = try await folders.watch(directory)
+            let started = WatchStarted()
             let heard = Task {
                 var events: [FolderEvent] = []
                 for try await event in watch {
+                    started.hear(event)
                     events.append(event)
                     if case .passed(let pass) = event, pass.scan.created == 1, pass.drain.answered >= 1 { break }
                 }
                 return events
             }
+            try await started.wait()
             guard
                 case .synced = try await bounded(
                     "a sync beside the watch", within: 30, { try await folders.sync(directory) })
@@ -425,14 +446,17 @@ extension LiveWorkingCopies {
         @Test func aCallOverAFolderTheAppsOwnWatchHoldsSucceedsAndTheWatchHandsItOverAndTakesItBack() async throws {
             let directory = try await FolderFixture.synced()
             let watch = try await folders.watch(directory)
+            let started = WatchStarted()
             let heard = Task {
                 var events: [FolderEvent] = []
                 for try await event in watch {
+                    started.hear(event)
                     events.append(event)
                     if case .takenBack = event { break }
                 }
                 return events
             }
+            try await started.wait()
             let result = try await bounded("the sync", within: 30) { try await folders.sync(directory) }
             guard case .synced = result else {
                 Issue.record("the sync did not run: \(result)")
@@ -450,11 +474,16 @@ extension LiveWorkingCopies {
         @Test func removingAFolderTheAppsOwnWatchHoldsEndsTheWatchAfterTellingRemoved() async throws {
             let directory = try await FolderFixture.synced()
             let watch = try await folders.watch(directory)
+            let started = WatchStarted()
             let heard = Task {
                 var events: [FolderEvent] = []
-                for try await event in watch { events.append(event) }
+                for try await event in watch {
+                    started.hear(event)
+                    events.append(event)
+                }
                 return events
             }
+            try await started.wait()
             try await bounded("the removal", within: 30) { try await folders.remove(directory) }
             let events = try await bounded("the watch to end", within: 60) { try await heard.value }
             #expect(events.contains { if case .handedOver = $0 { true } else { false } }, "\(events)")
