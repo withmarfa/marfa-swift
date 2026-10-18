@@ -10,7 +10,10 @@ func temporaryStore() -> URL {
     FileManager.default.temporaryDirectory.appending(path: "marfa-\(UUID()).sqlite")
 }
 
-func eventually(_ what: String, within seconds: Double = 5, _ condition: () async throws -> Bool) async throws {
+func eventually(
+    _ what: String, within seconds: Double = 5, isolation: isolated (any Actor)? = #isolation,
+    _ condition: () async throws -> Bool
+) async throws {
     let deadline = Date.now.addingTimeInterval(seconds)
     while try await !condition() {
         guard Date.now < deadline else {
