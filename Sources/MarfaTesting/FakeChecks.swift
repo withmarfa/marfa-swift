@@ -43,8 +43,7 @@ enum Checks {
 
     /// The kind of each value against the field its type declares.
     ///
-    /// Only a
-    /// string field is judged with the core's message; a value the fake cannot
+    /// Only a string field is judged with the core's message; a value the fake cannot
     /// judge as the core does, and a body that links, throw `unsupported`.
     static func properties(_ properties: JsonObject, of type: ItemType, call: String) throws {
         for member in properties.members {

@@ -8,7 +8,7 @@ import Testing
 ///
 /// The real copy gets its refusal from a booted server, so it runs only where
 /// `MARFA_API_URL` and `MARFA_API_KEY` name one; with `MARFA_LIVE_REQUIRED` a
-/// missing server fails `theLiveTestsHaveAServerWhereTheyAreRequired` instead of
+/// missing server fails `theLiveBehaviorTestsHaveAServerWhereTheyAreRequired` instead of
 /// skipping. The fake gets the same refusal from its verdict chooser, and both
 /// must show the same rows.
 @Suite(.timeLimit(.minutes(2)))
