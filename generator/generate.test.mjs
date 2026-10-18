@@ -249,3 +249,50 @@ test("normalizes null-only properties, array items, and references without chang
   assert.deepEqual(output.components.schemas.Fixture.required, ["next_cursor"]);
   assert.equal(JSON.stringify(input), before);
 });
+
+test("optional nullable type arrays keep presence, constraints, and annotations", () => {
+  const field = {
+    type: ["string", "null"],
+    format: "uri",
+    maxLength: 2048,
+    description: "null clears the value",
+    example: { type: ["string", "null"] },
+    "x-fixture": { type: ["string", "null"] },
+  };
+  const input = document({
+    type: "object",
+    properties: {
+      optional: field,
+      required: field,
+      choice: { type: ["null", "string"], enum: [null, "a", "b"] },
+    },
+    required: ["required"],
+  });
+  const before = JSON.stringify(input);
+  const result = prepare(input);
+  const fields = result.document.components.schemas.Fixture.properties;
+  assert.ok(fields.optional.$ref);
+  assert.deepEqual(fields.required, field);
+  assert.equal(result.nullable.size, 2);
+  const name = fields.optional.$ref.split("/").at(-1);
+  const target = result.nullable.get(name).target;
+  assert.deepEqual(result.document.components.schemas[target], {
+    type: "string", format: "uri", maxLength: 2048,
+  });
+  assert.equal(fields.optional.description, field.description);
+  assert.deepEqual(fields.optional.example, field.example);
+  assert.deepEqual(fields.optional["x-fixture"], field["x-fixture"]);
+  const choiceName = fields.choice.$ref.split("/").at(-1);
+  const choice = result.document.components.schemas[result.nullable.get(choiceName).target];
+  assert.deepEqual(choice, { type: "string", enum: ["a", "b"] });
+  assert.deepEqual(prepare(input).document, result.document);
+  assert.equal(JSON.stringify(input), before);
+  const reordered = structuredClone(input);
+  reordered.components.schemas.Fixture.properties.optional = Object.fromEntries(Object.entries(field).reverse());
+  assert.equal(prepare(reordered).document.components.schemas.Fixture.properties.optional.$ref, fields.optional.$ref);
+  for (const reserved of [name, target]) {
+    const collision = structuredClone(input);
+    collision.components.schemas[reserved] = { type: "string" };
+    assert.throws(() => prepare(collision), /already defines/);
+  }
+});

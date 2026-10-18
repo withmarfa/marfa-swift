@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   mkdirSync,
@@ -19,6 +20,14 @@ const nullRef = `#/components/schemas/${nullName}`;
 export function prepare(document) {
   let usesNull = false;
   const nullable = new Map();
+  const inline = new Map();
+  const canonical = (value) => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (!value || typeof value !== "object") return value;
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, canonical(value[key])]),
+    );
+  };
   const schemaMaps = new Set([
     "properties",
     "patternProperties",
@@ -38,7 +47,7 @@ export function prepare(document) {
     "then",
     "else",
   ]);
-  function schema(value, inUnion = false) {
+  function schema(value, inUnion = false, optionalProperty = false) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
     if (value.type === "null" && !inUnion) {
@@ -50,7 +59,14 @@ export function prepare(document) {
     for (const [key, child] of Object.entries(value)) {
       if (schemaMaps.has(key)) {
         result[key] = Object.fromEntries(
-          Object.entries(child).map(([name, entry]) => [name, schema(entry)]),
+          Object.entries(child).map(([name, entry]) => [
+            name,
+            schema(
+              entry,
+              false,
+              key === "properties" && !value.required?.includes(name),
+            ),
+          ]),
         );
       } else if (schemaArrays.has(key)) {
         result[key] = child.map((member) =>
@@ -59,6 +75,43 @@ export function prepare(document) {
       } else {
         result[key] = schemaValues.has(key) ? schema(child) : child;
       }
+    }
+    if (
+      optionalProperty &&
+      Array.isArray(result.type) &&
+      result.type.length === 2 &&
+      result.type.includes("null") &&
+      (!Array.isArray(result.enum) || result.enum.includes(null)) &&
+      !("const" in result)
+    ) {
+      // An optional nullable property has three states; Swift Optional alone loses explicit null.
+      const annotation = (key) =>
+        ["description", "title", "example", "examples", "default", "deprecated", "readOnly", "writeOnly"].includes(key) ||
+        key.startsWith("x-");
+      const annotations = Object.fromEntries(
+        Object.entries(result).filter(([key]) => annotation(key)),
+      );
+      const targetSchema = {
+        ...Object.fromEntries(Object.entries(result).filter(([key]) => !annotation(key))),
+        type: result.type.find((type) => type !== "null"),
+      };
+      if (Array.isArray(targetSchema.enum))
+        targetSchema.enum = targetSchema.enum.filter((value) => value !== null);
+      const hash = createHash("sha256")
+        .update(JSON.stringify(canonical(targetSchema)))
+        .digest("hex")
+        .slice(0, 16);
+      const target = `MarfaInline${hash}`;
+      const name = `MarfaNullable${target}`;
+      inline.set(target, targetSchema);
+      nullable.set(name, {
+        target,
+        schema: {
+          anyOf: [{ $ref: `#/components/schemas/${target}` }, { $ref: nullRef }],
+        },
+      });
+      usesNull = true;
+      return { ...annotations, $ref: `#/components/schemas/${name}` };
     }
     if (Array.isArray(result.allOf) && result.allOf.length >= 2) {
       // A reference with only a description beside it is the reference: the generator would make a pair of
@@ -158,6 +211,11 @@ export function prepare(document) {
     // An enum containing only null is equivalent to type:null. The generator
     // accepts this schema, and its configured Swift type admits only null.
     result.components.schemas[nullName] = { enum: [null] };
+  }
+  for (const [name, value] of inline) {
+    if (name in result.components.schemas)
+      throw new Error(`the API document already defines ${name}`);
+    result.components.schemas[name] = value;
   }
   for (const [name, entry] of nullable) {
     if (name in result.components.schemas)
