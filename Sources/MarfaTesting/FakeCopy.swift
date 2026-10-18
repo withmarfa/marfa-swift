@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Marfa
 import MarfaCore
@@ -33,16 +34,23 @@ import Synchronization
 ///
 /// Every other call throws ``FakeCopyError/unsupported(call:)``.
 ///
-/// The fake differs from a real copy in these ways:
+/// The fake is not a second engine. A call, or an input to a call, that it
+/// cannot match exactly and cheaply throws ``FakeCopyError/unsupported(call:)``
+/// instead of being answered differently. That includes a `filter`, an
+/// `occurredAt` outside the forms it checks, a body that links to another item,
+/// a tag with surrounding whitespace, and a value for any field but a string
+/// field it can judge. It also differs from a real copy in these ways:
 ///
-/// - A drain answers each write with the verdict ``verdict`` chooses, as the
-///   server would. A verdict records the answer; it does not change a row.
-/// - A write is checked for the ids, versions, types, required fields, edge
-///   ends and nesting limit the real copy checks it for. The fake does not
-///   check a property's kind, a tag's form or an edge type's constraints.
-/// - A body's links and embeds queue no edges of their own.
+/// - A drain answers each write with the verdict ``verdict`` chooses, one drain
+///   at a time. A refused write puts back the row it changed, as the real copy
+///   shows it after the server refused; a write that depends on a refused or
+///   dead one is refused unsent, and one that depends on a blocked or
+///   unanswered one waits.
 /// - It knows only the types it was given and the ones the app declares, not
-///   Marfa's built-in catalog.
+///   Marfa's built-in catalog, and it does not check an edge type's
+///   constraints.
+///
+/// The module compiles only in a debug build, so a release build holds none of it.
 public final class FakeCopy: Sendable {
     /// The copy to hand to the code under test.
     public let copy: WorkingCopy
@@ -155,3 +163,4 @@ extension Marfa.EdgeType {
             properties: properties.map(\.held), shipped: shipped)
     }
 }
+#endif

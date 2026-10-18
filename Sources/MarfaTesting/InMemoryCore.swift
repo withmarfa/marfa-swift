@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import MarfaCore
 import Synchronization
@@ -8,8 +9,16 @@ import Synchronization
 /// stated by `FakeCopy`; every other call of the core throws
 /// `FakeCopyError.unsupported`.
 final class InMemoryCore: CoreProtocol, Sendable {
+    /// What a write changed, so a refusal can put it back.
+    enum Undo {
+        case none
+        case item(String, Item?)
+        case edge(String, Edge?, Int?)
+    }
+
     struct Entry {
         var write: QueuedWrite
+        var undo = Undo.none
         var inQueue = true
     }
 
@@ -27,6 +36,8 @@ final class InMemoryCore: CoreProtocol, Sendable {
     }
 
     let state: Mutex<State>
+    /// Held for a whole drain, so two never answer the same write.
+    let draining = NSLock()
 
     init(items: [Item], edges: [Edge], itemTypes: [ItemType], edgeTypes: [EdgeType]) {
         var state = State()
@@ -160,3 +171,4 @@ extension InMemoryCore.State {
         return seen
     }
 }
+#endif

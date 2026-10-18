@@ -1,7 +1,9 @@
+#if DEBUG
 import Foundation
 import Marfa
 import MarfaTesting
 import Observation
+import Synchronization
 import Testing
 
 /// What only the fake does.
@@ -202,7 +204,7 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
-    @Test func theChosenVerdictAnswersEachWriteAndTheRowsStayAsWritten() async throws {
+    @Test func theChosenVerdictAnswersEachWriteAndARefusalPutsTheRowBack() async throws {
         let fake = Self.seeded()
         let copy = fake.copy
         let refusal = Refusal(reason: "validation_error", fields: [FieldRefusal(field: "title", message: "too long")])
@@ -225,8 +227,8 @@ struct FakeCopyBehavior {
         #expect(queue[created.id]?.verdict == .refused(refusal))
         #expect(queue[seeded.id]?.verdict == .merged(fields: ["title"]))
         #expect(queue[tagged.id]?.verdict == .accepted)
-        #expect(try await copy.items.get(id) != nil, "a verdict changed a row")
-        #expect(try await copy.items.get(Self.note.id)?.title == "E")
+        #expect(try await copy.items.get(id) == nil, "a refused create left its row")
+        #expect(try await copy.items.get(Self.note.id)?.title == "E", "a merged edit was put back")
         await copy.close()
     }
 
@@ -246,7 +248,9 @@ struct FakeCopyBehavior {
             Issue.record("the write behind a refused create was \(String(describing: tag.verdict))")
             return
         }
-        #expect(refusal.reason.contains(created.id))
+        #expect(refusal.reason == "the create_item it waits for was refused")
+        #expect(try await copy.items.get(created.itemId ?? "") == nil)
+        #expect(try await copy.items.get(Self.note.id)?.title == "E")
         #expect(queue.first { $0.id == seeded.id }?.verdict == .accepted)
         #expect(try await copy.queue.forgetAnswered() == 1, "only the accepted edit is forgotten")
         #expect(try await copy.queue.discard(tag.id) == true)
@@ -279,21 +283,192 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
-    @Test func aBlockedWriteCanBeWithdrawnAndTakesTheWritesWaitingOnItWithIt() async throws {
+    @Test func aRefusedEditPutsTheRowBackAsItWasBeforeTheWriteAndASeededRowKeepsItsGivenState() async throws {
         let fake = Self.seeded()
         let copy = fake.copy
-        fake.verdict = { $0.kind == .updateItem ? .blocked(reason: .conflictUnresolved) : .accepted }
-        let blocked = try await copy.items.update(Self.note.id, Edit(properties: ["title": "1"], baseVersion: 4))
-        let waiting = try await copy.tags.add("t", to: Self.note.id)
-        _ = try await copy.queue.drain()
-        let after = try await copy.queue.all()
-        #expect(after.first { $0.id == waiting.id }?.verdict != .accepted)
+        fake.verdict = {
+            [.updateItem, .createEdge, .updateEdge].contains($0.kind) ? .refused(Refusal(reason: "no")) : .accepted
+        }
+        let first = try await copy.items.update(Self.note.id, Edit(properties: ["title": "1"], baseVersion: 4))
+        let tag = try await copy.tags.add("t", to: Self.note.id)
+        let edge = try await copy.edges.create(from: Self.other.id, to: Self.note.id, type: "references")
+        let move = try await copy.edges.update(Self.edge.id, EdgeEdit(["n": 2], baseVersion: 2))
 
-        #expect(try await copy.queue.withdraw(blocked.id) == true)
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(Self.note.id)?.title == "Seed")
+        #expect(try await copy.items.get(Self.note.id)?.tags == ["seed", "t"], "the accepted tag was put back")
+        #expect(try await copy.edges.to(Self.note.id).isEmpty, "a refused edge stayed")
+        #expect(try await copy.edges.from(Self.note.id) == [Self.edge], "a refused edge edit was not put back")
+        #expect(fake.writes.map(\.id) == [first.id, tag.id, edge.id, move?.id])
+        await copy.close()
+    }
+
+    @Test func aWriteBehindABlockedOneWaitsAndAWithdrawRefusesIt() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        fake.verdict = { $0.kind == .createItem ? .blocked(reason: .conflictUnresolved) : .accepted }
+        let created = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"], tags: ["t"]))
+        let id = try #require(created.itemId)
+
+        let report = try await copy.queue.drain()
+
+        #expect(report.answered == 1 && report.held == 1 && report.unsent == 0)
+        let tag = try #require(try await copy.queue.all().first { $0.kind == .addTag })
+        #expect(tag.verdict == nil && tag.waiting)
+        #expect(try await copy.items.get(id) != nil, "a blocked write put its row back")
+
+        #expect(try await copy.queue.withdraw(created.id) == true)
 
         let left = try await copy.queue.all()
-        #expect(!left.contains { $0.id == blocked.id })
-        #expect(try await copy.queue.withdraw(waiting.id) == false)
+        #expect(left.map(\.id) == [tag.id])
+        guard case .refused(let refusal)? = left.first?.verdict else {
+            Issue.record("the tag was \(String(describing: left.first?.verdict))")
+            return
+        }
+        #expect(refusal.reason.contains(created.id))
+        #expect(try await copy.items.get(id) == nil, "withdrawing left the row")
+        #expect(try await copy.queue.withdraw(tag.id) == false)
+        await copy.close()
+    }
+
+    @Test func aWriteOnlyOrderedBehindARefusedOneStillGoes() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        fake.verdict = { $0.kind == .updateItem ? .refused(Refusal(reason: "no")) : .accepted }
+        _ = try await copy.items.update(Self.note.id, Edit(properties: ["title": "1"], baseVersion: 4))
+        let tag = try await copy.tags.add("t", to: Self.note.id)
+
+        let report = try await copy.queue.drain()
+
+        #expect(report.answered == 2 && report.unsent == 0)
+        #expect(try await copy.queue.all().first { $0.id == tag.id }?.verdict == .accepted)
+        await copy.close()
+    }
+
+    @Test func aDeleteWithNoServerVersionIsRefusedUnsent() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let made = try #require(
+            try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
+        _ = try await copy.queue.drain()
+        let write = try await copy.items.delete(made)
+
+        let report = try await copy.queue.drain()
+
+        #expect(report.unsent == 1 && report.answered == 0)
+        guard case .refused(let refusal)? = try await copy.queue.all().first(where: { $0.id == write.id })?.verdict
+        else {
+            Issue.record("the delete was not refused")
+            return
+        }
+        #expect(
+            refusal.reason == "the delete has no confirmed server version to remove; read the item before deleting it")
+        await copy.close()
+    }
+
+    @Test func twoDrainsNeverAnswerTheSameWriteTwice() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        _ = try await copy.tags.add("t", to: Self.note.id)
+        let offered = Mutex(0)
+        let release = DispatchSemaphore(value: 0)
+        fake.verdict = { _ in
+            let count = offered.withLock { count -> Int in
+                count += 1
+                return count
+            }
+            if count == 1 { release.wait() }
+            return .accepted
+        }
+        let first = Task { try await copy.queue.drain() }
+        try await eventually("the first drain offered the write") { offered.withLock { $0 } == 1 }
+        let started = Mutex(false)
+        let second = Task {
+            started.withLock { $0 = true }
+            return try await copy.queue.drain()
+        }
+        try await eventually("the second drain started") { started.withLock { $0 } }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(offered.withLock { $0 } == 1, "a second drain offered the write while the first held it")
+
+        release.signal()
+        let reports = [try await first.value, try await second.value]
+
+        #expect(reports.map(\.answered).reduce(0, +) == 1)
+        #expect(offered.withLock { $0 } == 1)
+        await copy.close()
+    }
+
+    @Test func aCanceledCallIsRefusedWithoutAStopFromTheRustCore() async throws {
+        let copy = Self.seeded().copy
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await copy.queue.drain()
+        }
+        await #expect {
+            try await task.value
+        } throws: { error in
+            if case MarfaError.canceled = error { true } else { false }
+        }
+        _ = try await copy.queue.drain()
+        await copy.close()
+    }
+
+    @Test func anInputTheFakeCannotJudgeAsTheCoreDoesIsUnsupportedNotAnsweredDifferently() async throws {
+        let copy = WorkingCopy.fake(
+            itemTypes: [
+                Self.noteType,
+                ItemType(
+                    id: "app.test.entry",
+                    fields: [
+                        TypeField(name: "count", type: "integer", declaredBy: "app.test.entry"),
+                        TypeField(name: "site", type: "url", declaredBy: "app.test.entry"),
+                        TypeField(
+                            name: "code", type: "string", declaredBy: "app.test.entry",
+                            definition: ["type": "string", "format": "bcp47"]),
+                    ]),
+            ]
+        ).copy
+        let held = try #require(
+            try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
+        let inputs: [(String, @Sendable () async throws -> Void)] = [
+            (
+                "items.create with links in the body",
+                { _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "see [[x]]"])) }
+            ),
+            (
+                "items.create with a integer field",
+                { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: ["count": "many"])) }
+            ),
+            (
+                "items.create with a url field",
+                { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: ["site": "x"])) }
+            ),
+            (
+                "items.create with a constrained code field",
+                { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: ["code": "en"])) }
+            ),
+            (
+                "items.update with links in the body",
+                { _ = try await copy.items.update(held, Edit(properties: ["body": "![[f]]"], baseVersion: 0)) }
+            ),
+            (
+                "an occurredAt of the form yesterday",
+                {
+                    _ = try await copy.items.create(
+                        Draft(type: "core.note", properties: ["body": "b"], occurredAt: "yesterday"))
+                }
+            ),
+            (
+                "a tag with surrounding whitespace",
+                { _ = try await copy.tags.add(" x", to: "absent") }
+            ),
+        ]
+        for (call, make) in inputs {
+            await #expect(performing: { try await make() }, throws: refusedAsUnsupported(call))
+        }
+        #expect(try await copy.queue.all().count == 1)
         await copy.close()
     }
 
@@ -345,3 +520,4 @@ final class NotesModel {
         await load()
     }
 }
+#endif

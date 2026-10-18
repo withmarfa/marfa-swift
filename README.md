@@ -54,7 +54,7 @@ for note in try await copy.items.list(ListFilters(type: "core.note")) {
 
 ## Test and preview
 
-The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. For previews in an app target, wrap the import and preview code in `#if DEBUG` so release builds do not use it. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:
+The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. Its module compiles empty in a release build, so nothing from it ships; wrap its uses in `#if DEBUG`. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:
 
 ```swift
 #if DEBUG

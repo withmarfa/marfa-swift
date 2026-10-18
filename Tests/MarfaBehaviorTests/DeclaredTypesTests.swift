@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Marfa
 import Testing
@@ -135,3 +136,4 @@ struct DeclaredTypesOffline {
         await copy.close()
     }
 }
+#endif

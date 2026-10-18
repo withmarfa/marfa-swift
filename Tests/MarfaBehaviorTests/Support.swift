@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Marfa
 import MarfaTesting
@@ -85,3 +86,4 @@ enum CopyKind: CaseIterable, Sendable, CustomTestStringConvertible {
         return types
     }
 }
+#endif

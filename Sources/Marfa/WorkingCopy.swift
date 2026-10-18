@@ -39,7 +39,7 @@ public final class WorkingCopy: Sendable {
 
     /// A copy over a core that is not the Rust one, for `MarfaTesting`.
     package convenience init(core: any CoreProtocol) {
-        self.init(holder: CoreHolder(core), hasServer: false)
+        self.init(holder: CoreHolder(core, stops: false), hasServer: false)
     }
 
     package func announce(_ change: Change) {

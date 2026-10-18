@@ -114,9 +114,12 @@ public func check(store: URL) async throws -> String {
     let copy = try await WorkingCopy.open(store: store)
     let status = try await copy.status()
     await copy.close()
+    var held = 0
+    #if DEBUG
     let fake = WorkingCopy.fake()
-    let held = try await fake.copy.items.list().count
+    held = try await fake.copy.items.list().count
     await fake.copy.close()
+    #endif
     return "contract \(marfaContractVersion), \(status), fake copy holds \(held)"
 }
 SWIFT

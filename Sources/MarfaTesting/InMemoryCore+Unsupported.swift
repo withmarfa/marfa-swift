@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import MarfaCore
 
@@ -130,3 +131,4 @@ extension InMemoryCore {
         try unsupported("search(inFolder:)")
     }
 }
+#endif

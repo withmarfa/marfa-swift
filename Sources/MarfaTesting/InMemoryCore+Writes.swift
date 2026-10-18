@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import MarfaCore
 
@@ -8,15 +9,19 @@ extension InMemoryCore {
         try Properties.cross(draft.properties)
         if draft.sourceId != nil { throw FakeCopyError.unsupported(call: "items.create(sourceId:)") }
         return try state.withLock { state in
+            try Checks.tags(draft.tags)
             if let id = draft.id, !Minted.isID(id) {
                 throw Refuse.validation("invalid_id", "Invalid id: \"\(id)\" is not a UUIDv7 in lowercase")
             }
+            try Checks.writable(draft.type)
             let types = state.resolvedItemTypes()
             guard let type = types[draft.type] else {
                 throw Refuse.unknownType("\(draft.type) is not a type this copy holds")
             }
-            try Self.requireFields(of: type, in: draft.properties)
-            let properties = Self.inAnswerOrder(draft.properties, of: type, in: types)
+            let kept = Self.droppingOptionalNulls(draft.properties, of: type)
+            try Checks.properties(kept, of: type, call: "items.create")
+            try Self.requireFields(of: type, in: kept)
+            let properties = Self.inAnswerOrder(kept, of: type, in: types)
             let id = draft.id ?? Minted.id()
             var body = JsonObject(members: [
                 JsonMember(key: "id", value: .string(id)), JsonMember(key: "type", value: .string(draft.type)),
@@ -29,8 +34,9 @@ extension InMemoryCore {
             if let version = draft.baseVersion {
                 body.members.append(JsonMember(key: "version", value: .integer(version)))
             }
+            let at = try draft.occurredAt.map(Checks.occurred) ?? Minted.now()
             try Properties.refuseTooDeep(body)
-            let at = draft.occurredAt ?? Minted.now()
+            let undo = state.undo(item: id)
             state.items[id] = Self.derived(
                 Item(
                     id: id, type: draft.type, properties: Properties.served(properties), state: .active,
@@ -40,10 +46,11 @@ extension InMemoryCore {
                 types: types)
             state.made.insert(id)
             let created = state.append(
-                .createItem, item: id, baseVersion: draft.baseVersion, body: body, dependsOn: [])
+                .createItem, item: id, baseVersion: draft.baseVersion, body: body, dependsOn: [], undo: undo)
             for tag in draft.tags {
                 state.append(
-                    .addTag, item: id, tag: tag, body: Self.tags([tag]), dependsOn: state.pendingCreates(of: id))
+                    .addTag, item: id, tag: tag, body: Self.tags([tag]), dependsOn: state.pendingCreates(of: id),
+                    undo: state.undo(item: id))
             }
             return created
         }
@@ -60,7 +67,9 @@ extension InMemoryCore {
     private func update(id: String, edit: Edit, asRead: Bool) throws -> QueuedWrite {
         try Properties.cross(edit.properties)
         return try state.withLock { state in
-            guard var held = state.items[id] else { throw Refuse.item(id) }
+            guard var held = state.items[id], held.state != .trashed else { throw Refuse.item(id) }
+            try Checks.writable(held.type)
+            if let type = edit.type { try Checks.writable(type) }
             let types = state.resolvedItemTypes()
             let retype = edit.type.flatMap { $0 == held.type ? nil : $0 }
             let tier = edit.tier.flatMap { $0 == held.tier ? nil : $0 }
@@ -86,8 +95,15 @@ extension InMemoryCore {
             }
             if let tier { body.members.append(.init(key: "tier", value: .string(tier.name))) }
             try Properties.refuseTooDeep(body)
+            let target = types[retype ?? held.type]
+            if let target {
+                try Checks.properties(edit.properties, of: target, call: "items.update")
+            }
+            let undo = state.undo(item: id)
+            // An edit based on an earlier version did not read the copy's row,
+            // so it cannot know which properties it clears: it merges.
             held.properties = Properties.merged(
-                held.properties, with: edit.properties, replacing: edit.replaceProperties)
+                held.properties, with: edit.properties, replacing: edit.replaceProperties && base == held.version)
             if let key = edit.sourceId { held.sourceId = key }
             if let retype { held.type = retype }
             if let tier { held.tier = tier }
@@ -96,44 +112,64 @@ extension InMemoryCore {
             }
             state.items[id] = Self.derived(held, types: types)
             return state.append(
-                .updateItem, item: id, baseVersion: base, body: body, dependsOn: state.pendingCreates(of: id))
+                .updateItem, item: id, baseVersion: base, body: body, dependsOn: state.pendingCreates(of: id),
+                undo: undo)
         }
     }
 
     func deleteItem(id: String) throws -> QueuedWrite {
         try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
+            let undo = state.undo(item: id)
             let body = JsonObject(members: [JsonMember(key: "version", value: .integer(held.version))])
             held.state = .trashed
             state.items[id] = held
             return state.append(
-                .deleteItem, item: id, baseVersion: held.version, body: body, dependsOn: state.pendingCreates(of: id))
+                .deleteItem, item: id, baseVersion: held.version, body: body, dependsOn: state.pendingCreates(of: id),
+                undo: undo)
         }
     }
 
+    /// An item the copy does not hold is restored by id: queued, and shown
+    /// nowhere until the server answers.
     func restoreItem(id: String) throws -> QueuedWrite {
-        try state.withLock { state in
-            guard var held = state.items[id] else { throw Refuse.item(id) }
+        state.withLock { state in
+            guard var held = state.items[id] else {
+                return state.append(.restoreItem, item: id, body: JsonObject(), dependsOn: [])
+            }
+            let undo = state.undo(item: id)
             held.state = .active
             state.items[id] = held
-            return state.append(.restoreItem, item: id, body: JsonObject(), dependsOn: state.pendingCreates(of: id))
+            return state.append(
+                .restoreItem, item: id, body: JsonObject(), dependsOn: state.pendingCreates(of: id), undo: undo)
         }
     }
 
     func transitionItem(id: String, state target: ItemState) throws -> QueuedWrite {
         try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
+            if target == .revoked {
+                if held.type.hasPrefix("system.") {
+                    throw FakeCopyError.unsupported(call: "items.transition(to: .revoked) on a system type")
+                }
+                throw Refuse.invalid(
+                    "a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
+                )
+            }
+            let undo = state.undo(item: id)
             held.state = target
             state.items[id] = held
             let body = JsonObject(members: [JsonMember(key: "state", value: .string(target.name))])
-            return state.append(.transitionItem, item: id, body: body, dependsOn: state.pendingCreates(of: id))
+            return state.append(
+                .transitionItem, item: id, body: body, dependsOn: state.pendingCreates(of: id), undo: undo)
         }
     }
 
     // MARK: Tags and extensions
 
     func addTag(id: String, tag: String) throws -> QueuedWrite {
-        try tagged(id, .addTag, tag: tag, body: Self.tags([tag])) { Self.sorted(Set($0).union([tag])) }
+        try Checks.tags([tag])
+        return try tagged(id, .addTag, tag: tag, body: Self.tags([tag])) { Self.sorted(Set($0).union([tag])) }
     }
 
     func removeTag(id: String, tag: String) throws -> QueuedWrite {
@@ -141,11 +177,13 @@ extension InMemoryCore {
     }
 
     func replaceMetadata(id: String, tags: [String]) throws -> QueuedWrite {
-        try tagged(id, .replaceMetadata, tag: nil, body: Self.tags(tags)) { _ in Self.sorted(Set(tags)) }
+        try Checks.tags(tags)
+        return try tagged(id, .replaceMetadata, tag: nil, body: Self.tags(tags)) { _ in Self.sorted(Set(tags)) }
     }
 
     func mergeMetadata(id: String, tags: [String]) throws -> QueuedWrite {
-        try tagged(id, .mergeMetadata, tag: nil, body: Self.tags(tags)) { Self.sorted(Set($0).union(tags)) }
+        try Checks.tags(tags)
+        return try tagged(id, .mergeMetadata, tag: nil, body: Self.tags(tags)) { Self.sorted(Set($0).union(tags)) }
     }
 
     private func tagged(
@@ -153,9 +191,11 @@ extension InMemoryCore {
     ) throws -> QueuedWrite {
         try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
+            let undo = state.undo(item: id)
             held.tags = change(held.tags)
             state.items[id] = held
-            return state.append(kind, item: id, tag: tag, body: body, dependsOn: state.pendingCreates(of: id))
+            return state.append(
+                kind, item: id, tag: tag, body: body, dependsOn: state.pendingCreates(of: id), undo: undo)
         }
     }
 
@@ -201,6 +241,7 @@ extension InMemoryCore {
             ])
             try Properties.refuseTooDeep(body)
             let at = Minted.now()
+            let undo = state.undo(edge: id)
             state.add(
                 Edge(
                     id: id, sourceId: draft.sourceId, targetId: draft.targetId, edgeType: draft.edgeType,
@@ -208,7 +249,7 @@ extension InMemoryCore {
                     unreadableProperties: nil))
             return state.append(
                 .createEdge, item: draft.sourceId, target: draft.targetId, edge: id, body: body,
-                dependsOn: state.pendingCreates(of: draft.sourceId, draft.targetId))
+                dependsOn: state.pendingCreates(of: draft.sourceId, draft.targetId), undo: undo)
         }
     }
 
@@ -249,6 +290,7 @@ extension InMemoryCore {
                 dependsOn.append(waited)
             }
             let (from, to) = (held.sourceId, held.targetId)
+            let undo = state.undo(edge: id)
             var members = held.properties.members
             for member in edit.properties.members {
                 if let at = members.firstIndex(where: { $0.key.utf8.elementsEqual(member.key.utf8) }) {
@@ -262,7 +304,8 @@ extension InMemoryCore {
             if let target { held.targetId = target }
             state.edges[id] = held
             return state.append(
-                .updateEdge, item: from, target: to, edge: id, baseVersion: base, body: body, dependsOn: dependsOn)
+                .updateEdge, item: from, target: to, edge: id, baseVersion: base, body: body, dependsOn: dependsOn,
+                undo: undo)
         }
     }
 
@@ -271,10 +314,12 @@ extension InMemoryCore {
             guard let held = state.edges[id] else { throw Refuse.edge(id) }
             let body = JsonObject(members: [.init(key: "edge_type", value: .string(held.edgeType))])
             let dependsOn = state.pendingCreate(ofEdge: id)
+            let undo = state.undo(edge: id)
             state.edges[id] = nil
             state.edgeOrder[id] = nil
             return state.append(
-                .deleteEdge, item: held.sourceId, target: held.targetId, edge: id, body: body, dependsOn: dependsOn)
+                .deleteEdge, item: held.sourceId, target: held.targetId, edge: id, body: body, dependsOn: dependsOn,
+                undo: undo)
         }
     }
 
@@ -298,6 +343,18 @@ extension InMemoryCore {
         for field in type.fields where field.required && Properties.value(properties, field.name) == nil {
             throw Refuse.validation("invalid_properties", "\(field.name): Required field is missing")
         }
+    }
+
+    /// A null on a field the type declares and does not require is dropped,
+    /// and one on any other property is kept.
+    private static func droppingOptionalNulls(_ properties: JsonObject, of type: ItemType) -> JsonObject {
+        JsonObject(
+            members: properties.members.filter { member in
+                guard member.value == .null, let field = type.fields.first(where: { $0.name == member.key }) else {
+                    return true
+                }
+                return field.required
+            })
     }
 
     /// A create's properties as the server holds them: a null on a field the
@@ -341,7 +398,7 @@ extension InMemoryCore {
     }
 
     /// The item with the title and body its type's hints name.
-    private static func derived(_ item: Item, types: [String: ItemType]) -> Item {
+    static func derived(_ item: Item, types: [String: ItemType]) -> Item {
         let type = types[item.type]
         var item = item
         item.title = Properties.string(item.properties, type?.titleField ?? "title")
@@ -356,7 +413,8 @@ extension InMemoryCore.State {
     @discardableResult
     mutating func append(
         _ kind: WriteKind, item: String, target: String? = nil, edge: String? = nil, namespace: String? = nil,
-        tag: String? = nil, baseVersion: Int64? = nil, body: JsonObject, dependsOn: [String]
+        tag: String? = nil, baseVersion: Int64? = nil, body: JsonObject, dependsOn: [String],
+        undo: InMemoryCore.Undo = .none
     ) -> QueuedWrite {
         let ahead = entries.last {
             $0.inQueue && $0.write.verdict == nil
@@ -367,8 +425,53 @@ extension InMemoryCore.State {
             blob: nil, baseVersion: baseVersion, idempotencyKey: Minted.id(), dependsOn: dependsOn,
             follows: ahead?.write.id, verdict: nil, waiting: false, body: body, answer: nil, refusals: 0,
             queuedAt: Minted.now(), answeredAt: nil)
-        entries.append(InMemoryCore.Entry(write: write))
+        entries.append(InMemoryCore.Entry(write: write, undo: undo))
         return write
+    }
+
+    func undo(item id: String) -> InMemoryCore.Undo { .item(id, items[id]) }
+
+    func undo(edge id: String) -> InMemoryCore.Undo { .edge(id, edges[id], edgeOrder[id]) }
+
+    /// Puts back what a refused write changed and nothing else, so a write
+    /// answered since keeps its effect.
+    mutating func revert(_ undo: InMemoryCore.Undo, of kind: WriteKind) {
+        switch undo {
+        case .none: break
+        case .item(let id, let before):
+            guard kind != .createItem else {
+                items[id] = before
+                return
+            }
+            guard var row = items[id], let before else { return }
+            switch kind {
+            case .updateItem:
+                (row.properties, row.type, row.tier, row.sourceId) = (
+                    before.properties, before.type, before.tier, before.sourceId
+                )
+                (row.title, row.body) = (before.title, before.body)
+            case .deleteItem, .restoreItem, .transitionItem: row.state = before.state
+            case .addTag, .removeTag, .replaceMetadata, .mergeMetadata: row.tags = before.tags
+            default: break
+            }
+            items[id] = row
+        case .edge(let id, let before, let order):
+            switch kind {
+            case .createEdge:
+                edges[id] = before
+                edgeOrder[id] = order
+            case .updateEdge:
+                guard var row = edges[id], let before else { return }
+                (row.properties, row.sourceId, row.targetId) = (before.properties, before.sourceId, before.targetId)
+                edges[id] = row
+            case .deleteEdge:
+                if edges[id] == nil, let before {
+                    edges[id] = before
+                    edgeOrder[id] = order
+                }
+            default: break
+            }
+        }
     }
 
     /// The creates of these items that no answer has settled.
@@ -415,3 +518,27 @@ extension ItemState {
         }
     }
 }
+
+extension WriteKind {
+    /// The name the core gives a kind in what it says of a write.
+    var name: String {
+        switch self {
+        case .createItem: "create_item"
+        case .updateItem: "update_item"
+        case .deleteItem: "delete_item"
+        case .restoreItem: "restore_item"
+        case .transitionItem: "transition_item"
+        case .createEdge: "create_edge"
+        case .updateEdge: "update_edge"
+        case .deleteEdge: "delete_edge"
+        case .replaceMetadata: "replace_metadata"
+        case .mergeMetadata: "merge_metadata"
+        case .addTag: "add_tag"
+        case .removeTag: "remove_tag"
+        case .writeExtension: "write_extension"
+        case .deleteExtension: "delete_extension"
+        case .uploadBlob: "upload_blob"
+        }
+    }
+}
+#endif

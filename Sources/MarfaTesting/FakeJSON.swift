@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import MarfaCore
 import Synchronization
@@ -188,3 +189,4 @@ enum Minted {
         Date.now.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
     }
 }
+#endif

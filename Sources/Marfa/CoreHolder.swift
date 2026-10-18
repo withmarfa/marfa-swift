@@ -29,12 +29,19 @@ final class CoreHolder: Sendable {
 
     private let state: Mutex<State>
     private let reopen: (@Sendable (String) throws -> any CoreProtocol)?
+    /// Whether a long call gets a `Stop` to raise on cancellation.
+    ///
+    /// A core with no Rust behind it takes none, and so makes no call into the glue.
+    private let stops: Bool
 
     /// `reopen` makes the core again from a new key; `nil` where the copy has
     /// no server and so no key.
-    init(_ core: any CoreProtocol, reopen: (@Sendable (String) throws -> any CoreProtocol)? = nil) {
+    init(
+        _ core: any CoreProtocol, reopen: (@Sendable (String) throws -> any CoreProtocol)? = nil, stops: Bool = true
+    ) {
         state = Mutex(State(core: core, handle: Handle(core.heldHandle())))
         self.reopen = reopen
+        self.stops = stops
     }
 
     /// What the copy held while it was open, and still the last thing it held
@@ -60,9 +67,9 @@ final class CoreHolder: Sendable {
     }
 
     func runUntilCanceled<T: Sendable>(
-        _ work: @escaping @Sendable (any CoreProtocol, MarfaCore.Stop) throws -> T
+        _ work: @escaping @Sendable (any CoreProtocol, MarfaCore.Stop?) throws -> T
     ) async throws -> T {
-        let stop = MarfaCore.Stop()
+        let stop = stops ? MarfaCore.Stop() : nil
         return try await withTaskCancellationHandler {
             let alreadyCanceled = Task.isCancelled
             return try await background { [self] in
@@ -72,7 +79,7 @@ final class CoreHolder: Sendable {
                 }
             }
         } onCancel: {
-            stop.raise()
+            stop?.raise()
         }
     }
 

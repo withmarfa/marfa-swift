@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Marfa
 import Testing
@@ -234,3 +235,4 @@ struct PropertyValuesOffline {
         await copy.close()
     }
 }
+#endif

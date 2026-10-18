@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import MarfaCore
 
@@ -7,37 +8,42 @@ extension InMemoryCore {
     }
 
     /// Offers each write that nothing holds back to the verdict chooser, in
-    /// queue order.
+    /// queue order, one drain at a time.
     ///
-    /// A write behind one the chooser left unanswered waits, and a write
-    /// behind one that was not accepted is refused without being offered.
+    /// A write behind one still unanswered waits, and one that depends on a
+    /// refused or dead write is refused without being offered.
     func drain(stop: Stop?) throws -> DrainReport {
+        draining.lock()
+        defer { draining.unlock() }
         var report = DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [],
             stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
         let pending = state.withLock { state in
             state.entries.filter { $0.inQueue && $0.write.verdict == nil }.map(\.write.id)
         }
+        var refused: [String] = []
         for id in pending {
             switch state.withLock({ $0.readiness(of: id) }) {
             case .waiting:
                 state.withLock { $0.setWaiting(id) }
                 report.held += 1
-            case .behindRefusal(let waitedOn):
+            case .refused(let reason):
                 let refusal = Refusal(
-                    reason: "waited on \(waitedOn), which was not accepted", code: nil, message: nil, fields: [],
-                    trashed: false, grant: nil)
+                    reason: reason, code: nil, message: nil, fields: [], trashed: false, grant: nil)
                 report.verdicts.append(state.withLock { $0.answer(id, .refused(refusal: refusal)) })
                 report.unsent += 1
+                refused.append(id)
             case .ready(let write, let choose):
                 if let verdict = choose(write) {
                     report.verdicts.append(state.withLock { $0.answer(id, verdict) })
                     report.answered += 1
+                    if case .refused = verdict { refused.append(id) }
                 } else {
                     report.undelivered += 1
                 }
             }
         }
+        state.withLock { $0.revert(refused) }
         return report
     }
 
@@ -47,6 +53,7 @@ extension InMemoryCore {
             switch state.entries[at].write.verdict {
             case .blocked(.ancestorUnavailable, _)?, .blocked(.conflictUnresolved, _)?:
                 state.entries[at].inQueue = false
+                var refused = [id]
                 for other in state.entries.indices
                 where state.entries[other].inQueue && state.entries[other].write.verdict == nil
                     && state.entries[other].write.dependsOn.contains(id)
@@ -56,7 +63,9 @@ extension InMemoryCore {
                         reason: "waited on \(id), which was withdrawn", code: nil, message: nil, fields: [],
                         trashed: false, grant: nil)
                     _ = state.answer(waited, .refused(refusal: refusal))
+                    refused.append(waited)
                 }
+                state.revert(refused)
                 return true
             default:
                 return false
@@ -85,7 +94,7 @@ extension InMemoryCore {
 extension InMemoryCore.State {
     enum Readiness {
         case waiting
-        case behindRefusal(String)
+        case refused(String)
         case ready(QueuedWrite, @Sendable (QueuedWrite) -> Verdict?)
     }
 
@@ -97,18 +106,37 @@ extension InMemoryCore.State {
         at(id).map { entries[$0].write.verdict }
     }
 
+    /// Whether a write goes, waits or is refused unsent, in the order the core
+    /// asks: the write ahead of it first, then what it depends on, then its
+    /// own version.
     func readiness(of id: String) -> Readiness {
         guard let index = at(id) else { return .waiting }
         let write = entries[index].write
-        let ahead = write.dependsOn + [write.follows].compactMap { $0 }
-        for waited in ahead {
+        if let ahead = write.follows, answered(of: ahead) == .some(.none) { return .waiting }
+        for waited in write.dependsOn {
             switch answered(of: waited) {
-            case .some(.some(.refused)), .some(.some(.dead)), .some(.some(.blocked)): return .behindRefusal(waited)
-            case .some(.none): return .waiting
+            case .none, .some(.none), .some(.blocked?): return .waiting
+            case .some(.refused?), .some(.dead?):
+                let kind = entries[at(waited) ?? index].write.kind
+                let verdict: String =
+                    if case .dead? = entries[at(waited) ?? index].write.verdict { "dead" } else { "refused" }
+                return .refused("the \(kind.name) it waits for was \(verdict)")
             default: break
             }
         }
+        if write.kind == .deleteItem, (write.baseVersion ?? 0) <= 0 {
+            return .refused("the delete has no confirmed server version to remove; read the item before deleting it")
+        }
         return .ready(write, verdict)
+    }
+
+    /// Puts back, newest write first, the rows the refused writes changed.
+    mutating func revert(_ ids: [String]) {
+        for id in ids.reversed() {
+            if let index = entries.firstIndex(where: { $0.write.id == id }) {
+                revert(entries[index].undo, of: entries[index].write.kind)
+            }
+        }
     }
 
     mutating func setWaiting(_ id: String) {
@@ -156,3 +184,4 @@ extension InMemoryCore.State {
         return cleared
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import Marfa
 import Testing
@@ -221,3 +222,4 @@ struct EdgeMoveOffline {
         await copy.close()
     }
 }
+#endif

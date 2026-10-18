@@ -1,5 +1,7 @@
+#if DEBUG
 import Foundation
 import Marfa
+import SQLite3
 import Testing
 
 /// Items, tags and extensions on a copy that never reached a server, with the
@@ -419,4 +421,168 @@ struct ItemsOffline {
         #expect(heard.locals.first?.itemId == id)
         await copy.close()
     }
+
+    static func refused(_ code: String, containing text: String) -> (any Error) -> Bool {
+        { error in
+            switch error as? MarfaError {
+            case .validation(let given, let message)?, .forbidden(let given, let message)?:
+                given == code && message.contains(text)
+            default: false
+            }
+        }
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aStringFieldHoldingAnotherKindOfValueIsRefusedBeforeAnythingIsQueued(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy)
+        let before = try await copy.queue.all()
+        await #expect {
+            _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": 42]))
+        } throws: { Self.refused("invalid_properties", containing: "body: Expected string")($0) }
+        await #expect {
+            _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b", "title": 4]))
+        } throws: { Self.refused("invalid_properties", containing: "title: Expected string")($0) }
+        await #expect {
+            _ = try await copy.items.update(id, Edit(properties: ["title": 4], baseVersion: 0))
+        } throws: { Self.refused("invalid_properties", containing: "title: Expected string")($0) }
+        #expect(try await copy.queue.all() == before)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases, [("", "must not be empty"), (" \t", "must not be blank")])
+    func aTagThatIsEmptyOrBlankIsRefusedByEveryCallThatTakesOne(kind: CopyKind, tag: (String, String)) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy)
+        let before = try await copy.queue.all()
+        let message = "tags[0]: A tag \(tag.1)"
+        let calls: [@Sendable () async throws -> Void] = [
+            { _ = try await copy.tags.add(tag.0, to: id) },
+            { _ = try await copy.metadata.replaceTags(of: id, with: [tag.0]) },
+            { _ = try await copy.metadata.mergeTags([tag.0], into: id) },
+            { _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"], tags: [tag.0])) },
+        ]
+        for call in calls {
+            await #expect { try await call() } throws: { Self.refused("validation_error", containing: message)($0) }
+        }
+        await #expect {
+            _ = try await copy.tags.add(String(repeating: "a", count: 129), to: id)
+        } throws: { Self.refused("validation_error", containing: "at most 128 UTF-16 code units")($0) }
+        #expect(try await copy.queue.all() == before)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aSystemTypeIsNotWrittenAsAnItem(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy)
+        let before = try await copy.queue.all()
+        await #expect {
+            _ = try await copy.items.create(Draft(type: "system.folder", properties: ["title": "f"]))
+        } throws: { Self.refused("type_not_permitted", containing: "system.folder is written only through")($0) }
+        await #expect {
+            _ = try await copy.items.update(id, Edit(baseVersion: 0, type: "system.folder"))
+        } throws: { Self.refused("type_not_permitted", containing: "folder operations")($0) }
+        #expect(try await copy.queue.all() == before)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aTrashedItemCannotBeEditedAndAnItemCannotBeRevoked(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let trashed = try await Self.note("A", in: copy)
+        let live = try await Self.note("B", in: copy)
+        _ = try await copy.items.delete(trashed)
+        let before = try await copy.queue.all()
+        await #expect {
+            _ = try await copy.items.update(trashed, Edit(properties: ["title": "x"], baseVersion: 0))
+        } throws: { Self.notFound("item_not_found")($0) }
+        await #expect {
+            _ = try await copy.items.transition(live, to: .revoked)
+        } throws: { error in
+            guard case .invalid(let message)? = error as? MarfaError else { return false }
+            return message.contains("revoked state")
+        }
+        #expect(try await copy.queue.all() == before)
+        _ = try await copy.tags.add("still", to: trashed)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anItemTheCopyDoesNotHoldIsRestoredByIdWithNoRowShown(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = "019a0000-0000-7000-8000-000000000001"
+
+        let write = try await copy.items.restore(id)
+
+        #expect(write.kind == .restoreItem && write.itemId == id && write.body == [:])
+        #expect(write.dependsOn.isEmpty && write.follows == nil)
+        #expect(try await copy.items.get(id) == nil)
+        #expect(try await copy.items.list(ListFilters(allStates: true)).isEmpty)
+        #expect(try await copy.queue.all() == [write])
+        await copy.close()
+    }
+
+    @Test(
+        arguments: CopyKind.allCases,
+        [
+            ("2026-01-01T01:00:00.500+0100", "2026-01-01T00:00:00.500Z"), ("2026-01-01", "2026-01-01T00:00:00.000Z"),
+            ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00.000Z"),
+            ("2026-03-01T00:30:00.250-0200", "2026-03-01T02:30:00.250Z"),
+        ])
+    func aTimeAnItemIsGivenIsHeldInUTCToTheMillisecond(kind: CopyKind, times: (String, String)) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy, at: times.0)
+        let held = try #require(try await copy.items.get(id))
+        #expect(held.occurredAt == times.1 && held.createdAt == times.1 && held.updatedAt == times.1)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func declaringAnotherTitleFieldShowsTheNewTitleOnItemsAlreadyHeld(kind: CopyKind) async throws {
+        let copy = try await kind.open(declaring: [["id": "app.review.note"]])
+        let id = try #require(
+            try await copy.items.create(
+                Draft(type: "app.review.note", properties: ["title": "old", "heading": "new"])
+            ).itemId)
+        #expect(try await copy.items.get(id)?.title == "old")
+
+        try await copy.declareTypes([["id": "app.review.note", "display_hints": ["title_field": "heading"]]])
+
+        #expect(try await copy.items.get(id)?.title == "new")
+        await copy.close()
+    }
+
+    /// Sets the version of every row, as a server's answers would have left them.
+    static func raise(_ store: URL, to version: Int) throws {
+        var database: OpaquePointer?
+        try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        try #require(sqlite3_exec(database, "UPDATE items SET version = \(version)", nil, nil, nil) == SQLITE_OK)
+    }
+
+    @Test func anEditBasedOnAnEarlierVersionMergesEvenWhereItReplacesAndTheFakeDoesTheSame() async throws {
+        let store = temporaryStore()
+        let first = try await WorkingCopy.open(store: store)
+        try await first.declareTypes([["id": "app.review.note"]])
+        let id = try #require(
+            try await first.items.create(
+                Draft(type: "app.review.note", properties: ["title": "old", "extra": "kept"])
+            ).itemId)
+        await first.close()
+        try Self.raise(store, to: 4)
+        let real = try await WorkingCopy.open(store: store)
+        let held = try #require(try await real.items.get(id))
+        let fake = WorkingCopy.fake(items: [held], itemTypes: try await real.catalog.itemTypes()).copy
+        for copy in [real, fake] {
+            _ = try await copy.items.updateAsRead(
+                id, Edit(properties: ["title": "new"], replaceProperties: true, baseVersion: 3))
+            #expect(try await copy.items.get(id)?.properties == ["title": "new", "extra": "kept"])
+            _ = try await copy.items.update(
+                id, Edit(properties: ["title": "all"], replaceProperties: true, baseVersion: 4))
+            #expect(try await copy.items.get(id)?.properties == ["title": "all"])
+            await copy.close()
+        }
+    }
 }
+#endif

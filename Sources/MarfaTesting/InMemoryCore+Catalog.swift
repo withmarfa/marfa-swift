@@ -1,3 +1,4 @@
+#if DEBUG
 import Foundation
 import MarfaCore
 
@@ -41,7 +42,12 @@ extension InMemoryCore {
                 let (id, row) = try Declaring.declaration(definition, known: known)
                 rows[id] = row
             }
+            let changed = Set(state.declared.keys).union(rows.keys)
             state.declared = rows
+            let types = state.resolvedItemTypes()
+            for (id, item) in state.items where changed.contains(item.type) {
+                state.items[id] = Self.derived(item, types: types)
+            }
         }
     }
 
@@ -182,3 +188,4 @@ enum Declaring {
             compatibleWith: Properties.strings(row, "compatible_with"))
     }
 }
+#endif
