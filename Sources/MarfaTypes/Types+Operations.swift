@@ -112431,7 +112431,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/enforcement/source_allowlist`.
                         public var sourceAllowlist: Components.Schemas.TypeAndSourceLeverStrict?
-                        /// Types whose listings, searches and exports show only items from the listed sources. A read by ID isn't narrowed.
+                        /// Types whose listings, searches, exports, event streams and webhook deliveries show only items from the listed sources. A read by ID isn't narrowed, and a copy stream sends such items with `listed: false`.
                         ///
                         /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/enforcement/source_filter`.
                         public var sourceFilter: Components.Schemas.TypeAndSourceLeverStrict?
@@ -112440,7 +112440,7 @@ public enum Operations {
                         /// - Parameters:
                         ///   - strictMode: Types on which a write may not set a property the type doesn't declare.
                         ///   - sourceAllowlist: Types that take new items only from the listed sources.
-                        ///   - sourceFilter: Types whose listings, searches and exports show only items from the listed sources. A read by ID isn't narrowed.
+                        ///   - sourceFilter: Types whose listings, searches, exports, event streams and webhook deliveries show only items from the listed sources. A read by ID isn't narrowed, and a copy stream sends such items with `listed: false`.
                         public init(
                             strictMode: Components.Schemas.TypeLeverStrict? = nil,
                             sourceAllowlist: Components.Schemas.TypeAndSourceLeverStrict? = nil,

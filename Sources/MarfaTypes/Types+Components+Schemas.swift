@@ -89,14 +89,15 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_name`.
             public var reverseName: Swift.String?
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
             @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case source = "source"
                 case target = "target"
+                case none = "none"
             }
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
             public var writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
@@ -116,7 +117,7 @@ extension Components {
             ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
-            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name.
+            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
             public init(
                 id: Swift.String,
@@ -177,7 +178,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/enum_values`.
             public var enumValues: [Swift.String]?
-            /// The type of each element of an `array` property. It can't be `thumbnail`.
+            /// The type of each element of an `array` property. A write is refused if an element is not a value of that type. It can't be `thumbnail`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
             public var itemsType: Swift.String?
@@ -192,7 +193,7 @@ extension Components {
             ///   - description: What the property holds.
             ///   - required: `true` if every edge of the type must have the property.
             ///   - enumValues: The values an `enum` property takes.
-            ///   - itemsType: The type of each element of an `array` property. It can't be `thumbnail`.
+            ///   - itemsType: The type of each element of an `array` property. A write is refused if an element is not a value of that type. It can't be `thumbnail`.
             ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
             public init(
                 _type: Swift.String,
@@ -351,7 +352,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EnforcementOverride/source_allowlist`.
             public var sourceAllowlist: Components.Schemas.TypeAndSourceLever?
-            /// Types whose listings, searches and exports show only items from the listed sources. A read by ID isn't narrowed.
+            /// Types whose listings, searches, exports, event streams and webhook deliveries show only items from the listed sources. A read by ID isn't narrowed, and a copy stream sends such items with `listed: false`.
             ///
             /// - Remark: Generated from `#/components/schemas/EnforcementOverride/source_filter`.
             public var sourceFilter: Components.Schemas.TypeAndSourceLever?
@@ -360,7 +361,7 @@ extension Components {
             /// - Parameters:
             ///   - strictMode: Types on which a write may not set a property the type doesn't declare.
             ///   - sourceAllowlist: Types that take new items only from the listed sources.
-            ///   - sourceFilter: Types whose listings, searches and exports show only items from the listed sources. A read by ID isn't narrowed.
+            ///   - sourceFilter: Types whose listings, searches, exports, event streams and webhook deliveries show only items from the listed sources. A read by ID isn't narrowed, and a copy stream sends such items with `listed: false`.
             public init(
                 strictMode: Components.Schemas.TypeLever? = nil,
                 sourceAllowlist: Components.Schemas.TypeAndSourceLever? = nil,
@@ -1542,6 +1543,50 @@ extension Components {
                 try container.encodeIfPresent(
                     self.maxVersions,
                     forKey: .maxVersions
+                )
+                try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// How long Marfa keeps the feed items of a type. A part you leave out comes from the parent type. A type that no type in its chain gives a window keeps its items.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RetentionPolicy`.
+        public struct RetentionPolicy: Codable, Hashable, Sendable {
+            /// How many days Marfa keeps a feed item, counted from when it arrived: a whole number from 1 to 36,500. After that Marfa moves the item to the trash. `null` keeps feed items although a parent type expires them. Library items never expire.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RetentionPolicy/feed_days`.
+            public var feedDays: Swift.Double?
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+            /// Creates a new `RetentionPolicy`.
+            ///
+            /// - Parameters:
+            ///   - feedDays: How many days Marfa keeps a feed item, counted from when it arrived: a whole number from 1 to 36,500. After that Marfa moves the item to the trash. `null` keeps feed items although a parent type expires them. Library items never expire.
+            ///   - additionalProperties: A container of undocumented properties.
+            public init(
+                feedDays: Swift.Double? = nil,
+                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+            ) {
+                self.feedDays = feedDays
+                self.additionalProperties = additionalProperties
+            }
+            public enum CodingKeys: String, CodingKey {
+                case feedDays = "feed_days"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.feedDays = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .feedDays
+                )
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                    "feed_days"
+                ])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encodeIfPresent(
+                    self.feedDays,
+                    forKey: .feedDays
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
@@ -5664,14 +5709,15 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/reverse_name`.
             public var reverseName: Swift.String?
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
             @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case source = "source"
                 case target = "target"
+                case none = "none"
             }
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
+            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
             public var writtenAt: Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload?
@@ -5691,7 +5737,7 @@ extension Components {
             ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
-            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `target` needs a `reverse_name`. Leave it out for `source`.
+            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
             ///   - evolveConstraints: `true` widens a registered type's endpoints in place. Retain every existing constraint token, or allow all types with `[]` or `*`; other members must stay unchanged. Omit or set `false` to register a new type. Not stored in the definition.
             public init(
                 id: Swift.String,
@@ -6004,6 +6050,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy`.
             public var mergePolicy: Components.Schemas.MergePolicy?
+            /// How long Marfa keeps the type's items in the feed tier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/retention_policy`.
+            public var retentionPolicy: Components.Schemas.RetentionPolicy?
             /// Creates a new `TypeDefinition`.
             ///
             /// - Parameters:
@@ -6019,6 +6069,7 @@ extension Components {
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
+            ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
@@ -6031,7 +6082,8 @@ extension Components {
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
-                mergePolicy: Components.Schemas.MergePolicy? = nil
+                mergePolicy: Components.Schemas.MergePolicy? = nil,
+                retentionPolicy: Components.Schemas.RetentionPolicy? = nil
             ) {
                 self.id = id
                 self.label = label
@@ -6045,6 +6097,7 @@ extension Components {
                 self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
+                self.retentionPolicy = retentionPolicy
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -6059,6 +6112,7 @@ extension Components {
                 case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
+                case retentionPolicy = "retention_policy"
             }
         }
         /// A structural role a type plays. `container`: the type can be the target of an `in-collection` edge.
@@ -6104,7 +6158,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/enum_values`.
             public var enumValues: [Swift.String]?
-            /// The type of each element of an `array` field.
+            /// The type of each element of an `array` field. A write is refused if an element is not a value of that type.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_type`.
             public var itemsType: Swift.String?
@@ -6145,7 +6199,7 @@ extension Components {
             ///   - description: What the field holds.
             ///   - required: `true` if an item of the type must have a value for it.
             ///   - enumValues: The values an `enum` field allows.
-            ///   - itemsType: The type of each element of an `array` field.
+            ///   - itemsType: The type of each element of an `array` field. A write is refused if an element is not a value of that type.
             ///   - format: A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
             ///   - searchable: `false` if full-text search should skip the field. Items still return it.
             ///   - maxLength: The longest value a `string` or `enum` field allows.
@@ -6766,6 +6820,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/merge_policy`.
             public var mergePolicy: Components.Schemas.MergePolicy?
+            /// How long Marfa keeps the type's items in the feed tier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/retention_policy`.
+            public var retentionPolicy: Components.Schemas.RetentionPolicy?
             /// The type's identifier, such as `acme.deal` or `user.recipe`.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/id`.
@@ -6785,6 +6843,7 @@ extension Components {
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
+            ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
             ///   - id: The type's identifier, such as `acme.deal` or `user.recipe`.
             public init(
                 fields: Components.Schemas.TypeDefinitionInput.FieldsPayload,
@@ -6799,6 +6858,7 @@ extension Components {
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
+                retentionPolicy: Components.Schemas.RetentionPolicy? = nil,
                 id: Swift.String
             ) {
                 self.fields = fields
@@ -6813,6 +6873,7 @@ extension Components {
                 self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
+                self.retentionPolicy = retentionPolicy
                 self.id = id
             }
             public enum CodingKeys: String, CodingKey {
@@ -6828,6 +6889,7 @@ extension Components {
                 case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
+                case retentionPolicy = "retention_policy"
                 case id
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -6880,6 +6942,10 @@ extension Components {
                     Components.Schemas.MergePolicy.self,
                     forKey: .mergePolicy
                 )
+                self.retentionPolicy = try container.decodeIfPresent(
+                    Components.Schemas.RetentionPolicy.self,
+                    forKey: .retentionPolicy
+                )
                 self.id = try container.decode(
                     Swift.String.self,
                     forKey: .id
@@ -6897,6 +6963,7 @@ extension Components {
                     "link_field",
                     "version_policy",
                     "merge_policy",
+                    "retention_policy",
                     "id"
                 ])
             }
@@ -7290,6 +7357,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/merge_policy`.
             public var mergePolicy: Components.Schemas.MergePolicy?
+            /// How long Marfa keeps the type's items in the feed tier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/retention_policy`.
+            public var retentionPolicy: Components.Schemas.RetentionPolicy?
             /// The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/id`.
@@ -7309,6 +7380,7 @@ extension Components {
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
+            ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
             ///   - id: The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             public init(
                 fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload,
@@ -7323,6 +7395,7 @@ extension Components {
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
+                retentionPolicy: Components.Schemas.RetentionPolicy? = nil,
                 id: Swift.String? = nil
             ) {
                 self.fields = fields
@@ -7337,6 +7410,7 @@ extension Components {
                 self.linkField = linkField
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
+                self.retentionPolicy = retentionPolicy
                 self.id = id
             }
             public enum CodingKeys: String, CodingKey {
@@ -7352,6 +7426,7 @@ extension Components {
                 case linkField = "link_field"
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
+                case retentionPolicy = "retention_policy"
                 case id
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -7404,6 +7479,10 @@ extension Components {
                     Components.Schemas.MergePolicy.self,
                     forKey: .mergePolicy
                 )
+                self.retentionPolicy = try container.decodeIfPresent(
+                    Components.Schemas.RetentionPolicy.self,
+                    forKey: .retentionPolicy
+                )
                 self.id = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .id
@@ -7421,6 +7500,7 @@ extension Components {
                     "link_field",
                     "version_policy",
                     "merge_policy",
+                    "retention_policy",
                     "id"
                 ])
             }
@@ -11423,7 +11503,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/InstanceConfig/enforcement/source_allowlist`.
                 public var sourceAllowlist: Components.Schemas.TypeAndSourceLever?
-                /// Types whose listings, searches and exports show only items from the listed sources. A read by ID isn't narrowed.
+                /// Types whose listings, searches, exports, event streams and webhook deliveries show only items from the listed sources. A read by ID isn't narrowed, and a copy stream sends such items with `listed: false`.
                 ///
                 /// - Remark: Generated from `#/components/schemas/InstanceConfig/enforcement/source_filter`.
                 public var sourceFilter: Components.Schemas.TypeAndSourceLever?
@@ -11432,7 +11512,7 @@ extension Components {
                 /// - Parameters:
                 ///   - strictMode: Types on which a write may not set a property the type doesn't declare.
                 ///   - sourceAllowlist: Types that take new items only from the listed sources.
-                ///   - sourceFilter: Types whose listings, searches and exports show only items from the listed sources. A read by ID isn't narrowed.
+                ///   - sourceFilter: Types whose listings, searches, exports, event streams and webhook deliveries show only items from the listed sources. A read by ID isn't narrowed, and a copy stream sends such items with `listed: false`.
                 public init(
                     strictMode: Components.Schemas.TypeLever? = nil,
                     sourceAllowlist: Components.Schemas.TypeAndSourceLever? = nil,
@@ -13783,7 +13863,7 @@ extension Components {
                 case error
             }
         }
-        /// An item event: a change to an item, or, as `metadata.changed`, to its tags or extensions.
+        /// An item event: a change to an item, or, as `metadata.changed`, to its tags or extensions. Except on a copy stream, you receive it only if your source filter shows the item.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemEventFrame`.
         public struct ItemEventFrame: Codable, Hashable, Sendable {
@@ -13848,7 +13928,7 @@ extension Components {
                 case listed
             }
         }
-        /// An edge event: a change to an edge. You receive it only if you can read both the edge type and `source_type`.
+        /// An edge event: a change to an edge. You receive it only if you can read both the edge type and `source_type`, and, except on a copy stream, only if your source filter shows the edge's source item.
         ///
         /// - Remark: Generated from `#/components/schemas/EdgeEventFrame`.
         public struct EdgeEventFrame: Codable, Hashable, Sendable {

@@ -4363,7 +4363,7 @@ public struct EdgeType: Equatable, Hashable {
      * The name the edge goes by read from its target.
      */
     public var reverseName: String?
-    public var writtenAt: EdgeEnd
+    public var writtenAt: EdgeWrittenAt
     public var sourceTypeConstraints: [String]
     public var targetTypeConstraints: [String]
     public var cascadeOnDelete: String
@@ -4375,7 +4375,7 @@ public struct EdgeType: Equatable, Hashable {
     public init(id: String, label: String?, description: String?, cardinality: String, 
         /**
          * The name the edge goes by read from its target.
-         */reverseName: String?, writtenAt: EdgeEnd, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool) {
+         */reverseName: String?, writtenAt: EdgeWrittenAt, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool) {
         self.id = id
         self.label = label
         self.description = description
@@ -4410,7 +4410,7 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
                 description: FfiConverterOptionString.read(from: &buf), 
                 cardinality: FfiConverterString.read(from: &buf), 
                 reverseName: FfiConverterOptionString.read(from: &buf), 
-                writtenAt: FfiConverterTypeEdgeEnd.read(from: &buf), 
+                writtenAt: FfiConverterTypeEdgeWrittenAt.read(from: &buf), 
                 sourceTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
                 targetTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
                 cascadeOnDelete: FfiConverterString.read(from: &buf), 
@@ -4425,7 +4425,7 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterString.write(value.cardinality, into: &buf)
         FfiConverterOptionString.write(value.reverseName, into: &buf)
-        FfiConverterTypeEdgeEnd.write(value.writtenAt, into: &buf)
+        FfiConverterTypeEdgeWrittenAt.write(value.writtenAt, into: &buf)
         FfiConverterSequenceString.write(value.sourceTypeConstraints, into: &buf)
         FfiConverterSequenceString.write(value.targetTypeConstraints, into: &buf)
         FfiConverterString.write(value.cascadeOnDelete, into: &buf)
@@ -8402,6 +8402,83 @@ public func FfiConverterTypeEdgeEnd_lift(_ buf: RustBuffer) throws -> EdgeEnd {
 #endif
 public func FfiConverterTypeEdgeEnd_lower(_ value: EdgeEnd) -> RustBuffer {
     return FfiConverterTypeEdgeEnd.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Which end of an edge has the file that writes it in a folder, or neither.
+ */
+
+public enum EdgeWrittenAt: Equatable, Hashable, CaseIterable {
+    
+    case source
+    case target
+    case none
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension EdgeWrittenAt: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEdgeWrittenAt: FfiConverterRustBuffer {
+    typealias SwiftType = EdgeWrittenAt
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeWrittenAt {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .source
+        
+        case 2: return .target
+        
+        case 3: return .none
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: EdgeWrittenAt, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .source:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .target:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .none:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeWrittenAt_lift(_ buf: RustBuffer) throws -> EdgeWrittenAt {
+    return try FfiConverterTypeEdgeWrittenAt.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeWrittenAt_lower(_ value: EdgeWrittenAt) -> RustBuffer {
+    return FfiConverterTypeEdgeWrittenAt.lower(value)
 }
 
 
