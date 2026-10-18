@@ -63,6 +63,9 @@ final class Feed: Sendable {
 
     var count: Int { locked { $0.streams.count } }
 
+    /// Whether the feed was closed, which it is before any of its streams finish.
+    var isClosed: Bool { locked { $0.closed } }
+
     func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
         let (added, joins) = locked { state -> (Bool, Bool) in
             guard !state.closed else { return (false, false) }

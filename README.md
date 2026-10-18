@@ -341,7 +341,7 @@ The query exposes these properties:
 - `value` is what the last successful read answered, and the reading's placeholder before one. A row with `unreadableProperties` is in it like any other.
 - `isLoading` is true from creation to the end of the first read, and during every later read. Check it with an empty `value` to show a spinner for the first load only.
 - `error` is why the last read failed and `nil` after a read succeeds. `value` keeps the rows of the last successful read, and the next change reads again.
-- `following` is `.live`, `.stopped(error)` or `.ended(error)`. `.stopped` means the follow of the server failed and the stream is still open, so local writes still refresh the query; it returns to `.live` on a server event, or a hydration or a catch-up that tells a change. `.ended` means the stream finished, because the copy closed (the error is `nil`) or the core ended it on a fault. The query doesn't ask for a new stream by itself, because the core ends a stream on a fault so that nothing asks again. `refresh()` asks for one and reads. It also reads now and returns after a read that began after the call, for `.refreshable`.
+- `following` is `.live`, `.stopped(error)` or `.ended(error)`. `.stopped` means the follow of the server failed and the stream is still open, so local writes still refresh the query; it returns to `.live` on a server event, or a hydration or a catch-up that tells a change. `.ended` means the stream finished. Its error is `nil` when the copy is closed by the time the query sees the end, even after a watch failure, and otherwise the fault the core ended the stream on. The query doesn't ask for a new stream by itself, because the core ends a stream on a fault so that nothing asks again. `refresh()` asks for one and reads. It also reads now and returns after a read that began after the call, for `.refreshable`.
 
 A query doesn't page. A reload reads and compares the whole result, so an app with many rows sets `ListFilters.limit` and grows it by assigning `reading` again.
 
@@ -483,6 +483,6 @@ for try await event in watch {
 
 ## The sample
 
-`Examples/MarfaSample` is a SwiftUI app for macOS and the iOS simulator; `xcodegen generate` in that folder makes its project. Its notes and its queue are `LiveQuery`s, and no code in the app reads again. `--scenario hydrate|write|drain|catch-up` runs one phase unattended and exits nonzero when a check fails; each phase also checks that a query it never calls shows what the copy holds. CI runs all four with the server stopped between `hydrate` and `write`.
+`Examples/MarfaSample` is a SwiftUI app for macOS and the iOS simulator; `xcodegen generate` in that folder makes its project. Its notes and its queue are `LiveQuery`s, and no code in the app reads again after a write; its Refresh button shows only when a query's stream has ended. `--scenario hydrate|write|drain|catch-up` runs one phase unattended and exits nonzero when a check fails; each phase also checks that a query it never calls shows what the copy holds. CI runs all four with the server stopped between `hydrate` and `write`.
 
 `AGENTS.md` has the rules for working in this repository.

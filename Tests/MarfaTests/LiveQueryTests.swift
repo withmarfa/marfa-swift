@@ -307,13 +307,17 @@ struct LiveQueries {
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await eventually("the first read began") { probe.reads == 1 }
         for _ in 0..<100 { copy.feed.announce(write(.addTag, item: "n1")) }
-        try await Task.sleep(for: .milliseconds(200))
+        // The stream is in order and `.stopped` changes only `following`, so once it shows
+        // the query has heard all 100 changes before it.
+        copy.feed.announce(told(.stopped(.network(message: "sentinel"))))
+        try await eventually("the query heard the burst") { query.following == .stopped(.network(message: "sentinel")) }
         #expect(probe.reads == 1, "\(probe.reads - 1) of 100 changes started a read while one ran")
 
         probe.release(1)
-        try await eventually("the burst was read") { !query.isLoading && probe.reads >= 2 }
+        try await eventually("the burst was read once more") { !query.isLoading && probe.reads == 2 }
         try await Task.sleep(for: .milliseconds(100))
-        #expect(query.value == "A\(probe.reads)", "the rows are not the latest read's")
+        #expect(probe.reads == 2, "the burst caused \(probe.reads) reads")
+        #expect(query.value == "A2")
         try await bounded("close") { await copy.close() }
     }
 
@@ -440,6 +444,21 @@ struct LiveQueries {
         copy.feed.announce(write(.addTag, item: "n1"))
         try await eventually("the new stream is heard") { probe.reads >= 3 && !query.isLoading }
         try await bounded("close") { await copy.close() }
+    }
+
+    @Test func aCopyClosedAfterAWatchFailureEndsTheQueryWithNoError() async throws {
+        let (core, copy) = Self.fake()
+        let probe = Probe()
+        let query = LiveQuery(copy, reading: probe.reading("A"))
+        try await Self.settled(query)
+        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
+        try await eventually("the failure is shown") { query.following == .stopped(.network(message: "dropped")) }
+
+        try await bounded("close") { await copy.close() }
+        try await eventually("the end is shown") { query.following == .ended(nil) }
+        // Left alone, the end stays what the close made it.
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(query.following == .ended(nil), "a close after a failure was shown as the failure: \(query.following)")
     }
 
     @Test func aCopyClosedWhileTheQueryLivesEndsItKeepingItsRows() async throws {

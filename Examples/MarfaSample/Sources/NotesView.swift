@@ -52,6 +52,9 @@ struct NotesView: View {
             .searchable(text: $model.searchText)
             .navigationTitle("Notes")
             .toolbar {
+                if model.hasEnded {
+                    Button("Refresh") { Task { await model.refresh() } }
+                }
                 Button("Drain") { Task { await model.drain() } }
             }
             .safeAreaInset(edge: .bottom) {

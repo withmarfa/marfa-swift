@@ -78,9 +78,11 @@ public enum Following: Sendable, Hashable {
     /// that tells the stream a change. A catch-up that applies nothing tells
     /// nothing, so this can outlast the failure it names.
     case stopped(MarfaError)
-    /// The stream finished, so the query no longer refreshes by itself: the
-    /// copy was closed (the error is `nil`), or the core ended the stream on a
-    /// fault, which is the error. ``LiveQuery/refresh()`` asks for a new stream.
+    /// The stream finished, so the query no longer refreshes by itself.
+    ///
+    /// The error is `nil` when the copy is closed by the time the query sees
+    /// the end, whatever came before, and otherwise the fault the core ended
+    /// the stream on. ``LiveQuery/refresh()`` asks for a new stream.
     case ended(MarfaError?)
 }
 
@@ -194,7 +196,9 @@ public final class LiveQuery<Value: Sendable & Equatable> {
     }
 
     private func streamFinished() {
-        if case .stopped(let reason) = following {
+        // The feed is closed before a close finishes its streams, so a stream
+        // the core ended on a fault is told apart from one a close ended.
+        if !copy.feed.isClosed, case .stopped(let reason) = following {
             following = .ended(reason)
         } else {
             following = .ended(nil)
