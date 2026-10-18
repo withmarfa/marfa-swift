@@ -483,6 +483,6 @@ for try await event in watch {
 
 ## The sample
 
-`Examples/MarfaSample` is a SwiftUI app for macOS and the iOS simulator; `xcodegen generate` in that folder makes its project. `--scenario hydrate|write|drain|catch-up` runs one phase unattended and exits nonzero when a check fails. CI runs all four with the server stopped between `hydrate` and `write`.
+`Examples/MarfaSample` is a SwiftUI app for macOS and the iOS simulator; `xcodegen generate` in that folder makes its project. Its notes and its queue are `LiveQuery`s, and no code in the app reads again. `--scenario hydrate|write|drain|catch-up` runs one phase unattended and exits nonzero when a check fails; each phase also checks that a query it never calls shows what the copy holds. CI runs all four with the server stopped between `hydrate` and `write`.
 
 `AGENTS.md` has the rules for working in this repository.
