@@ -6,11 +6,11 @@ import Observation
 final class Model {
     let configuration: Configuration
     private(set) var copy: WorkingCopy?
-    private(set) var notes: [Item] = []
-    private(set) var queued: [QueuedWrite] = []
+    private(set) var notes: LiveQuery<[Item]>?
+    private(set) var queued: LiveQuery<[QueuedWrite]>?
     private(set) var message = ""
-    var query = "" {
-        didSet { Task { await refresh() } }
+    var searchText = "" {
+        didSet { notes?.reading = noteReading }
     }
 
     init(configuration: Configuration) {
@@ -20,26 +20,49 @@ final class Model {
     func open() async {
         guard copy == nil, configuration.scenario == nil else { return }
         do {
-            copy = try await WorkingCopy.open(store: configuration.store, server: configuration.server)
+            let opened = try await WorkingCopy.open(store: configuration.store, server: configuration.server)
+            copy = opened
+            notes = LiveQuery(opened, reading: noteReading)
+            queued = LiveQuery(opened, reading: .queue)
         } catch {
             message = error.localizedDescription
         }
     }
 
-    func listen() async {
-        guard let copy else { return }
-        await hydrate(copy)
-        await refresh()
-        for await change in copy.changes() {
-            if case .stopped(let error) = change.origin {
-                message = "no longer following the server: \(error.message)"
-            }
-            await refresh()
-        }
+    private var noteReading: Reading<[Item]> {
+        searchText.isEmpty
+            ? .list(ListFilters(type: "core.note", tier: .feed))
+            : .search(searchText, filters: SearchFilters(type: "core.note"))
     }
 
-    private func hydrate(_ copy: WorkingCopy) async {
-        guard configuration.server != nil else { return }
+    /// Whether the notes stopped following the copy, so they need a refresh to start again.
+    var hasEnded: Bool {
+        if case .ended = notes?.following { return true }
+        return false
+    }
+
+    /// What the bottom of the window says: a failure the queries met, else the last thing done.
+    var status: String {
+        switch notes?.following {
+        case .stopped(let error):
+            return "no longer following the server: \(error.message)"
+        case .ended(let error):
+            let why = error.map { ": \($0.message)" } ?? ""
+            return "the notes no longer update\(why). Refresh to start again."
+        case .live, nil:
+            break
+        }
+        if let failure = notes?.error ?? queued?.error { return failure.localizedDescription }
+        return message
+    }
+
+    func refresh() async {
+        await notes?.refresh()
+        await queued?.refresh()
+    }
+
+    func hydrate() async {
+        guard let copy, configuration.server != nil else { return }
         while !Task.isCancelled {
             do {
                 if try await copy.status().hydration != .complete {
@@ -54,20 +77,6 @@ final class Model {
         }
     }
 
-    func refresh() async {
-        guard let copy else { return }
-        do {
-            if query.isEmpty {
-                notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
-            } else {
-                notes = try await copy.search(query, filters: SearchFilters(type: "core.note")).map(\.item)
-            }
-            queued = try await copy.queue.all()
-        } catch {
-            message = error.localizedDescription
-        }
-    }
-
     func perform(_ what: String, _ work: (WorkingCopy) async throws -> Void) async {
         guard let copy else { return }
         do {
@@ -76,7 +85,6 @@ final class Model {
         } catch {
             message = "\(what): \(error.localizedDescription)"
         }
-        await refresh()
     }
 
     func create(title: String) async {

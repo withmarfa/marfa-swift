@@ -20,7 +20,7 @@ struct NotesView: View {
                         }
                         .disabled(newTitle.isEmpty)
                     }
-                    ForEach(model.notes) { note in
+                    ForEach(model.notes?.value ?? []) { note in
                         NoteRow(model: model, note: note, linking: $linking)
                             .contextMenu {
                                 Button(note.tags.contains("favorite") ? "Unfavorite" : "Favorite") {
@@ -39,7 +39,7 @@ struct NotesView: View {
                     }
                 }
                 Section("Queue") {
-                    ForEach(model.queued, id: \.id) { write in
+                    ForEach(model.queued?.value ?? [], id: \.id) { write in
                         HStack {
                             Text(String(describing: write.kind))
                             Spacer()
@@ -49,13 +49,16 @@ struct NotesView: View {
                     }
                 }
             }
-            .searchable(text: $model.query)
+            .searchable(text: $model.searchText)
             .navigationTitle("Notes")
             .toolbar {
+                if model.hasEnded {
+                    Button("Refresh") { Task { await model.refresh() } }
+                }
                 Button("Drain") { Task { await model.drain() } }
             }
             .safeAreaInset(edge: .bottom) {
-                Text(model.message).font(.caption).foregroundStyle(.secondary).padding(4)
+                Text(model.status).font(.caption).foregroundStyle(.secondary).padding(4)
             }
             .fileImporter(
                 isPresented: Binding(get: { attaching != nil }, set: { if !$0 { attaching = nil } }),

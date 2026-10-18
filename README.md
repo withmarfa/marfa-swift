@@ -271,7 +271,7 @@ An app drives the copy through its life:
 
 1. **On first launch, or when `status().hydration` is `never` or `expired`,** call `hydrate(types:tier:)`. It replaces the copy with the slice and keeps the queue.
 1. **When the app starts or comes to the front,** call `catchUp()` to apply what changed while it was away, then `queue.drain()` to send what it queued.
-1. **While a screen shows server data,** hold a `changes()` stream. It follows the server's events and tells each one as `.server`.
+1. **While a screen shows server data,** hold a `changes()` stream. It follows the server's events and tells each one as `.server`. A SwiftUI view holds one through a `LiveQuery`, which also reads again for it.
 1. **When the stream tells `.serverUnreachable(error)`,** show the app as offline; `error` is typed, such as `network`, `rateLimited` or `server`. The follow keeps asking at a falling rate. Writes still queue. The copy tells this once until the server is reached again, however often the follow starts again around a catch-up or a hydration, and a stream added meanwhile is told it first.
 1. **When it tells `.serverReachable`,** show the app as online again. Any request that reaches the server tells it: the follow's, even when the server's answer then ends the follow, a hydration's or catch-up's that succeeded, and a drain's that answered a write. A held stream sends what waited by itself, so there is nothing to start.
 1. **When it tells `.queueDrained(report)`,** the stream has drained the writes queued while the server was away, once for each return, and the writes a drain you started left undelivered, once. `report` is the drain's report, and each write it answered is told as `.answered`, as for a drain the app starts. When it tells `.queueNotDrained(error)`, that drain stopped with `error`: the answers it had recorded stay recorded and the rest stay queued, and the stream doesn't try again until its server next returns, so call `queue.drain()` once the app can.
@@ -295,6 +295,57 @@ for await change in copy.changes() {
 ```
 
 A stream that tells `.stopped` has ended its follow until the next hydration or catch-up. `copyExpired` means the copy can no longer be kept current from where it is, after the server's log moved past it, another instance answered at its address (`instance_changed`), or its read view changed, such as after a retype or a type registered: hydrate again, and the queue survives. `unauthorized` means the server refused the key, and `signedOut` that a signed-in credential is gone: get a new key and pass it to `useKey(_:)`, and the follow starts again with it.
+
+## Keep a view's items current
+
+A `LiveQuery` reads from a working copy and reads again whenever the copy changes, so a SwiftUI view that reads its `value` stays current with no refresh code. It uses the Observation framework only; `Marfa` still doesn't import SwiftUI.
+
+```swift
+@MainActor @Observable
+final class Library {
+    let notes: LiveQuery<[Item]>
+
+    init(copy: WorkingCopy) {
+        notes = LiveQuery(copy, reading: .list(ListFilters(type: "core.note")))
+    }
+}
+
+struct NotesView: View {
+    let notes: LiveQuery<[Item]>
+    @State private var searchText = ""
+
+    var body: some View {
+        List(notes.value) { note in Text(note.title ?? "Untitled") }
+            .searchable(text: $searchText)
+            .onChange(of: searchText) {
+                notes.reading = searchText.isEmpty ? .list(ListFilters(type: "core.note")) : .search(searchText)
+            }
+    }
+}
+```
+
+Create a query once on the main actor, in the model that owns the copy rather than in a view's `init`, which SwiftUI runs often. It reads its copy for life, so a view for another copy makes another query. `reading` says what to read, and assigning it reads again at once. A `Reading` is one of:
+
+- `.list(_:sort:)` reads `items.list(_:sort:)`. `ListFilters.limit` and `offset` bound the result.
+- `.search(_:filters:limit:)` reads `search(_:filters:limit:)` and gives the items, best match first. Without a `limit` it holds the copy's default of 20 hits. Both give `[Item]`, so one query switches between a list and a search.
+- `.item(_:)` gives one `Item?`, `nil` while the copy doesn't hold the item or it's in the bin.
+- `.queue` gives the `[QueuedWrite]` the queue holds.
+- `Reading(placeholder:_:)` makes any other read, such as `items.original(ofConflictedCopy:)` or a search that keeps each hit's score. Its closure only reads, and runs often. The type it answers is `Sendable` and `Equatable`.
+
+The query reads again after every change the copy tells that can alter a read: a local write, a server event, an answered write, a drain, a hydration, a catch-up, a pin, a purge, a changed catalog, and a reader's `.saved`. It makes no read for `.serverUnreachable`, `.serverReachable` or `.stopped`, which change no row. Every read is from the copy, so the rows update offline too, with no server or with one that's away.
+
+A read that starts while another runs doesn't start a second one. A burst of changes causes the read in flight and at most one more, and a read that a newer one made obsolete, such as one for the filters before you changed them, is dropped. An answer that equals `value` tells no observer.
+
+The query exposes these properties:
+
+- `value` is what the last successful read answered, and the reading's placeholder before one. A row with `unreadableProperties` is in it like any other.
+- `isLoading` is true from creation to the end of the first read, and during every later read. Check it with an empty `value` to show a spinner for the first load only.
+- `error` is why the last read failed and `nil` after a read succeeds. `value` keeps the rows of the last successful read, and the next change reads again.
+- `following` is `.live`, `.stopped(error)` or `.ended(error)`. `.stopped` means the follow of the server failed and the stream is still open, so local writes still refresh the query; it returns to `.live` on a server event, or a hydration or a catch-up that tells a change. `.ended` means the stream finished. Its error is `nil` when the copy is closed by the time the query sees the end, even after a watch failure, and otherwise the fault the core ended the stream on. The query doesn't ask for a new stream by itself, because the core ends a stream on a fault so that nothing asks again. `refresh()` asks for one and reads. It also reads now and returns after a read that began after the call, for `.refreshable`.
+
+A query doesn't page. A reload reads and compares the whole result, so an app with many rows sets `ListFilters.limit` and grows it by assigning `reading` again.
+
+Releasing the query ends its `changes()` stream, so it doesn't keep the copy open.
 
 ## Read and manage folders
 
@@ -432,6 +483,6 @@ for try await event in watch {
 
 ## The sample
 
-`Examples/MarfaSample` is a SwiftUI app for macOS and the iOS simulator; `xcodegen generate` in that folder makes its project. `--scenario hydrate|write|drain|catch-up` runs one phase unattended and exits nonzero when a check fails. CI runs all four with the server stopped between `hydrate` and `write`.
+`Examples/MarfaSample` is a SwiftUI app for macOS and the iOS simulator; `xcodegen generate` in that folder makes its project. Its notes and its queue are `LiveQuery`s, and no code in the app reads again after a write; its Refresh button shows only when a query's stream has ended. `--scenario hydrate|write|drain|catch-up` runs one phase unattended and exits nonzero when a check fails; each phase also checks that a query it never calls shows what the copy holds. CI runs all four with the server stopped between `hydrate` and `write`.
 
 `AGENTS.md` has the rules for working in this repository.

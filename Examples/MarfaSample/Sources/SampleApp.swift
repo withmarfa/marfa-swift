@@ -19,7 +19,7 @@ struct SampleApp: App {
             NotesView(model: model)
                 .task {
                     await model.open()
-                    await model.listen()
+                    await model.hydrate()
                 }
         }
     }

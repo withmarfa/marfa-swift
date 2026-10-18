@@ -16,6 +16,8 @@ enum Scenario {
         }
         do {
             let copy = try await WorkingCopy.open(store: configuration.store, server: configuration.server)
+            // Never called after the phases' writes, hydrations and drains: it follows by itself.
+            let live = await following(copy)
             switch phase {
             case "hydrate":
                 let report = try await copy.hydrate(types: ["core.note"], tier: .feed)
@@ -27,6 +29,7 @@ enum Scenario {
                 expect(sent.verdicts.map(\.verdict) == [.accepted], "the note sent online was not accepted")
                 // So the queue the write phase reads holds only what it queues.
                 _ = try await copy.queue.forgetAnswered()
+                try await checkLive(live, in: copy, expect)
 
             case "write":
                 let first = try await copy.items.create(
@@ -76,6 +79,7 @@ enum Scenario {
                 print("held for an earlier write: \(waiting)")
                 expect(waiting > 0, "no write waited on an earlier one")
                 expect(after.allSatisfy { $0.verdict == nil }, "a write was answered with the server away")
+                try await checkLive(live, in: copy, expect)
 
             case "drain":
                 let report = try await copy.queue.drain()
@@ -104,6 +108,7 @@ enum Scenario {
                 if let keptId = kept.first?.id {
                     try await checkSearch(first: first.id, kept: keptId, in: copy, expect)
                 }
+                try await checkLive(live, in: copy, expect)
 
             case "catch-up":
                 let title = "Made elsewhere \(UUID())"
@@ -112,6 +117,7 @@ enum Scenario {
                 print("caught up: applied \(report.applied)")
                 let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
                 expect(notes.contains { $0.title == title }, "the change made elsewhere did not arrive")
+                try await checkLive(live, in: copy, expect)
 
             default:
                 print("name a phase: hydrate, write, drain or catch-up")
@@ -123,6 +129,29 @@ enum Scenario {
         }
         print("scenario \(phase): \(passed ? "passed" : "failed")")
         return passed
+    }
+
+    @MainActor
+    static func following(_ copy: WorkingCopy) -> LiveQuery<[Item]> {
+        LiveQuery(copy, reading: .list(ListFilters(type: "core.note", tier: .feed)))
+    }
+
+    /// The query shows what the copy holds, after writes, hydrations, drains and
+    /// catch-ups the phase made with no call to the query.
+    static func checkLive(
+        _ live: LiveQuery<[Item]>, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
+    ) async throws {
+        let held = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
+        var shown: [Item] = []
+        for _ in 0..<250 {
+            shown = await live.value
+            if shown == held { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        print("the query shows \(shown.count) of \(held.count) note(s)")
+        expect(shown == held, "the query does not show the notes the copy holds")
+        let failure = await live.error
+        expect(failure == nil, "the query failed: \(String(describing: failure))")
     }
 
     static func checkAttachment(
