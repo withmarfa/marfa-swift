@@ -1,5 +1,9 @@
 import MarfaCore
 
+@_exported import struct MarfaCore.JsonMember
+@_exported import struct MarfaCore.JsonObject
+@_exported import enum MarfaCore.JsonValue
+
 /// One JSON value.
 ///
 /// The core's own value, the one properties, bodies and answers cross the
