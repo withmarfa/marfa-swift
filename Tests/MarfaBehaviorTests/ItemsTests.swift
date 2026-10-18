@@ -584,5 +584,46 @@ struct ItemsOffline {
             await copy.close()
         }
     }
+
+    @Test(arguments: CopyKind.allCases)
+    func anOptionalFieldTakesANullAndKeepsItsValue(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy)
+
+        let write = try await copy.items.update(id, Edit(properties: ["title": .null], baseVersion: 0))
+        let created = try await copy.items.create(
+            Draft(type: "core.note", properties: ["body": "b", "title": .null]))
+
+        #expect(write.kind == .updateItem)
+        #expect(try await copy.items.get(id)?.title == "A")
+        #expect(try await copy.items.get(created.itemId ?? "")?.properties == ["body": "b"])
+        await copy.close()
+    }
+
+    @Test(
+        arguments: CopyKind.allCases,
+        [
+            ("2026-01-01T00:00:00.000+01:00", "2025-12-31T23:00:00.000Z"),
+            ("2026-01-01T00:00:00.000-14:00", "2026-01-01T14:00:00.000Z"),
+            ("2026-01-01T00:00:00.000+14:00", "2025-12-31T10:00:00.000Z"),
+            ("2026-01-01T00:00:00+01:30", "2025-12-31T22:30:00.000Z"),
+        ])
+    func aTimeWithAColonOffsetIsHeldInUTCToTheMillisecond(kind: CopyKind, times: (String, String)) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy, at: times.0)
+        #expect(try await copy.items.get(id)?.occurredAt == times.1)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aBareArrayFieldTakesAnArrayAndAnOptionalNullOnAnyDeclaredKind(kind: CopyKind) async throws {
+        let copy = try await kind.open(declaring: [
+            ["id": "app.review.list", "fields": ["items": ["type": "array"], "count": ["type": "integer"]]]
+        ])
+        let write = try await copy.items.create(
+            Draft(type: "app.review.list", properties: ["items": [1, "two"], "count": .null]))
+        #expect(try await copy.items.get(write.itemId ?? "")?.properties == ["items": [1, "two"]])
+        await copy.close()
+    }
 }
 #endif

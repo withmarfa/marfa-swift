@@ -9,11 +9,29 @@ import Synchronization
 /// stated by `FakeCopy`; every other call of the core throws
 /// `FakeCopyError.unsupported`.
 final class InMemoryCore: CoreProtocol, Sendable {
-    /// What a write changed, so a refusal can put it back.
+    /// What one write itself changed, so a refusal puts back that and nothing
+    /// else.
+    struct Patch {
+        /// The earlier value of each property the write set or cleared; `nil`
+        /// where it had none.
+        var properties: [(String, JsonValue?)] = []
+        var type: String?
+        var tier: Tier??
+        var sourceId: String??
+        var state: ItemState?
+        var tagsAdded: Set<String> = []
+        var tagsRemoved: Set<String> = []
+        var source: String?
+        var target: String?
+    }
+
     enum Undo {
         case none
-        case item(String, Item?)
-        case edge(String, Edge?, Int?)
+        case createdItem(String)
+        case item(String, Patch)
+        case createdEdge(String)
+        case edge(String, Patch)
+        case deletedEdge(Edge, Int?)
     }
 
     struct Entry {

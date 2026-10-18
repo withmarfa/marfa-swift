@@ -90,7 +90,6 @@ enum CopyKind: CaseIterable, Sendable, CustomTestStringConvertible {
         return types
     }
 }
-#endif
 
 /// The server the live tests run against, named as `MarfaTests` names it.
 enum LiveServer {
@@ -104,3 +103,4 @@ enum LiveServer {
 
     static var isRequired: Bool { ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil }
 }
+#endif

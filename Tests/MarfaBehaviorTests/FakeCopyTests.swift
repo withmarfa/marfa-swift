@@ -437,7 +437,7 @@ struct FakeCopyBehavior {
             try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
         let inputs: [(String, @Sendable () async throws -> Void)] = [
             (
-                "items.create with links in the body",
+                "items.create with links in a property",
                 { _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "see [[x]]"])) }
             ),
             (
@@ -453,7 +453,7 @@ struct FakeCopyBehavior {
                 { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: ["code": "en"])) }
             ),
             (
-                "items.update with links in the body",
+                "items.update with links in a property",
                 { _ = try await copy.items.update(held, Edit(properties: ["body": "![[f]]"], baseVersion: 0)) }
             ),
             (
@@ -500,6 +500,106 @@ struct FakeCopyBehavior {
         #expect(fake.writes.map(\.kind) == [.createItem])
         #expect(fake.writes.first?.body["properties"]?.object?["title"] == "New")
         await fake.copy.close()
+    }
+
+    /// The refused write's own change goes back, and what was answered since stays.
+    @Test func aRefusedWriteUndoesOnlyWhatItChangedSoLaterAcceptedWritesSurvive() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let titleEdit = try await copy.items.update(Self.note.id, Edit(properties: ["title": "T"], baseVersion: 4))
+        _ = try await copy.items.update(Self.note.id, Edit(properties: ["body": "B"], baseVersion: 4))
+        let tag = try await copy.tags.add("refused", to: Self.note.id)
+        _ = try await copy.tags.add("kept", to: Self.note.id)
+        let edgeEdit = try await copy.edges.update(Self.edge.id, EdgeEdit(["n": 2], baseVersion: 2))
+        _ = try await copy.edges.update(Self.edge.id, EdgeEdit(["m": 3], baseVersion: 2))
+        let refused = Set([titleEdit.id, tag.id, try #require(edgeEdit).id])
+        fake.verdict = { refused.contains($0.id) ? .refused(Refusal(reason: "no")) : .accepted }
+
+        _ = try await copy.queue.drain()
+
+        let note = try #require(try await copy.items.get(Self.note.id))
+        #expect(note.title == "Seed" && note.body == "B")
+        #expect(note.tags == ["kept", "seed"])
+        #expect(try await copy.edges.from(Self.note.id).first?.properties == ["n": 1, "m": 3])
+        await copy.close()
+    }
+
+    @Test func aCreateWhoseTagWriteIsRefusedKeepsTheItemWithoutTheTag() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        fake.verdict = { $0.kind == .addTag ? .refused(Refusal(reason: "no")) : .accepted }
+        let created = try await copy.items.create(
+            Draft(type: "core.note", properties: ["body": "b"], tags: ["refused"]))
+        let id = try #require(created.itemId)
+
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(id)?.tags == [])
+        await copy.close()
+    }
+
+    @Test func aFieldWithConstraintsBeyondItsKindIsUnsupportedWhateverTheValue() async throws {
+        let copy = WorkingCopy.fake(
+            itemTypes: [
+                ItemType(
+                    id: "app.test.entry",
+                    fields: [
+                        TypeField(
+                            name: "few", type: "array", declaredBy: "app.test.entry",
+                            definition: ["type": "array", "maxItems": 2]),
+                        TypeField(
+                            name: "pick", type: "string", declaredBy: "app.test.entry",
+                            definition: ["type": "string", "enum": ["a", "b"]]),
+                        TypeField(
+                            name: "bare", type: "array", declaredBy: "app.test.entry", definition: ["type": "array"]),
+                    ])
+            ]
+        ).copy
+        for properties: JSONObject in [["few": [1, 2, 3]], ["few": [1]], ["pick": "a"], ["pick": "c"]] {
+            await #expect {
+                _ = try await copy.items.create(Draft(type: "app.test.entry", properties: properties))
+            } throws: { error in
+                guard case .unsupported(let call)? = error as? FakeCopyError else { return false }
+                return call.contains("constrained")
+            }
+        }
+        _ = try await copy.items.create(Draft(type: "app.test.entry", properties: ["bare": [1, 2, 3], "few": .null]))
+        await copy.close()
+    }
+
+    @Test(
+        arguments: [
+            "2026-01-01T00:00:00.000+2460", "2026-01-01T00:00:00.000+0160", "2026-01-01T00:00:00.000+01:60",
+            "2026-01-01T00:00:00.000+14:01", "2026-01-01T00:00:00.000+15:00", "2026-02-30",
+            "2026-01-01T24:00:00Z", "2026-01-01T23:59:60Z", "2026-01-01T00:00:00.5Z", "2026-01-01T00:00:00,500Z",
+            "2026-01-01 00:00:00", "bogus",
+        ])
+    func aTimeWhoseNormalizationWasNotCheckedAgainstTheCoreIsUnsupported(time: String) async throws {
+        let copy = WorkingCopy.fake(itemTypes: [Self.noteType]).copy
+        await #expect {
+            _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"], occurredAt: time))
+        } throws: { error in
+            guard case .unsupported(let call)? = error as? FakeCopyError else { return false }
+            return call.contains(time)
+        }
+        #expect(try await copy.queue.all().isEmpty)
+        await copy.close()
+    }
+
+    @Test func aLinkInAnyPropertyOfAnyTypeIsUnsupported() async throws {
+        let copy = WorkingCopy.fake(itemTypes: [ItemType(id: "app.review.note")]).copy
+        for properties: JSONObject in [
+            ["text": "see [[x]]"], ["list": ["![[file.png]]"]], ["deep": ["a": ["b": "[["]]],
+        ] {
+            await #expect {
+                _ = try await copy.items.create(Draft(type: "app.review.note", properties: properties))
+            } throws: { error in
+                guard case .unsupported(let call)? = error as? FakeCopyError else { return false }
+                return call.contains("links")
+            }
+        }
+        #expect(try await copy.queue.all().isEmpty)
+        await copy.close()
     }
 }
 

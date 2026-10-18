@@ -48,19 +48,33 @@ enum Checks {
     static func properties(_ properties: JsonObject, of type: ItemType, call: String) throws {
         for member in properties.members {
             guard let field = type.fields.first(where: { $0.name == member.key }) else { continue }
+            if member.value == .null && !field.required { continue }
+            if !field.definition.members.allSatisfy({ plain.contains($0.key) }) {
+                throw FakeCopyError.unsupported(call: "\(call) with a constrained \(field.name) field")
+            }
             if field.fieldType == "string" {
-                guard case .string(let text) = member.value else {
+                guard case .string = member.value else {
                     throw Refuse.validation("invalid_properties", "\(field.name): Expected string")
-                }
-                if !field.definition.members.allSatisfy({ plain.contains($0.key) }) {
-                    throw FakeCopyError.unsupported(call: "\(call) with a constrained \(field.name) field")
-                }
-                if field.name == (type.bodyField ?? "body"), text.contains("[[") {
-                    throw FakeCopyError.unsupported(call: "\(call) with links in the body")
                 }
             } else if !agrees(member.value, with: field.fieldType) {
                 throw FakeCopyError.unsupported(call: "\(call) with a \(field.fieldType) field")
             }
+        }
+    }
+
+    /// A string that links to another item, or embeds a file, in any property of any
+    /// type: the core would queue an edge for it, which the fake does not.
+    static func links(_ properties: JsonObject, call: String) throws {
+        func holds(_ value: JsonValue) -> Bool {
+            switch value {
+            case .string(let text): text.contains("[[")
+            case .array(let items): items.contains(where: holds)
+            case .object(let object): object.members.contains { holds($0.value) }
+            case .null, .bool, .integer, .number: false
+            }
+        }
+        if properties.members.contains(where: { holds($0.value) }) {
+            throw FakeCopyError.unsupported(call: "\(call) with links in a property")
         }
     }
 
@@ -80,7 +94,7 @@ enum Checks {
     /// Only the forms checked against the core are accepted.
     static func occurred(_ text: String) throws -> String {
         let form =
-            /(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?(Z|[+-]\d{4}))?/
+            /(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?(Z|[+-]\d{2}:?\d{2}))?/
         guard let match = text.wholeMatch(of: form),
             let year = Int(match.1), let month = Int(match.2), let day = Int(match.3)
         else { throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)") }
@@ -91,14 +105,18 @@ enum Checks {
         parts.hour = match.4.flatMap { Int($0) } ?? 0
         parts.minute = match.5.flatMap { Int($0) } ?? 0
         parts.second = match.6.flatMap { Int($0) } ?? 0
-        guard let date = parts.date, parts.isValidDate else {
+        if parts.hour.map({ $0 >= 24 }) == true {
             throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)")
         }
         var offset = 0
-        if let zone = match.8, zone != "Z", let hours = Int(zone.dropFirst().prefix(2)),
-            let minutes = Int(zone.suffix(2))
-        {
+        if let zone = match.8, zone != "Z" {
+            guard let hours = Int(zone.dropFirst().prefix(2)), let minutes = Int(zone.suffix(2)), minutes < 60,
+                hours * 60 + minutes <= 14 * 60
+            else { throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)") }
             offset = (zone.hasPrefix("-") ? -1 : 1) * (hours * 3600 + minutes * 60)
+        }
+        guard let date = parts.date, parts.isValidDate, (parts.hour ?? 0) < 24, (parts.second ?? 0) < 60 else {
+            throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)")
         }
         let utc = Date(timeIntervalSince1970: date.timeIntervalSince1970 - Double(offset))
         let whole = utc.formatted(Date.ISO8601FormatStyle())

@@ -134,7 +134,7 @@ extension InMemoryCore.State {
     mutating func revert(_ ids: [String]) {
         for id in ids.reversed() {
             if let index = entries.firstIndex(where: { $0.write.id == id }) {
-                revert(entries[index].undo, of: entries[index].write.kind)
+                revert(entries[index].undo)
             }
         }
     }
