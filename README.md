@@ -52,6 +52,23 @@ for note in try await copy.items.list(ListFilters(type: "core.note")) {
 
 `storeURL` is where the working copy keeps its SQLite file, and `serverURL` is your instance's address. Keep `key` in the keychain between launches with `Keychain.system`; the copy holds it in memory and never writes it to its store.
 
+## Test and preview
+
+The `MarfaTesting` product is a working copy that runs without a store, a server or a call into the Rust core, for your tests and SwiftUI previews. Add it to your test targets. In the app target, import it only under `#if DEBUG`, so a release build never uses it. A view model that takes a `WorkingCopy` takes the fake the same way:
+
+```swift
+#if DEBUG
+import MarfaTesting
+
+#Preview {
+    let fake = WorkingCopy.fake(items: [note], itemTypes: [noteType])
+    NotesView(model: NotesModel(copy: fake.copy))
+}
+#endif
+```
+
+`FakeCopy` also records the writes the copy receives, chooses the verdict a drain gives each one, and sends changes on `changes()`. A call it does not serve throws `FakeCopyError.unsupported`; the documentation comment on `FakeCopy` lists what it serves.
+
 ## Learn more
 
 The documentation is at [docs.marfa.so](https://docs.marfa.so).

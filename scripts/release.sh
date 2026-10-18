@@ -94,6 +94,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Marfa", package: "marfa-swift"),
                 .product(name: "MarfaTypes", package: "marfa-swift"),
+                .product(name: "MarfaTesting", package: "marfa-swift"),
             ],
             swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
         ),
@@ -105,6 +106,7 @@ SWIFT
   cat >"${dir}/Sources/Consumer/Consumer.swift" <<'SWIFT'
 import Foundation
 import Marfa
+import MarfaTesting
 import MarfaTypes
 
 public func check(store: URL) async throws -> String {
@@ -112,7 +114,10 @@ public func check(store: URL) async throws -> String {
     let copy = try await WorkingCopy.open(store: store)
     let status = try await copy.status()
     await copy.close()
-    return "contract \(marfaContractVersion), \(status)"
+    let fake = WorkingCopy.fake()
+    let held = try await fake.copy.items.list().count
+    await fake.copy.close()
+    return "contract \(marfaContractVersion), \(status), fake copy holds \(held)"
 }
 SWIFT
   cat >"${dir}/Sources/Run/main.swift" <<'SWIFT'
