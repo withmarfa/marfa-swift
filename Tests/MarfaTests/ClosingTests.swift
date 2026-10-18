@@ -392,7 +392,7 @@ struct ChangingTheKey {
         try await bounded("close") { await copy.close() }
     }
 
-    @Test func aStreamThatCannotTakeAPlaceInTheWatchIsToldWhy() async throws {
+    @Test func aStreamThatCannotTakeAPlaceInTheWatchIsToldWhyAndEnds() async throws {
         let holder = CoreHolder(FakeCore.writer())
         let feed = Feed(holder: holder, watched: true)
         await holder.close()
@@ -405,6 +405,8 @@ struct ChangingTheKey {
             return
         }
         #expect(isClosed(error))
+        #expect(await heard.next() == nil)
+        #expect(feed.count == 0)
     }
 
     @Test func aCloseDuringAFailingReopenMakesUseKeyThrowClosed() async throws {

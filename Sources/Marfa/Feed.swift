@@ -33,8 +33,8 @@ final class Feed: Sendable {
         /// Places the core has not yet let go; the store is free when none is left.
         var open: Set<Int> = []
         var waitingForEnd: [CheckedContinuation<Void, Never>] = []
-        /// Told once the lock is let go.
-        var told: [(AsyncStream<Change>.Continuation, Change)] = []
+        /// Told once the lock is let go; `nil` ends the stream.
+        var told: [(AsyncStream<Change>.Continuation, Change?)] = []
     }
 
     let holder: CoreHolder
@@ -50,11 +50,14 @@ final class Feed: Sendable {
     /// Runs `body` under the lock, then tells what it queued to stream
     /// continuations, outside the lock.
     private func locked<T: Sendable>(_ body: (inout State) throws -> T) rethrows -> T {
-        let (result, told) = try state.withLock { state -> (T, [(AsyncStream<Change>.Continuation, Change)]) in
+        let (result, told) = try state.withLock { state -> (T, [(AsyncStream<Change>.Continuation, Change?)]) in
             let result = try body(&state)
             return (result, state.told.drain())
         }
-        for (continuation, change) in told { continuation.yield(change) }
+        // Finishing a stream runs its termination handler, which takes the lock.
+        for (continuation, change) in told {
+            if let change { continuation.yield(change) } else { continuation.finish() }
+        }
         return result
     }
 
@@ -181,11 +184,7 @@ final class Feed: Sendable {
         case .failure(let error):
             let waiters = locked { state -> [CheckedContinuation<Void, Never>] in
                 if state.streams[token]?.registration == claim.registration {
-                    state.streams[token]?.registration = nil
-                    if let stream = state.streams[token] {
-                        let error = error as? MarfaError ?? .store(message: "\(error)")
-                        state.told.append((stream.continuation, Self.stopped(error)))
-                    }
+                    end(&state, token, with: error as? MarfaError ?? .store(message: "\(error)"))
                 }
                 return release(&state, claim.registration)
             }
@@ -212,14 +211,26 @@ final class Feed: Sendable {
     /// drop the working copy and open the store again at once.
     fileprivate func letGo(by token: UUID, registration: Int, error: MarfaError?) {
         let waiters = locked { state -> [CheckedContinuation<Void, Never>] in
-            if let stream = state.streams[token], stream.registration == registration {
-                state.streams[token]?.registration = nil
-                state.streams[token]?.subscription = nil
-                if let error { state.told.append((stream.continuation, Self.stopped(error))) }
+            if state.streams[token]?.registration == registration {
+                if let error {
+                    end(&state, token, with: error)
+                } else {
+                    state.streams[token]?.registration = nil
+                    state.streams[token]?.subscription = nil
+                }
             }
             return release(&state, registration)
         }
         for waiter in waiters { waiter.resume() }
+    }
+
+    /// A stream whose place the core ended on a fault, or refused, is told why and
+    /// ends: a recovery or a key change must not take a place for it again, and the
+    /// app needs to tell it from a watch failure, which a recovery restarts.
+    private func end(_ state: inout State, _ token: UUID, with error: MarfaError) {
+        guard let stream = state.streams.removeValue(forKey: token) else { return }
+        state.told.append((stream.continuation, Self.stopped(error)))
+        state.told.append((stream.continuation, nil))
     }
 
     private func release(_ state: inout State, _ registration: Int) -> [CheckedContinuation<Void, Never>] {

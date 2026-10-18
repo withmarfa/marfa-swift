@@ -195,7 +195,7 @@ public final class WorkingCopy: Sendable {
     /// still notify the writer's streams. `status().hydration` says which.
     /// A reader keeps reading and tells `.saved` once it reads a changed
     /// SQLite data version. A stream the core's own fault ended is told
-    /// `.stopped`, and no hydration or catch-up starts it again: ask for a new
+    /// `.stopped` and then finishes, as one the core refused does: ask for a new
     /// one.
     public func changes() -> AsyncStream<Change> {
         let (stream, continuation) = AsyncStream<Change>.makeStream()

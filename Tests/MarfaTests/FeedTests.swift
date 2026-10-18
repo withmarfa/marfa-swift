@@ -213,20 +213,24 @@ struct Changes {
         try await bounded("close") { await feed.close() }
     }
 
-    /// Only a fault in the core ends a place with an error; its stream is told
-    /// and hears nothing more from that place.
-    @Test func aFaultInTheCoreEndsTheStreamWithTheErrorAndNothingMore() async throws {
+    /// A fault in the core is told to its stream, which then ends and is not revived.
+    @Test func aFaultInTheCoreEndsTheStreamAfterTellingTheError() async throws {
         let core = FakeCore.writer()
-        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
-        let heard = Heard(copy.changes())
-        core.fail(0, with: .Invalid(message: "the watch stopped on a fault in the core"))
-        try await eventually("the fault was told") {
-            heard.stops == [stopped(.invalid(message: "the watch stopped on a fault in the core"))]
-        }
+        let next = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
+        var heard = copy.changes().makeAsyncIterator()
+        let fault = MarfaCore.MarfaError.Invalid(message: "the watch stopped on a fault in the core")
+        core.fail(0, with: fault)
+        #expect(await heard.next() == stopped(.invalid(message: "the watch stopped on a fault in the core")))
+        #expect(await heard.next() == nil, "the stream stayed open after the fault")
+        #expect(copy.feed.count == 0)
+
         core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
         copy.feed.announce(write(.addTag, item: "n1"))
-        try await eventually("a local write is still told") { heard.locals.count == 1 }
-        #expect(heard.all.count == 2, "the stream was told by a place that had ended: \(heard.all)")
+        _ = try await bounded("the catch-up") { try await copy.catchUp() }
+        try await bounded("useKey") { try await copy.useKey("new-key") }
+        #expect(core.places.count == 1, "a recovery took a new place for a stream the fault ended")
+        #expect(next.places.isEmpty, "a key change revived a stream the fault ended")
         try await bounded("close") { await copy.close() }
     }
 
@@ -446,12 +450,17 @@ struct Changes {
         try await eventually("the feed was let go") { held == nil }
     }
 
-    @Test func aStreamRefusedAPlaceInTheWatchIsToldWhy() async throws {
+    @Test func aStreamRefusedAPlaceInTheWatchIsToldWhyAndEnds() async throws {
         let core = FakeCore.reader()
+        let next = FakeCore.reader()
         core.state.withLock { $0.watchRefused = .Invalid(message: "gone") }
-        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        let heard = Heard(copy.changes())
-        try await eventually("the failure was told") { heard.all == [stopped(.invalid(message: "gone"))] }
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
+        var heard = copy.changes().makeAsyncIterator()
+        #expect(await heard.next() == stopped(.invalid(message: "gone")))
+        #expect(await heard.next() == nil, "the stream stayed open after it was refused")
+        #expect(copy.feed.count == 0)
+        try await bounded("useKey") { try await copy.useKey("new-key") }
+        #expect(next.places.isEmpty, "a key change revived a stream that was refused")
         try await bounded("close") { await copy.close() }
     }
 
