@@ -13,7 +13,7 @@ public import struct Foundation.Date
 public protocol APIProtocol: Sendable {
     /// Describe the instance
     ///
-    /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
+    /// Describes the instance: its display name, `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -622,7 +622,7 @@ public protocol APIProtocol: Sendable {
     func revokeKey(_ input: Operations.RevokeKey.Input) async throws -> Operations.RevokeKey.Output
     /// Get the configuration
     ///
-    /// Returns the instance configuration: its enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    /// Returns the instance configuration: its display name, enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
     ///
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.
@@ -669,6 +669,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
+    /// Update the owner
+    ///
+    /// Updates the owner's email or name and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    ///
+    /// - Remark: HTTP `PATCH /owner`.
+    /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
+    func updateOwner(_ input: Operations.UpdateOwner.Input) async throws -> Operations.UpdateOwner.Output
     /// List sign-ins
     ///
     /// Returns every browser, app and key that can reach Marfa, marking the browser that sent the request. Requires the owner's browser session or the local command.
@@ -711,6 +718,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(removeOwnerPasskey)`.
     func removeOwnerPasskey(_ input: Operations.RemoveOwnerPasskey.Input) async throws -> Operations.RemoveOwnerPasskey.Output
+    /// Update the profile
+    ///
+    /// Updates the owner's name or avatar and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    ///
+    /// - Remark: HTTP `PATCH /profile`.
+    /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
+    func updateProfile(_ input: Operations.UpdateProfile.Input) async throws -> Operations.UpdateProfile.Output
     /// Export items and edges
     ///
     /// Exports readable items, metadata and edges, excluding trash unless requested. The owner can use their browser session. An archive can be read by `POST /restore`.
@@ -801,7 +815,7 @@ public protocol APIProtocol: Sendable {
 extension APIProtocol {
     /// Describe the instance
     ///
-    /// Describes the instance: its `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
+    /// Describes the instance: its display name, `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -2116,7 +2130,7 @@ extension APIProtocol {
     }
     /// Get the configuration
     ///
-    /// Returns the instance configuration: its enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    /// Returns the instance configuration: its display name, enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
     ///
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.
@@ -2197,6 +2211,21 @@ extension APIProtocol {
         body: Operations.CreateOwner.Input.Body
     ) async throws -> Operations.CreateOwner.Output {
         try await createOwner(Operations.CreateOwner.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Update the owner
+    ///
+    /// Updates the owner's email or name and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    ///
+    /// - Remark: HTTP `PATCH /owner`.
+    /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
+    public func updateOwner(
+        headers: Operations.UpdateOwner.Input.Headers = .init(),
+        body: Operations.UpdateOwner.Input.Body
+    ) async throws -> Operations.UpdateOwner.Output {
+        try await updateOwner(Operations.UpdateOwner.Input(
             headers: headers,
             body: body
         ))
@@ -2283,6 +2312,21 @@ extension APIProtocol {
         try await removeOwnerPasskey(Operations.RemoveOwnerPasskey.Input(
             path: path,
             headers: headers
+        ))
+    }
+    /// Update the profile
+    ///
+    /// Updates the owner's name or avatar and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    ///
+    /// - Remark: HTTP `PATCH /profile`.
+    /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
+    public func updateProfile(
+        headers: Operations.UpdateProfile.Input.Headers = .init(),
+        body: Operations.UpdateProfile.Input.Body
+    ) async throws -> Operations.UpdateProfile.Output {
+        try await updateProfile(Operations.UpdateProfile.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// Export items and edges

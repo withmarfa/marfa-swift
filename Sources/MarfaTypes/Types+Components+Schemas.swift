@@ -377,6 +377,130 @@ extension Components {
                 case sourceFilter = "source_filter"
             }
         }
+        /// Profile field permissions. Only the owner can change email.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ProfilePermissions`.
+        public struct ProfilePermissions: Codable, Hashable, Sendable {
+            /// Access to every profile field. write changes only name and avatar.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/*`.
+            @frozen public enum _ast_Payload: String, Codable, Hashable, Sendable, CaseIterable {
+                case read = "read"
+                case write = "write"
+            }
+            /// Access to every profile field. write changes only name and avatar.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/*`.
+            public var _ast_: Components.Schemas.ProfilePermissions._ast_Payload?
+            /// Access to the owner's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/name`.
+            @frozen public enum NamePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case read = "read"
+                case write = "write"
+            }
+            /// Access to the owner's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/name`.
+            public var name: Components.Schemas.ProfilePermissions.NamePayload?
+            /// Read access to the owner's email address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
+            @frozen public enum EmailPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case read = "read"
+            }
+            /// Read access to the owner's email address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
+            public var email: Components.Schemas.ProfilePermissions.EmailPayload?
+            /// Access to the owner's avatar URL.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/avatar`.
+            @frozen public enum AvatarPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case read = "read"
+                case write = "write"
+            }
+            /// Access to the owner's avatar URL.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/avatar`.
+            public var avatar: Components.Schemas.ProfilePermissions.AvatarPayload?
+            /// Creates a new `ProfilePermissions`.
+            ///
+            /// - Parameters:
+            ///   - _ast_: Access to every profile field. write changes only name and avatar.
+            ///   - name: Access to the owner's name.
+            ///   - email: Read access to the owner's email address.
+            ///   - avatar: Access to the owner's avatar URL.
+            public init(
+                _ast_: Components.Schemas.ProfilePermissions._ast_Payload? = nil,
+                name: Components.Schemas.ProfilePermissions.NamePayload? = nil,
+                email: Components.Schemas.ProfilePermissions.EmailPayload? = nil,
+                avatar: Components.Schemas.ProfilePermissions.AvatarPayload? = nil
+            ) {
+                self._ast_ = _ast_
+                self.name = name
+                self.email = email
+                self.avatar = avatar
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _ast_ = "*"
+                case name
+                case email
+                case avatar
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._ast_ = try container.decodeIfPresent(
+                    Components.Schemas.ProfilePermissions._ast_Payload.self,
+                    forKey: ._ast_
+                )
+                self.name = try container.decodeIfPresent(
+                    Components.Schemas.ProfilePermissions.NamePayload.self,
+                    forKey: .name
+                )
+                self.email = try container.decodeIfPresent(
+                    Components.Schemas.ProfilePermissions.EmailPayload.self,
+                    forKey: .email
+                )
+                self.avatar = try container.decodeIfPresent(
+                    Components.Schemas.ProfilePermissions.AvatarPayload.self,
+                    forKey: .avatar
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "*",
+                    "name",
+                    "email",
+                    "avatar"
+                ])
+            }
+        }
+        /// Stored profile levels by field. Only name and avatar permit writes.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StoredProfilePermissions`.
+        public struct StoredProfilePermissions: Codable, Hashable, Sendable {
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: Components.Schemas.PermissionLevel]
+            /// Creates a new `StoredProfilePermissions`.
+            ///
+            /// - Parameters:
+            ///   - additionalProperties: A container of undocumented properties.
+            public init(additionalProperties: [String: Components.Schemas.PermissionLevel] = .init()) {
+                self.additionalProperties = additionalProperties
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// What a key may do with an entry: `read` it, or `write` it (which includes reading). A name no entry covers is denied.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PermissionLevel`.
+        @frozen public enum PermissionLevel: String, Codable, Hashable, Sendable, CaseIterable {
+            case read = "read"
+            case write = "write"
+        }
         /// An item's lifecycle state. `active`: in use, and what a listing returns by default. `archived`: kept and readable by ID, but left out of a default listing. `trashed`: in the trash until restored or purged. `revoked`: retired for good, on `system.*` items only.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemState`.
@@ -1767,16 +1891,10 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/InstanceDescription`.
         public struct InstanceDescription: Codable, Hashable, Sendable {
-            /// Always `marfa`.
+            /// The instance's display name. Defaults to `Marfa`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/name`.
-            @frozen public enum NamePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case marfa = "marfa"
-            }
-            /// Always `marfa`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InstanceDescription/name`.
-            public var name: Components.Schemas.InstanceDescription.NamePayload
+            public var name: Swift.String
             /// The build the instance runs.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/version`.
@@ -1796,13 +1914,13 @@ extension Components {
             /// Creates a new `InstanceDescription`.
             ///
             /// - Parameters:
-            ///   - name: Always `marfa`.
+            ///   - name: The instance's display name. Defaults to `Marfa`.
             ///   - version: The build the instance runs.
             ///   - instanceId: Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
             ///   - contract: The contract version, the same number as this document's `info.version`. It stays at `0` until the first public release.
             ///   - features: The features the instance serves, such as `items` and `webhooks`.
             public init(
-                name: Components.Schemas.InstanceDescription.NamePayload,
+                name: Swift.String,
                 version: Swift.String,
                 instanceId: Swift.String,
                 contract: Swift.Int,
@@ -10982,30 +11100,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/metadata_permissions`.
             public var metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload
-            /// What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
+            /// Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/profile_permissions`.
-            public struct ProfilePermissionsPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.PermissionLevel]
-                /// Creates a new `ProfilePermissionsPayload`.
-                ///
-                /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.PermissionLevel] = .init()) {
-                    self.additionalProperties = additionalProperties
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
-                }
-            }
-            /// What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
-            ///
-            /// - Remark: Generated from `#/components/schemas/KeyResponse/profile_permissions`.
-            public var profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload
+            public var profilePermissions: Components.Schemas.StoredProfilePermissions
             /// The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/enforcement_override`.
@@ -11037,7 +11135,7 @@ extension Components {
             ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
             ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
-            ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
+            ///   - profilePermissions: Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
             ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
@@ -11055,7 +11153,7 @@ extension Components {
                 extensionPermissions: Components.Schemas.KeyResponse.ExtensionPermissionsPayload,
                 edgePermissions: Components.Schemas.KeyResponse.EdgePermissionsPayload,
                 metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload,
-                profilePermissions: Components.Schemas.KeyResponse.ProfilePermissionsPayload,
+                profilePermissions: Components.Schemas.StoredProfilePermissions,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
                 expiresAt: Swift.String? = nil,
@@ -11123,13 +11221,6 @@ extension Components {
             case read = "read"
             case write = "write"
             case none = "none"
-        }
-        /// What a key may do with an entry: `read` it, or `write` it (which includes reading). A name no entry covers is denied.
-        ///
-        /// - Remark: Generated from `#/components/schemas/PermissionLevel`.
-        @frozen public enum PermissionLevel: String, Codable, Hashable, Sendable, CaseIterable {
-            case read = "read"
-            case write = "write"
         }
         /// A page holding every key you can reach.
         ///
@@ -11288,30 +11379,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/metadata_permissions`.
             public var metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload
-            /// What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
+            /// Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/profile_permissions`.
-            public struct ProfilePermissionsPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.PermissionLevel]
-                /// Creates a new `ProfilePermissionsPayload`.
-                ///
-                /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.PermissionLevel] = .init()) {
-                    self.additionalProperties = additionalProperties
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
-                }
-            }
-            /// What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ApiKey/profile_permissions`.
-            public var profilePermissions: Components.Schemas.ApiKey.ProfilePermissionsPayload
+            public var profilePermissions: Components.Schemas.StoredProfilePermissions
             /// The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/enforcement_override`.
@@ -11342,7 +11413,7 @@ extension Components {
             ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
             ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
-            ///   - profilePermissions: What the key may `read` or `write` of the owner's profile: `name`, `email` or `avatar`, or `*` for all of it.
+            ///   - profilePermissions: Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
             ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
@@ -11359,7 +11430,7 @@ extension Components {
                 extensionPermissions: Components.Schemas.ApiKey.ExtensionPermissionsPayload,
                 edgePermissions: Components.Schemas.ApiKey.EdgePermissionsPayload,
                 metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload,
-                profilePermissions: Components.Schemas.ApiKey.ProfilePermissionsPayload,
+                profilePermissions: Components.Schemas.StoredProfilePermissions,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
                 expiresAt: Swift.String? = nil,
@@ -11483,7 +11554,7 @@ extension Components {
                 case error
             }
         }
-        /// The instance configuration: its enforcement levers and retention settings, with the instance's ID.
+        /// The instance configuration: its display name, enforcement levers and retention settings, with the instance's ID.
         ///
         /// - Remark: Generated from `#/components/schemas/InstanceConfig`.
         public struct InstanceConfig: Codable, Hashable, Sendable {
@@ -11491,6 +11562,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/instance_id`.
             public var instanceId: Swift.String
+            /// The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/name`.
+            public var name: Swift.String?
             /// The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/enforcement`.
@@ -11556,6 +11631,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - instanceId: Unique identifier for the instance, the same value `GET /` returns.
+            ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
             ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
             ///   - auditRetentionDays: Days Marfa keeps audit log entries and outbound webhook delivery history. `0` keeps them with no age limit. Absent: the server's default applies.
             ///   - eventLogRetentionHours: Hours Marfa keeps events, which a stream can replay from a cursor, and the answers it replays for an `Idempotency-Key`. `0` keeps them with no age limit. Absent: the server's default applies.
@@ -11564,6 +11640,7 @@ extension Components {
             ///   - inboundPendingRetentionDays: Days Marfa keeps inbound webhook deliveries no connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
             public init(
                 instanceId: Swift.String,
+                name: Swift.String? = nil,
                 enforcement: Components.Schemas.InstanceConfig.EnforcementPayload? = nil,
                 auditRetentionDays: Swift.Int? = nil,
                 eventLogRetentionHours: Swift.Int? = nil,
@@ -11572,6 +11649,7 @@ extension Components {
                 inboundPendingRetentionDays: Swift.Int? = nil
             ) {
                 self.instanceId = instanceId
+                self.name = name
                 self.enforcement = enforcement
                 self.auditRetentionDays = auditRetentionDays
                 self.eventLogRetentionHours = eventLogRetentionHours
@@ -11581,6 +11659,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case instanceId = "instance_id"
+                case name
                 case enforcement
                 case auditRetentionDays = "audit_retention_days"
                 case eventLogRetentionHours = "event_log_retention_hours"
