@@ -1,6 +1,9 @@
 import Foundation
 import MarfaCore
 
+@_exported import enum MarfaCore.ItemState
+@_exported import enum MarfaCore.Tier
+
 /// The tier an item is in: `library` for lasting material, `feed` for an
 /// incoming stream.
 public typealias Tier = MarfaCore.Tier

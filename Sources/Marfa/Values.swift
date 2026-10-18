@@ -1,6 +1,15 @@
 import Foundation
 import MarfaCore
 
+@_exported import struct MarfaCore.BinPage
+@_exported import struct MarfaCore.Draft
+@_exported import struct MarfaCore.Edge
+@_exported import struct MarfaCore.Edit
+@_exported import struct MarfaCore.Item
+@_exported import struct MarfaCore.ListFilters
+@_exported import struct MarfaCore.SearchFilters
+@_exported import struct MarfaCore.SearchHit
+
 /// Every way the core refuses or fails. `code` is the server's, where the
 /// server answered.
 public enum MarfaError: Error, Sendable, Hashable, LocalizedError {

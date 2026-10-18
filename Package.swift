@@ -38,6 +38,11 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
+            name: "MarfaImportTests",
+            dependencies: ["Marfa"],
+            swiftSettings: [.swiftLanguageMode(.v6), .enableUpcomingFeature("MemberImportVisibility")]
+        ),
+        .testTarget(
             name: "MarfaTypesTests",
             dependencies: ["MarfaTypes"],
             swiftSettings: [.swiftLanguageMode(.v6)]

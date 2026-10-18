@@ -94,18 +94,21 @@ let package = Package(
             dependencies: [
                 .product(name: "Marfa", package: "marfa-swift"),
                 .product(name: "MarfaTypes", package: "marfa-swift"),
-            ]
+            ],
+            swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
         ),
         .executableTarget(name: "Run", dependencies: ["Consumer"]),
     ]
 )
 SWIFT
+  cp Tests/MarfaImportTests/Imports.swift "${dir}/Sources/Consumer/Imports.swift"
   cat >"${dir}/Sources/Consumer/Consumer.swift" <<'SWIFT'
 import Foundation
 import Marfa
 import MarfaTypes
 
 public func check(store: URL) async throws -> String {
+    checkImports()
     let copy = try await WorkingCopy.open(store: store)
     let status = try await copy.status()
     await copy.close()
