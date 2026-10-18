@@ -137,6 +137,7 @@ import Testing
         let edgeType = EdgeType(
             id: "parent-of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target)
         #expect(edgeType.writtenAt == .target)
+        #expect(EdgeType(id: "in-folder", cardinality: "many-to-many", writtenAt: .none).writtenAt == .none)
         #expect(Status(catalogVersion: 2).catalogVersion == 2)
         #expect(Change.Refresh.catalog != .hydrated)
         #expect(Change.Origin.serverUnreachable(.network(message: "m")) != .serverReachable)

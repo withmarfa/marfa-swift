@@ -179,7 +179,8 @@ struct OwnValueTypes {
         for hydration in Marfa.Hydration.allCases { #expect(Marfa.Hydration(hydration.core) == hydration) }
         for field in Marfa.SortField.allCases { #expect(Marfa.SortField(field.core) == field) }
         for direction in Marfa.SortDirection.allCases { #expect(Marfa.SortDirection(direction.core) == direction) }
-        for end in Marfa.EdgeEnd.allCases { #expect(Marfa.EdgeEnd(end.core) == end) }
+        #expect(MarfaCore.EdgeWrittenAt.allCases.map { Marfa.EdgeWrittenAt($0) } == Marfa.EdgeWrittenAt.allCases)
+        #expect(Marfa.EdgeWrittenAt(.none) == .none)
         for kind in Marfa.GrantKind.allCases { #expect(Marfa.GrantKind(kind.core) == kind) }
         for level in Marfa.GrantLevel.allCases { #expect(Marfa.GrantLevel(level.core) == level) }
     }

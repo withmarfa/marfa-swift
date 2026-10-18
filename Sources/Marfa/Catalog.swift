@@ -120,22 +120,19 @@ public struct TypeField: Sendable, Hashable, Identifiable {
     }
 }
 
-/// The end of an edge whose file writes it.
-public enum EdgeEnd: Sendable, Hashable, CaseIterable {
+/// Where a folder writes an edge: in its source item's file, in its target
+/// item's file under the edge type's reverse name, or in none.
+public enum EdgeWrittenAt: Sendable, Hashable, CaseIterable {
     case source
     case target
+    /// No file writes the edge, as for a file's placement in a folder.
+    case none
 
-    init(_ core: MarfaCore.EdgeEnd) {
+    init(_ core: MarfaCore.EdgeWrittenAt) {
         switch core {
         case .source: self = .source
         case .target: self = .target
-        }
-    }
-
-    var core: MarfaCore.EdgeEnd {
-        switch self {
-        case .source: .source
-        case .target: .target
+        case .none: self = .none
         }
     }
 }
@@ -150,7 +147,7 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     public let cardinality: String
     /// The name the edge goes by read from its target.
     public let reverseName: String?
-    public let writtenAt: EdgeEnd
+    public let writtenAt: EdgeWrittenAt
     public let sourceTypeConstraints: [String]
     public let targetTypeConstraints: [String]
     /// `cascade`, `orphan` or `block`.
@@ -163,7 +160,7 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     /// For an app's previews and tests.
     public init(
         id: String, label: String? = nil, description: String? = nil, cardinality: String,
-        reverseName: String? = nil, writtenAt: EdgeEnd = .source, sourceTypeConstraints: [String] = ["*"],
+        reverseName: String? = nil, writtenAt: EdgeWrittenAt = .source, sourceTypeConstraints: [String] = ["*"],
         targetTypeConstraints: [String] = ["*"], cascadeOnDelete: String = "orphan", properties: [TypeField] = [],
         shipped: Bool = false
     ) {
@@ -183,7 +180,7 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     init(_ core: MarfaCore.EdgeType) {
         self.init(
             id: core.id, label: core.label, description: core.description, cardinality: core.cardinality,
-            reverseName: core.reverseName, writtenAt: EdgeEnd(core.writtenAt),
+            reverseName: core.reverseName, writtenAt: EdgeWrittenAt(core.writtenAt),
             sourceTypeConstraints: core.sourceTypeConstraints, targetTypeConstraints: core.targetTypeConstraints,
             cascadeOnDelete: core.cascadeOnDelete, properties: core.properties.map(TypeField.init),
             shipped: core.shipped)
