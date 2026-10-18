@@ -47,7 +47,7 @@ enum Checks {
     /// judge as the core does, and a body that links, throw `unsupported`.
     static func properties(_ properties: JsonObject, of type: ItemType, call: String) throws {
         for member in properties.members {
-            guard let field = type.fields.first(where: { $0.name == member.key }) else { continue }
+            guard let field = type.fields.first(where: { $0.name.isBytes(member.key) }) else { continue }
             if member.value == .null && !field.required { continue }
             if !field.definition.members.allSatisfy({ plain.contains($0.key) }) {
                 throw FakeCopyError.unsupported(call: "\(call) with a constrained \(field.name) field")

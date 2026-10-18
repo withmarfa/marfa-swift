@@ -84,8 +84,10 @@ enum Properties {
 
     /// An edit's properties laid over the held ones: a null names a property
     /// the server drops, so it changes nothing.
-    static func merged(_ held: JsonObject, with edit: JsonObject, replacing: Bool) -> JsonObject {
-        let given = edit.members.filter { $0.value != .null }
+    static func merged(
+        _ held: JsonObject, with edit: JsonObject, replacing: Bool, dropping: Bool = true
+    ) -> JsonObject {
+        let given = dropping ? edit.members.filter { $0.value != .null } : edit.members
         guard !replacing else { return served(JsonObject(members: given)) }
         var members = held.members
         for member in given {
@@ -99,7 +101,7 @@ enum Properties {
     }
 
     static func value(_ object: JsonObject, _ key: String) -> JsonValue? {
-        object.members.first { $0.key == key }?.value
+        object.members.first { $0.key.isBytes(key) }?.value
     }
 
     static func string(_ object: JsonObject, _ key: String) -> String? {
@@ -190,3 +192,8 @@ enum Minted {
     }
 }
 #endif
+
+extension String {
+    /// Equal as bytes, not as Unicode: `é` and `e` with a combining accent differ, as they do to the core.
+    func isBytes(_ other: String) -> Bool { utf8.elementsEqual(other.utf8) }
+}

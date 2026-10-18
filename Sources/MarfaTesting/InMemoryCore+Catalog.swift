@@ -162,12 +162,12 @@ enum Declaring {
         guard let row = declared[id] else { return given[id] }
         let parent = Properties.string(row, "parent").flatMap { $0 == id ? nil : $0 }
         let inherited = parent.flatMap { resolve($0, declared: declared, given: given, depth: depth + 1) }
-        var fields = Dictionary(uniqueKeysWithValues: (inherited?.fields ?? []).map { ($0.name, $0) })
+        var fields = Dictionary(uniqueKeysWithValues: (inherited?.fields ?? []).map { (Array($0.name.utf8), $0) })
         for member in Properties.object(row, "fields")?.members ?? [] {
             guard case .object(let definition) = member.value else { continue }
             var required = false
             if case .bool(true)? = Properties.value(definition, "required") { required = true }
-            fields[member.key] = TypeField(
+            fields[Array(member.key.utf8)] = TypeField(
                 name: member.key, fieldType: Properties.string(definition, "type") ?? "", required: required,
                 description: Properties.string(definition, "description"), declaredBy: id, definition: definition)
         }

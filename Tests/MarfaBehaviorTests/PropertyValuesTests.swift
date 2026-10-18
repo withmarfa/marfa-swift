@@ -234,5 +234,24 @@ struct PropertyValuesOffline {
         #expect(try await copy.queue.all().count == 1)
         await copy.close()
     }
+
+    @Test(arguments: CopyKind.allCases)
+    func keysThatDifferOnlyInNormalizationAreChangedOneAtATime(kind: CopyKind) async throws {
+        let copy = try await Self.open(kind)
+        let composed = "\u{e9}"
+        let decomposed = "e\u{301}"
+        var properties = JSONObject()
+        properties[composed] = 1
+        properties[decomposed] = 2
+        let id = try await Self.create(copy, properties)
+        var edit = JSONObject()
+        edit[decomposed] = 20
+
+        _ = try await copy.items.update(id, Edit(properties: edit, baseVersion: 0))
+
+        let held = try #require(try await copy.items.get(id))
+        #expect(held.properties.count == 2 && held.properties[composed] == 1 && held.properties[decomposed] == 20)
+        await copy.close()
+    }
 }
 #endif

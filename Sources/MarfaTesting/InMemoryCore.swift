@@ -9,34 +9,32 @@ import Synchronization
 /// stated by `FakeCopy`; every other call of the core throws
 /// `FakeCopyError.unsupported`.
 final class InMemoryCore: CoreProtocol, Sendable {
-    /// What one write itself changed, so a refusal puts back that and nothing
-    /// else.
-    struct Patch {
-        /// The earlier value of each property the write set or cleared; `nil`
-        /// where it had none.
-        var properties: [(String, JsonValue?)] = []
-        var type: String?
-        var tier: Tier??
-        var sourceId: String??
-        var state: ItemState?
-        var tagsAdded: Set<String> = []
-        var tagsRemoved: Set<String> = []
-        var source: String?
-        var target: String?
+    enum TagChange {
+        case add(String)
+        case remove(String)
+        case replace([String])
+        case merge([String])
     }
 
-    enum Undo {
+    /// What a write does to the rows, so the rows can be worked out again from
+    /// the seed and the writes that were not refused.
+    enum Effect {
         case none
-        case createdItem(String)
-        case item(String, Patch)
-        case createdEdge(String)
-        case edge(String, Patch)
-        case deletedEdge(Edge, Int?)
+        /// A create, with the row as it was made and no tags: each tag is its own write.
+        case made(Item)
+        case edit(properties: JsonObject, replacing: Bool, type: String?, tier: Tier?, sourceId: String?)
+        case state(ItemState)
+        case tags(TagChange)
+        case madeEdge(Edge)
+        case editEdge(properties: JsonObject, source: String?, target: String?)
+        case removedEdge
     }
 
     struct Entry {
         var write: QueuedWrite
-        var undo = Undo.none
+        var effect = Effect.none
+        /// Taken out by a withdraw, so it no longer shows in the rows.
+        var withdrawn = false
         var inQueue = true
     }
 
@@ -44,6 +42,9 @@ final class InMemoryCore: CoreProtocol, Sendable {
         var items: [String: Item] = [:]
         var edges: [String: Edge] = [:]
         var edgeOrder: [String: Int] = [:]
+        var seedItems: [String: Item] = [:]
+        var seedEdges: [String: Edge] = [:]
+        var seedEdgeOrder: [String: Int] = [:]
         var givenItemTypes: [String: ItemType] = [:]
         var edgeTypes: [String: EdgeType] = [:]
         var declared: [String: JsonObject] = [:]
@@ -61,6 +62,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         var state = State()
         for item in items { state.items[item.id] = item }
         for edge in edges { state.add(edge) }
+        (state.seedItems, state.seedEdges, state.seedEdgeOrder) = (state.items, state.edges, state.edgeOrder)
         for type in itemTypes { state.givenItemTypes[type.id] = type }
         for type in edgeTypes { state.edgeTypes[type.id] = type }
         self.state = Mutex(state)
@@ -78,7 +80,9 @@ final class InMemoryCore: CoreProtocol, Sendable {
         state.withLock { state in
             Status(
                 serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [],
-                pinned: state.made.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }, eventCursor: nil,
+                pinned: state.made.filter { state.items[$0] != nil }.sorted {
+                    $0.utf8.lexicographicallyPrecedes($1.utf8)
+                }, eventCursor: nil,
                 hydration: .never, items: UInt64(state.items.count), edges: UInt64(state.edges.count),
                 catalogVersion: nil)
         }

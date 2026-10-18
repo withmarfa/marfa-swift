@@ -21,7 +21,6 @@ extension InMemoryCore {
         let pending = state.withLock { state in
             state.entries.filter { $0.inQueue && $0.write.verdict == nil }.map(\.write.id)
         }
-        var refused: [String] = []
         for id in pending {
             switch state.withLock({ $0.readiness(of: id) }) {
             case .waiting:
@@ -32,18 +31,16 @@ extension InMemoryCore {
                     reason: reason, code: nil, message: nil, fields: [], trashed: false, grant: nil)
                 report.verdicts.append(state.withLock { $0.answer(id, .refused(refusal: refusal)) })
                 report.unsent += 1
-                refused.append(id)
             case .ready(let write, let choose):
                 if let verdict = choose(write) {
                     report.verdicts.append(state.withLock { $0.answer(id, verdict) })
                     report.answered += 1
-                    if case .refused = verdict { refused.append(id) }
                 } else {
                     report.undelivered += 1
                 }
             }
         }
-        state.withLock { $0.revert(refused) }
+        state.withLock { $0.replay() }
         return report
     }
 
@@ -53,7 +50,6 @@ extension InMemoryCore {
             switch state.entries[at].write.verdict {
             case .blocked(.ancestorUnavailable, _)?, .blocked(.conflictUnresolved, _)?:
                 state.entries[at].inQueue = false
-                var refused = [id]
                 for other in state.entries.indices
                 where state.entries[other].inQueue && state.entries[other].write.verdict == nil
                     && state.entries[other].write.dependsOn.contains(id)
@@ -63,9 +59,9 @@ extension InMemoryCore {
                         reason: "waited on \(id), which was withdrawn", code: nil, message: nil, fields: [],
                         trashed: false, grant: nil)
                     _ = state.answer(waited, .refused(refusal: refusal))
-                    refused.append(waited)
                 }
-                state.revert(refused)
+                state.entries[at].withdrawn = true
+                state.replay()
                 return true
             default:
                 return false
@@ -128,15 +124,6 @@ extension InMemoryCore.State {
             return .refused("the delete has no confirmed server version to remove; read the item before deleting it")
         }
         return .ready(write, verdict)
-    }
-
-    /// Puts back, newest write first, the rows the refused writes changed.
-    mutating func revert(_ ids: [String]) {
-        for id in ids.reversed() {
-            if let index = entries.firstIndex(where: { $0.write.id == id }) {
-                revert(entries[index].undo)
-            }
-        }
     }
 
     mutating func setWaiting(_ id: String) {

@@ -601,6 +601,63 @@ struct FakeCopyBehavior {
         #expect(try await copy.queue.all().isEmpty)
         await copy.close()
     }
+
+    @Test func theRowsAreTheSeedPlusEveryWriteNotRefusedSoARefusedEarlierEditLeavesTheAcceptedLaterOne() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let first = try await copy.items.update(Self.note.id, Edit(properties: ["title": "Refused"], baseVersion: 4))
+        _ = try await copy.items.update(Self.note.id, Edit(properties: ["title": "Accepted"], baseVersion: 4))
+        let firstTag = try await copy.tags.add("same", to: Self.note.id)
+        _ = try await copy.tags.add("same", to: Self.note.id)
+        fake.verdict = { [first.id, firstTag.id].contains($0.id) ? .refused(Refusal(reason: "no")) : .accepted }
+
+        _ = try await copy.queue.drain()
+
+        let note = try #require(try await copy.items.get(Self.note.id))
+        #expect(note.title == "Accepted" && note.tags == ["same", "seed"])
+        await copy.close()
+    }
+
+    @Test func aRefusedCreateOfAnExistingIDLeavesTheRowItDidNotMake() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        fake.verdict = { [.createItem, .createEdge].contains($0.kind) ? .refused(Refusal(reason: "no")) : .accepted }
+        _ = try await copy.items.create(
+            Draft(type: "core.note", properties: ["body": "other"], id: Self.note.id))
+        _ = try await copy.edges.create(from: Self.note.id, to: Self.other.id, type: "references", id: Self.edge.id)
+
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(Self.note.id) == Self.note)
+        #expect(try await copy.edges.from(Self.note.id) == [Self.edge])
+        await copy.close()
+    }
+
+    @Test func aRefusedEditOfKeysThatDifferOnlyInNormalizationKeepsBothValues() async throws {
+        let composed = "\u{e9}"
+        let decomposed = "e\u{301}"
+        var properties: JSONObject = ["body": "b"]
+        properties[composed] = 1
+        properties[decomposed] = 2
+        let seed = Item(
+            id: "01a1500d-78bd-73f0-8c55-2a4160c5ff09", type: "core.note", properties: properties, state: .active,
+            tier: .library, version: 1, schemaVersion: 1, source: "app", sourceId: nil,
+            occurredAt: "2026-09-26T00:00:00.000Z", createdAt: "2026-09-26T00:00:00.000Z",
+            updatedAt: "2026-09-26T00:00:00.000Z", tags: [])
+        let fake = WorkingCopy.fake(items: [seed], itemTypes: [Self.noteType])
+        fake.verdict = { _ in .refused(Refusal(reason: "no")) }
+        var edit = JSONObject()
+        edit[composed] = 10
+        edit[decomposed] = 20
+        _ = try await fake.copy.items.update(seed.id, Edit(properties: edit, baseVersion: 1))
+        #expect(try await fake.copy.items.get(seed.id)?.properties[decomposed] == 20)
+
+        _ = try await fake.copy.queue.drain()
+
+        let held = try #require(try await fake.copy.items.get(seed.id))
+        #expect(held.properties[composed] == 1 && held.properties[decomposed] == 2)
+        await fake.copy.close()
+    }
 }
 
 /// A view model as an app writes it: it takes a `WorkingCopy`, so a test or a
