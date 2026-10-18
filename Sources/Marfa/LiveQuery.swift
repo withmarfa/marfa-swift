@@ -139,6 +139,7 @@ public final class LiveQuery<Value: Sendable & Equatable> {
     @ObservationIgnored private var waiting: [CheckedContinuation<Void, Never>] = []
     nonisolated private let tasks = Tasks()
 
+    /// Reads `copy` as `reading` says, and keeps reading as the copy changes until the query is released.
     public init(_ copy: WorkingCopy, reading: Reading<Value>) {
         self.copy = copy
         self.reading = reading
