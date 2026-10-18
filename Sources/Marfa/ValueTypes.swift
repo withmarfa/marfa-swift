@@ -159,7 +159,7 @@ public enum Verdict: Sendable, Hashable {
         }
     }
 
-    var core: MarfaCore.Verdict {
+    package var core: MarfaCore.Verdict {
         switch self {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
@@ -446,7 +446,7 @@ public struct QueuedWrite: Sendable, Hashable {
         self.answeredAt = answeredAt
     }
 
-    init(_ core: MarfaCore.QueuedWrite) {
+    package init(_ core: MarfaCore.QueuedWrite) {
         self.init(
             id: core.id, kind: WriteKind(core.kind), itemId: core.itemId, targetId: core.targetId,
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,

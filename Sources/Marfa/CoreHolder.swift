@@ -18,7 +18,7 @@ final class CoreHolder: Sendable {
     }
 
     private struct State {
-        var core: Core?
+        var core: (any CoreProtocol)?
         var phase = Phase.open
         var closing = false
         var leases = 0
@@ -28,11 +28,11 @@ final class CoreHolder: Sendable {
     }
 
     private let state: Mutex<State>
-    private let reopen: (@Sendable (String) throws -> Core)?
+    private let reopen: (@Sendable (String) throws -> any CoreProtocol)?
 
     /// `reopen` makes the core again from a new key; `nil` where the copy has
     /// no server and so no key.
-    init(_ core: Core, reopen: (@Sendable (String) throws -> Core)? = nil) {
+    init(_ core: any CoreProtocol, reopen: (@Sendable (String) throws -> any CoreProtocol)? = nil) {
         state = Mutex(State(core: core, handle: Handle(core.heldHandle())))
         self.reopen = reopen
     }
@@ -55,12 +55,12 @@ final class CoreHolder: Sendable {
     }
 
     /// Runs `work` off the caller's thread against the core.
-    func run<T: Sendable>(_ work: @escaping @Sendable (Core) throws -> T) async throws -> T {
+    func run<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
         try await background { [self] in try with(work) }
     }
 
     func runUntilCanceled<T: Sendable>(
-        _ work: @escaping @Sendable (Core, MarfaCore.Stop) throws -> T
+        _ work: @escaping @Sendable (any CoreProtocol, MarfaCore.Stop) throws -> T
     ) async throws -> T {
         let stop = MarfaCore.Stop()
         return try await withTaskCancellationHandler {
@@ -77,8 +77,8 @@ final class CoreHolder: Sendable {
     }
 
     /// Runs `work` on this thread against the core, translating the core's errors.
-    func with<T>(_ work: (Core) throws -> T) throws -> T {
-        var core: Core? = try lease()
+    func with<T>(_ work: (any CoreProtocol) throws -> T) throws -> T {
+        var core: (any CoreProtocol)? = try lease()
         let result = Result { try translated { try work(core.unsafelyUnwrapped) } }
         // The lease ends only once this reference is gone, so the store is
         // free the moment the last lease is.
@@ -137,7 +137,7 @@ final class CoreHolder: Sendable {
             if ready { continuation.resume() }
         }
         _ = state.withLock { $0.core.take() }
-        let reopened: Result<Core, any Error>
+        let reopened: Result<any CoreProtocol, any Error>
         do {
             reopened = .success(try await background { try reopen(key) })
         } catch {
@@ -165,7 +165,7 @@ final class CoreHolder: Sendable {
         message: "this working copy has no server, so it has no key to change")
     private static let replacingMessage = "this working copy is changing its key; ask again"
 
-    private func lease() throws -> Core {
+    private func lease() throws -> any CoreProtocol {
         try state.withLock { state in
             switch state.phase {
             case .dropping, .released: throw MarfaError.closed(message: Self.closedMessage)
