@@ -42,7 +42,6 @@ public final class WorkingCopy: Sendable {
         self.init(holder: CoreHolder(core), hasServer: false)
     }
 
-    /// Tells every held `changes()` stream of `change`, as if the copy had made it.
     package func announce(_ change: Change) {
         feed.announce(change)
     }

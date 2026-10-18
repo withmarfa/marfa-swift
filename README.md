@@ -54,7 +54,7 @@ for note in try await copy.items.list(ListFilters(type: "core.note")) {
 
 ## Test and preview
 
-The `MarfaTesting` product is a working copy that runs without a store, a server or a call into the Rust core, for your tests and SwiftUI previews. Add it to your test targets. In the app target, import it only under `#if DEBUG`, so a release build never uses it. A view model that takes a `WorkingCopy` takes the fake the same way:
+The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. For previews in an app target, wrap the import and preview code in `#if DEBUG` so release builds do not use it. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:
 
 ```swift
 #if DEBUG
@@ -67,7 +67,7 @@ import MarfaTesting
 #endif
 ```
 
-`FakeCopy` also records the writes the copy receives, chooses the verdict a drain gives each one, and sends changes on `changes()`. A call it does not serve throws `FakeCopyError.unsupported`; the documentation comment on `FakeCopy` lists what it serves.
+Use `FakeCopy` to record writes, choose drain verdicts, and send changes on `changes()`. Unsupported calls throw `FakeCopyError.unsupported`. The `FakeCopy` API documentation lists the supported calls.
 
 ## Learn more
 
