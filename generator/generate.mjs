@@ -38,9 +38,14 @@ export function prepare(document) {
     "then",
     "else",
   ]);
-  function schema(value) {
+  function schema(value, inUnion = false) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
+    if (value.type === "null" && !inUnion) {
+      usesNull = true;
+      const { type, ...rest } = value;
+      return { ...rest, $ref: nullRef };
+    }
     const result = {};
     for (const [key, child] of Object.entries(value)) {
       if (schemaMaps.has(key)) {
@@ -48,7 +53,9 @@ export function prepare(document) {
           Object.entries(child).map(([name, entry]) => [name, schema(entry)]),
         );
       } else if (schemaArrays.has(key)) {
-        result[key] = child.map(schema);
+        result[key] = child.map((member) =>
+          schema(member, key === "oneOf" || key === "anyOf"),
+        );
       } else {
         result[key] = schemaValues.has(key) ? schema(child) : child;
       }
@@ -157,7 +164,7 @@ export function prepare(document) {
       throw new Error(`the API document already defines ${name}`);
     result.components.schemas[name] = entry.schema;
   }
-  return { document: result, nullable };
+  return { document: result, nullable, usesNull };
 }
 
 export function generate(binary, source, destination) {
@@ -182,7 +189,7 @@ export function generate(binary, source, destination) {
     writeFileSync(
       config,
       readFileSync(join(here, "openapi-generator-config.yaml"), "utf8") +
-        (preparedDocument.nullable.size
+        (preparedDocument.usesNull
           ? "    MarfaNull: MarfaNullValue\n"
           : "") +
         overrides,

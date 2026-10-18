@@ -34,7 +34,7 @@ public protocol APIProtocol: Sendable {
     func createItem(_ input: Operations.CreateItem.Input) async throws -> Operations.CreateItem.Output
     /// Get item counts
     ///
-    /// Returns counts of the items you can read, grouped by state or by type. It takes the filters `GET /items` takes, but without `state` it counts every state, not only active items.
+    /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -690,9 +690,30 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
     func endSignIn(_ input: Operations.EndSignIn.Input) async throws -> Operations.EndSignIn.Output
+    /// List passkeys
+    ///
+    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or private local authority.
+    ///
+    /// - Remark: HTTP `GET /owner/passkeys`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/get(listOwnerPasskeys)`.
+    func listOwnerPasskeys(_ input: Operations.ListOwnerPasskeys.Input) async throws -> Operations.ListOwnerPasskeys.Output
+    /// Rename a passkey
+    ///
+    /// Renames the passkey and returns its public details. Requires the owner's browser session authenticated within five minutes or private local authority.
+    ///
+    /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(updateOwnerPasskey)`.
+    func updateOwnerPasskey(_ input: Operations.UpdateOwnerPasskey.Input) async throws -> Operations.UpdateOwnerPasskey.Output
+    /// Remove a passkey
+    ///
+    /// Removes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session authenticated within five minutes or private local authority.
+    ///
+    /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(removeOwnerPasskey)`.
+    func removeOwnerPasskey(_ input: Operations.RemoveOwnerPasskey.Input) async throws -> Operations.RemoveOwnerPasskey.Output
     /// Export items and edges
     ///
-    /// Exports the items you can read, with their tags and readable extensions, followed by the edges between them. Without `state`, trashed items are left out. With `format=archive`, returns a file that `POST /restore` reads.
+    /// Exports readable items, metadata and edges, excluding trash unless requested. The owner can use their browser session. An archive can be read by `POST /restore`.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
@@ -819,7 +840,7 @@ extension APIProtocol {
     }
     /// Get item counts
     ///
-    /// Returns counts of the items you can read, grouped by state or by type. It takes the filters `GET /items` takes, but without `state` it counts every state, not only active items.
+    /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -2223,9 +2244,50 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// List passkeys
+    ///
+    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or private local authority.
+    ///
+    /// - Remark: HTTP `GET /owner/passkeys`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/get(listOwnerPasskeys)`.
+    public func listOwnerPasskeys(headers: Operations.ListOwnerPasskeys.Input.Headers = .init()) async throws -> Operations.ListOwnerPasskeys.Output {
+        try await listOwnerPasskeys(Operations.ListOwnerPasskeys.Input(headers: headers))
+    }
+    /// Rename a passkey
+    ///
+    /// Renames the passkey and returns its public details. Requires the owner's browser session authenticated within five minutes or private local authority.
+    ///
+    /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(updateOwnerPasskey)`.
+    public func updateOwnerPasskey(
+        path: Operations.UpdateOwnerPasskey.Input.Path,
+        headers: Operations.UpdateOwnerPasskey.Input.Headers = .init(),
+        body: Operations.UpdateOwnerPasskey.Input.Body
+    ) async throws -> Operations.UpdateOwnerPasskey.Output {
+        try await updateOwnerPasskey(Operations.UpdateOwnerPasskey.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove a passkey
+    ///
+    /// Removes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session authenticated within five minutes or private local authority.
+    ///
+    /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(removeOwnerPasskey)`.
+    public func removeOwnerPasskey(
+        path: Operations.RemoveOwnerPasskey.Input.Path,
+        headers: Operations.RemoveOwnerPasskey.Input.Headers = .init()
+    ) async throws -> Operations.RemoveOwnerPasskey.Output {
+        try await removeOwnerPasskey(Operations.RemoveOwnerPasskey.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Export items and edges
     ///
-    /// Exports the items you can read, with their tags and readable extensions, followed by the edges between them. Without `state`, trashed items are left out. With `format=archive`, returns a file that `POST /restore` reads.
+    /// Exports readable items, metadata and edges, excluding trash unless requested. The owner can use their browser session. An archive can be read by `POST /restore`.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.

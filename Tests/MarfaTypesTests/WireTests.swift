@@ -185,3 +185,48 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
     #expect(decoded.map(\.rawValue) == names)
     #expect(Set(Components.Schemas.Permission.allCases.map(\.rawValue)) == Set(names))
 }
+
+@Test func ownerPasskeyCursorRequiresAndRoundTripsNull() throws {
+    let decoder = JSONDecoder()
+    let list = try decoder.decode(
+        Components.Schemas.OwnerPasskeyList.self, from: Data(#"{"data":[],"next_cursor":null}"#.utf8))
+    #expect(list.nextCursor == .null)
+    let encoded = try JSONEncoder().encode(list)
+    let fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    #expect(fields["next_cursor"] is NSNull)
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(Components.Schemas.OwnerPasskeyList.self, from: Data(#"{"data":[]}"#.utf8))
+    }
+}
+
+@Test(arguments: ["true", "0", #""cursor""#, "[]", "{}"])
+func ownerPasskeyCursorRejectsNonNull(value: String) {
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(
+            Components.Schemas.OwnerPasskeyList.self, from: Data("{\"data\":[],\"next_cursor\":\(value)}".utf8))
+    }
+}
+
+private struct NullOnlyFields: Codable {
+    var required: MarfaNullValue
+    var optional: MarfaNullValue?
+}
+
+@Test func optionalNullOnlyFieldKeepsNullDistinctFromAbsence() throws {
+    let decoder = JSONDecoder()
+    let omitted = try decoder.decode(NullOnlyFields.self, from: Data(#"{"required":null}"#.utf8))
+    #expect(omitted.required == .null)
+    #expect(omitted.optional == nil)
+    let present = try decoder.decode(
+        NullOnlyFields.self, from: Data(#"{"required":null,"optional":null}"#.utf8))
+    #expect(present.optional == .null)
+    let fields = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(present)) as? [String: Any])
+    #expect(fields["required"] is NSNull)
+    #expect(fields["optional"] is NSNull)
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(NullOnlyFields.self, from: Data(#"{"optional":null}"#.utf8))
+    }
+    #expect(throws: DecodingError.self) {
+        try decoder.decode(NullOnlyFields.self, from: Data(#"{"required":null,"optional":false}"#.utf8))
+    }
+}
