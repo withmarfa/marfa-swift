@@ -108782,7 +108782,7 @@ public enum Operations {
                     /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made or through `keys.manage`.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/expires_at`.
-                    public var expiresAt: Swift.String?
+                    public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
                     /// Can't change. To give a key another source, create a new key and revoke this one.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/source`.
@@ -108813,7 +108813,7 @@ public enum Operations {
                         profilePermissions: Components.Schemas.ProfilePermissions? = nil,
                         permissions: [Components.Schemas.Permission]? = nil,
                         enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride? = nil,
-                        expiresAt: Swift.String? = nil,
+                        expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
                         source: Swift.String? = nil
                     ) {
                         self.label = label
@@ -108886,7 +108886,7 @@ public enum Operations {
                             forKey: .enforcementOverride
                         )
                         self.expiresAt = try container.decodeIfPresent(
-                            Swift.String.self,
+                            Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
                             forKey: .expiresAt
                         )
                         self.source = try container.decodeIfPresent(
@@ -127566,7 +127566,7 @@ public enum Operations {
                     /// HTTP or HTTPS avatar URL, at most 2048 characters. null clears it. Marfa does not fetch the URL.
                     ///
                     /// - Remark: Generated from `#/paths/profile/PATCH/requestBody/json/avatar`.
-                    public var avatar: Swift.String?
+                    public var avatar: Components.Schemas.MarfaNullableMarfaInline59652345197f6db0?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
@@ -127574,7 +127574,7 @@ public enum Operations {
                     ///   - avatar: HTTP or HTTPS avatar URL, at most 2048 characters. null clears it. Marfa does not fetch the URL.
                     public init(
                         name: Swift.String? = nil,
-                        avatar: Swift.String? = nil
+                        avatar: Components.Schemas.MarfaNullableMarfaInline59652345197f6db0? = nil
                     ) {
                         self.name = name
                         self.avatar = avatar
@@ -127590,7 +127590,7 @@ public enum Operations {
                             forKey: .name
                         )
                         self.avatar = try container.decodeIfPresent(
-                            Swift.String.self,
+                            Components.Schemas.MarfaNullableMarfaInline59652345197f6db0.self,
                             forKey: .avatar
                         )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -133237,7 +133237,7 @@ public enum Operations {
                     /// Send item events only for this type and its subtypes, such as `core.media`, or for every type a pattern such as `app.*` matches. The type needn't be registered. Edge events aren't filtered. Leave it out, blank or `null` for every type.
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/POST/requestBody/json/type_filter`.
-                    public var typeFilter: Swift.String?
+                    public var typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
                     /// The key Marfa signs each delivery with. Leave it out for Marfa to generate one.
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/POST/requestBody/json/secret`.
@@ -133252,7 +133252,7 @@ public enum Operations {
                     public init(
                         url: Swift.String,
                         events: Operations.CreateWebhook.Input.Body.JsonPayload.EventsPayload,
-                        typeFilter: Swift.String? = nil,
+                        typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
                         secret: Swift.String? = nil
                     ) {
                         self.url = url
@@ -133277,7 +133277,7 @@ public enum Operations {
                             forKey: .events
                         )
                         self.typeFilter = try container.decodeIfPresent(
-                            Swift.String.self,
+                            Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
                             forKey: .typeFilter
                         )
                         self.secret = try container.decodeIfPresent(
@@ -135550,7 +135550,7 @@ public enum Operations {
                     /// Send item events only for this type and its subtypes, such as `core.media`, or for every type a pattern such as `app.*` matches. The type needn't be registered. Edge events aren't filtered. Blank or `null` removes it.
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/json/type_filter`.
-                    public var typeFilter: Swift.String?
+                    public var typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
                     /// `false` stops sending events and cancels pending deliveries. `true` starts again.
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/json/active`.
@@ -135565,7 +135565,7 @@ public enum Operations {
                     public init(
                         url: Swift.String? = nil,
                         events: Operations.UpdateWebhook.Input.Body.JsonPayload.EventsPayload? = nil,
-                        typeFilter: Swift.String? = nil,
+                        typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
                         active: Swift.Bool? = nil
                     ) {
                         self.url = url
@@ -135590,7 +135590,7 @@ public enum Operations {
                             forKey: .events
                         )
                         self.typeFilter = try container.decodeIfPresent(
-                            Swift.String.self,
+                            Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
                             forKey: .typeFilter
                         )
                         self.active = try container.decodeIfPresent(

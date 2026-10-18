@@ -1678,7 +1678,7 @@ extension Components {
             /// How many days Marfa keeps a feed item, counted from when it arrived: a whole number from 1 to 36,500. After that Marfa moves the item to the trash. `null` keeps feed items although a parent type expires them. Library items never expire.
             ///
             /// - Remark: Generated from `#/components/schemas/RetentionPolicy/feed_days`.
-            public var feedDays: Swift.Double?
+            public var feedDays: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408?
             /// A container of undocumented properties.
             public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `RetentionPolicy`.
@@ -1687,7 +1687,7 @@ extension Components {
             ///   - feedDays: How many days Marfa keeps a feed item, counted from when it arrived: a whole number from 1 to 36,500. After that Marfa moves the item to the trash. `null` keeps feed items although a parent type expires them. Library items never expire.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
-                feedDays: Swift.Double? = nil,
+                feedDays: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.feedDays = feedDays
@@ -1699,7 +1699,7 @@ extension Components {
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 self.feedDays = try container.decodeIfPresent(
-                    Swift.Double.self,
+                    Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408.self,
                     forKey: .feedDays
                 )
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
@@ -13078,7 +13078,7 @@ extension Components {
             /// The type, with its subtypes, or the pattern whose item events Marfa sends. Absent when Marfa sends item events of every type. Edge events aren't filtered.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/type_filter`.
-            public var typeFilter: Swift.String?
+            public var typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
             /// The key Marfa signs each delivery with. Only `POST /webhooks` returns it whole; other responses show `****` and its last four characters.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/secret`.
@@ -13110,7 +13110,7 @@ extension Components {
                 id: Swift.String,
                 url: Swift.String,
                 events: [Swift.String],
-                typeFilter: Swift.String? = nil,
+                typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
                 secret: Swift.String,
                 active: Swift.Bool,
                 createdAt: Swift.String,
@@ -14739,8 +14739,20 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/MarfaNull`.
         public typealias MarfaNull = MarfaNullValue
+        /// - Remark: Generated from `#/components/schemas/MarfaInline00404e686415370f`.
+        public typealias MarfaInline00404e686415370f = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline59652345197f6db0`.
+        public typealias MarfaInline59652345197f6db0 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinecddf8275afa15408`.
+        public typealias MarfaInlinecddf8275afa15408 = Swift.Double
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline00404e686415370f`.
+        public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline59652345197f6db0`.
+        public typealias MarfaNullableMarfaInline59652345197f6db0 = MarfaNullable<Components.Schemas.MarfaInline59652345197f6db0>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinecddf8275afa15408`.
+        public typealias MarfaNullableMarfaInlinecddf8275afa15408 = MarfaNullable<Components.Schemas.MarfaInlinecddf8275afa15408>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableTypeDefinition`.
         public typealias MarfaNullableTypeDefinition = MarfaNullable<Components.Schemas.TypeDefinition>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.
