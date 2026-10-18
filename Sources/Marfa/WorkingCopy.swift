@@ -37,6 +37,15 @@ public final class WorkingCopy: Sendable {
         catalog = Catalog(holder: holder)
     }
 
+    /// A copy over a core that is not the Rust one, for `MarfaTesting`.
+    package convenience init(core: any CoreProtocol) {
+        self.init(holder: CoreHolder(core, stops: false), hasServer: false)
+    }
+
+    package func announce(_ change: Change) {
+        feed.announce(change)
+    }
+
     /// Opens the store at `store`, making it when absent.
     ///
     /// A new store reads and queues writes before its first hydration. A store
@@ -55,7 +64,7 @@ public final class WorkingCopy: Sendable {
         }
         let url = server.url.absoluteString
         let core = try await background { try Core.open(path: path, url: url, key: key) }
-        let reopen: @Sendable (String) throws -> Core = { key in
+        let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
             try Core.open(path: path, url: url, key: key)
         }
         return WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
@@ -500,8 +509,9 @@ public struct Items: Sendable {
         return Embedded(attached: attached, body: written, embed: embed)
     }
 
-    private static func writeEmbed(_ attached: Attached, into id: String, _ core: Core) throws -> (QueuedWrite, String)
-    {
+    private static func writeEmbed(_ attached: Attached, into id: String, _ core: any CoreProtocol) throws -> (
+        QueuedWrite, String
+    ) {
         let embed = try core.embedText(id: id, file: attached.item.itemId ?? "")
         guard let host = try core.get(id: id) else {
             throw MarfaError.notFound(code: "item_not_found", message: "\(id) is not a row this copy holds")
@@ -533,7 +543,9 @@ public struct Items: Sendable {
         try await holder.run { core in try core.embedText(id: id, file: file) }
     }
 
-    private func write(_ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite) async throws -> QueuedWrite {
+    private func write(_ work: @escaping @Sendable (any CoreProtocol) throws -> MarfaCore.QueuedWrite) async throws
+        -> QueuedWrite
+    {
         try await queued(holder, feed, work)
     }
 }
@@ -595,7 +607,9 @@ public struct Edges: Sendable {
         try await write { core in try core.deleteEdge(id: id) }
     }
 
-    private func write(_ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite) async throws -> QueuedWrite {
+    private func write(_ work: @escaping @Sendable (any CoreProtocol) throws -> MarfaCore.QueuedWrite) async throws
+        -> QueuedWrite
+    {
         try await queued(holder, feed, work)
     }
 }
@@ -748,7 +762,9 @@ public struct Queue: Sendable {
 }
 
 /// Queues one write and tells every held stream of it.
-func queued(_ holder: CoreHolder, _ feed: Feed, _ work: @escaping @Sendable (Core) throws -> MarfaCore.QueuedWrite)
+func queued(
+    _ holder: CoreHolder, _ feed: Feed, _ work: @escaping @Sendable (any CoreProtocol) throws -> MarfaCore.QueuedWrite
+)
     async throws -> QueuedWrite
 {
     let written = try await holder.run { QueuedWrite(try work($0)) }

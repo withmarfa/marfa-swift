@@ -92,7 +92,7 @@ jobs:
       - name: Lint
         run: |
           swift format lint --strict --configuration .swift-format -r \
-            Package.swift Sources/Marfa Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
+            Package.swift Sources/Marfa Sources/MarfaTesting Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
 
       # The steps from here on are for a pull request that is ready for
       # review and for a push. A draft ends here and passes; `Full CI`, named

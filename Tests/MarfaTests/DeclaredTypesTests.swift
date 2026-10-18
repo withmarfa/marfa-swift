@@ -3,6 +3,9 @@ import Testing
 
 @testable import Marfa
 
+/// The declarations that need a store reopened.
+///
+/// The rest are held to the fake copy as well, in `DeclaredTypesOffline`.
 @Suite(.timeLimit(.minutes(1)))
 struct DeclaredTypes {
     static let definition: JSONObject = [
@@ -28,51 +31,5 @@ struct DeclaredTypes {
         #expect(try await reopened.declaredTypes().isEmpty)
         #expect(try await reopened.queue.all().contains { $0.id == write.id })
         await reopened.close()
-    }
-
-    @Test func localCatalogChangesAreToldToObservers() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        let heard = Heard(copy.changes())
-        try await copy.declareTypes([Self.definition])
-        try await eventually("the declared catalog was told") {
-            heard.all.contains { $0.origin == .refreshed(.catalog) }
-        }
-        #expect(try await copy.catalog.itemType("app.readinglist.entry").id == "app.readinglist.entry")
-        await copy.close()
-    }
-
-    @Test func anInvalidReplacementPreservesDeclarationsAndRefusesUnknownTypes() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        try await copy.declareTypes([Self.definition])
-        let before = try await copy.declaredTypes()
-        await #expect {
-            try await copy.declareTypes([["fields": [:]]])
-        } throws: { error in
-            if case MarfaError.invalid = error { true } else { false }
-        }
-        #expect(try await copy.declaredTypes() == before)
-        await #expect {
-            _ = try await copy.items.create(Draft(type: "app.other.entry", properties: ["title": "Unknown"]))
-        } throws: { error in
-            if case MarfaError.unknownType = error { true } else { false }
-        }
-        #expect(try await copy.queue.all().isEmpty)
-        _ = try await copy.items.create(Draft(type: "app.readinglist.entry", properties: ["title": "Known"]))
-        #expect(try await copy.queue.all().count == 1)
-        await copy.close()
-    }
-
-    @Test(arguments: ["app.readinglist", "app.readinglist.entry.extra", "keys.entry"])
-    func anInvalidRegistrationIdentifierPreservesTheDeclarationSet(id: String) async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        try await copy.declareTypes([Self.definition])
-        let before = try await copy.declaredTypes()
-        await #expect {
-            try await copy.declareTypes([["id": .string(id), "fields": [:]]])
-        } throws: { error in
-            if case MarfaError.invalid = error { true } else { false }
-        }
-        #expect(try await copy.declaredTypes() == before)
-        await copy.close()
     }
 }

@@ -1,7 +1,7 @@
+#if DEBUG
 import Foundation
+import Marfa
 import Testing
-
-@testable import Marfa
 
 private func refused(with code: String) -> (any Error) -> Bool {
     { error in
@@ -27,8 +27,8 @@ struct EdgeMoveOffline {
     }
 
     /// `parent` holds `child` through a `parent-of` edge, and `other` holds nothing.
-    static func tree() async throws -> Tree {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
+    static func tree(_ kind: CopyKind) async throws -> Tree {
+        let copy = try await kind.open()
         let parent = try await note("parent", in: copy)
         let other = try await note("other", in: copy)
         let child = try await note("child", in: copy)
@@ -36,8 +36,9 @@ struct EdgeMoveOffline {
         return Tree(copy: copy, parent: parent, other: other, child: child, edge: edge)
     }
 
-    @Test func aMovedSourceShowsAtOnceAtItsNewEndAndQueuesOneWrite() async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases)
+    func aMovedSourceShowsAtOnceAtItsNewEndAndQueuesOneWrite(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
         let before = try await tree.copy.queue.all().count
 
@@ -61,8 +62,9 @@ struct EdgeMoveOffline {
         await tree.copy.close()
     }
 
-    @Test func aMoveToAnItemNotYetSentWaitsForItsCreate() async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases)
+    func aMoveToAnItemNotYetSentWaitsForItsCreate(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
         let created = try #require(
             try await tree.copy.queue.all().first { $0.kind == .createItem && $0.itemId == tree.other })
@@ -75,8 +77,9 @@ struct EdgeMoveOffline {
         await tree.copy.close()
     }
 
-    @Test func anEditNamingTheEndTheEdgeHoldsAndAPropertySendsNoEnd() async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases)
+    func anEditNamingTheEndTheEdgeHoldsAndAPropertySendsNoEnd(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
 
         let write = try #require(
@@ -89,9 +92,9 @@ struct EdgeMoveOffline {
         await tree.copy.close()
     }
 
-    @Test(arguments: [false, true])
-    func anEditThatChangesNothingQueuesAndTellsNothing(namingTheHeldEnd: Bool) async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases, [false, true])
+    func anEditThatChangesNothingQueuesAndTellsNothing(kind: CopyKind, namingTheHeldEnd: Bool) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
         let before = try await tree.copy.queue.all()
         let heard = Heard(tree.copy.changes())
@@ -107,13 +110,14 @@ struct EdgeMoveOffline {
             try await tree.copy.edges.update(tree.edge, EdgeEdit(["note": "n"], baseVersion: held.version, move: move)))
         try await eventually("the edit that changed something was told") { !heard.locals.isEmpty }
         try await Task.sleep(for: .milliseconds(100))
-        #expect(heard.locals == [Marfa.Change(origin: .local(.updateEdge), itemId: named.itemId, edgeId: named.edgeId)])
+        #expect(heard.locals == [Change(origin: .local(.updateEdge), itemId: named.itemId, edgeId: named.edgeId)])
         #expect(try await tree.copy.queue.all().count == before.count + 1)
         await tree.copy.close()
     }
 
-    @Test func anEditThatChangesNothingStillMeetsTheVersionAndTheMissingEdge() async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases)
+    func anEditThatChangesNothingStillMeetsTheVersionAndTheMissingEdge(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
 
         await #expect {
@@ -130,8 +134,9 @@ struct EdgeMoveOffline {
         await tree.copy.close()
     }
 
-    @Test func propertiesMergeOverTheOnesNotGivenAndTravelWithAMove() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
+    @Test(arguments: CopyKind.allCases)
+    func propertiesMergeOverTheOnesNotGivenAndTravelWithAMove(kind: CopyKind) async throws {
+        let copy = try await kind.open()
         let a = try await Self.note("a", in: copy)
         let b = try await Self.note("b", in: copy)
         let c = try await Self.note("c", in: copy)
@@ -150,8 +155,9 @@ struct EdgeMoveOffline {
         await copy.close()
     }
 
-    @Test func aMoveThatClosesALoopIsRefusedAndQueuesNothing() async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases)
+    func aMoveThatClosesALoopIsRefusedAndQueuesNothing(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
         let before = try await tree.copy.queue.all()
 
@@ -166,8 +172,9 @@ struct EdgeMoveOffline {
         await tree.copy.close()
     }
 
-    @Test func aMoveOfAnEndWhoseOtherEndHoldsManyIsRefusedAndQueuesNothing() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
+    @Test(arguments: CopyKind.allCases)
+    func aMoveOfAnEndWhoseOtherEndHoldsManyIsRefusedAndQueuesNothing(kind: CopyKind) async throws {
+        let copy = try await kind.open()
         let a = try await Self.note("a", in: copy)
         let b = try await Self.note("b", in: copy)
         let c = try await Self.note("c", in: copy)
@@ -185,8 +192,9 @@ struct EdgeMoveOffline {
         await copy.close()
     }
 
-    @Test func anEditAtAnotherVersionThanTheCopyHoldsIsRefusedAndQueuesNothing() async throws {
-        let tree = try await Self.tree()
+    @Test(arguments: CopyKind.allCases)
+    func anEditAtAnotherVersionThanTheCopyHoldsIsRefusedAndQueuesNothing(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
         let held = try #require(try await tree.copy.edges.to(tree.child).first)
         let before = try await tree.copy.queue.all()
 
@@ -203,8 +211,9 @@ struct EdgeMoveOffline {
         await tree.copy.close()
     }
 
-    @Test func aMoveOfAnEdgeTheCopyDoesNotHoldIsNotFound() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
+    @Test(arguments: CopyKind.allCases)
+    func aMoveOfAnEdgeTheCopyDoesNotHoldIsNotFound(kind: CopyKind) async throws {
+        let copy = try await kind.open()
         await #expect {
             _ = try await copy.edges.update("missing", EdgeEdit(baseVersion: 1, move: .source("a")))
         } throws: { error in
@@ -213,3 +222,4 @@ struct EdgeMoveOffline {
         await copy.close()
     }
 }
+#endif

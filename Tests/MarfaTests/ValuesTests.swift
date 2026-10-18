@@ -123,33 +123,6 @@ struct Errors {
         #expect(expected.message == "m")
         #expect(expected.localizedDescription == "m")
     }
-
-    @Test func aValueJSONCannotHoldIsRefusedAsInvalid() async throws {
-        let copy = try await WorkingCopy.open(store: temporaryStore())
-        let unwritable: JSONObject = ["r": .number(.nan)]
-        let infinite: JSONObject = ["r": .number(-.infinity)]
-        let writes: [(String, @Sendable () async throws -> Marfa.QueuedWrite?)] = [
-            ("create", { try await copy.items.create(Marfa.Draft(type: "core.note", properties: unwritable)) }),
-            ("update", { try await copy.items.update("n1", Marfa.Edit(properties: infinite, baseVersion: 1)) }),
-            ("edge", { try await copy.edges.create(from: "a", to: "b", type: "references", properties: unwritable) }),
-            ("edge update", { try await copy.edges.update("e1", Marfa.EdgeEdit(infinite, baseVersion: 1)) }),
-            ("extension", { try await copy.extensions.write("ns", unwritable, on: "n1") }),
-        ]
-        for (name, write) in writes {
-            await #expect {
-                _ = try await write()
-            } throws: { error in
-                guard case Marfa.MarfaError.invalid(let message) = error else {
-                    Issue.record("\(name) threw \(error)")
-                    return false
-                }
-                return message.contains("not finite")
-            }
-        }
-        _ = try await copy.items.create(Marfa.Draft(type: "core.note", properties: ["title": "Writable", "body": ""]))
-        #expect(try await copy.queue.all().count == 1)
-        await copy.close()
-    }
 }
 
 @Suite(.timeLimit(.minutes(1)))
