@@ -128,6 +128,18 @@ test(
         readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8"),
         /MarfaNull/,
       );
+      writeFileSync(source, JSON.stringify(document({
+        type: "object",
+        properties: {
+          next_cursor: { type: "null" },
+          optional: { type: "null" },
+        },
+        required: ["next_cursor"],
+      })));
+      generate(process.env.MARFA_GENERATOR_BIN, source, output);
+      const nullFields = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
+      assert.match(nullFields, /nextCursor: Components\.Schemas\.MarfaNull[^?]/);
+      assert.match(nullFields, /optional: Components\.Schemas\.MarfaNull\?/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -208,4 +220,32 @@ test("drops a requirement one member makes of a name another defines, and keeps 
     "id",
     "typo",
   ]);
+});
+
+
+test("normalizes null-only properties, array items, and references without changing required fields", () => {
+  const input = document({
+    type: "object",
+    properties: {
+      next_cursor: { type: "null", description: "Always null" },
+      optional: { type: "null" },
+      values: { type: "array", items: { type: "null" } },
+      named: { $ref: "#/components/schemas/OnlyNull" },
+    },
+    required: ["next_cursor"],
+  });
+  input.components.schemas.OnlyNull = { type: "null" };
+  const before = JSON.stringify(input);
+  const { document: output, usesNull } = prepare(input);
+  assert.equal(usesNull, true);
+  assert.deepEqual(output.components.schemas.Fixture.properties, {
+    next_cursor: { $ref: "#/components/schemas/MarfaNull", description: "Always null" },
+    optional: { $ref: "#/components/schemas/MarfaNull" },
+    values: { type: "array", items: { $ref: "#/components/schemas/MarfaNull" } },
+    named: { $ref: "#/components/schemas/OnlyNull" },
+  });
+  assert.deepEqual(output.components.schemas.OnlyNull, { $ref: "#/components/schemas/MarfaNull" });
+  assert.deepEqual(output.components.schemas.MarfaNull, { enum: [null] });
+  assert.deepEqual(output.components.schemas.Fixture.required, ["next_cursor"]);
+  assert.equal(JSON.stringify(input), before);
 });

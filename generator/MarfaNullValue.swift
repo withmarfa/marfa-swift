@@ -1,6 +1,6 @@
 // Copied by generator/generate.mjs; edit the template in generator/.
 
-/// A JSON null that can be supplied inside an optional generated union.
+/// An explicit JSON null.
 ///
 /// Unlike an absent Swift optional, this value writes an explicit null.
 public enum MarfaNullValue: Codable, Hashable, Sendable {
@@ -19,5 +19,13 @@ public enum MarfaNullValue: Codable, Hashable, Sendable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encodeNil()
+    }
+}
+
+extension KeyedDecodingContainer {
+    /// Synthesized decoding normally collapses a missing key and null into nil.
+    public func decodeIfPresent(_ type: MarfaNullValue.Type, forKey key: Key) throws -> MarfaNullValue? {
+        guard contains(key) else { return nil }
+        return try decode(type, forKey: key)
     }
 }

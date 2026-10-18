@@ -12498,6 +12498,154 @@ extension Components {
                 case error
             }
         }
+        /// Every registered owner passkey.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OwnerPasskeyList`.
+        public struct OwnerPasskeyList: Codable, Hashable, Sendable {
+            /// Every registered owner passkey, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskeyList/data`.
+            public var data: [Components.Schemas.OwnerPasskey]
+            /// Always `null`: every passkey is returned in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskeyList/next_cursor`.
+            public var nextCursor: Components.Schemas.MarfaNull
+            /// Creates a new `OwnerPasskeyList`.
+            ///
+            /// - Parameters:
+            ///   - data: Every registered owner passkey, oldest first.
+            ///   - nextCursor: Always `null`: every passkey is returned in one page.
+            public init(
+                data: [Components.Schemas.OwnerPasskey],
+                nextCursor: Components.Schemas.MarfaNull
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// An owner's registered passkey, without credential material.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OwnerPasskey`.
+        public struct OwnerPasskey: Codable, Hashable, Sendable {
+            /// Unique identifier for the passkey.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskey/id`.
+            public var id: Swift.String
+            /// The owner's name for the passkey, or `null` when unnamed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskey/name`.
+            public var name: Swift.String?
+            /// When the passkey was registered, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskey/created_at`.
+            public var createdAt: Swift.String
+            /// Creates a new `OwnerPasskey`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the passkey.
+            ///   - name: The owner's name for the passkey, or `null` when unnamed.
+            ///   - createdAt: When the passkey was registered, in UTC.
+            public init(
+                id: Swift.String,
+                name: Swift.String? = nil,
+                createdAt: Swift.String
+            ) {
+                self.id = id
+                self.name = name
+                self.createdAt = createdAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case createdAt = "created_at"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal`.
+        public struct PasskeyNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case passkeyNotFound = "passkey_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PasskeyNotFoundRefusal/error`.
+            public var error: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload
+            /// Creates a new `PasskeyNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// An OAuth client: its app metadata and the grants it uses.
         ///
         /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration`.
