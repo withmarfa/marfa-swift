@@ -74,9 +74,13 @@ enum CopyKind: CaseIterable, Sendable, CustomTestStringConvertible {
 
     /// The fake is given the catalog a real copy holds before any hydration, so
     /// the two answer the same questions about the same types.
-    private static func fake() async throws -> WorkingCopy {
+    static func makeFake() async throws -> FakeCopy {
         let (itemTypes, edgeTypes) = try await builtIn.value
-        return WorkingCopy.fake(itemTypes: itemTypes, edgeTypes: edgeTypes).copy
+        return WorkingCopy.fake(itemTypes: itemTypes, edgeTypes: edgeTypes)
+    }
+
+    private static func fake() async throws -> WorkingCopy {
+        try await makeFake().copy
     }
 
     private static let builtIn = Task {
@@ -87,3 +91,16 @@ enum CopyKind: CaseIterable, Sendable, CustomTestStringConvertible {
     }
 }
 #endif
+
+/// The server the live tests run against, named as `MarfaTests` names it.
+enum LiveServer {
+    static var server: Server? {
+        let environment = ProcessInfo.processInfo.environment
+        guard let url = environment["MARFA_API_URL"].flatMap(URL.init(string:)),
+            let key = environment["MARFA_API_KEY"]
+        else { return nil }
+        return Server(url: url, key: key)
+    }
+
+    static var isRequired: Bool { ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil }
+}

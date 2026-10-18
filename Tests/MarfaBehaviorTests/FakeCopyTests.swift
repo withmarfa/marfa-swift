@@ -389,7 +389,10 @@ struct FakeCopyBehavior {
             return try await copy.queue.drain()
         }
         try await eventually("the second drain started") { started.withLock { $0 } }
-        try await Task.sleep(for: .milliseconds(500))
+        // The second drain must be held out, so there is nothing to wait for: stop at
+        // the first sign it was not, and otherwise give it two seconds to show one.
+        let deadline = Date.now.addingTimeInterval(2)
+        while offered.withLock({ $0 }) == 1, Date.now < deadline { try await Task.sleep(for: .milliseconds(20)) }
         #expect(offered.withLock { $0 } == 1, "a second drain offered the write while the first held it")
 
         release.signal()
