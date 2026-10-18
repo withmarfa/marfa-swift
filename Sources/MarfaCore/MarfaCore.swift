@@ -589,9 +589,9 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 /**
- * What an app hands `follow`: told of each change as it lands, on a thread
- * of the core's, and once when the stream ends, with the error that ended
- * it or none where it was stopped.
+ * What an app hands `follow` or `watch`: told of each change as it lands, on a
+ * thread of the core's, and once when the stream ends, with the error that
+ * ended it or none where it was stopped.
  */
 public protocol ChangeListener: AnyObject, Sendable {
     
@@ -601,9 +601,9 @@ public protocol ChangeListener: AnyObject, Sendable {
     
 }
 /**
- * What an app hands `follow`: told of each change as it lands, on a thread
- * of the core's, and once when the stream ends, with the error that ended
- * it or none where it was stopped.
+ * What an app hands `follow` or `watch`: told of each change as it lands, on a
+ * thread of the core's, and once when the stream ends, with the error that
+ * ended it or none where it was stopped.
  */
 open class ChangeListenerImpl: ChangeListener, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -1136,6 +1136,33 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * merges the change against.
      */
     func updateItemAsRead(id: String, edit: Edit) throws  -> QueuedWrite
+    
+    /**
+     * Adds `listener` to this store's watch, and starts it if it was idle.
+     * However many listeners there are, one source runs: a writer with a
+     * server holds the event stream and tells what `follow` tells, and a
+     * reading handle tells `Saved` each time another process saves. A
+     * hydration or catch-up takes the stream for its duration and gives it
+     * back, and no listener is told of the gap.
+     *
+     * A listener hears what changes after it joins, and is first told the
+     * outage or failure that holds then. `told_unreachable` says the app was
+     * last told `ServerUnreachable` by an earlier watch, so it is told
+     * `ServerReachable` once the server is reached, and not
+     * `ServerUnreachable` again before. A request that reaches the server
+     * tells `ServerReachable` to a listener that was told it did not:
+     * the follow's, a hydration's or catch-up's that succeeded, or a drain's
+     * that answered a write. A follow that fails ends no listener: each is
+     * told `WatchFailed` once, and no stream is held until the next
+     * hydration or catch-up. The first stream the watch has after the server
+     * was lost, or after a drain left a write undelivered, is drained to
+     * once, and the drain is told as `follow` tells it.
+     *
+     * Throws `NoServer` for a writer with no server. `changed` must return
+     * promptly, and a hydration or catch-up called from inside it throws
+     * `Invalid`.
+     */
+    func watch(toldUnreachable: Bool, listener: ChangeListener) throws  -> Subscription
     
     /**
      * Takes a write blocked `ancestor_unavailable` or `conflict_unresolved`
@@ -1979,6 +2006,41 @@ open func updateItemAsRead(id: String, edit: Edit)throws  -> QueuedWrite  {
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeEdit_lower(edit),$0
+    )
+})
+}
+    
+    /**
+     * Adds `listener` to this store's watch, and starts it if it was idle.
+     * However many listeners there are, one source runs: a writer with a
+     * server holds the event stream and tells what `follow` tells, and a
+     * reading handle tells `Saved` each time another process saves. A
+     * hydration or catch-up takes the stream for its duration and gives it
+     * back, and no listener is told of the gap.
+     *
+     * A listener hears what changes after it joins, and is first told the
+     * outage or failure that holds then. `told_unreachable` says the app was
+     * last told `ServerUnreachable` by an earlier watch, so it is told
+     * `ServerReachable` once the server is reached, and not
+     * `ServerUnreachable` again before. A request that reaches the server
+     * tells `ServerReachable` to a listener that was told it did not:
+     * the follow's, a hydration's or catch-up's that succeeded, or a drain's
+     * that answered a write. A follow that fails ends no listener: each is
+     * told `WatchFailed` once, and no stream is held until the next
+     * hydration or catch-up. The first stream the watch has after the server
+     * was lost, or after a drain left a write undelivered, is drained to
+     * once, and the drain is told as `follow` tells it.
+     *
+     * Throws `NoServer` for a writer with no server. `changed` must return
+     * promptly, and a hydration or catch-up called from inside it throws
+     * `Invalid`.
+     */
+open func watch(toldUnreachable: Bool, listener: ChangeListener)throws  -> Subscription  {
+    return try  FfiConverterTypeSubscription_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_watch(
+            self.uniffiCloneHandle(),
+        FfiConverterBool.lower(toldUnreachable),
+        FfiConverterTypeChangeListener_lower(listener),$0
     )
 })
 }
@@ -2893,9 +2955,10 @@ public func FfiConverterTypeStop_lower(_ value: Stop) -> UInt64 {
 
 
 /**
- * A held stream or a folder's watch, stopped by `stop` or by letting it go.
- * A follow ends within a quarter second of either; a watch within about a
- * second, or once the pass under way is done. `ended` is called once it has.
+ * A held stream, a folder's watch, or a place in a store's watch, stopped by
+ * `stop` or by letting it go. A follow ends within a quarter second of either;
+ * a folder's watch within about a second, or once the pass under way is done.
+ * `ended` is called once it has.
  */
 public protocol SubscriptionProtocol: AnyObject, Sendable {
     
@@ -2903,9 +2966,10 @@ public protocol SubscriptionProtocol: AnyObject, Sendable {
     
 }
 /**
- * A held stream or a folder's watch, stopped by `stop` or by letting it go.
- * A follow ends within a quarter second of either; a watch within about a
- * second, or once the pass under way is done. `ended` is called once it has.
+ * A held stream, a folder's watch, or a place in a store's watch, stopped by
+ * `stop` or by letting it go. A follow ends within a quarter second of either;
+ * a folder's watch within about a second, or once the pass under way is done.
+ * `ended` is called once it has.
  */
 open class Subscription: SubscriptionProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -8138,6 +8202,19 @@ public enum Change: Equatable, Hashable {
      */
     case queueNotDrained(error: MarfaError, cursor: String
     )
+    /**
+     * Told by a watch of a reading handle: another process saved to the
+     * store, which now has this data version.
+     */
+    case saved(dataVersion: Int64, cursor: String
+    )
+    /**
+     * Told by a watch, once, when what feeds it fails. A follow that failed
+     * holds no stream until the next hydration or catch-up; a reading
+     * handle's reads go on, and the first that works is told as `Saved`.
+     */
+    case watchFailed(reason: MarfaError, cursor: String
+    )
 
 
 
@@ -8175,6 +8252,12 @@ public struct FfiConverterTypeChange: FfiConverterRustBuffer {
         )
         
         case 6: return .queueNotDrained(error: try FfiConverterTypeMarfaError.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 7: return .saved(dataVersion: try FfiConverterInt64.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 8: return .watchFailed(reason: try FfiConverterTypeMarfaError.read(from: &buf), cursor: try FfiConverterString.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -8218,6 +8301,18 @@ public struct FfiConverterTypeChange: FfiConverterRustBuffer {
         case let .queueNotDrained(error,cursor):
             writeInt(&buf, Int32(6))
             FfiConverterTypeMarfaError.write(error, into: &buf)
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .saved(dataVersion,cursor):
+            writeInt(&buf, Int32(7))
+            FfiConverterInt64.write(dataVersion, into: &buf)
+            FfiConverterString.write(cursor, into: &buf)
+            
+        
+        case let .watchFailed(reason,cursor):
+            writeInt(&buf, Int32(8))
+            FfiConverterTypeMarfaError.write(reason, into: &buf)
             FfiConverterString.write(cursor, into: &buf)
             
         }
@@ -11868,6 +11963,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_update_item_as_read() != 6005) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_watch() != 793) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 24491) {

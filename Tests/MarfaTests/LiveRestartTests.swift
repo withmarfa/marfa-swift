@@ -164,6 +164,143 @@ struct LiveRestart {
         try await own.end()
     }
 
+    /// A request past the copy, as the server's owner.
+    static func send(_ own: OwnServer, _ method: String, _ path: String, body: [String: Any]? = nil) async throws
+        -> JSONObject
+    {
+        var request = URLRequest(url: own.url.appending(path: path))
+        request.httpMethod = method
+        request.setValue("Bearer \(own.key)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = try #require((response as? HTTPURLResponse)?.statusCode)
+        try #require((200..<300).contains(status), "\(method) \(path) answered \(status)")
+        return data.isEmpty ? [:] : try JSONObject(json: String(decoding: data, as: UTF8.self))
+    }
+
+    static func told(_ heard: Heard, where matches: (Change.Origin) -> Bool) -> Int {
+        heard.all.filter { matches($0.origin) }.count
+    }
+
+    static func unreachable(_ origin: Change.Origin) -> Bool {
+        if case .serverUnreachable = origin { true } else { false }
+    }
+    static func reachable(_ origin: Change.Origin) -> Bool { if case .serverReachable = origin { true } else { false } }
+    static func drained(_ origin: Change.Origin) -> Bool { if case .queueDrained = origin { true } else { false } }
+
+    /// A write a drain the app started left undelivered is drained once by the follow a
+    /// recovery starts, though the server was never lost.
+    ///
+    /// With no outage the core starts no follow of its own after that drain, so the
+    /// follow the `catchUp()` restarts is the only one that can send the write.
+    @Test func aWriteALaterDrainLeftUndeliveredIsDrainedOnceByTheFollowARecoveryStarts() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            let copy = try await Self.hydrated(own)
+            let heard = Heard(copy.changes())
+            // Long enough for the follow to hold its stream.
+            try await Task.sleep(for: .milliseconds(500))
+
+            let note = try #require(try await copy.items.create(Self.note("answered by the app's drain")).itemId)
+            let upload = try await copy.blobs.put(file: try Live.file("kept for the next stream \(UUID())"))
+            let cached = try await copy.blobs.get(try #require(upload.blob))
+
+            // The core cannot read the cached bytes, so it sends the note and
+            // leaves the upload.
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: cached.path)
+            let partial = try await copy.queue.drain()
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: cached.path)
+            #expect(partial.answered >= 1, "the app's drain answered nothing: \(partial)")
+            #expect(partial.undelivered == 1, "the app's drain left \(partial.undelivered) undelivered")
+            #expect(try await Self.read(own, note).status == 200)
+
+            // The witness: nothing else sends the upload. The server was never lost, so the
+            // stream was told nothing of it, and nothing has drained since.
+            try await Task.sleep(for: .seconds(1))
+            #expect(Self.told(heard, where: Self.drained) == 0, "a drain ran before the recovery")
+            #expect(Self.told(heard, where: Self.unreachable) == 0)
+            #expect(try await copy.queue.all().first { $0.id == upload.id }?.verdict == nil)
+
+            _ = try await copy.catchUp()
+            try await eventually("the follow the recovery started drained the write left", within: 30) {
+                Self.told(heard, where: Self.drained) == 1
+            }
+            let report = try #require(
+                heard.all.compactMap { change -> DrainReport? in
+                    if case .queueDrained(let report) = change.origin { report } else { nil }
+                }.first)
+            #expect(report.verdicts.map(\.verdict) == [.accepted])
+            #expect(report.verdicts.first?.id == upload.id)
+            #expect(try await copy.queue.drain().verdicts.isEmpty, "something was still queued")
+            try await Task.sleep(for: .milliseconds(500))
+            #expect(Self.told(heard, where: Self.drained) == 1, "the queue was drained a second time")
+            #expect(heard.stops.isEmpty)
+            heard.stop()
+            await copy.close()
+        } catch {
+            try? await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    /// The server answered the follow, so it is reachable, even when the answer
+    /// ends the follow.
+    ///
+    /// A key that expires while the server is away makes the refusal certain, whenever the
+    /// follow next asks.
+    @Test func aFollowThatEndsOnTheServersRefusalAfterAnOutageStillTellsTheServerIsReachable() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            let expires = Date.now.addingTimeInterval(20)
+            let minted = try await Self.send(
+                own, "POST", "keys",
+                body: [
+                    "label": "Swift restart test", "source": "swift-restart-\(UUID().uuidString.prefix(8))",
+                    "default_tier": "library", "type_permissions": ["core.note": "write"],
+                    "expires_at": ISO8601DateFormatter().string(from: expires),
+                ])
+            let copy = try await WorkingCopy.open(
+                store: Live.store(), server: Server(url: own.url, key: try #require(minted["key"]?.string)))
+            _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+            let heard = Heard(copy.changes())
+            try await Task.sleep(for: .milliseconds(500))
+
+            try await own.stop()
+            try await eventually("the follow said the server went", within: 15) {
+                Self.told(heard, where: Self.unreachable) == 1
+            }
+            // The key expires while the server is away.
+            try await Task.sleep(for: .seconds(max(0, expires.timeIntervalSinceNow) + 1.5))
+            try await own.start()
+
+            try await eventually("the follow ended on the refusal", within: 60) { !heard.stops.isEmpty }
+            #expect(Self.told(heard, where: Self.reachable) == 1, "the server answered and was not told reachable")
+            let origins = heard.all.map(\.origin)
+            let back = try #require(origins.firstIndex(where: Self.reachable))
+            let refused = try #require(origins.firstIndex { if case .stopped = $0 { true } else { false } })
+            #expect(back < refused, "the refusal was told before the server was: \(origins)")
+
+            // A stream added now is told the refusal and not an outage the
+            // server has since ended.
+            let late = Heard(copy.changes())
+            try await eventually("the late stream was told", within: 10) { !late.all.isEmpty }
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(Self.told(late, where: Self.unreachable) == 0, "a late stream was told the old outage")
+            #expect(late.stops.count == 1)
+            heard.stop()
+            late.stop()
+            await copy.close()
+        } catch {
+            try? await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
     @Test func editsThatReplaceRetypeAndMoveTierQueueOfflineAndLandOnceBack() async throws {
         let own = try await OwnServer.boot()
         do {

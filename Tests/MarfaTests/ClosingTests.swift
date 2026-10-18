@@ -264,7 +264,7 @@ struct ChangingTheKey {
         await copy.close()
     }
 
-    @Test func aHeldFollowEndsOnTheOldCoreAndStartsAgainOnTheNew() async throws {
+    @Test func aHeldStreamLeavesTheOldCoresWatchAndTakesAPlaceInTheNewOnes() async throws {
         let old = FakeCore.writer()
         let new = FakeCore.writer()
         let keys = Mutex<[String]>([])
@@ -273,35 +273,39 @@ struct ChangingTheKey {
                 old,
                 reopen: { key in
                     keys.withLock { $0.append(key) }
-                    #expect(old.follows[0].ended, "the old follow still held the store when it was reopened")
+                    #expect(old.places[0].ended, "the old place in the watch still held the store when it was reopened")
                     return new
                 }),
             hasServer: true)
         let heard = Heard(copy.changes())
-        #expect(old.follows.count == 1)
+        #expect(old.places.count == 1)
 
         try await bounded("useKey") { try await copy.useKey("new-key") }
 
         #expect(keys.withLock { $0 } == ["new-key"])
-        try await eventually("the follow started on the new core") { new.follows.count == 1 }
+        #expect(new.places.count == 1)
         new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2"))
         try await eventually("the stream heard the new core") { heard.all.count == 1 }
-        #expect(heard.stops.isEmpty, "the stream was told the follow stopped")
+        #expect(heard.stops.isEmpty, "the stream was told the watch stopped")
         try await bounded("close") { await copy.close() }
-        #expect(new.follows[0].ended)
+        #expect(new.places[0].ended)
     }
 
-    @Test func aFollowStoppedByTheOldKeyStartsAgainWithTheNewOne() async throws {
+    @Test func aWatchFailedByTheOldKeyIsGivenAFreshPlaceWithTheNewOne() async throws {
         let old = FakeCore.writer()
         let new = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: true)
         let heard = Heard(copy.changes())
-        old.fail(0, with: .Unauthorized(code: "unauthorized", message: "no"))
+        old.change(
+            0, MarfaCore.Change.watchFailed(reason: .Unauthorized(code: "unauthorized", message: "no"), cursor: "3"))
         try await eventually("the stream was told") { heard.stops.count == 1 }
-        #expect(new.follows.isEmpty)
+        #expect(new.places.isEmpty)
 
         try await bounded("useKey") { try await copy.useKey("new-key") }
-        try await eventually("the follow started on the new core") { new.follows.count == 1 }
+        #expect(new.places.count == 1)
+        new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "4"))
+        try await eventually("the stream heard the new core") { heard.all.count == 2 }
+        #expect(heard.stops.count == 1)
         try await bounded("close") { await copy.close() }
     }
 
@@ -310,11 +314,11 @@ struct ChangingTheKey {
         let new = FakeCore.reader()
         let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: true)
         let heard = Heard(copy.changes())
-        old.save()
+        old.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
         try await eventually("the old core's save was told") { heard.saves.count == 1 }
 
         try await bounded("useKey") { try await copy.useKey("new-key") }
-        new.save()
+        new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
         try await eventually("the new core's save was told") { heard.saves.count == 2 }
         try await bounded("close") { await copy.close() }
     }
@@ -381,15 +385,16 @@ struct ChangingTheKey {
         reopening.gate.signal()
         try await bounded("useKey") { try await changing.value }
 
-        try await eventually("the stream was told to read again") { heard.saves.count >= 1 }
-        new.save()
-        try await eventually("the next save was told") { heard.saves.count >= 2 }
+        try await eventually("the stream was told to read again") { heard.saves.count == 1 }
+        #expect(new.places.count == 1)
+        new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
+        try await eventually("the next save was told") { heard.saves.count == 2 }
         try await bounded("close") { await copy.close() }
     }
 
-    @Test func aFollowThatCannotStartEndsTheStreamsWithTheError() async throws {
+    @Test func aStreamThatCannotTakeAPlaceInTheWatchIsToldWhyAndEnds() async throws {
         let holder = CoreHolder(FakeCore.writer())
-        let feed = Feed(holder: holder, source: .follow)
+        let feed = Feed(holder: holder, watched: true)
         await holder.close()
         let (stream, continuation) = AsyncStream<Marfa.Change>.makeStream()
         _ = try #require(feed.add(continuation))
@@ -400,6 +405,8 @@ struct ChangingTheKey {
             return
         }
         #expect(isClosed(error))
+        #expect(await heard.next() == nil)
+        #expect(feed.count == 0)
     }
 
     @Test func aCloseDuringAFailingReopenMakesUseKeyThrowClosed() async throws {

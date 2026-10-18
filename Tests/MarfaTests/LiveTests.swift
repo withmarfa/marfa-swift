@@ -631,13 +631,10 @@ extension LiveWorkingCopies {
                     told.at.timeIntervalSince(madeAt) < 1, "a save was told \(told.at.timeIntervalSince(madeAt))s late")
             }
 
-            let watch = try #require(reader.feed.watchTask)
             try await bounded("close") { await reader.close() }
-            #expect(watch.isCancelled)
-            #expect(reader.feed.watchTask == nil)
+            #expect(reader.feed.count == 0)
         }
 
-        /// Rarely races against the real core; `Changes` pins the race down.
         @Test func aSaveMadeAsSoonAsAReaderListensIsTold() async throws {
             let store = Live.store()
             let writer = try await Live.hydrated(store)
@@ -651,7 +648,6 @@ extension LiveWorkingCopies {
             }
         }
 
-        /// The core refuses a reader a follow.
         @Test func aSecondOpenerIsToldTheWritersSaves() async throws {
             let store = Live.store()
             let writer = try await Live.hydrated(store)
@@ -695,8 +691,6 @@ extension LiveWorkingCopies {
             }
         }
 
-        /// The core lets go of its stream only as a follow ends, a moment after
-        /// it is stopped.
         @Test func aStreamTakenAsSoonAsTheLastIsLetGoIsFed() async throws {
             let watching = try await Live.hydrated()
             let first = Heard(watching.changes())
@@ -716,8 +710,6 @@ extension LiveWorkingCopies {
             try await bounded("close") { await watching.close() }
         }
 
-        /// The core refuses a catch-up or hydration while a follow holds the
-        /// stream.
         @Test func aCatchUpAndAHydrationRunWhileAStreamIsHeld() async throws {
             let copy = try await Live.hydrated()
             let heard = Heard(copy.changes())
@@ -738,7 +730,7 @@ extension LiveWorkingCopies {
             try await bounded("close") { await copy.close() }
         }
 
-        /// The follow's thread holds the store until the follow ends.
+        /// The core's watch holds the store until its last listener is let go.
         @Test func closingLetsGoOfTheStore() async throws {
             for _ in 1...5 {
                 let store = Live.store()
