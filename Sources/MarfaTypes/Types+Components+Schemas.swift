@@ -4127,31 +4127,32 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal`.
-        public struct BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
+        public struct BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkAtomicRollback = "bulk_atomic_rollback"
+                    case invalidProperties = "invalid_properties"
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -4171,8 +4172,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -4180,9 +4181,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -4196,13 +4197,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -4478,32 +4479,33 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal`.
-        public struct BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
+        public struct BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkCapExceeded = "bulk_cap_exceeded"
                     case bulkConfirmationRequired = "bulk_confirmation_required"
+                    case invalidProperties = "invalid_properties"
                     case missingRequiredField = "missing_required_field"
                     case validationError = "validation_error"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -4523,8 +4525,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -4532,9 +4534,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -4548,13 +4550,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -5024,6 +5026,91 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case extensions
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
+        public struct InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
+                    case invalidProperties = "invalid_properties"
+                    case missingRequiredField = "missing_required_field"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// One edge.
@@ -10476,6 +10563,91 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+        public struct InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidProperties = "invalid_properties"
+                    case missingRequiredField = "missing_required_field"
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// Which items the folder holds.
         ///
         /// - Remark: Generated from `#/components/schemas/FolderSearch`.
@@ -10580,7 +10752,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/tier`.
             public var tier: Components.Schemas.Tier?
-            /// Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property.
+            /// Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property. A whole number whose digits a 64-bit float doesn't keep is refused.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/properties`.
             public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -10600,7 +10772,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property.
+            /// Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property. A whole number whose digits a 64-bit float doesn't keep is refused.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderDefaults/properties`.
             public var properties: Components.Schemas.FolderDefaults.PropertiesPayload?
@@ -10637,7 +10809,7 @@ extension Components {
             /// - Parameters:
             ///   - _type: The type a new file becomes if its frontmatter names none.
             ///   - tier: The tier a new file takes if its frontmatter names none.
-            ///   - properties: Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property.
+            ///   - properties: Properties a new file takes where its frontmatter doesn't set them. A default for the type's body field is never taken: the file's body is that property. A whole number whose digits a 64-bit float doesn't keep is refused.
             ///   - tags: Tags a new file takes if its frontmatter has no `tags` line.
             ///   - edges: Edges a new file takes, as a map from edge type to item IDs: at most 100 edge types, 100 IDs each. An edge runs from the new file to the item, except `parent-of`, which makes the new file its child.
             public init(
@@ -10737,17 +10909,18 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
-        public struct InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+        public struct InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case invalidId = "invalid_id"
+                    case invalidProperties = "invalid_properties"
                     case invalidTransition = "invalid_transition"
                     case missingRequiredField = "missing_required_field"
                     case unknownType = "unknown_type"
@@ -10755,15 +10928,15 @@ extension Components {
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -10783,8 +10956,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -10792,9 +10965,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -10808,13 +10981,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {

@@ -110,6 +110,10 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     case keySpent
     case ancestorUnavailable
     case conflictUnresolved
+    /// The write was set aside because it keeps meeting a failure that is no
+    /// answer to it while the server answers other writes. `QueuedWrite.lastFailure`
+    /// says what it met. Release it to send it again, or withdraw it.
+    case failingAlone
 
     init(_ core: MarfaCore.BlockedReason) {
         switch core {
@@ -117,6 +121,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .keySpent: self = .keySpent
         case .ancestorUnavailable: self = .ancestorUnavailable
         case .conflictUnresolved: self = .conflictUnresolved
+        case .failingAlone: self = .failingAlone
         }
     }
 
@@ -126,6 +131,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .keySpent: .keySpent
         case .ancestorUnavailable: .ancestorUnavailable
         case .conflictUnresolved: .conflictUnresolved
+        case .failingAlone: .failingAlone
         }
     }
 }
@@ -415,6 +421,23 @@ public struct QueuedWrite: Sendable, Hashable {
     /// an answer that was not JSON, its text as a string.
     public var answer: JSONValue?
     public var refusals: Int64
+    /// The drains in a row in which the write met a failure that was no
+    /// answer to it.
+    ///
+    /// A `429` adds nothing, and a run starts again at 1 when
+    /// the previous failure was more than 15 minutes earlier. An answer to the
+    /// write, a refusal and a release set it back to 0.
+    public var environmentalStreak: Int64
+    /// The last failure the write met that was no answer to it.
+    ///
+    /// A `429` updates this and leaves `environmentalStreak` as it was. A
+    /// failure that came before the server could answer, from renewing
+    /// the credential or the device's own storage, leaves it as it was. An
+    /// answer to the write and a refusal clear it, except the block that sets
+    /// the write aside `failingAlone`, which keeps it for the app to show.
+    /// Releasing the write clears it at once, before the write is answered
+    /// again. `nil` when the write has met none since.
+    public var lastFailure: LastFailure?
     public var queuedAt: String
     public var answeredAt: String?
 
@@ -423,6 +446,7 @@ public struct QueuedWrite: Sendable, Hashable {
         namespace: String? = nil, tag: String? = nil, blob: String? = nil, baseVersion: Int64? = nil,
         idempotencyKey: String, dependsOn: [String] = [], follows: String? = nil, verdict: Verdict? = nil,
         waiting: Bool = false, body: JSONObject = [:], answer: JSONValue? = nil, refusals: Int64 = 0,
+        environmentalStreak: Int64 = 0, lastFailure: LastFailure? = nil,
         queuedAt: String, answeredAt: String? = nil
     ) {
         self.id = id
@@ -442,6 +466,8 @@ public struct QueuedWrite: Sendable, Hashable {
         self.body = body
         self.answer = answer
         self.refusals = refusals
+        self.environmentalStreak = environmentalStreak
+        self.lastFailure = lastFailure
         self.queuedAt = queuedAt
         self.answeredAt = answeredAt
     }
@@ -453,6 +479,7 @@ public struct QueuedWrite: Sendable, Hashable {
             baseVersion: core.baseVersion, idempotencyKey: core.idempotencyKey, dependsOn: core.dependsOn,
             follows: core.follows, verdict: core.verdict.map(Verdict.init), waiting: core.waiting,
             body: core.body, answer: core.answer, refusals: core.refusals,
+            environmentalStreak: core.environmentalStreak, lastFailure: core.lastFailure.map(LastFailure.init),
             queuedAt: core.queuedAt, answeredAt: core.answeredAt)
     }
 
@@ -461,9 +488,33 @@ public struct QueuedWrite: Sendable, Hashable {
             id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
-            body: body, answer: answer, refusals: refusals, queuedAt: queuedAt,
-            answeredAt: answeredAt)
+            body: body, answer: answer, refusals: refusals,
+            environmentalStreak: environmentalStreak, lastFailure: lastFailure?.core,
+            queuedAt: queuedAt, answeredAt: answeredAt)
     }
+}
+
+/// What a write met that was no answer to it.
+public struct LastFailure: Sendable, Hashable {
+    /// The HTTP status the server gave, a `429` and a gateway's included.
+    /// `nil` means no status was kept, not that nothing answered: the headers
+    /// can arrive and the body then fail to read.
+    public var status: UInt16?
+    /// The start of the answer's body when it was text, with its whitespace
+    /// collapsed, truncated to 200 Unicode scalar values, with `...` appended
+    /// when truncated; `nil` for a body that was empty or not text.
+    public var text: String?
+
+    public init(status: UInt16?, text: String? = nil) {
+        self.status = status
+        self.text = text
+    }
+
+    init(_ core: MarfaCore.LastFailure) {
+        self.init(status: core.status, text: core.text)
+    }
+
+    var core: MarfaCore.LastFailure { MarfaCore.LastFailure(status: status, text: text) }
 }
 
 /// What became of one write a drain answered, sent or not.

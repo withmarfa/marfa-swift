@@ -1576,7 +1576,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/POST/requestBody/json/type`.
                     public var _type: Swift.String
-                    /// The item's properties, checked against the type's schema. If the instance's strict mode names the type, an undeclared property is refused as `invalid_properties` with `details.code` `unknown_property`.
+                    /// The item's properties, checked against the type's schema. Strict mode refuses an undeclared property as `invalid_properties` (`details.code` `unknown_property`). A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///
                     /// - Remark: Generated from `#/paths/items/POST/requestBody/json/properties`.
                     public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -1596,7 +1596,7 @@ public enum Operations {
                             try encoder.encodeAdditionalProperties(additionalProperties)
                         }
                     }
-                    /// The item's properties, checked against the type's schema. If the instance's strict mode names the type, an undeclared property is refused as `invalid_properties` with `details.code` `unknown_property`.
+                    /// The item's properties, checked against the type's schema. Strict mode refuses an undeclared property as `invalid_properties` (`details.code` `unknown_property`). A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///
                     /// - Remark: Generated from `#/paths/items/POST/requestBody/json/properties`.
                     public var properties: Operations.CreateItem.Input.Body.JsonPayload.PropertiesPayload?
@@ -1668,7 +1668,7 @@ public enum Operations {
                     ///
                     /// - Parameters:
                     ///   - _type: The item's type identifier, such as `core.note`.
-                    ///   - properties: The item's properties, checked against the type's schema. If the instance's strict mode names the type, an undeclared property is refused as `invalid_properties` with `details.code` `unknown_property`.
+                    ///   - properties: The item's properties, checked against the type's schema. Strict mode refuses an undeclared property as `invalid_properties` (`details.code` `unknown_property`). A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///   - id: A UUIDv7 you choose for the item. Leave it out and Marfa creates one. Sending an ID you already created returns the stored item, marked `acknowledged`.
                     ///   - state: The item's first lifecycle state, one the type's lifecycle can reach. Defaults to `active`.
                     ///   - occurredAt: When the item occurred, as an ISO 8601 time. Defaults to the creation time.
@@ -5805,7 +5805,7 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. Strict mode refuses an undeclared property, as in `POST /items`.
+                    /// The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. As in `POST /items`, strict mode refuses an undeclared property, and a whole number whose digits a 64-bit float doesn't keep is refused.
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/properties`.
                     public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -5825,7 +5825,7 @@ public enum Operations {
                             try encoder.encodeAdditionalProperties(additionalProperties)
                         }
                     }
-                    /// The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. Strict mode refuses an undeclared property, as in `POST /items`.
+                    /// The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. As in `POST /items`, strict mode refuses an undeclared property, and a whole number whose digits a 64-bit float doesn't keep is refused.
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/properties`.
                     public var properties: Operations.UpdateItem.Input.Body.JsonPayload.PropertiesPayload?
@@ -5901,7 +5901,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - properties: The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. Strict mode refuses an undeclared property, as in `POST /items`.
+                    ///   - properties: The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. As in `POST /items`, strict mode refuses an undeclared property, and a whole number whose digits a 64-bit float doesn't keep is refused.
                     ///   - _type: The item's type. It must match the item's current type unless `retype` is `true`.
                     ///   - propertiesMode: How `properties` applies. `merge` (the default) lays them over the item's properties. `replace` takes them as the whole set, so a property you leave out is cleared.
                     ///   - retype: `true` moves the item to `type`. You need write on both types, and the properties the item ends up with must fit the new type. Naming the item's current type changes nothing.
@@ -22346,7 +22346,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/type`.
                         public var _type: Swift.String
-                        /// The item's properties, checked against the type's schema. If the instance's strict mode names the type, an undeclared property is refused as `invalid_properties` with `details.code` `unknown_property`.
+                        /// The item's properties, checked against the type's schema. Strict mode refuses an undeclared property as `invalid_properties` (`details.code` `unknown_property`). A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/properties`.
                         public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -22366,7 +22366,7 @@ public enum Operations {
                                 try encoder.encodeAdditionalProperties(additionalProperties)
                             }
                         }
-                        /// The item's properties, checked against the type's schema. If the instance's strict mode names the type, an undeclared property is refused as `invalid_properties` with `details.code` `unknown_property`.
+                        /// The item's properties, checked against the type's schema. Strict mode refuses an undeclared property as `invalid_properties` (`details.code` `unknown_property`). A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/properties`.
                         public var properties: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload.PropertiesPayload?
@@ -22432,7 +22432,7 @@ public enum Operations {
                         /// - Parameters:
                         ///   - id: A UUIDv7 for the item. Leave it out and Marfa creates one. If no item matches the natural key, an `id` naming an existing item matches that item: under `upsert` only a live item you can read.
                         ///   - _type: The item's type identifier, such as `core.note`.
-                        ///   - properties: The item's properties, checked against the type's schema. If the instance's strict mode names the type, an undeclared property is refused as `invalid_properties` with `details.code` `unknown_property`.
+                        ///   - properties: The item's properties, checked against the type's schema. Strict mode refuses an undeclared property as `invalid_properties` (`details.code` `unknown_property`). A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         ///   - propertiesMode: How `properties` applies to an existing item, as in `PATCH /items/{id}`. `merge` (the default) lays them over its properties. `replace` takes them as the whole set. A new item takes them whole either way.
                         ///   - state:
                         ///   - tier:
@@ -22751,12 +22751,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/bulk/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/bulk/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -22780,9 +22780,10 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body is malformed, has a key this operation doesn't declare, or has more than 5,000 entries.
+            /// - `validation_error`: the body is malformed, has an undeclared key or has over 5,000 entries.
             /// - `missing_required_field`: a required field is missing.
-            /// - `bulk_atomic_rollback`: with `atomic` true, an entry was refused and nothing was written. `details.code` and `details.index` give its code and position. The status is the one that refusal carries alone.
+            /// - `invalid_properties`: an entry's `properties` hold a whole number a 64-bit float can't keep.
+            /// - `bulk_atomic_rollback`: an `atomic` entry was refused and nothing was written (`details.code`, `details.index`). The status is the refusal's own.
             ///
             /// - Remark: Generated from `#/paths//items/bulk/post(bulkUpsertItems)/responses/400`.
             ///
@@ -24303,6 +24304,8 @@ public enum Operations {
                         }
                         /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case5/action`.
                         public var action: Operations.ApplyBulkAction.Input.Body.JsonPayload.Case5Payload.ActionPayload
+                        /// The properties to lay over each item's properties. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
+                        ///
                         /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case5/patch`.
                         public struct PatchPayload: Codable, Hashable, Sendable {
                             /// A container of undocumented properties.
@@ -24321,6 +24324,8 @@ public enum Operations {
                                 try encoder.encodeAdditionalProperties(additionalProperties)
                             }
                         }
+                        /// The properties to lay over each item's properties. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
+                        ///
                         /// - Remark: Generated from `#/paths/items/bulk-actions/POST/requestBody/json/case5/patch`.
                         public var patch: Operations.ApplyBulkAction.Input.Body.JsonPayload.Case5Payload.PatchPayload
                         /// Creates a new `Case5Payload`.
@@ -24331,7 +24336,7 @@ public enum Operations {
                         ///   - maxItems: The most items the action may match. Defaults to 10,000. A value above 50,000 counts as 50,000.
                         ///   - enableFanout:
                         ///   - action:
-                        ///   - patch:
+                        ///   - patch: The properties to lay over each item's properties. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         public init(
                             filter: Components.Schemas.BulkActionFilter? = nil,
                             dryRun: Swift.Bool? = nil,
@@ -24856,12 +24861,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/bulk-actions/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrMissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.BulkCapExceededOrBulkConfirmationRequiredOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -24885,8 +24890,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body or `filter` is malformed or has an undeclared key or an empty field, `update_tags` has neither `add` nor `remove`, or `expected_ids` is empty or not on a purge.
-            /// - `missing_required_field`: a field the action needs is missing.
+            /// - `validation_error`: the body is malformed or has an undeclared or empty field, or `update_tags` has no `add` or `remove`.
+            /// - `missing_required_field`: a needed field is missing.
+            /// - `invalid_properties`: `patch` holds a whole number a 64-bit float cannot keep.
             /// - `bulk_confirmation_required`: a purge without `confirm: "PURGE"`.
             /// - `bulk_cap_exceeded`: more items match than `max_items` allows.
             ///
@@ -34432,7 +34438,7 @@ public enum Operations {
             public var headers: Operations.ReplaceItemExtension.Input.Headers
             /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/requestBody`.
             @frozen public enum Body: Sendable, Hashable {
-                /// The namespace's new data, as a JSON object.
+                /// The namespace's new data, as a JSON object. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
@@ -34654,12 +34660,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/extensions/{namespace}/PUT/responses/400/content/application\/json`.
-                    case json(Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.InvalidIdOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -34685,6 +34691,7 @@ public enum Operations {
             }
             /// - `validation_error`: the body is not a JSON object, or its JSON is longer than 102,400 characters.
             /// - `invalid_id`: the ID is not a valid item ID.
+            /// - `invalid_properties`: the body holds a whole number a 64-bit float can't keep.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)/responses/400`.
             ///
@@ -40998,7 +41005,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/POST/requestBody/json/edge_type`.
                     public var edgeType: Swift.String
-                    /// The edge's properties. Leave it out for none.
+                    /// The edge's properties. Leave it out for none. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///
                     /// - Remark: Generated from `#/paths/edges/POST/requestBody/json/properties`.
                     public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -41018,7 +41025,7 @@ public enum Operations {
                             try encoder.encodeAdditionalProperties(additionalProperties)
                         }
                     }
-                    /// The edge's properties. Leave it out for none.
+                    /// The edge's properties. Leave it out for none. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///
                     /// - Remark: Generated from `#/paths/edges/POST/requestBody/json/properties`.
                     public var properties: Operations.CreateEdge.Input.Body.JsonPayload.PropertiesPayload?
@@ -41029,7 +41036,7 @@ public enum Operations {
                     ///   - sourceId: The ID of the item the edge starts from.
                     ///   - targetId: The ID of the item the edge points to.
                     ///   - edgeType: The identifier of the edge type, such as `parent-of`.
-                    ///   - properties: The edge's properties. Leave it out for none.
+                    ///   - properties: The edge's properties. Leave it out for none. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     public init(
                         id: Swift.String? = nil,
                         sourceId: Swift.String,
@@ -43994,7 +44001,7 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/edges/{id}/PATCH/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// Properties to merge over the edge's. Required unless an end moves.
+                    /// Properties to merge over the edge's. Required unless an end moves. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/PATCH/requestBody/json/properties`.
                     public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -44014,7 +44021,7 @@ public enum Operations {
                             try encoder.encodeAdditionalProperties(additionalProperties)
                         }
                     }
-                    /// Properties to merge over the edge's. Required unless an end moves.
+                    /// Properties to merge over the edge's. Required unless an end moves. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/PATCH/requestBody/json/properties`.
                     public var properties: Operations.UpdateEdge.Input.Body.JsonPayload.PropertiesPayload?
@@ -44033,7 +44040,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - properties: Properties to merge over the edge's. Required unless an end moves.
+                    ///   - properties: Properties to merge over the edge's. Required unless an end moves. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                     ///   - sourceId: The ID of the source item to move the edge to. Only for an edge type where each target holds one edge (`one-to-one`, `one-to-many`). An update moves one end at a time.
                     ///   - targetId: The ID of the target item to move the edge to. Only for an edge type where each source holds one edge (`one-to-one`, `many-to-one`). An update moves one end at a time.
                     ///   - version: The version of the edge your change is based on, from a read. If the edge has moved on, the update fails with `version_conflict`.
@@ -47196,7 +47203,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/EdgesPayload/edge_type`.
                         public var edgeType: Swift.String
-                        /// The edge's properties. On an existing edge they merge over its own. Leave it out for none.
+                        /// The edge's properties. On an existing edge they merge over its own. Leave it out for none. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         ///
                         /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/EdgesPayload/properties`.
                         public struct PropertiesPayload: Codable, Hashable, Sendable {
@@ -47216,7 +47223,7 @@ public enum Operations {
                                 try encoder.encodeAdditionalProperties(additionalProperties)
                             }
                         }
-                        /// The edge's properties. On an existing edge they merge over its own. Leave it out for none.
+                        /// The edge's properties. On an existing edge they merge over its own. Leave it out for none. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         ///
                         /// - Remark: Generated from `#/paths/edges/bulk/POST/requestBody/json/EdgesPayload/properties`.
                         public var properties: Operations.BulkUpsertEdges.Input.Body.JsonPayload.EdgesPayloadPayload.PropertiesPayload?
@@ -47231,7 +47238,7 @@ public enum Operations {
                         ///   - sourceId: The ID of the item the edge starts from.
                         ///   - targetId: The ID of the item the edge points to.
                         ///   - edgeType: The identifier of the edge type, such as `parent-of`.
-                        ///   - properties: The edge's properties. On an existing edge they merge over its own. Leave it out for none.
+                        ///   - properties: The edge's properties. On an existing edge they merge over its own. Leave it out for none. A whole number whose digits a 64-bit float doesn't keep is refused: send it as a string.
                         ///   - version: The version of the existing edge your entry is based on. A stale value makes the entry `errored`, or rolls everything back when `atomic` is true.
                         public init(
                             id: Swift.String? = nil,
@@ -47511,12 +47518,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edges/bulk/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal)
+                    case json(Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.BulkAtomicRollbackOrMissingRequiredFieldOrValidationErrorRefusal {
+                    public var json: Components.Schemas.BulkAtomicRollbackOrInvalidPropertiesOrMissingRequiredFieldOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -47540,9 +47547,10 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body is malformed, has an undeclared key, or has more than 5,000 entries.
-            /// - `missing_required_field`: `edges` is missing, or an entry lacks `source_id`, `target_id` or `edge_type`.
-            /// - `bulk_atomic_rollback`: with `atomic` true, an entry was refused and nothing was written. `details.code` and `details.index` give its code and position. The status is that refusal's own.
+            /// - `validation_error`: the body is malformed, has an undeclared key or has over 5,000 entries.
+            /// - `missing_required_field`: a required field is missing.
+            /// - `invalid_properties`: an entry's `properties` hold a whole number a 64-bit float can't keep.
+            /// - `bulk_atomic_rollback`: an `atomic` entry was refused and nothing was written (`details.code`, `details.index`). The status is the refusal's own.
             ///
             /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)/responses/400`.
             ///
@@ -98646,12 +98654,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/folders/POST/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/folders/POST/responses/400/content/application\/json`.
-                    case json(Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal)
+                    case json(Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.MissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal {
+                    public var json: Components.Schemas.InvalidPropertiesOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -98675,9 +98683,10 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a setting is malformed, such as a `system.*` type, an invalid `filter` or a `first_placement` directory outside the folder. `details.errors[0].path` names it. A key the body or a setting doesn't declare is named in `details.unknown_body_fields`.
+            /// - `validation_error`: a setting is malformed or undeclared, such as a `system.*` type or a `first_placement` outside the folder. `details.errors[0].path` or `details.unknown_body_fields` names it.
             /// - `missing_required_field`: `title` is missing.
-            /// - `unknown_type`: a setting names a type that isn't registered.
+            /// - `unknown_type`: a setting's type is unknown.
+            /// - `invalid_properties`: `defaults.properties` has a whole number a 64-bit float can't keep.
             ///
             /// - Remark: Generated from `#/paths//folders/post(createFolder)/responses/400`.
             ///
@@ -100200,12 +100209,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/folders/{id}/PATCH/responses/400/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/folders/{id}/PATCH/responses/400/content/application\/json`.
-                    case json(Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal)
+                    case json(Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal {
+                    public var json: Components.Schemas.InvalidIdOrInvalidPropertiesOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -100229,10 +100238,11 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a setting is malformed (`details.errors[0].path` names it), a key is undeclared (`details.unknown_body_fields` names it), the body names no setting, or the query has `conflict`.
+            /// - `validation_error`: a setting is malformed or undeclared (`details.errors[0].path` or `details.unknown_body_fields` names it).
             /// - `missing_required_field`: `version` is missing.
-            /// - `unknown_type`: a setting names a type that isn't registered.
-            /// - `invalid_id`: the ID is malformed.
+            /// - `unknown_type`: a setting's type is unknown.
+            /// - `invalid_properties`: `defaults.properties` has a whole number a 64-bit float can't keep.
+            /// - `invalid_id`: the ID is invalid.
             /// - `invalid_transition`: the folder is revoked.
             ///
             /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)/responses/400`.
@@ -109000,7 +109010,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/enforcement_override`.
                     public var enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride?
-                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made or through `keys.manage`.
+                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made, through `keys.manage` or with `narrow_only`.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/expires_at`.
                     public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
@@ -109008,6 +109018,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/source`.
                     public var source: Swift.String?
+                    /// `true` to refuse the update if it would give the key more: a permission, map entry or claimed source it doesn't hold, a later `expires_at` or none, or an `enforcement_override` other than its own. Defaults to `false`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/narrow_only`.
+                    public var narrowOnly: Swift.Bool?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
@@ -109021,8 +109035,9 @@ public enum Operations {
                     ///   - profilePermissions: Profile access by `name`, `email`, `avatar`, or `*`. `write` permits name and avatar changes and implies read; email accepts only `read`. `*` reads every field and writes only name and avatar.
                     ///   - permissions: The permissions the key holds, such as `audit.read`.
                     ///   - enforcementOverride: Replaces the key's enforcement levers whole. `null` clears them.
-                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made or through `keys.manage`.
+                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made, through `keys.manage` or with `narrow_only`.
                     ///   - source: Can't change. To give a key another source, create a new key and revoke this one.
+                    ///   - narrowOnly: `true` to refuse the update if it would give the key more: a permission, map entry or claimed source it doesn't hold, a later `expires_at` or none, or an `enforcement_override` other than its own. Defaults to `false`.
                     public init(
                         label: Swift.String? = nil,
                         defaultTier: Components.Schemas.Tier? = nil,
@@ -109035,7 +109050,8 @@ public enum Operations {
                         permissions: [Components.Schemas.Permission]? = nil,
                         enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride? = nil,
                         expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
-                        source: Swift.String? = nil
+                        source: Swift.String? = nil,
+                        narrowOnly: Swift.Bool? = nil
                     ) {
                         self.label = label
                         self.defaultTier = defaultTier
@@ -109049,6 +109065,7 @@ public enum Operations {
                         self.enforcementOverride = enforcementOverride
                         self.expiresAt = expiresAt
                         self.source = source
+                        self.narrowOnly = narrowOnly
                     }
                     public enum CodingKeys: String, CodingKey {
                         case label
@@ -109063,6 +109080,7 @@ public enum Operations {
                         case enforcementOverride = "enforcement_override"
                         case expiresAt = "expires_at"
                         case source
+                        case narrowOnly = "narrow_only"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -109114,6 +109132,10 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .source
                         )
+                        self.narrowOnly = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .narrowOnly
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "label",
                             "default_tier",
@@ -109126,7 +109148,8 @@ public enum Operations {
                             "permissions",
                             "enforcement_override",
                             "expires_at",
-                            "source"
+                            "source",
+                            "narrow_only"
                         ])
                     }
                 }
@@ -109558,7 +109581,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body gives the key a permission, map entry or source you don't hold, or an `expires_at` later than yours; it widens a key an app created or, through `keys.manage`, any key; or it names `enforcement_override` and you don't hold `config.manage`. `details.required_scope` or `details.source` names what's missing.
+            /// - `forbidden`: you don't hold `keys.mint` and aren't the owner or local command; the body gives the key more than you hold or an `expires_at` later than yours; it widens or lengthens an app's key, or any key through `keys.manage` or with `narrow_only`, which also refuses a changed `enforcement_override`; or it names `enforcement_override` without `config.manage`. `details` names what's missing.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/403`.
             ///
@@ -135925,7 +135948,7 @@ public enum Operations {
     }
     /// Update a webhook
     ///
-    /// Updates a webhook and returns it. Fields you leave out keep their values. Changing `url`, or setting `active` to `false`, cancels its pending deliveries. To change the secret, create a new webhook.
+    /// Updates a webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.

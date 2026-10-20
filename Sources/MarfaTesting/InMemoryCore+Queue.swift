@@ -48,7 +48,7 @@ extension InMemoryCore {
         try state.withLock { state in
             guard let at = state.at(id) else { throw Refuse.write(id) }
             switch state.entries[at].write.verdict {
-            case .blocked(.ancestorUnavailable, _)?, .blocked(.conflictUnresolved, _)?:
+            case .blocked(.ancestorUnavailable, _)?, .blocked(.conflictUnresolved, _)?, .blocked(.failingAlone, _)?:
                 state.entries[at].inQueue = false
                 for other in state.entries.indices
                 where state.entries[other].inQueue && state.entries[other].write.verdict == nil

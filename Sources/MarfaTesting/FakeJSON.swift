@@ -15,6 +15,34 @@ enum Properties {
         try cross(.object(object), depth: 0)
     }
 
+    /// The core's refusal of the first whole number, in document order and at
+    /// any depth, that Marfa would serve back with other digits.
+    ///
+    /// A number with
+    /// a fraction or an exponent names a float and is never judged. Each write
+    /// calls it where the core does, after the refusals that come first there.
+    static func keptAsWritten(_ object: JsonObject) throws {
+        try keptAsWritten(.object(object), path: [])
+    }
+
+    private static func keptAsWritten(_ value: JsonValue, path: [String]) throws {
+        switch value {
+        case .integer(let number):
+            guard !Integers.kept(number) else { return }
+            let served = Integers.served(number).map { ", which it serves as \($0)" } ?? ""
+            throw Refuse.validation(
+                "invalid_properties",
+                "\(path.joined(separator: ".")): Must be a whole number that Marfa serves back with the same digits, not \(number)\(served). Send it as a string."
+            )
+        case .array(let items):
+            for (index, item) in items.enumerated() { try keptAsWritten(item, path: path + [String(index)]) }
+        case .object(let object):
+            for member in object.members { try keptAsWritten(member.value, path: path + [member.key]) }
+        case .null, .bool, .number, .string:
+            break
+        }
+    }
+
     private static func cross(_ value: JsonValue, depth: Int) throws {
         switch value {
         case .number(let number):
@@ -115,6 +143,44 @@ enum Properties {
 
     static func object(_ object: JsonObject, _ key: String) -> JsonObject? {
         if case .object(let found)? = value(object, key) { found } else { nil }
+    }
+}
+
+/// Marfa holds a number as a 64-bit float and serves it as JavaScript prints
+/// it: the shortest digits that name the float.
+enum Integers {
+    /// Fewest digits a whole number can have and still be beyond a float's
+    /// exact range, 2^53.
+    private static let minimumDigits = 16
+
+    /// Whether the number is served back with the digits it was written with.
+    static func kept(_ number: Int64) -> Bool {
+        let digits = number.magnitude.description
+        return digits.count < minimumDigits || served(number) == String(number)
+    }
+
+    /// The digits JavaScript prints for the float the number rounds to.
+    static func served(_ number: Int64) -> String? {
+        let float = Double(number)
+        guard float.isFinite else { return nil }
+        // Swift prints the shortest digits that name the float, as JavaScript
+        // does, but writes a large one with an exponent.
+        let text = float.magnitude.description
+        let (mantissa, exponent): (Substring, Int) =
+            if let mark = text.firstIndex(where: { $0 == "e" || $0 == "E" }) {
+                (text[..<mark], Int(text[text.index(after: mark)...]) ?? 0)
+            } else {
+                (text[...], 0)
+            }
+        let parts = mantissa.split(separator: ".", omittingEmptySubsequences: false)
+        let whole = parts[0]
+        var fraction = parts.count > 1 ? parts[1] : ""
+        while fraction.last == "0" { fraction = fraction.dropLast() }
+        var digits = String(whole) + fraction
+        let places = whole.count + exponent
+        guard places >= digits.count else { return nil }
+        digits += String(repeating: "0", count: places - digits.count)
+        return (float < 0 ? "-" : "") + digits
     }
 }
 

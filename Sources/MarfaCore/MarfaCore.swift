@@ -1165,8 +1165,8 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func watch(toldUnreachable: Bool, listener: ChangeListener) throws  -> Subscription
     
     /**
-     * Takes a write blocked `ancestor_unavailable` or `conflict_unresolved`
-     * out of the queue, and puts the copy back to what the server holds;
+     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved` or
+     * `failing_alone` out of the queue, and puts the copy back to what the server holds;
      * each write held for it is refused unsent. Answers whether the row was
      * one a withdraw takes.
      */
@@ -2046,8 +2046,8 @@ open func watch(toldUnreachable: Bool, listener: ChangeListener)throws  -> Subsc
 }
     
     /**
-     * Takes a write blocked `ancestor_unavailable` or `conflict_unresolved`
-     * out of the queue, and puts the copy back to what the server holds;
+     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved` or
+     * `failing_alone` out of the queue, and puts the copy back to what the server holds;
      * each write held for it is refused unsent. Answers whether the row was
      * one a withdraw takes.
      */
@@ -6263,6 +6263,64 @@ public func FfiConverterTypeJsonObject_lower(_ value: JsonObject) -> RustBuffer 
 
 
 /**
+ * What a write met that was no answer to it: the HTTP status, absent where
+ * nothing answered, and the start of the answer's body when it is text.
+ */
+public struct LastFailure: Equatable, Hashable {
+    public var status: UInt16?
+    public var text: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(status: UInt16?, text: String?) {
+        self.status = status
+        self.text = text
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LastFailure: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLastFailure: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LastFailure {
+        return
+            try LastFailure(
+                status: FfiConverterOptionUInt16.read(from: &buf), 
+                text: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LastFailure, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt16.write(value.status, into: &buf)
+        FfiConverterOptionString.write(value.text, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLastFailure_lift(_ buf: RustBuffer) throws -> LastFailure {
+    return try FfiConverterTypeLastFailure.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLastFailure_lower(_ value: LastFailure) -> RustBuffer {
+    return FfiConverterTypeLastFailure.lower(value)
+}
+
+
+/**
  * Narrowing for a list. Leaving `state` unset answers the active state, as
  * the server does; `all_states` lifts that, and a named state wins.
  */
@@ -6691,6 +6749,14 @@ public struct QueuedWrite: Equatable, Hashable {
      */
     public var answer: JsonValue?
     public var refusals: Int64
+    /**
+     * The drains in a row in which the write met an environmental failure.
+     */
+    public var environmentalStreak: Int64
+    /**
+     * What the write last met when the failure was environmental.
+     */
+    public var lastFailure: LastFailure?
     public var queuedAt: String
     public var answeredAt: String?
 
@@ -6721,7 +6787,13 @@ public struct QueuedWrite: Equatable, Hashable {
         /**
          * The server's answer, whole, as it arrived: the JSON it held, or, for
          * an answer that was not JSON, its text as a string.
-         */answer: JsonValue?, refusals: Int64, queuedAt: String, answeredAt: String?) {
+         */answer: JsonValue?, refusals: Int64, 
+        /**
+         * The drains in a row in which the write met an environmental failure.
+         */environmentalStreak: Int64, 
+        /**
+         * What the write last met when the failure was environmental.
+         */lastFailure: LastFailure?, queuedAt: String, answeredAt: String?) {
         self.id = id
         self.kind = kind
         self.itemId = itemId
@@ -6739,6 +6811,8 @@ public struct QueuedWrite: Equatable, Hashable {
         self.body = body
         self.answer = answer
         self.refusals = refusals
+        self.environmentalStreak = environmentalStreak
+        self.lastFailure = lastFailure
         self.queuedAt = queuedAt
         self.answeredAt = answeredAt
     }
@@ -6776,6 +6850,8 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
                 body: FfiConverterTypeJsonObject.read(from: &buf), 
                 answer: FfiConverterOptionTypeJsonValue.read(from: &buf), 
                 refusals: FfiConverterInt64.read(from: &buf), 
+                environmentalStreak: FfiConverterInt64.read(from: &buf), 
+                lastFailure: FfiConverterOptionTypeLastFailure.read(from: &buf), 
                 queuedAt: FfiConverterString.read(from: &buf), 
                 answeredAt: FfiConverterOptionString.read(from: &buf)
         )
@@ -6799,6 +6875,8 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
         FfiConverterTypeJsonObject.write(value.body, into: &buf)
         FfiConverterOptionTypeJsonValue.write(value.answer, into: &buf)
         FfiConverterInt64.write(value.refusals, into: &buf)
+        FfiConverterInt64.write(value.environmentalStreak, into: &buf)
+        FfiConverterOptionTypeLastFailure.write(value.lastFailure, into: &buf)
         FfiConverterString.write(value.queuedAt, into: &buf)
         FfiConverterOptionString.write(value.answeredAt, into: &buf)
     }
@@ -7905,6 +7983,11 @@ public enum BlockedReason: Equatable, Hashable, CaseIterable {
     case keySpent
     case ancestorUnavailable
     case conflictUnresolved
+    /**
+     * The write keeps meeting an environmental failure while the server
+     * answers other writes.
+     */
+    case failingAlone
 
 
 
@@ -7934,6 +8017,8 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case 4: return .conflictUnresolved
         
+        case 5: return .failingAlone
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -7956,6 +8041,10 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case .conflictUnresolved:
             writeInt(&buf, Int32(4))
+        
+        
+        case .failingAlone:
+            writeInt(&buf, Int32(5))
         
         }
     }
@@ -10937,6 +11026,30 @@ fileprivate struct FfiConverterOptionTypeItem: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeLastFailure: FfiConverterRustBuffer {
+    typealias SwiftType = LastFailure?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLastFailure.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLastFailure.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeMissingGrant: FfiConverterRustBuffer {
     typealias SwiftType = MissingGrant?
 
@@ -12059,7 +12172,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_watch() != 793) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 24491) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 46871) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {
