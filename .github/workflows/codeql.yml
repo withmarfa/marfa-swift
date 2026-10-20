@@ -1,5 +1,7 @@
 name: CodeQL
 
+# Analyzes the workflows. `codeql-swift.yml` analyzes Swift, on macOS.
+#
 # A pull request or a push to `main` that changes only documentation or agent
 # instructions starts no run. CodeQL is not a required check, so a run that
 # never starts leaves no check pending. A draft pull request is analyzed once
@@ -29,8 +31,11 @@ on:
     - cron: "41 4 * * 1"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A draft and a ready pull request have groups of their own, so a draft's
+  # run, queued a moment after the ready one, never cancels it. Other events
+  # get a group each, so a run on `main` is never cancelled by a later push.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && format('{0}-{1}', github.ref, github.event.pull_request.draft && 'draft' || 'ready') || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -53,57 +58,3 @@ jobs:
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:actions
-
-  # CodeQL reads Swift from a build it watches, and the package builds only
-  # beside the core's framework: the one `ci.yml` keeps for this pin, or one
-  # built here when that has gone.
-  swift:
-    name: Analyze (swift)
-    if: ${{ !github.event.pull_request.draft }}
-    runs-on: xcode-27
-    timeout-minutes: 60
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Select Xcode
-        run: echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
-
-      # The paths and the key are `ci.yml`'s, since both make one cache's name.
-      - name: Restore what the pin generates
-        id: core
-        uses: actions/cache@v6
-        with:
-          path: |
-            Frameworks/MarfaCoreFFI.xcframework
-            Sources/MarfaCore
-            Sources/MarfaTypes
-          key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-      - name: Build the core at the pin
-        if: ${{ steps.core.outputs.cache-hit != 'true' }}
-        run: |
-          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-          scripts/core.sh
-
-      # Before CodeQL watches, so only the build is traced. Outside the
-      # checkout, so the dependencies' sources are not reported as its own.
-      - name: Resolve the dependencies
-        run: swift package resolve --scratch-path "${RUNNER_TEMP}/swift-build"
-      - uses: github/codeql-action/init@v4
-        with:
-          languages: swift
-          build-mode: manual
-      # The library targets alone. Traced, a build that does not name its
-      # architecture picks no slice of the core's framework and cannot import
-      # it; CodeQL advises one architecture. On macOS 27 the tracer cannot
-      # start `sandbox-exec` ("Bad CPU type"), so the manifest runs unsandboxed.
-      - name: Build the package
-        run: swift build --arch arm64 --disable-sandbox --scratch-path "${RUNNER_TEMP}/swift-build"
-      - uses: github/codeql-action/analyze@v4
-        with:
-          category: /language:swift

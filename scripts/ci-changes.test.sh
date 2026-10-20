@@ -117,6 +117,20 @@ for directory in .codex .githooks .claude; do
 done
 check "CodeQL ignores Markdown on a pull request and on a push" "$(grep -cF -e '- "**/*.md"' "${codeql}")" 2
 
+# The Swift analysis runs on macOS, so it starts only for a change to what the build reads.
+codeql_swift="${root}/.github/workflows/codeql-swift.yml"
+for path in '"Sources/**"' Package.swift .github/workflows/codeql-swift.yml; do
+  check "CodeQL Swift runs for ${path} on a pull request and on a push" "$(grep -cF -e "- ${path}" "${codeql_swift}")" 2
+done
+
+# A draft and a ready pull request never share a group, and a push to main is never cancelled.
+for flow in ci codeql codeql-swift; do
+  workflow="${root}/.github/workflows/${flow}.yml"
+  check "${flow} separates a draft pull request from a ready one" "$(grep -cF "github.event.pull_request.draft && 'draft' || 'ready'" "${workflow}")" 1
+  check "${flow} gives a push its own group" "$(grep -cF "|| github.run_id }}" "${workflow}")" 1
+  check "${flow} cancels only a pull request's run" "$(grep -cF "cancel-in-progress: \${{ github.event_name == 'pull_request' }}" "${workflow}")" 1
+done
+
 # As CI runs it, against a repository whose history holds each kind of change.
 repo="$(mktemp -d)"
 bin="$(mktemp -d)"
