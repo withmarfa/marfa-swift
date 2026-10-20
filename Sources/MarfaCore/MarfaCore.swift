@@ -7003,6 +7003,12 @@ public struct RestoredRemoval: Equatable, Hashable {
      */
     public var putBack: UInt64
     /**
+     * Files gone from the disk that could not be written back, such as one
+     * whose bytes could not be fetched, each with why. Every later sync
+     * tries each again.
+     */
+    public var notWrittenBack: [FlaggedFile]
+    /**
      * Items that left elsewhere, restored at the next sync.
      */
     public var restored: UInt64
@@ -7015,9 +7021,15 @@ public struct RestoredRemoval: Equatable, Hashable {
          * Files gone from the disk, written back.
          */putBack: UInt64, 
         /**
+         * Files gone from the disk that could not be written back, such as one
+         * whose bytes could not be fetched, each with why. Every later sync
+         * tries each again.
+         */notWrittenBack: [FlaggedFile], 
+        /**
          * Items that left elsewhere, restored at the next sync.
          */restored: UInt64, pull: FolderPull) {
         self.putBack = putBack
+        self.notWrittenBack = notWrittenBack
         self.restored = restored
         self.pull = pull
     }
@@ -7039,6 +7051,7 @@ public struct FfiConverterTypeRestoredRemoval: FfiConverterRustBuffer {
         return
             try RestoredRemoval(
                 putBack: FfiConverterUInt64.read(from: &buf), 
+                notWrittenBack: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
                 restored: FfiConverterUInt64.read(from: &buf), 
                 pull: FfiConverterTypeFolderPull.read(from: &buf)
         )
@@ -7046,6 +7059,7 @@ public struct FfiConverterTypeRestoredRemoval: FfiConverterRustBuffer {
 
     public static func write(_ value: RestoredRemoval, into buf: inout [UInt8]) {
         FfiConverterUInt64.write(value.putBack, into: &buf)
+        FfiConverterSequenceTypeFlaggedFile.write(value.notWrittenBack, into: &buf)
         FfiConverterUInt64.write(value.restored, into: &buf)
         FfiConverterTypeFolderPull.write(value.pull, into: &buf)
     }

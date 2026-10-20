@@ -1899,6 +1899,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/version`.
             public var version: Swift.String
+            /// The release the build was made as, such as `0.0.14`. Absent for a build that is not a release.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/release`.
+            public var release: Swift.String?
             /// Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/instance_id`.
@@ -1916,18 +1920,21 @@ extension Components {
             /// - Parameters:
             ///   - name: The instance's display name. Defaults to `Marfa`.
             ///   - version: The build the instance runs.
+            ///   - release: The release the build was made as, such as `0.0.14`. Absent for a build that is not a release.
             ///   - instanceId: Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
             ///   - contract: The contract version, the same number as this document's `info.version`. It stays at `0` until the first public release.
             ///   - features: The features the instance serves, such as `items` and `webhooks`.
             public init(
                 name: Swift.String,
                 version: Swift.String,
+                release: Swift.String? = nil,
                 instanceId: Swift.String,
                 contract: Swift.Int,
                 features: [Swift.String]
             ) {
                 self.name = name
                 self.version = version
+                self.release = release
                 self.instanceId = instanceId
                 self.contract = contract
                 self.features = features
@@ -1935,6 +1942,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case name
                 case version
+                case release
                 case instanceId = "instance_id"
                 case contract
                 case features
@@ -2315,30 +2323,31 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal`.
-        public struct EdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case blobNotFound = "blob_not_found"
                     case edgeTypeNotFound = "edge_type_not_found"
                     case itemNotFound = "item_not_found"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -2358,8 +2367,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -2367,9 +2376,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -2383,13 +2392,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
-            public var error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
-            /// Creates a new `EdgeTypeNotFoundOrItemNotFoundRefusal`.
+            /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -3279,31 +3288,32 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
-        public struct EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case blobNotFound = "blob_not_found"
                     case edgeNotFound = "edge_not_found"
                     case edgeTypeNotFound = "edge_type_not_found"
                     case itemNotFound = "item_not_found"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -3323,8 +3333,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -3332,9 +3342,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -3348,13 +3358,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
-            public var error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
-            /// Creates a new `EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+            /// - Remark: Generated from `#/components/schemas/BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -5124,6 +5134,89 @@ extension Components {
         }
         /// An error response.
         ///
+        /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct EdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeTypeNotFound = "edge_type_not_found"
+                    case itemNotFound = "item_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeTypeNotFoundOrItemNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/IdReusedRefusal`.
         public struct IdReusedRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -5280,6 +5373,90 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+        public struct EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeNotFound = "edge_not_found"
+                    case edgeTypeNotFound = "edge_type_not_found"
+                    case itemNotFound = "item_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal/error`.
+            public var error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload
+            /// Creates a new `EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -8097,6 +8274,88 @@ extension Components {
                 case count
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal`.
+        public struct RequestTimeoutRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case requestTimeout = "request_timeout"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error/code`.
+                public var code: Components.Schemas.RequestTimeoutRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error/details`.
+                public var details: Components.Schemas.RequestTimeoutRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.RequestTimeoutRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.RequestTimeoutRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RequestTimeoutRefusal/error`.
+            public var error: Components.Schemas.RequestTimeoutRefusal._ErrorPayload
+            /// Creates a new `RequestTimeoutRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.RequestTimeoutRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// A page holding every orphan.
         ///
         /// - Remark: Generated from `#/components/schemas/BlobOrphanPage`.
@@ -8434,6 +8693,89 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal`.
+        public struct BlobStoreUnavailableOrWriteContentionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case blobStoreUnavailable = "blob_store_unavailable"
+                    case writeContention = "write_contention"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/code`.
+                public var code: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/details`.
+                public var details: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error`.
+            public var error: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload
+            /// Creates a new `BlobStoreUnavailableOrWriteContentionRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -9694,7 +10036,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDelivery/query`.
             public var query: Swift.String
-            /// `[name, value]` pairs in the order and case they arrived.
+            /// `[name, value]` pairs in the order and case they arrived, without any header whose name begins with `Tailscale-`.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDelivery/headers`.
             public var headers: [OpenAPIRuntime.OpenAPIArrayContainer]
@@ -9773,7 +10115,7 @@ extension Components {
             ///   - receivedAt: When Marfa received the delivery.
             ///   - method: The HTTP method of the request.
             ///   - query: The query string as the sender sent it, without the `?`; empty if there was none.
-            ///   - headers: `[name, value]` pairs in the order and case they arrived.
+            ///   - headers: `[name, value]` pairs in the order and case they arrived, without any header whose name begins with `Tailscale-`.
             ///   - size: The size of the body in bytes.
             ///   - sha256: The SHA-256 hash of the body, in hex.
             ///   - duplicateOf: The earliest retained delivery on the same endpoint with the same `duplicate_header` value; `null` if this is the first with its value, the delivery lacks the header, or the endpoint sets none.
@@ -11116,7 +11458,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/expires_at`.
             public var expiresAt: Swift.String?
-            /// When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
+            /// When the key's use was last recorded, in UTC, or `null` if none is recorded. Marfa records usage asynchronously at most once an hour; a busy or unavailable store can delay or drop a record.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/last_used_at`.
             public var lastUsedAt: Swift.String?
@@ -11139,7 +11481,7 @@ extension Components {
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
             ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
-            ///   - lastUsedAt: When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
+            ///   - lastUsedAt: When the key's use was last recorded, in UTC, or `null` if none is recorded. Marfa records usage asynchronously at most once an hour; a busy or unavailable store can delay or drop a record.
             public init(
                 id: Swift.String,
                 key: Swift.String,
@@ -11395,7 +11737,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/expires_at`.
             public var expiresAt: Swift.String?
-            /// When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
+            /// When the key's use was last recorded, in UTC, or `null` if none is recorded. Marfa records usage asynchronously at most once an hour; a busy or unavailable store can delay or drop a record.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/last_used_at`.
             public var lastUsedAt: Swift.String?
@@ -11417,7 +11759,7 @@ extension Components {
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
             ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
-            ///   - lastUsedAt: When the key was last used, in UTC, or `null` if never. Marfa updates it at most once an hour.
+            ///   - lastUsedAt: When the key's use was last recorded, in UTC, or `null` if none is recorded. Marfa records usage asynchronously at most once an hour; a busy or unavailable store can delay or drop a record.
             public init(
                 id: Swift.String,
                 label: Swift.String,
@@ -11962,7 +12304,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformType/child_types`.
             public var childTypes: [Swift.String]
-            /// `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it.
+            /// `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it or names it in `compatible_with`.
             ///
             /// - Remark: Generated from `#/components/schemas/DriftedPlatformType/removable`.
             public var removable: Swift.Bool
@@ -11972,7 +12314,7 @@ extension Components {
             ///   - id: The identifier of the stale type.
             ///   - itemCount: How many items carry this type, counted when you ask.
             ///   - childTypes: The types that name this one as their `parent`.
-            ///   - removable: `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it.
+            ///   - removable: `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it or names it in `compatible_with`.
             public init(
                 id: Swift.String,
                 itemCount: Swift.Double,
@@ -12262,7 +12604,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/created_at`.
             public var createdAt: Swift.String
-            /// When the sign-in last made a request, in UTC, or `null` if it hasn't. Marfa records a browser's use at most once a minute and an app's or key's at most once an hour.
+            /// When a recorded use occurred, in UTC, or `null` if none is recorded. Uses are recorded at most once a minute for browsers and once an hour for apps or keys. Failed recording leaves the previous value.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/last_used_at`.
             public var lastUsedAt: Swift.String?
@@ -12290,7 +12632,7 @@ extension Components {
             ///   - name: A readable name: a browser's from its `user_agent`, an app's the owner's name for it or else its registered name, a key's its `label`. A name with a control or bidirectional character, or over 200 characters, gives way to the ID.
             ///   - current: `true` if this sign-in sent the request.
             ///   - createdAt: When the sign-in was made, in UTC. For an app, when the owner last approved it.
-            ///   - lastUsedAt: When the sign-in last made a request, in UTC, or `null` if it hasn't. Marfa records a browser's use at most once a minute and an app's or key's at most once an hour.
+            ///   - lastUsedAt: When a recorded use occurred, in UTC, or `null` if none is recorded. Uses are recorded at most once a minute for browsers and once an hour for apps or keys. Failed recording leaves the previous value.
             ///   - expiresAt: When the sign-in ends unless something changes, in UTC. A browser's is seven days and one minute after `last_used_at`. `null` for an app, and for a key that doesn't expire.
             ///   - ipAddress: The address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
             ///   - userAgent: The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
@@ -12719,6 +13061,172 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal`.
+        public struct ExportRowsUnrestorableRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case exportRowsUnrestorable = "export_rows_unrestorable"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/code`.
+                public var code: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/details`.
+                public var details: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error`.
+            public var error: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload
+            /// Creates a new `ExportRowsUnrestorableRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal`.
+        public struct BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case blobStoreUnavailable = "blob_store_unavailable"
+                    case exportUnrestorable = "export_unrestorable"
+                    case writeContention = "write_contention"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/code`.
+                public var code: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/details`.
+                public var details: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error`.
+            public var error: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload
+            /// Creates a new `BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
