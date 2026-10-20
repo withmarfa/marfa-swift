@@ -241,7 +241,7 @@ struct PropertyValuesOffline {
         // Witness: whole numbers that are served back as written, at the edge of the rule.
         let kept: JSONObject = [
             "safe": .integer(9_007_199_254_740_991), "sixteen": .integer(9_007_199_254_740_992),
-            "exact": .integer(1_152_921_504_606_847_000), "float": .number(9_007_199_254_740_993),
+            "exact": .integer(1_152_921_504_606_847_000), "float": .number(9_007_199_254_740_992.0),
         ]
         _ = try await copy.items.update(id, Edit(properties: kept, baseVersion: version))
         _ = try await copy.extensions.write("acme.x", kept, on: id)
@@ -273,6 +273,68 @@ struct PropertyValuesOffline {
             if case MarfaError.validation("invalid_properties", _) = error { true } else { false }
         }
         #expect(try await copy.queue.all().count == queued + 1)
+        await copy.close()
+    }
+
+    /// The core judges a whole number after the refusals that come before it in each
+    /// call, so a write that fails one of those is answered with that refusal.
+    @Test(arguments: CopyKind.allCases)
+    func aWholeNumberMarfaWouldServeBackWithOtherDigitsIsJudgedAfterTheRefusalsThatComeFirst(kind: CopyKind) async throws {
+        let copy = try await Self.open(kind)
+        let first = try await Self.create(copy, ["title": "first"])
+        let second = try await Self.create(copy, ["title": "second"])
+        let made = try await copy.edges.create(from: first, to: second, type: "in-thread", properties: ["position": 1])
+        let edgeId = try #require(made.edgeId)
+        let queued = try await copy.queue.all().count
+        let beyond: JSONObject = ["position": .integer(9_007_199_254_740_993)]
+        let missing = "018f0000-0000-7000-8000-000000000000"
+
+        await #expect {
+            _ = try await copy.edges.update(edgeId, EdgeEdit(beyond, baseVersion: 7))
+        } throws: { error in
+            if case MarfaError.invalid(let message) = error {
+                message.contains("is based on version 7 and this copy holds version")
+            } else {
+                false
+            }
+        }
+        await #expect {
+            _ = try await copy.edges.update(missing, EdgeEdit(beyond, baseVersion: 0))
+        } throws: { error in
+            if case MarfaError.notFound("edge_not_found", _) = error { true } else { false }
+        }
+        await #expect {
+            _ = try await copy.items.create(Draft(type: "app.test.entry", properties: beyond, tags: [""]))
+        } throws: { error in
+            if case MarfaError.validation("validation_error", let message) = error {
+                message.contains("tags[0]: A tag must not be empty")
+            } else {
+                false
+            }
+        }
+        await #expect {
+            _ = try await copy.edges.create(from: first, to: first, type: "in-thread", properties: beyond)
+        } throws: { error in
+            if case MarfaError.validation("edge_cycle", _) = error { true } else { false }
+        }
+        // The same write with nothing before it to fail is refused for the number, and
+        // where the core judges the number before it looks for the row, so is a write to a
+        // row the copy does not hold.
+        let unobstructed: [@Sendable () async throws -> Void] = [
+            { _ = try await copy.edges.update(edgeId, EdgeEdit(beyond, baseVersion: 0)) },
+            { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: beyond, tags: ["t"])) },
+            { _ = try await copy.items.update(missing, Edit(properties: beyond, baseVersion: 0)) },
+            { _ = try await copy.extensions.write("acme.x", beyond, on: missing) },
+            { _ = try await copy.edges.create(from: missing, to: first, type: "in-thread", properties: beyond) },
+        ]
+        for write in unobstructed {
+            await #expect {
+                try await write()
+            } throws: { error in
+                if case MarfaError.validation("invalid_properties", _) = error { true } else { false }
+            }
+        }
+        #expect(try await copy.queue.all().count == queued)
         await copy.close()
     }
 

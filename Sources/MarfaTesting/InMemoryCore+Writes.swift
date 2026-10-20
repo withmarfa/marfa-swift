@@ -11,6 +11,7 @@ extension InMemoryCore {
         if draft.sourceId != nil { throw FakeCopyError.unsupported(call: "items.create(sourceId:)") }
         return try state.withLock { state in
             try Checks.tags(draft.tags)
+            try Properties.keptAsWritten(draft.properties)
             if let id = draft.id, !Minted.isID(id) {
                 throw Refuse.validation("invalid_id", "Invalid id: \"\(id)\" is not a UUIDv7 in lowercase")
             }
@@ -67,6 +68,7 @@ extension InMemoryCore {
     private func update(id: String, edit: Edit, asRead: Bool) throws -> QueuedWrite {
         try Properties.cross(edit.properties)
         try Checks.links(edit.properties, call: "items.update")
+        try Properties.keptAsWritten(edit.properties)
         return try state.withLock { state in
             guard var held = state.items[id], held.state != .trashed else { throw Refuse.item(id) }
             try Checks.writable(held.type)
@@ -201,6 +203,7 @@ extension InMemoryCore {
 
     func writeExtension(id: String, namespace: String, body: JsonObject) throws -> QueuedWrite {
         try Properties.cross(body)
+        try Properties.keptAsWritten(body)
         return try state.withLock { state in
             guard state.items[id] != nil else { throw Refuse.item(id) }
             try Properties.refuseTooDeep(body)
@@ -227,6 +230,7 @@ extension InMemoryCore {
                 throw Refuse.validation("invalid_id", "Invalid id: \"\(id)\" is not a UUIDv7 in lowercase")
             }
             try Self.refuseSelfLoop(draft.sourceId, draft.targetId)
+            try Properties.keptAsWritten(draft.properties)
             guard state.items[draft.sourceId] != nil else {
                 throw Refuse.invalid(
                     "\(draft.sourceId) is not a row this copy holds, and \(draft.edgeType) is not an edge type its slice holds whole, so the copy cannot hold an edge from it"
@@ -276,6 +280,7 @@ extension InMemoryCore {
                 }
                 try Self.refuseSelfLoop(source ?? held.sourceId, target ?? held.targetId)
             }
+            try Properties.keptAsWritten(edit.properties)
             guard !edit.properties.members.isEmpty || source != nil || target != nil else { return nil }
             var body = JsonObject(members: [
                 .init(key: "properties", value: .object(edit.properties)), .init(key: "version", value: .integer(base)),

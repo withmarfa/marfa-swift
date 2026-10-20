@@ -10,17 +10,19 @@ enum Properties {
     static let depthLimit = 64
 
     /// The refusals the binding makes before the core sees a value: a number
-    /// that is not finite, a key that repeats, and nesting past the limit; then
-    /// the core's own refusal of a whole number it would not serve back as
-    /// written.
+    /// that is not finite, a key that repeats, and nesting past the limit.
     static func cross(_ object: JsonObject) throws {
         try cross(.object(object), depth: 0)
+    }
+
+    /// The core's refusal of the first whole number, in document order and at
+    /// any depth, that Marfa would serve back with other digits. A number with
+    /// a fraction or an exponent names a float and is never judged. Each write
+    /// calls it where the core does, after the refusals that come first there.
+    static func keptAsWritten(_ object: JsonObject) throws {
         try keptAsWritten(.object(object), path: [])
     }
 
-    /// Refuses the first whole number, in document order and at any depth,
-    /// that Marfa would serve back with other digits. A number with a fraction
-    /// or an exponent names a float and is never judged.
     private static func keptAsWritten(_ value: JsonValue, path: [String]) throws {
         switch value {
         case .integer(let number):
