@@ -422,13 +422,16 @@ public struct QueuedWrite: Sendable, Hashable {
     public var answer: JSONValue?
     public var refusals: Int64
     /// The drains in a row in which the write met a failure that was no
-    /// answer to it. A `429` adds nothing, and a run starts again at 1 when
+    /// answer to it.
+    ///
+    /// A `429` adds nothing, and a run starts again at 1 when
     /// the previous failure was more than 15 minutes earlier. An answer to the
     /// write, a refusal and a release set it back to 0.
     public var environmentalStreak: Int64
-    /// The last failure the write met that was no answer to it, a `429`
-    /// included, which updates this and leaves `environmentalStreak` as it
-    /// was. A failure that came before the server could answer, from renewing
+    /// The last failure the write met that was no answer to it.
+    ///
+    /// A `429` updates this and leaves `environmentalStreak` as it was. A
+    /// failure that came before the server could answer, from renewing
     /// the credential or the device's own storage, leaves it as it was. An
     /// answer to the write and a refusal clear it, except the block that sets
     /// the write aside `failingAlone`, which keeps it for the app to show.

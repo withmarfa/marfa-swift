@@ -16,7 +16,9 @@ enum Properties {
     }
 
     /// The core's refusal of the first whole number, in document order and at
-    /// any depth, that Marfa would serve back with other digits. A number with
+    /// any depth, that Marfa would serve back with other digits.
+    ///
+    /// A number with
     /// a fraction or an exponent names a float and is never judged. Each write
     /// calls it where the core does, after the refusals that come first there.
     static func keptAsWritten(_ object: JsonObject) throws {

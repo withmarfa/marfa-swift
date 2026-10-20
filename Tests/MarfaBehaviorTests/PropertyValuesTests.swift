@@ -214,9 +214,18 @@ struct PropertyValuesOffline {
         let version = try #require(try await copy.items.get(id)).version
         let queued = try await copy.queue.all().count
         let cases: [(JSONObject, String, String)] = [
-            (["beyond": .integer(9_007_199_254_740_993)], "beyond", "not 9007199254740993, which it serves as 9007199254740992"),
-            (["least": .integer(.min)], "least", "not -9223372036854775808, which it serves as -9223372036854776000"),
-            (["deep": ["list": [1, ["n": .integer(9_223_372_036_854_775_807)]]]], "deep.list.1.n", "not 9223372036854775807, which it serves as 9223372036854776000"),
+            (
+                ["beyond": .integer(9_007_199_254_740_993)], "beyond",
+                "not 9007199254740993, which it serves as 9007199254740992"
+            ),
+            (
+                ["least": .integer(.min)], "least",
+                "not -9223372036854775808, which it serves as -9223372036854776000"
+            ),
+            (
+                ["deep": ["list": [1, ["n": .integer(9_223_372_036_854_775_807)]]]], "deep.list.1.n",
+                "not 9223372036854775807, which it serves as 9223372036854776000"
+            ),
         ]
         for (bad, path, text) in cases {
             let attempts: [(String, @Sendable () async throws -> Void)] = [
@@ -279,7 +288,9 @@ struct PropertyValuesOffline {
     /// The core judges a whole number after the refusals that come before it in each
     /// call, so a write that fails one of those is answered with that refusal.
     @Test(arguments: CopyKind.allCases)
-    func aWholeNumberMarfaWouldServeBackWithOtherDigitsIsJudgedAfterTheRefusalsThatComeFirst(kind: CopyKind) async throws {
+    func aWholeNumberMarfaWouldServeBackWithOtherDigitsIsJudgedAfterTheRefusalsThatComeFirst(
+        kind: CopyKind
+    ) async throws {
         let copy = try await Self.open(kind)
         let first = try await Self.create(copy, ["title": "first"])
         let second = try await Self.create(copy, ["title": "second"])
