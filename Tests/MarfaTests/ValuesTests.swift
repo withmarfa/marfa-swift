@@ -186,9 +186,14 @@ struct OwnValueTypes {
             id: "q", kind: .uploadBlob, itemId: "i", targetId: "t", edgeId: "e", namespace: "n", tag: "g",
             blob: "b", baseVersion: 2, idempotencyKey: "k", dependsOn: ["d"], follows: "f",
             verdict: .refused(Self.refusal), body: ["title": "kept", "n": 1], answer: ["data": ["id": "i"]],
-            refusals: 3,
+            refusals: 3, environmentalStreak: 4, lastFailure: Marfa.LastFailure(status: 413, text: "Too Large"),
             queuedAt: "t0", answeredAt: "t1")
         #expect(Marfa.QueuedWrite(write.core) == write)
+        #expect(write.core.environmentalStreak == 4)
+        #expect(write.core.lastFailure == MarfaCore.LastFailure(status: 413, text: "Too Large"))
+        for failure in [Marfa.LastFailure(status: nil), Marfa.LastFailure(status: 503, text: nil)] {
+            #expect(Marfa.LastFailure(failure.core) == failure)
+        }
         let waiting = Marfa.QueuedWrite(id: "w", kind: .updateItem, idempotencyKey: "k", waiting: true, queuedAt: "t0")
         #expect(Marfa.QueuedWrite(waiting.core) == waiting)
         let report = Marfa.DrainReport(

@@ -440,7 +440,7 @@ extension InMemoryCore.State {
             id: Minted.id(), kind: kind, itemId: item, targetId: target, edgeId: edge, namespace: namespace, tag: tag,
             blob: nil, baseVersion: baseVersion, idempotencyKey: Minted.id(), dependsOn: dependsOn,
             follows: ahead?.write.id, verdict: nil, waiting: false, body: body, answer: nil, refusals: 0,
-            queuedAt: Minted.now(), answeredAt: nil)
+            environmentalStreak: 0, lastFailure: nil, queuedAt: Minted.now(), answeredAt: nil)
         entries.append(InMemoryCore.Entry(write: write, effect: effect))
         return write
     }

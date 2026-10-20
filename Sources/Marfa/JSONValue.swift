@@ -10,6 +10,11 @@ import MarfaCore
 /// binding as; its cases and their documentation are the core's. An integer
 /// is kept exact, where a `Double` holds integers exactly only up to 2^53; an
 /// integer beyond `Int64` arrives as the nearest `number`.
+///
+/// Marfa holds a number as a 64-bit float, so a write refuses, as
+/// `MarfaError.validation` with the code `invalid_properties`, an integer
+/// with 16 or more digits that it would serve back with other digits, such as
+/// `9007199254740993`. Send such a number as a string.
 public typealias JSONValue = MarfaCore.JsonValue
 
 /// A JSON object that keeps its keys in order.

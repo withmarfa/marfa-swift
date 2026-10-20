@@ -30,7 +30,7 @@ struct PropertyValuesOffline {
         let properties: JSONObject = [
             "title": "caf\u{e9} \u{1F600} \u{2028} \"quoted\"\n",
             "nothing": nil, "yes": true, "no": false,
-            "small": -7, "beyond": .integer(9_007_199_254_740_993), "least": .integer(.min),
+            "small": -7, "beyond": .integer(1_152_921_504_606_847_000), "least": .integer(-1_152_921_504_606_847_000),
             "ratio": 0.1, "tiny": 1e-300,
             "list": [1, [2, [3, ["deep": [nil, "x"]]]]], "empty": [:], "none": [],
         ]
@@ -38,8 +38,8 @@ struct PropertyValuesOffline {
         let held = try #require(try await copy.items.get(id))
         #expect(held.unreadableProperties == nil)
         #expect(held.properties == properties)
-        #expect(held.properties["beyond"] == .integer(9_007_199_254_740_993))
-        #expect(held.properties["least"] == .integer(.min))
+        #expect(held.properties["beyond"] == .integer(1_152_921_504_606_847_000))
+        #expect(held.properties["least"] == .integer(-1_152_921_504_606_847_000))
         #expect(held.properties["ratio"] == .number(0.1))
         #expect(held.properties["nothing"] == .null)
         #expect(held.properties["list"]?.array?[1].array?[1].array?[1].object?["deep"]?.array?.count == 2)
@@ -204,6 +204,75 @@ struct PropertyValuesOffline {
         _ = try await copy.edges.update(edgeId, EdgeEdit(nested(62), baseVersion: 0))
         _ = try await copy.extensions.write("acme.x", nested(63), on: id)
         #expect(try await copy.queue.all().count == queued + 5)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aWholeNumberMarfaWouldServeBackWithOtherDigitsIsRefusedBeforeAnythingIsQueued(kind: CopyKind) async throws {
+        let copy = try await Self.open(kind)
+        let id = try await Self.create(copy, ["title": "t"])
+        let version = try #require(try await copy.items.get(id)).version
+        let queued = try await copy.queue.all().count
+        let cases: [(JSONObject, String, String)] = [
+            (["beyond": .integer(9_007_199_254_740_993)], "beyond", "not 9007199254740993, which it serves as 9007199254740992"),
+            (["least": .integer(.min)], "least", "not -9223372036854775808, which it serves as -9223372036854776000"),
+            (["deep": ["list": [1, ["n": .integer(9_223_372_036_854_775_807)]]]], "deep.list.1.n", "not 9223372036854775807, which it serves as 9223372036854776000"),
+        ]
+        for (bad, path, text) in cases {
+            let attempts: [(String, @Sendable () async throws -> Void)] = [
+                ("create", { _ = try await copy.items.create(Draft(type: "app.test.entry", properties: bad)) }),
+                ("update", { _ = try await copy.items.update(id, Edit(properties: bad, baseVersion: version)) }),
+                ("extension", { _ = try await copy.extensions.write("acme.x", bad, on: id) }),
+            ]
+            for (name, attempt) in attempts {
+                await #expect {
+                    try await attempt()
+                } throws: { error in
+                    guard case MarfaError.validation("invalid_properties", let message) = error else {
+                        Issue.record("\(name) threw \(error)")
+                        return false
+                    }
+                    return message.contains("\(path): Must be a whole number") && message.contains(text)
+                        && message.hasSuffix("Send it as a string.")
+                }
+            }
+        }
+        #expect(try await copy.queue.all().count == queued)
+        // Witness: whole numbers that are served back as written, at the edge of the rule.
+        let kept: JSONObject = [
+            "safe": .integer(9_007_199_254_740_991), "sixteen": .integer(9_007_199_254_740_992),
+            "exact": .integer(1_152_921_504_606_847_000), "float": .number(9_007_199_254_740_993),
+        ]
+        _ = try await copy.items.update(id, Edit(properties: kept, baseVersion: version))
+        _ = try await copy.extensions.write("acme.x", kept, on: id)
+        #expect(try await copy.queue.all().count == queued + 2)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aWholeNumberMarfaWouldServeBackWithOtherDigitsIsRefusedOnAnEdge(kind: CopyKind) async throws {
+        let copy = try await Self.open(kind)
+        let first = try await Self.create(copy, ["title": "first"])
+        let second = try await Self.create(copy, ["title": "second"])
+        let queued = try await copy.queue.all().count
+        await #expect {
+            _ = try await copy.edges.create(
+                from: first, to: second, type: "in-thread", properties: ["position": .integer(9_007_199_254_740_993)])
+        } throws: { error in
+            if case MarfaError.validation("invalid_properties", let message) = error {
+                message.contains("position: Must be a whole number")
+            } else {
+                false
+            }
+        }
+        let made = try await copy.edges.create(from: first, to: second, type: "in-thread", properties: ["position": 1])
+        await #expect {
+            _ = try await copy.edges.update(
+                try #require(made.edgeId), EdgeEdit(["position": .integer(9_007_199_254_740_993)], baseVersion: 0))
+        } throws: { error in
+            if case MarfaError.validation("invalid_properties", _) = error { true } else { false }
+        }
+        #expect(try await copy.queue.all().count == queued + 1)
         await copy.close()
     }
 
