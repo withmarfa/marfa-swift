@@ -718,9 +718,10 @@ public struct Queue: Sendable {
     /// row back to what the server holds.
     ///
     /// Only a write blocked `ancestorUnavailable`, `conflictUnresolved` or
-    /// `failingAlone` is taken; `false` for any other. Writes waiting on it are refused unsent.
-    /// It reads the row from the server first, so it needs the server, and
-    /// throws `invalid` when the copy moved during the read; ask again.
+    /// `failingAlone` is taken; `false` for any other. Writes waiting on it
+    /// are refused unsent. It reads the row from the server first, so it needs
+    /// the server, and returns `false` when the copy moved during the read;
+    /// ask again.
     public func withdraw(_ id: String) async throws -> Bool {
         let withdrawn = try await holder.run { core in try core.withdraw(id: id) }
         if withdrawn {

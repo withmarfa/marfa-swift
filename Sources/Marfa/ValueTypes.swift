@@ -422,11 +422,18 @@ public struct QueuedWrite: Sendable, Hashable {
     public var answer: JSONValue?
     public var refusals: Int64
     /// The drains in a row in which the write met a failure that was no
-    /// answer to it.
+    /// answer to it. A `429` adds nothing, and a run starts again at 1 when
+    /// the previous failure was more than 15 minutes earlier. An answer to the
+    /// write, a refusal and a release set it back to 0.
     public var environmentalStreak: Int64
-    /// The last failure that was no answer to the write, kept until the write
-    /// is answered; `nil` when it has met none. Shown for a write blocked
-    /// `failingAlone`.
+    /// The last failure the write met that was no answer to it, a `429`
+    /// included, which updates this and leaves `environmentalStreak` as it
+    /// was. A failure that came before the server could answer, from renewing
+    /// the credential or the device's own storage, leaves it as it was. An
+    /// answer to the write and a refusal clear it, except the block that sets
+    /// the write aside `failingAlone`, which keeps it for the app to show.
+    /// Releasing the write clears it at once, before the write is answered
+    /// again. `nil` when the write has met none since.
     public var lastFailure: LastFailure?
     public var queuedAt: String
     public var answeredAt: String?
@@ -486,10 +493,13 @@ public struct QueuedWrite: Sendable, Hashable {
 
 /// What a write met that was no answer to it.
 public struct LastFailure: Sendable, Hashable {
-    /// The HTTP status; `nil` when nothing answered.
+    /// The HTTP status the server gave, a `429` and a gateway's included.
+    /// `nil` means no status was kept, not that nothing answered: the headers
+    /// can arrive and the body then fail to read.
     public var status: UInt16?
-    /// The start of the answer's body when it was text, cut to a short
-    /// length; `nil` for a body that was empty or not text.
+    /// The start of the answer's body when it was text, with its whitespace
+    /// collapsed, truncated to 200 Unicode scalar values, with `...` appended
+    /// when truncated; `nil` for a body that was empty or not text.
     public var text: String?
 
     public init(status: UInt16?, text: String? = nil) {
