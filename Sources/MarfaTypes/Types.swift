@@ -13,7 +13,7 @@ public import struct Foundation.Date
 public protocol APIProtocol: Sendable {
     /// Describe the instance
     ///
-    /// Describes the instance: its display name, `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
+    /// Describes the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -636,7 +636,7 @@ public protocol APIProtocol: Sendable {
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes before the request starts.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -664,7 +664,7 @@ public protocol APIProtocol: Sendable {
     func getOwner(_ input: Operations.GetOwner.Input) async throws -> Operations.GetOwner.Output
     /// Claim the instance
     ///
-    /// Creates the one owner using a machine-issued setup code or setup-only browser session. The claim, consumed proof, and audit commit together. A claimed instance never reopens setup.
+    /// Creates the one owner using a machine-issued setup code or setup-only browser session. A claimed instance never reopens setup. A claim from the instance's own origin, which the setup page sends, also signs the owner in with a session cookie.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -692,7 +692,7 @@ public protocol APIProtocol: Sendable {
     func updateSignIn(_ input: Operations.UpdateSignIn.Input) async throws -> Operations.UpdateSignIn.Output
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't make another request, and an app can't refresh its tokens. The keys an app minted stay unless `revoke_keys` is `true`. Requires the owner's browser session, signed in within five minutes, or the local command.
+    /// Ends a sign-in at once: it can't refresh or make another request. An app's keys stay unless `revoke_keys` is `true`. Needs the owner's browser session or the local command. A browser over five minutes old can end only itself, without `revoke_keys`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
@@ -815,7 +815,7 @@ public protocol APIProtocol: Sendable {
 extension APIProtocol {
     /// Describe the instance
     ///
-    /// Describes the instance: its display name, `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
+    /// Describes the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -2154,7 +2154,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes before the request starts.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -2202,7 +2202,7 @@ extension APIProtocol {
     }
     /// Claim the instance
     ///
-    /// Creates the one owner using a machine-issued setup code or setup-only browser session. The claim, consumed proof, and audit commit together. A claimed instance never reopens setup.
+    /// Creates the one owner using a machine-issued setup code or setup-only browser session. A claimed instance never reopens setup. A claim from the instance's own origin, which the setup page sends, also signs the owner in with a session cookie.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -2258,7 +2258,7 @@ extension APIProtocol {
     }
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't make another request, and an app can't refresh its tokens. The keys an app minted stay unless `revoke_keys` is `true`. Requires the owner's browser session, signed in within five minutes, or the local command.
+    /// Ends a sign-in at once: it can't refresh or make another request. An app's keys stay unless `revoke_keys` is `true`. Needs the owner's browser session or the local command. A browser over five minutes old can end only itself, without `revoke_keys`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.

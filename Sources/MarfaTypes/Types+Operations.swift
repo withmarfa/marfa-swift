@@ -13,7 +13,7 @@ public import struct Foundation.Date
 public enum Operations {
     /// Describe the instance
     ///
-    /// Describes the instance: its display name, `instance_id`, the build it runs, the contract version it speaks and the features it serves. Needs no credential.
+    /// Describes the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks and the features it serves. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -2455,12 +2455,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/POST/responses/404/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/POST/responses/404/content/application\/json`.
-                    case json(Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal)
+                    case json(Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgeTypeNotFoundOrItemNotFoundRefusal {
+                    public var json: Components.Schemas.BlobNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -2486,6 +2486,7 @@ public enum Operations {
             }
             /// - `edge_type_not_found`: an edge names an edge type that doesn't exist.
             /// - `item_not_found`: an edge's target doesn't exist, or its type is one you can't read.
+            /// - `blob_not_found`: `blob_ref` names bytes you didn't upload and can't read.
             ///
             /// - Remark: Generated from `#/paths//items/post(createItem)/responses/404`.
             ///
@@ -6646,12 +6647,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/404/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/responses/404/content/application\/json`.
-                    case json(Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal)
+                    case json(Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.EdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal {
+                    public var json: Components.Schemas.BlobNotFoundOrEdgeNotFoundOrEdgeTypeNotFoundOrItemNotFoundRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -6675,9 +6676,10 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `item_not_found`: no item has this ID, its type is one you can't read, or an edge target doesn't exist or has a type you can't read. For an item in the trash, `details.trashed` is `true` if you can read its type.
+            /// - `item_not_found`: no item you can read has this ID or an edge target's ID. For a trashed item, `details.trashed` is `true` if you can read its type.
             /// - `edge_type_not_found`: an edge names an edge type that doesn't exist.
-            /// - `edge_not_found`: a repeat under the `Idempotency-Key` would show an edge you can no longer read.
+            /// - `edge_not_found`: a repeat under the `Idempotency-Key` would show an edge you can't read now.
+            /// - `blob_not_found`: `blob_ref` names bytes you didn't upload and can't read.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)/responses/404`.
             ///
@@ -53714,7 +53716,7 @@ public enum Operations {
                 }
             }
             /// - `forbidden`: you don't have `metadata.types:write`, or the identifier is under `core.*`, `system.*` or `marfa.*`, which no credential can register.
-            /// - `type_not_permitted`: your type map doesn't grant write on the identifier, or on `parent` (`details.grant` names it).
+            /// - `type_not_permitted`: your type map lacks write on the identifier or a non-platform `parent` or `compatible_with` target (`details.grant` names it).
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/403`.
             ///
@@ -56103,9 +56105,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you have neither `schema.write` nor `metadata.types:write`, or the change needs `schema.write`, such as adding a field some item already holds a value under. `details.changes` lists what needs it.
+            /// - `forbidden`: you lack `schema.write` and `metadata.types:write`, or `details.changes` names changes needing `schema.write`.
             /// - `core_type_immutable`: Marfa ships this type.
-            /// - `type_not_permitted`: your type map doesn't grant write on the type or a new `parent` (`details.grant` names it).
+            /// - `type_not_permitted`: your type map lacks write on the type or a new non-platform `parent` or `compatible_with` target (`details.grant` names it).
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)/responses/403`.
             ///
@@ -56565,7 +56567,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `compatible_with_violation`: `compatible_with` names a type this instance doesn't hold, or one the type doesn't satisfy.
+            /// `compatible_with_violation`: `compatible_with` names a type this instance doesn't hold, or one the type doesn't satisfy, or the change breaks another type's claim (`details.dependent_type_ids`).
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)/responses/422`.
             ///
@@ -57088,21 +57090,21 @@ public enum Operations {
             public var path: Operations.DeleteType.Input.Path
             /// - Remark: Generated from `#/paths/types/{id}/DELETE/query`.
             public struct Query: Sendable, Hashable {
-                /// Delete the type even if items of it exist, in any state. It doesn't cover a type that has subtypes.
+                /// Delete the type even if items of it exist, in any state. It doesn't cover subtypes or compatibility dependents.
                 ///
                 /// - Remark: Generated from `#/paths/types/{id}/DELETE/query/force`.
                 @frozen public enum ForcePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case _true = "true"
                     case _false = "false"
                 }
-                /// Delete the type even if items of it exist, in any state. It doesn't cover a type that has subtypes.
+                /// Delete the type even if items of it exist, in any state. It doesn't cover subtypes or compatibility dependents.
                 ///
                 /// - Remark: Generated from `#/paths/types/{id}/DELETE/query/force`.
                 public var force: Operations.DeleteType.Input.Query.ForcePayload?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - force: Delete the type even if items of it exist, in any state. It doesn't cover a type that has subtypes.
+                ///   - force: Delete the type even if items of it exist, in any state. It doesn't cover subtypes or compatibility dependents.
                 public init(force: Operations.DeleteType.Input.Query.ForcePayload? = nil) {
                     self.force = force
                 }
@@ -57924,6 +57926,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "contentTooLarge",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct UnprocessableContent: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.DeleteType.Output.UnprocessableContent.Headers
+                /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/content/application\/json`.
+                    case json(Components.Schemas.CompatibleWithViolationRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteType.Output.UnprocessableContent.Body
+                /// Creates a new `UnprocessableContent`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.DeleteType.Output.UnprocessableContent.Headers = .init(),
+                    body: Operations.DeleteType.Output.UnprocessableContent.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `compatible_with_violation`: other types name this type in `compatible_with`. `details.dependent_type_ids` lists them. Remove their claims before deleting the target; `force=true` does not bypass this check.
+            ///
+            /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/422`.
+            ///
+            /// HTTP response code: `422 unprocessableContent`.
+            case unprocessableContent(Operations.DeleteType.Output.UnprocessableContent)
+            /// The associated value of the enum case if `self` is `.unprocessableContent`.
+            ///
+            /// - Throws: An error if `self` is not `.unprocessableContent`.
+            /// - SeeAlso: `.unprocessableContent`.
+            public var unprocessableContent: Operations.DeleteType.Output.UnprocessableContent {
+                get throws {
+                    switch self {
+                    case let .unprocessableContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unprocessableContent",
                             response: self
                         )
                     }
@@ -63056,6 +63167,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct RequestTimeout: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.UploadBlob.Output.RequestTimeout.Headers
+                /// - Remark: Generated from `#/paths/blobs/POST/responses/408/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/blobs/POST/responses/408/content/application\/json`.
+                    case json(Components.Schemas.RequestTimeoutRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RequestTimeoutRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UploadBlob.Output.RequestTimeout.Body
+                /// Creates a new `RequestTimeout`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.UploadBlob.Output.RequestTimeout.Headers = .init(),
+                    body: Operations.UploadBlob.Output.RequestTimeout.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `request_timeout`: no bytes arrived for 60 seconds, or for the time `MARFA_UPLOAD_IDLE_TIMEOUT_MS` sets. Marfa stores nothing. An upload has no other time limit while bytes keep arriving.
+            ///
+            /// - Remark: Generated from `#/paths//blobs/post(uploadBlob)/responses/408`.
+            ///
+            /// HTTP response code: `408 requestTimeout`.
+            case requestTimeout(Operations.UploadBlob.Output.RequestTimeout)
+            /// The associated value of the enum case if `self` is `.requestTimeout`.
+            ///
+            /// - Throws: An error if `self` is not `.requestTimeout`.
+            /// - SeeAlso: `.requestTimeout`.
+            public var requestTimeout: Operations.UploadBlob.Output.RequestTimeout {
+                get throws {
+                    switch self {
+                    case let .requestTimeout(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "requestTimeout",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct Conflict: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/blobs/POST/responses/409/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -66656,12 +66876,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/503/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/blobs/{hash}/GET/responses/503/content/application\/json`.
-                    case json(Components.Schemas.WriteContentionRefusal)
+                    case json(Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.WriteContentionRefusal {
+                    public var json: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -66685,7 +66905,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
+            /// - `blob_store_unavailable`: no store that holds this blob answered, so Marfa couldn't tell whether it still has the bytes. Try again later.
+            /// - `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)/responses/503`.
             ///
@@ -110605,7 +110826,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: this operation requires its explicit permission or direct owner or local authority. `details.required_scope` names it.
+            /// - `forbidden`: you hold neither `keys.manage` nor `keys.mint` and aren't the owner or local command, or you're the owner and your browser session signed in more than five minutes ago. `details.required_scope` names a missing permission.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)/responses/403`.
             ///
@@ -113671,7 +113892,7 @@ public enum Operations {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes before the request starts.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -113814,6 +114035,10 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/blobs_imported`.
                         public var blobsImported: Swift.Double
+                        /// The hashes of the blobs the archive names but doesn't carry with matching bytes, and that Marfa holds no copy of. Upload their bytes again with `POST /blobs` to restore them.
+                        ///
+                        /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/blobs_missing`.
+                        public var blobsMissing: [Swift.String]
                         /// How many types Marfa registered.
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/types_registered`.
@@ -113839,6 +114064,7 @@ public enum Operations {
                         ///   - edgesSkipped: How many edges Marfa skipped.
                         ///   - edgesSkippedReasons: How many edges Marfa skipped for each reason, such as `endpoint_missing` or `already_present`.
                         ///   - blobsImported: How many blobs the archive carried whose bytes match their hash, whether or not the instance already had them.
+                        ///   - blobsMissing: The hashes of the blobs the archive names but doesn't carry with matching bytes, and that Marfa holds no copy of. Upload their bytes again with `POST /blobs` to restore them.
                         ///   - typesRegistered: How many types Marfa registered.
                         ///   - typesSkipped: How many types Marfa skipped because the instance already registers them identically.
                         ///   - edgeTypesRegistered: How many edge types Marfa registered.
@@ -113850,6 +114076,7 @@ public enum Operations {
                             edgesSkipped: Swift.Double,
                             edgesSkippedReasons: Operations.RestoreArchive.Output.Ok.Body.JsonPayload.EdgesSkippedReasonsPayload,
                             blobsImported: Swift.Double,
+                            blobsMissing: [Swift.String],
                             typesRegistered: Swift.Double,
                             typesSkipped: Swift.Double,
                             edgeTypesRegistered: Swift.Double,
@@ -113861,6 +114088,7 @@ public enum Operations {
                             self.edgesSkipped = edgesSkipped
                             self.edgesSkippedReasons = edgesSkippedReasons
                             self.blobsImported = blobsImported
+                            self.blobsMissing = blobsMissing
                             self.typesRegistered = typesRegistered
                             self.typesSkipped = typesSkipped
                             self.edgeTypesRegistered = edgeTypesRegistered
@@ -113873,6 +114101,7 @@ public enum Operations {
                             case edgesSkipped = "edges_skipped"
                             case edgesSkippedReasons = "edges_skipped_reasons"
                             case blobsImported = "blobs_imported"
+                            case blobsMissing = "blobs_missing"
                             case typesRegistered = "types_registered"
                             case typesSkipped = "types_skipped"
                             case edgeTypesRegistered = "edge_types_registered"
@@ -113909,7 +114138,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the counts. Items and edges keep their IDs, versions and dates, and items keep their tags, extensions and history. Marfa restores an edge whether or not its properties fit its edge type's `property_schema`. Marfa leaves an existing item as it is when an archived one has its ID, natural key or link. An archive holds no keys, webhooks, configuration or tombstones.
+            /// Returns the counts. Items and edges keep their IDs, versions and dates, and items keep their tags, extensions and history. Marfa restores an edge, and an item of a type you registered, as archived, even if its type now refuses it or is gone. Marfa leaves an existing item as it is when an archived one has its ID, natural key or link. An archive holds no keys, webhooks, configuration or tombstones.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/200`.
             ///
@@ -114018,9 +114247,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body isn't a valid archive, or is at another format version, repeats an entry, has an invalid row, or has a file over 64 MiB.
-            /// - `invalid_properties`: an item sets a property its type doesn't declare, and `strict_mode` names that type.
-            /// - `invalid_schema`: an archived type is invalid or carries a key the schema doesn't define.
+            /// - `validation_error`: the body isn't a valid archive, lacks one of its four files (`details.entries`), repeats an entry, is at another version, has an invalid row, or has a file over 64 MiB.
+            /// - `invalid_properties`: a `core` or `system` item breaks its type, an event's schedule can't unfold, or `strict_mode` refuses a property.
+            /// - `invalid_schema`: an archived type is invalid or has an unknown key.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/400`.
             ///
@@ -114238,7 +114467,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Requires direct owner or local authority and recent owner authentication.
+            /// Requires direct owner or local authority, and an owner who signed in within five minutes before the request started, however long the upload takes.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/403`.
             ///
@@ -114256,6 +114485,115 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct RequestTimeout: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.RestoreArchive.Output.RequestTimeout.Headers
+                /// - Remark: Generated from `#/paths/restore/POST/responses/408/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/restore/POST/responses/408/content/application\/json`.
+                    case json(Components.Schemas.RequestTimeoutRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RequestTimeoutRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RestoreArchive.Output.RequestTimeout.Body
+                /// Creates a new `RequestTimeout`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.RestoreArchive.Output.RequestTimeout.Headers = .init(),
+                    body: Operations.RestoreArchive.Output.RequestTimeout.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `request_timeout`: no bytes of the archive arrived for 60 seconds, or for the time `MARFA_UPLOAD_IDLE_TIMEOUT_MS` sets. Nothing was written. An upload has no other time limit while bytes keep arriving.
+            ///
+            /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/408`.
+            ///
+            /// HTTP response code: `408 requestTimeout`.
+            case requestTimeout(Operations.RestoreArchive.Output.RequestTimeout)
+            /// The associated value of the enum case if `self` is `.requestTimeout`.
+            ///
+            /// - Throws: An error if `self` is not `.requestTimeout`.
+            /// - SeeAlso: `.requestTimeout`.
+            public var requestTimeout: Operations.RestoreArchive.Output.RequestTimeout {
+                get throws {
+                    switch self {
+                    case let .requestTimeout(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "requestTimeout",
                             response: self
                         )
                     }
@@ -114786,12 +115124,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/restore/POST/responses/503/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/restore/POST/responses/503/content/application\/json`.
-                    case json(Components.Schemas.WriteContentionRefusal)
+                    case json(Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.WriteContentionRefusal {
+                    public var json: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -114815,7 +115153,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
+            /// - `blob_store_unavailable`: a blob store failed, or didn't answer in time, while Marfa checked a blob's copy. Nothing was written. Try again later.
+            /// - `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/503`.
             ///
@@ -116663,7 +117002,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `conflict`: the type isn't one this build stopped shipping, items still carry it, or another type inherits from it (`details.child_types` lists them).
+            /// `conflict`: the type isn't one this build stopped shipping, items still carry it, another type inherits from it (`details.child_types`), or another type declares compatibility with it (`details.dependent_type_ids`).
             ///
             /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deletePlatformType)/responses/409`.
             ///
@@ -118292,7 +118631,7 @@ public enum Operations {
     }
     /// Claim the instance
     ///
-    /// Creates the one owner using a machine-issued setup code or setup-only browser session. The claim, consumed proof, and audit commit together. A claimed instance never reopens setup.
+    /// Creates the one owner using a machine-issued setup code or setup-only browser session. A claimed instance never reopens setup. A claim from the instance's own origin, which the setup page sends, also signs the owner in with a session cookie.
     ///
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
@@ -118466,7 +118805,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// The new owner can sign in.
+            /// The new owner can sign in. A claim from the instance's own origin also sets the owner session cookie, unless the sign-in that follows the claim fails. A claim with no `Origin` header, such as a script's, sets none.
             ///
             /// - Remark: Generated from `#/paths//owner/post(createOwner)/responses/201`.
             ///
@@ -122729,7 +123068,7 @@ public enum Operations {
     }
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't make another request, and an app can't refresh its tokens. The keys an app minted stay unless `revoke_keys` is `true`. Requires the owner's browser session, signed in within five minutes, or the local command.
+    /// Ends a sign-in at once: it can't refresh or make another request. An app's keys stay unless `revoke_keys` is `true`. Needs the owner's browser session or the local command. A browser over five minutes old can end only itself, without `revoke_keys`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
@@ -123217,7 +123556,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: the request carries a key or an app's token rather than the owner's browser session or the local command's authority, or the browser signed in more than five minutes ago.
+            /// - `forbidden`: the request carries a key or an app's token rather than the owner's browser session or the local command's authority, or the browser signed in more than five minutes ago and the ID names another sign-in or `revoke_keys` is `true`.
             ///
             /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)/responses/403`.
             ///
@@ -128857,14 +129196,14 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/export/GET/query/occurred_before`.
                 public var occurredBefore: Swift.String?
-                /// `ndjson` for lines of JSON, or `archive` for a `.tar.gz` file that `POST /restore` reads. Defaults to `ndjson`.
+                /// `ndjson` for lines of JSON, or `archive` for a `.tar.gz` file that `POST /restore` reads. Defaults to `ndjson`. An archive's `manifest.json` lists in `missing_blobs` each blob no store could read, which the archive doesn't hold.
                 ///
                 /// - Remark: Generated from `#/paths/export/GET/query/format`.
                 @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case ndjson = "ndjson"
                     case archive = "archive"
                 }
-                /// `ndjson` for lines of JSON, or `archive` for a `.tar.gz` file that `POST /restore` reads. Defaults to `ndjson`.
+                /// `ndjson` for lines of JSON, or `archive` for a `.tar.gz` file that `POST /restore` reads. Defaults to `ndjson`. An archive's `manifest.json` lists in `missing_blobs` each blob no store could read, which the archive doesn't hold.
                 ///
                 /// - Remark: Generated from `#/paths/export/GET/query/format`.
                 public var format: Operations.ExportData.Input.Query.FormatPayload?
@@ -128876,7 +129215,7 @@ public enum Operations {
                 ///   - source: Only export items stamped with this source.
                 ///   - occurredAfter: Only export items whose own time (`occurred_at`, else `created_at`) is after this time.
                 ///   - occurredBefore: Only export items whose own time (`occurred_at`, else `created_at`) is before this time.
-                ///   - format: `ndjson` for lines of JSON, or `archive` for a `.tar.gz` file that `POST /restore` reads. Defaults to `ndjson`.
+                ///   - format: `ndjson` for lines of JSON, or `archive` for a `.tar.gz` file that `POST /restore` reads. Defaults to `ndjson`. An archive's `manifest.json` lists in `missing_blobs` each blob no store could read, which the archive doesn't hold.
                 public init(
                     _type: Swift.String? = nil,
                     state: Swift.String? = nil,
@@ -129023,7 +129362,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// With `format=ndjson`, one JSON object per line: `item` and `metadata` for each item, then `edge` for each edge between them whose type you can read. With `format=archive`, a `.tar.gz` of the items with the history you can read, the edges, the type registrations and the blobs they reference that you can read. If an archive fails partway, the connection ends early and the file won't unpack.
+            /// With `format=ndjson`, one JSON object per line: `item` and `metadata` for each item, then `edge` for each edge between them whose type you can read. With `format=archive`, a `.tar.gz` of the items, history, edges, type registrations and blobs you can read. If the export fails partway or your credential ends or narrows below it, the connection ends early and an archive won't unpack.
             ///
             /// - Remark: Generated from `#/paths//export/get(exportData)/responses/200`.
             ///
@@ -129374,6 +129713,115 @@ public enum Operations {
                     }
                 }
             }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/export/GET/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/headers/X-RateLimit-Limit`.
+                    public var xRateLimitLimit: Components.Headers.XRateLimitLimit?
+                    /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/headers/X-RateLimit-Remaining`.
+                    public var xRateLimitRemaining: Components.Headers.XRateLimitRemaining?
+                    /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/headers/X-RateLimit-Reset`.
+                    public var xRateLimitReset: Components.Headers.XRateLimitReset?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
+                    ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
+                    ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
+                        xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
+                        xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xRateLimitLimit = xRateLimitLimit
+                        self.xRateLimitRemaining = xRateLimitRemaining
+                        self.xRateLimitReset = xRateLimitReset
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.ExportData.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/export/GET/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/export/GET/responses/409/content/application\/json`.
+                    case json(Components.Schemas.ExportRowsUnrestorableRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ExportRowsUnrestorableRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ExportData.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.ExportData.Output.Conflict.Headers = .init(),
+                    body: Operations.ExportData.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `export_rows_unrestorable`: with `format=archive`, Marfa read the selection twice, and both times a restore would refuse or skip the same row, which was unchanged between the reads, so no archive was sent. `details.row` names the row by `kind`, `id`, `type` and `field`, with the `code` a restore refuses it with or the reason it skips it. Correct the row or its type, then export again.
+            ///
+            /// - Remark: Generated from `#/paths//export/get(exportData)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.ExportData.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.ExportData.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/export/GET/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -129656,12 +130104,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/export/GET/responses/503/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/export/GET/responses/503/content/application\/json`.
-                    case json(Components.Schemas.WriteContentionRefusal)
+                    case json(Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.WriteContentionRefusal {
+                    public var json: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -129685,7 +130133,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again.
+            /// - `blob_store_unavailable`: a blob store failed, or didn't answer in time, while Marfa checked a blob's copy. Try again later.
+            /// - `write_contention`: the database was busy. Nothing changed. Try the request again.
+            /// - `export_unrestorable`: with `format=archive`, writes changed a row that a restore would refuse, or its type, between two reads. No archive was sent. Retry the export.
             ///
             /// - Remark: Generated from `#/paths//export/get(exportData)/responses/503`.
             ///
@@ -133209,7 +133659,7 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/webhooks/POST/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address, which Marfa checks again at each delivery.
+                    /// The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address: Marfa refuses a URL whose host resolves to a private one, and checks again at each delivery.
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/POST/requestBody/json/url`.
                     public var url: Swift.String
@@ -133245,7 +133695,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - url: The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address, which Marfa checks again at each delivery.
+                    ///   - url: The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address: Marfa refuses a URL whose host resolves to a private one, and checks again at each delivery.
                     ///   - events: The events to send. Name each one: there's no wildcard.
                     ///   - typeFilter: Send item events only for this type and its subtypes, such as `core.media`, or for every type a pattern such as `app.*` matches. The type needn't be registered. Edge events aren't filtered. Leave it out, blank or `null` for every type.
                     ///   - secret: The key Marfa signs each delivery with. Leave it out for Marfa to generate one.
@@ -135522,7 +135972,7 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address, which Marfa checks again at each delivery.
+                    /// The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address: Marfa refuses a URL whose host resolves to a private one, and checks again at each delivery.
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/json/url`.
                     public var url: Swift.String?
@@ -135558,7 +136008,7 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - url: The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address, which Marfa checks again at each delivery.
+                    ///   - url: The URL Marfa posts events to: `http` or `https`, with no user name or password. Unless the instance allows private addresses, it must reach a public address: Marfa refuses a URL whose host resolves to a private one, and checks again at each delivery.
                     ///   - events: The events to send. Name each one: there's no wildcard.
                     ///   - typeFilter: Send item events only for this type and its subtypes, such as `core.media`, or for every type a pattern such as `app.*` matches. The type needn't be registered. Edge events aren't filtered. Blank or `null` removes it.
                     ///   - active: `false` stops sending events and cancels pending deliveries. `true` starts again.
