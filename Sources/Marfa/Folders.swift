@@ -595,8 +595,8 @@ public struct FolderScan: Sendable, Hashable {
     public let renamed: UInt64
     /// Files whose bytes are as they were and have no write waiting.
     public let unchanged: UInt64
-    /// Files whose bytes are as they were but whose create or edit the server hasn't answered yet, not
-    /// counted in `unchanged`.
+    /// Files whose bytes are as they were but whose create or edit the server hasn't answered yet. Not counted in
+    /// `unchanged`.
     public let waiting: UInt64
     public let missing: UInt64
     public let deleted: UInt64
