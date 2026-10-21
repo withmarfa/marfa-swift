@@ -19,7 +19,8 @@ final class RenewalLease: Sendable {
     private struct State {
         /// The label the lease item carries, as far as this holder knows.
         var label: String
-        /// Whether moving the lapse on failed, so another holder may have taken the lease since.
+        /// Whether the lease item was found gone or relabeled when this holder moved the lapse on, so another
+        /// holder may have taken it since.
         var lost = false
         var released = false
         var beat: (any DispatchSourceTimer)?
@@ -103,9 +104,15 @@ final class RenewalLease: Sendable {
         state.withLock { state in
             guard !state.released, !state.lost else { return }
             let moved = Self.label(lapsingIn: lifetime)
-            let kept =
-                (try? place.keychain.relabel(
-                    from: state.label, to: moved, service: place.service, account: place.leaseAccount)) ?? false
+            let kept: Bool
+            do {
+                kept = try place.keychain.relabel(
+                    from: state.label, to: moved, service: place.service, account: place.leaseAccount)
+            } catch {
+                // A keychain that failed for a moment proves nothing about who holds the lease; the next beat
+                // tries again, and the lapse in the label still bounds how long this holder may write.
+                return
+            }
             if kept {
                 state.label = moved
             } else {

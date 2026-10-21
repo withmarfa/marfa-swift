@@ -104,8 +104,9 @@ final class TokenRenewer: CredentialRenewer {
     /// What a renewal's answer comes to, and the keychain written to match.
     ///
     /// The kept sign-in is written, or deleted, only while this renewal still holds the lease and the kept
-    /// refresh token is still the one it sent. Otherwise another holder has written since, and the token the
-    /// keychain holds now is the answer.
+    /// refresh token is still the one it sent. Otherwise, where another holder has written since, the token the
+    /// keychain holds now is the answer, and where the keychain still holds the sent refresh token, the renewal
+    /// is unavailable rather than answering the token the server refused.
     private static func settle(
         _ answered: Result<Answer, any Error>, sent: String, kept: KeptSignIn, place: SignInPlace,
         lease: RenewalLease
@@ -163,6 +164,11 @@ final class TokenRenewer: CredentialRenewer {
             if let decided = decided ?? nil { return decided }
             guard let current = try place.read() else {
                 return .failure(.Ended(message: "the app is no longer signed in to \(place.account)"))
+            }
+            // The lease was lost with the sent refresh token still kept, so nothing renewed the sign-in and its
+            // access token is the one the server refused.
+            guard current.refreshToken != sent else {
+                return .failure(.Unavailable(message: "the renewal of the sign-in to \(place.account) lost its lease"))
             }
             return .success(current.accessToken)
         } catch {

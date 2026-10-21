@@ -62,6 +62,33 @@ extension KeptSignIn {
     }
 }
 
+/// Keychain errors a test turns on for one account's lookups, as a keychain that fails for a moment does.
+private final class KeychainFault: Sendable {
+    private let left = Mutex(0)
+
+    /// Fails the next `count` lookups.
+    func fail(_ count: Int = .max) { left.withLock { $0 = count } }
+    func stop() { left.withLock { $0 = 0 } }
+
+    fileprivate func take() -> Bool {
+        left.withLock { left in
+            guard left > 0 else { return false }
+            left -= 1
+            return true
+        }
+    }
+
+    /// `keychain`, the same place, failing lookups of `account` while the fault is on. Adding an item never fails.
+    func on(_ keychain: Keychain, account: String) -> Keychain {
+        Keychain(identity: keychain.identity) { query, forNewItem in
+            if !forNewItem, query[kSecAttrAccount] as? String == account, self.take() {
+                throw Keychain.Failure(status: errSecInteractionNotAllowed)
+            }
+            try keychain.narrow(&query, forNewItem)
+        }
+    }
+}
+
 /// Runs `renew` off the main thread, as the core does.
 private func renew(_ credential: Credential, refused: String) async throws -> String {
     let renewer = TokenRenewer(credential)
@@ -551,7 +578,12 @@ struct TokenRenewal {
                         #expect(renewed == "at-9", "\(change)")
                         #expect(try place.read() == renewedElsewhere, "\(change)")
                     default:
-                        #expect(renewed == "at-1", "\(change)")
+                        // The refused token is never handed back as if it were renewed.
+                        if case RenewalError.Unavailable? = failure as? RenewalError {
+                        } else {
+                            Issue.record(
+                                "\(change): renewed \(String(describing: renewed)), \(String(describing: failure))")
+                        }
                         #expect(try place.read() == original, "\(change)")
                     }
                     if change == "lease taken" {
@@ -559,6 +591,28 @@ struct TokenRenewal {
                     }
                 }
             }
+        }
+    }
+
+    @Test func aKeychainErrorWhileTheLeaseIsMovedOnKeepsTheRenewedSignIn() async throws {
+        let server = ScriptedAuthServer()
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            var transport = server.transport()
+            transport.timeLimit = .seconds(3)
+            let (authorization, _) = try signedIn(server, keychain, transport: transport)
+            let place = authorization.place
+            let faulty = try Authorization(
+                server: server.url, client: client, keychain: fault.on(keychain, account: place.leaseAccount),
+                service: service, transport: transport)
+            let credential = try #require(try faulty.credential())
+            // While the request is out, the lease's next move fails once; it outlasts a third of the lifetime.
+            marfa(server) { _ in
+                fault.fail(1)
+                return .delayed(.milliseconds(500), tokens("at-2", "rt-2"))
+            }
+            #expect(try await renew(credential, refused: "at-1") == "at-2")
+            #expect(try place.read()?.refreshToken == "rt-2")
         }
     }
 
