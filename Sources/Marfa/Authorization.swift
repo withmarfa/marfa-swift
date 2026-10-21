@@ -79,7 +79,9 @@ public struct Authorization: Sendable {
     ///
     /// Throws ``SignInError/canceled`` when the person closes the browser, ``SignInError/denied`` when they
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
-    /// ask for, and ``SignInError/noRedirect`` when the client names no redirect.
+    /// ask for, ``SignInError/noRedirect`` when the client names no redirect, and
+    /// ``SignInError/unavailable(message:)`` when another process sharing the keychain holds the sign-in too long to keep the approval, after which the
+    /// approved grant is revoked at the server.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -177,7 +179,9 @@ public struct Authorization: Sendable {
     /// token at the server, which ends the app's grant there.
     ///
     /// Answers whether the server confirmed the revocation. The keychain no longer holds the sign-in either
-    /// way; on `false`, the grant stands at the server until the owner revokes it.
+    /// way; on `false`, the grant stands at the server until the owner revokes it. Throws
+    /// ``SignInError/unavailable(message:)``, changing nothing, when another process sharing the keychain
+    /// holds the sign-in too long.
     @discardableResult
     public func signOut() async throws -> Bool {
         let place = place
@@ -189,7 +193,14 @@ public struct Authorization: Sendable {
                 return kept
             }
         }
-        guard let kept, let revocation = kept.revocationEndpoint else { return false }
+        guard let kept else { return false }
+        return await revoke(kept)
+    }
+
+    /// Revokes the sign-in's refresh token at the server, which ends the app's grant there, or its access
+    /// token where it holds no refresh token. Answers whether the server confirmed it.
+    private func revoke(_ kept: KeptSignIn) async -> Bool {
+        guard let revocation = kept.revocationEndpoint else { return false }
         let (token, hint) =
             kept.refreshToken.map { ($0, "refresh_token") } ?? (kept.accessToken, "access_token")
         do {
@@ -259,7 +270,13 @@ public struct Authorization: Sendable {
             tokenEndpoint: discovery.tokenEndpoint, revocationEndpoint: discovery.revocationEndpoint)
         let place = place
         let transport = transport
-        try await background { try place.exclusively(transport) { try place.keep(kept) } }
+        do {
+            try await background { try place.exclusively(transport) { try place.keep(kept) } }
+        } catch {
+            // The person approved a grant the app cannot use; ending it keeps it from standing at the server.
+            _ = await revoke(kept)
+            throw error
+        }
         return Credential(place: place, kept: kept, transport: transport)
     }
 }
@@ -291,8 +308,10 @@ public struct DeviceSignIn: Sendable {
     /// When the server cannot be reached or fails with a 5xx status, it doubles the interval and keeps
     /// asking, as RFC 8628 section 3.5 recommends, until the code expires.
     ///
-    /// Throws ``SignInError/denied`` when the person declines and ``SignInError/expired`` once the code
-    /// expires. Cancel the task to stop waiting; it throws `CancellationError`.
+    /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
+    /// expires, and ``SignInError/unavailable(message:)`` when another process sharing the keychain holds the sign-in too long to keep the approval, after which the
+    /// approved grant is revoked at the server.
+    /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
         var interval = polling.interval

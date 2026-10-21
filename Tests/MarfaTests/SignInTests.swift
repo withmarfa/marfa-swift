@@ -89,6 +89,14 @@ private final class KeychainFault: Sendable {
     }
 }
 
+/// Takes `place`'s lease as another process sharing its keychain would, with no lock of this process shared.
+private func heldElsewhere(_ place: SignInPlace, _ transport: SignInTransport) async throws -> RenewalLease {
+    let other = SignInPlace(keychain: Keychain(narrow: place.keychain.narrow), service: place.service, account: place.account)
+    return try await background { try RenewalLease.take(other, transport) }
+}
+
+private let leaseHeldElsewhere = SignInError.unavailable(message: "another process is using the sign-in")
+
 /// Runs `renew` off the main thread, as the core does.
 private func renew(_ credential: Credential, refused: String) async throws -> String {
     let renewer = TokenRenewer(credential)
@@ -270,6 +278,8 @@ struct DeviceSignInPolling {
                         "verification_uri_complete": "\(origin)/auth/device?user_code=ABCD-EFGH",
                         "expires_in": expiresIn, "interval": 5,
                     ])
+            case "/auth/oauth2/revoke":
+                return .json(200, [:])
             case "/auth/oauth2/token":
                 return polls(
                     count.withLock {
@@ -315,6 +325,23 @@ struct DeviceSignInPolling {
             let registered = try #require(server.requests(to: "/auth/oauth2/register").first).json
             #expect(registered["redirect_uris"] == nil)
             #expect(registered["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
+        }
+    }
+
+    @Test func anApprovalThatCannotBeKeptIsRevokedRatherThanLeftStanding() async throws {
+        let server = deviceServer { _ in tokens("at-1", "rt-1") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = server.transport()
+            let authorization = try Authorization(
+                server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: transport)
+            let started = try await authorization.startDeviceSignIn()
+            let held = try await heldElsewhere(authorization.place, transport)
+            defer { held.release() }
+            await #expect(throws: leaseHeldElsewhere) { try await started.credential() }
+            #expect(try authorization.place.read() == nil)
+            let revoked = try #require(server.requests(to: "/auth/oauth2/revoke").first).form
+            #expect(revoked == ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"])
         }
     }
 
@@ -714,6 +741,20 @@ struct SigningOut {
             #expect(try authorization.place.read() == nil)
             let revoked = try #require(server.requests(to: "/auth/oauth2/revoke").first).form
             #expect(revoked == ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"])
+        }
+    }
+
+    @Test func aSignOutThatCannotTakeTheLeaseSaysSoAndChangesNothing() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(200, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = server.transport()
+            let (authorization, _) = try signedIn(server, keychain, transport: transport)
+            let held = try await heldElsewhere(authorization.place, transport)
+            defer { held.release() }
+            await #expect(throws: leaseHeldElsewhere) { try await authorization.signOut() }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            #expect(server.requests(to: "/auth/oauth2/revoke").isEmpty)
         }
     }
 
