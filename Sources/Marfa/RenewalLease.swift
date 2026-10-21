@@ -33,6 +33,7 @@ final class RenewalLease: Sendable {
     private let place: SignInPlace
     private let lifetime: Duration
     private let clock: @Sendable () -> UInt64
+    private let poll: Duration
     private let gate: DispatchSemaphore
     private let state: Mutex<State>
 
@@ -40,6 +41,7 @@ final class RenewalLease: Sendable {
         self.place = place
         lifetime = transport.leaseLifetime
         clock = transport.leaseClock
+        poll = transport.leasePoll
         self.gate = gate
         state = Mutex(State(label: label))
         let beat = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
@@ -86,13 +88,30 @@ final class RenewalLease: Sendable {
     /// A lease that lapsed but that no other holder took is still this holder's, so the work runs. Another
     /// holder cannot take it while `work` runs, since a full lifetime is left and the heartbeat waits.
     ///
-    /// Throws, writing nothing, when the keychain fails to move the lapse on: that proves nothing about who
-    /// holds the lease, so this holder is not marked as having lost it.
+    /// A keychain error while moving the lapse on proves nothing about who holds the lease, so this holder is
+    /// not marked as having lost it. The caller may hold an answer the server spent a refresh token on, so the
+    /// move is tried again, at least once and for as long as the heartbeat waits between beats, blocking the
+    /// calling thread. Throws, writing nothing, if the keychain still fails then.
     func whileHeld<T>(_ work: () throws -> T) throws -> T? {
-        try state.withLock { state in
-            guard !state.released, !state.lost else { return nil }
-            guard try moveLapseOn(&state) else { return nil }
-            return try work()
+        let giveUp = DispatchTime.now() + (lifetime / 3).seconds
+        var triedAgain = false
+        while true {
+            let attempt: Result<T?, any Error> = try state.withLock { state in
+                guard !state.released, !state.lost else { return .success(nil) }
+                do {
+                    guard try moveLapseOn(&state) else { return .success(nil) }
+                } catch {
+                    return .failure(error)
+                }
+                return .success(try work())
+            }
+            switch attempt {
+            case .success(let done): return done
+            case .failure(let error):
+                if triedAgain, DispatchTime.now() >= giveUp { throw error }
+                triedAgain = true
+                Thread.sleep(forTimeInterval: poll.seconds)
+            }
         }
     }
 

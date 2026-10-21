@@ -682,6 +682,22 @@ struct TokenRenewal {
         }
     }
 
+    @Test func aKeychainErrorAsTheRenewalWritesIsTriedAgainAndTheRenewedSignInKept() async throws {
+        let server = ScriptedAuthServer()
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            // No heartbeat falls due before the answer: the renewal's own move of the lapse meets the error.
+            let (place, credential) = try faultyRenewal(server, keychain, server.transport(), fault)
+            marfa(server) { _ in
+                fault.fail(1)
+                return tokens("at-2", "rt-2")
+            }
+            #expect(try await renew(credential, refused: "at-1") == "at-2")
+            #expect(fault.failed == 1)
+            #expect(try place.read()?.refreshToken == "rt-2")
+        }
+    }
+
     @Test func aRenewalAnsweredAfterItsHeartbeatsFailedKeepsTheRenewedSignIn() async throws {
         let server = ScriptedAuthServer()
         let fault = KeychainFault()
