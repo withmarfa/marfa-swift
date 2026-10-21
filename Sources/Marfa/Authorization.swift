@@ -80,8 +80,8 @@ public struct Authorization: Sendable {
     /// Throws ``SignInError/canceled`` when the person closes the browser, ``SignInError/denied`` when they
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
     /// ask for, ``SignInError/noRedirect`` when the client names no redirect, and
-    /// ``SignInError/unavailable(message:)`` when another process sharing the keychain holds the sign-in too long to keep the approval, after which the
-    /// approved grant is revoked at the server.
+    /// ``SignInError/unavailable(message:)`` when another process sharing the keychain holds the sign-in too
+    /// long to keep the approval, after which the approved grant is revoked at the server.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -310,8 +310,8 @@ public struct DeviceSignIn: Sendable {
     /// asking, as RFC 8628 section 3.5 recommends, until the code expires.
     ///
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
-    /// expires, and ``SignInError/unavailable(message:)`` when another process sharing the keychain holds the sign-in too long to keep the approval, after which the
-    /// approved grant is revoked at the server.
+    /// expires, and ``SignInError/unavailable(message:)`` when another process sharing the keychain holds
+    /// the sign-in too long to keep the approval, after which the approved grant is revoked at the server.
     /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
