@@ -78,7 +78,9 @@ private final class KeychainFault: Sendable {
         }
     }
 
-    /// `keychain`, the same place, failing lookups of `account` while the fault is on. Adding an item never fails.
+    /// `keychain`, the same place, failing lookups of `account` while the fault is on.
+    ///
+    /// Adding an item never fails.
     func on(_ keychain: Keychain, account: String) -> Keychain {
         Keychain(identity: keychain.identity) { query, forNewItem in
             if !forNewItem, query[kSecAttrAccount] as? String == account, self.take() {
@@ -89,9 +91,10 @@ private final class KeychainFault: Sendable {
     }
 }
 
-/// Takes `place`'s lease as another process sharing its keychain would, with no lock of this process shared.
+/// Takes the lease on `place` as another process sharing its keychain would, sharing no lock of this one.
 private func heldElsewhere(_ place: SignInPlace, _ transport: SignInTransport) async throws -> RenewalLease {
-    let other = SignInPlace(keychain: Keychain(narrow: place.keychain.narrow), service: place.service, account: place.account)
+    let other = SignInPlace(
+        keychain: Keychain(narrow: place.keychain.narrow), service: place.service, account: place.account)
     return try await background { try RenewalLease.take(other, transport) }
 }
 

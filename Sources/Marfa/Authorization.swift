@@ -197,8 +197,9 @@ public struct Authorization: Sendable {
         return await revoke(kept)
     }
 
-    /// Revokes the sign-in's refresh token at the server, which ends the app's grant there, or its access
-    /// token where it holds no refresh token. Answers whether the server confirmed it.
+    /// Revokes the sign-in at the server, and answers whether the server confirmed it.
+    ///
+    /// Revoking the refresh token ends the app's grant there; a sign-in with none revokes its access token.
     private func revoke(_ kept: KeptSignIn) async -> Bool {
         guard let revocation = kept.revocationEndpoint else { return false }
         let (token, hint) =

@@ -126,9 +126,10 @@ final class RenewalLease: Sendable {
         }
     }
 
-    /// The clock leases are read on, in nanoseconds: `CLOCK_UPTIME_RAW`, which is `mach_absolute_time()`, the
-    /// clock Dispatch runs the heartbeat on. It is the same in every process, stops while the device sleeps
-    /// and starts again at boot.
+    /// The clock leases are read on, in nanoseconds.
+    ///
+    /// `CLOCK_UPTIME_RAW` is `mach_absolute_time()`, the clock Dispatch runs the heartbeat on. It is the same
+    /// in every process, stops while the device sleeps and starts again at boot.
     static func now() -> UInt64 { clock_gettime_nsec_np(CLOCK_UPTIME_RAW) }
 
     /// This boot's identifier, so a lease written before a restart, on a clock that has since started again,
