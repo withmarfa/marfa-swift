@@ -70,8 +70,12 @@ An app that people install signs in to their instance instead of asking them for
            scopes: ["core.note:read", "core.note:write"]),
        service: "com.example.notes")
 
-   let credential = try await authorization.credential()
-       ?? authorization.signIn(presentingFrom: window)
+   let credential: Credential
+   if let kept = try authorization.credential() {
+       credential = kept
+   } else {
+       credential = try await authorization.signIn(presentingFrom: window)
+   }
    let server = try Server(url: serverURL, credential: credential)
    let copy = try await WorkingCopy.open(store: storeURL, server: server)
    ```
