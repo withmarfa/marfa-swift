@@ -606,6 +606,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /folders`.
     /// - Remark: Generated from `#/paths//folders/post(createFolder)`.
     func createFolder(_ input: Operations.CreateFolder.Input) async throws -> Operations.CreateFolder.Output
+    /// List attention items
+    ///
+    /// Returns current concerns for the owner or a private local command. Failed or timed-out checks appear as unavailable items alongside known concerns. An empty list means every check completed without a concern.
+    ///
+    /// - Remark: HTTP `GET /attention`.
+    /// - Remark: Generated from `#/paths//attention/get(listAttention)`.
+    func listAttention(_ input: Operations.ListAttention.Input) async throws -> Operations.ListAttention.Output
     /// Update a folder
     ///
     /// Updates a folder's title and settings. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
@@ -727,7 +734,7 @@ public protocol APIProtocol: Sendable {
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
     /// Update the owner
     ///
-    /// Updates the owner's email or name and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    /// Updates the owner's email, name, or picture URL and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
     ///
     /// - Remark: HTTP `PATCH /owner`.
     /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
@@ -2187,6 +2194,15 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// List attention items
+    ///
+    /// Returns current concerns for the owner or a private local command. Failed or timed-out checks appear as unavailable items alongside known concerns. An empty list means every check completed without a concern.
+    ///
+    /// - Remark: HTTP `GET /attention`.
+    /// - Remark: Generated from `#/paths//attention/get(listAttention)`.
+    public func listAttention(headers: Operations.ListAttention.Input.Headers = .init()) async throws -> Operations.ListAttention.Output {
+        try await listAttention(Operations.ListAttention.Input(headers: headers))
+    }
     /// Update a folder
     ///
     /// Updates a folder's title and settings. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
@@ -2420,7 +2436,7 @@ extension APIProtocol {
     }
     /// Update the owner
     ///
-    /// Updates the owner's email or name and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    /// Updates the owner's email, name, or picture URL and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
     ///
     /// - Remark: HTTP `PATCH /owner`.
     /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.

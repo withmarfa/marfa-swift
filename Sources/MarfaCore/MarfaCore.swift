@@ -4976,7 +4976,7 @@ public func FfiConverterTypeFileStatus_lower(_ value: FileStatus) -> RustBuffer 
  */
 public struct FirstSyncPlan: Equatable, Hashable {
     /**
-     * Files it will write into the directory.
+     * Files it will write into the directory. Not those `left` counts.
      */
     public var write: UInt64
     /**
@@ -4985,30 +4985,42 @@ public struct FirstSyncPlan: Equatable, Hashable {
      */
     public var send: UInt64
     /**
-     * Of the files it will write, those whose path a file already in the
-     * directory has. Both end up in the folder, and one of the two takes a
-     * number in its name; none is written over.
+     * Of the files it will write, those whose path a file it sends already
+     * has. Both end up in the folder, and one of the two takes a number in
+     * its name; none is written over.
      */
     public var beside: UInt64
+    /**
+     * Items whose file it will not write, because a file it does not send
+     * is at the path: one it holds back, or one it takes no part in. That
+     * file stays as it is and no number is added.
+     */
+    public var left: UInt64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * Files it will write into the directory.
+         * Files it will write into the directory. Not those `left` counts.
          */write: UInt64, 
         /**
          * Files in the directory it will send, as new items or as the edits of
          * the items they name.
          */send: UInt64, 
         /**
-         * Of the files it will write, those whose path a file already in the
-         * directory has. Both end up in the folder, and one of the two takes a
-         * number in its name; none is written over.
-         */beside: UInt64) {
+         * Of the files it will write, those whose path a file it sends already
+         * has. Both end up in the folder, and one of the two takes a number in
+         * its name; none is written over.
+         */beside: UInt64, 
+        /**
+         * Items whose file it will not write, because a file it does not send
+         * is at the path: one it holds back, or one it takes no part in. That
+         * file stays as it is and no number is added.
+         */left: UInt64) {
         self.write = write
         self.send = send
         self.beside = beside
+        self.left = left
     }
 
     
@@ -5029,7 +5041,8 @@ public struct FfiConverterTypeFirstSyncPlan: FfiConverterRustBuffer {
             try FirstSyncPlan(
                 write: FfiConverterUInt64.read(from: &buf), 
                 send: FfiConverterUInt64.read(from: &buf), 
-                beside: FfiConverterUInt64.read(from: &buf)
+                beside: FfiConverterUInt64.read(from: &buf), 
+                left: FfiConverterUInt64.read(from: &buf)
         )
     }
 
@@ -5037,6 +5050,7 @@ public struct FfiConverterTypeFirstSyncPlan: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.write, into: &buf)
         FfiConverterUInt64.write(value.send, into: &buf)
         FfiConverterUInt64.write(value.beside, into: &buf)
+        FfiConverterUInt64.write(value.left, into: &buf)
     }
 }
 

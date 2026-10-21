@@ -9155,6 +9155,89 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal`.
+        public struct BlobStoreUnavailableOrWriteContentionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case blobStoreUnavailable = "blob_store_unavailable"
+                    case writeContention = "write_contention"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/code`.
+                public var code: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/details`.
+                public var details: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error`.
+            public var error: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload
+            /// Creates a new `BlobStoreUnavailableOrWriteContentionRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// A page holding every orphan.
         ///
         /// - Remark: Generated from `#/components/schemas/BlobOrphanPage`.
@@ -9492,89 +9575,6 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.RangeNotSatisfiableRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal`.
-        public struct BlobStoreUnavailableOrWriteContentionRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case blobStoreUnavailable = "blob_store_unavailable"
-                    case writeContention = "write_contention"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/code`.
-                public var code: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error/details`.
-                public var details: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrWriteContentionRefusal/error`.
-            public var error: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload
-            /// Creates a new `BlobStoreUnavailableOrWriteContentionRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.BlobStoreUnavailableOrWriteContentionRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -11339,6 +11339,104 @@ extension Components {
                 case id
                 case title
                 case createdAt = "created_at"
+            }
+        }
+        /// The current attention inventory, without pagination.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AttentionList`.
+        public struct AttentionList: Codable, Hashable, Sendable {
+            /// Every known concern and unavailable check; empty when all checks report no concerns.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionList/data`.
+            public var data: [Components.Schemas.AttentionConcern]
+            /// Creates a new `AttentionList`.
+            ///
+            /// - Parameters:
+            ///   - data: Every known concern and unavailable check; empty when all checks report no concerns.
+            public init(data: [Components.Schemas.AttentionConcern]) {
+                self.data = data
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+            }
+        }
+        /// One known concern or unavailable check.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AttentionConcern`.
+        public struct AttentionConcern: Codable, Hashable, Sendable {
+            /// health: degraded or down; job: failed last run; connector: failed, problems, or quiet; folder: sync concern; key: expires within seven days; unavailable: check failed or timed out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case health = "health"
+                case job = "job"
+                case connector = "connector"
+                case folder = "folder"
+                case key = "key"
+                case unavailable = "unavailable"
+            }
+            /// health: degraded or down; job: failed last run; connector: failed, problems, or quiet; folder: sync concern; key: expires within seven days; unavailable: check failed or timed out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
+            public var kind: Components.Schemas.AttentionConcern.KindPayload
+            /// The component or job name, connector, folder, or key ID, or unavailable check name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/reference`.
+            public var reference: Swift.String
+            /// A short name for the concern.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/title`.
+            public var title: Swift.String
+            /// What needs attention or remains unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/description`.
+            public var description: Swift.String
+            /// The local console path for the concern.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/href`.
+            public var href: Swift.String
+            /// warn: needs a look; danger: a component or connector failed. Present when the concern has a severity.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/tone`.
+            @frozen public enum TonePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case warn = "warn"
+                case danger = "danger"
+            }
+            /// warn: needs a look; danger: a component or connector failed. Present when the concern has a severity.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionConcern/tone`.
+            public var tone: Components.Schemas.AttentionConcern.TonePayload?
+            /// Creates a new `AttentionConcern`.
+            ///
+            /// - Parameters:
+            ///   - kind: health: degraded or down; job: failed last run; connector: failed, problems, or quiet; folder: sync concern; key: expires within seven days; unavailable: check failed or timed out.
+            ///   - reference: The component or job name, connector, folder, or key ID, or unavailable check name.
+            ///   - title: A short name for the concern.
+            ///   - description: What needs attention or remains unknown.
+            ///   - href: The local console path for the concern.
+            ///   - tone: warn: needs a look; danger: a component or connector failed. Present when the concern has a severity.
+            public init(
+                kind: Components.Schemas.AttentionConcern.KindPayload,
+                reference: Swift.String,
+                title: Swift.String,
+                description: Swift.String,
+                href: Swift.String,
+                tone: Components.Schemas.AttentionConcern.TonePayload? = nil
+            ) {
+                self.kind = kind
+                self.reference = reference
+                self.title = title
+                self.description = description
+                self.href = href
+                self.tone = tone
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case reference
+                case title
+                case description
+                case href
+                case tone
             }
         }
         /// An error response.
@@ -13455,6 +13553,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
             public var name: Swift.String
+            /// The owner's picture URL, or `null` when none is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Owner/avatar`.
+            public var avatar: Swift.String?
             /// When the owner was created, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/created_at`.
@@ -13465,22 +13567,26 @@ extension Components {
             ///   - id: Unique identifier for the owner.
             ///   - email: Email address used to sign in.
             ///   - name: Display name of the owner.
+            ///   - avatar: The owner's picture URL, or `null` when none is set.
             ///   - createdAt: When the owner was created, in UTC.
             public init(
                 id: Swift.String,
                 email: Swift.String,
                 name: Swift.String,
+                avatar: Swift.String? = nil,
                 createdAt: Swift.String
             ) {
                 self.id = id
                 self.email = email
                 self.name = name
+                self.avatar = avatar
                 self.createdAt = createdAt
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case email
                 case name
+                case avatar
                 case createdAt = "created_at"
             }
         }
@@ -14375,7 +14481,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/id`.
             public var id: Swift.String
-            /// `cli` registered for device authorization; otherwise `web` has approved web origins, and `app` is any other app.
+            /// `cli` registered with the `marfa` command line's `software_id`; otherwise `web` has approved web origins, and `app` is any other app.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -14383,7 +14489,7 @@ extension Components {
                 case web = "web"
                 case cli = "cli"
             }
-            /// `cli` registered for device authorization; otherwise `web` has approved web origins, and `app` is any other app.
+            /// `cli` registered with the `marfa` command line's `software_id`; otherwise `web` has approved web origins, and `app` is any other app.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/kind`.
             public var kind: Components.Schemas.AppGrant.KindPayload
@@ -14419,7 +14525,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the app's grant.
-            ///   - kind: `cli` registered for device authorization; otherwise `web` has approved web origins, and `app` is any other app.
+            ///   - kind: `cli` registered with the `marfa` command line's `software_id`; otherwise `web` has approved web origins, and `app` is any other app.
             ///   - clientId: The ID of the registered app.
             ///   - clientName: The app's registered name, or null if unavailable.
             ///   - origins: Approved web origins, empty for a native app.
