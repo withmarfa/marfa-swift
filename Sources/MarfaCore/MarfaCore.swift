@@ -1276,14 +1276,17 @@ open class Core: CoreProtocol, @unchecked Sendable {
     
     /**
      * Opens the file at `path`, creating it when absent. `url` and `key`
-     * go together; without them only local reads work.
+     * go together; without them only local reads work. `renewer` renews
+     * `key` when the server refuses it, as an app signed in with OAuth
+     * does with its refresh token; it needs `url` and `key`.
      */
-public static func `open`(path: String, url: String?, key: String?)throws  -> Core  {
+public static func `open`(path: String, url: String?, key: String?, renewer: CredentialRenewer? = nil)throws  -> Core  {
     return try  FfiConverterTypeCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_constructor_core_open(
         FfiConverterString.lower(path),
         FfiConverterOptionString.lower(url),
-        FfiConverterOptionString.lower(key),$0
+        FfiConverterOptionString.lower(key),
+        FfiConverterOptionTypeCredentialRenewer.lower(renewer),$0
     )
 })
 }
@@ -2218,6 +2221,267 @@ public func FfiConverterTypeCore_lower(_ value: Core) -> UInt64 {
 
 
 /**
+ * What an app hands `Core.open` or `Folders` with a token that can
+ * expire. The core calls `renew` when the server refuses the token it sent,
+ * and sends the refused request again, once, with the token `renew`
+ * returns.
+ *
+ * Within one `Core` or one `Folders`, `renew` is called once at a time:
+ * calls refused together wait for one renewal and send the token it
+ * answered, and a folder still sending the token renewed away gets the new
+ * one without asking. Separate `Core` and `Folders` objects ask on their
+ * own, so an app that opens more than one with the same sign-in must
+ * serialize renewals across them.
+ *
+ * `renew` runs on the thread that was refused: the app's own call or a
+ * watch's. It must not call this `Core` or these `Folders`, which may be
+ * waiting on it. A renewer must:
+ *
+ * - Keep the new access token and refresh token before returning: a
+ * refresh token is spent once the server answers.
+ * - Return the access token it holds, without renewing, when `refused`
+ * differs from it, as when a copy was opened with a token since renewed.
+ * - Throw `Ended`, and delete the refresh token, on a token endpoint's
+ * `invalid_grant` or `invalid_client`.
+ * - Give the token request a time limit, and throw `Unavailable` when it
+ * times out or there is no network: stopping a watch waits for a renewal
+ * under way.
+ * - Never wait synchronously on the main thread inside `renew`.
+ * - Never log the refused token.
+ */
+public protocol CredentialRenewer: AnyObject, Sendable {
+    
+    /**
+     * `refused` is the access token the server refused, without `Bearer`.
+     * Answer the token to send instead.
+     */
+    func renew(refused: String) throws  -> String
+    
+}
+/**
+ * What an app hands `Core.open` or `Folders` with a token that can
+ * expire. The core calls `renew` when the server refuses the token it sent,
+ * and sends the refused request again, once, with the token `renew`
+ * returns.
+ *
+ * Within one `Core` or one `Folders`, `renew` is called once at a time:
+ * calls refused together wait for one renewal and send the token it
+ * answered, and a folder still sending the token renewed away gets the new
+ * one without asking. Separate `Core` and `Folders` objects ask on their
+ * own, so an app that opens more than one with the same sign-in must
+ * serialize renewals across them.
+ *
+ * `renew` runs on the thread that was refused: the app's own call or a
+ * watch's. It must not call this `Core` or these `Folders`, which may be
+ * waiting on it. A renewer must:
+ *
+ * - Keep the new access token and refresh token before returning: a
+ * refresh token is spent once the server answers.
+ * - Return the access token it holds, without renewing, when `refused`
+ * differs from it, as when a copy was opened with a token since renewed.
+ * - Throw `Ended`, and delete the refresh token, on a token endpoint's
+ * `invalid_grant` or `invalid_client`.
+ * - Give the token request a time limit, and throw `Unavailable` when it
+ * times out or there is no network: stopping a watch waits for a renewal
+ * under way.
+ * - Never wait synchronously on the main thread inside `renew`.
+ * - Never log the refused token.
+ */
+open class CredentialRenewerImpl: CredentialRenewer, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_marfa_core_ffi_fn_clone_credentialrenewer(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_marfa_core_ffi_fn_free_credentialrenewer(handle, $0) }
+    }
+
+    
+
+    
+    /**
+     * `refused` is the access token the server refused, without `Bearer`.
+     * Answer the token to send instead.
+     */
+open func renew(refused: String)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeRenewalError_lift) {
+    uniffi_marfa_core_ffi_fn_method_credentialrenewer_renew(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(refused),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceCredentialRenewer {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // Store the vtable directly.
+    static let vtable: UniffiVTableCallbackInterfaceCredentialRenewer = UniffiVTableCallbackInterfaceCredentialRenewer(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterTypeCredentialRenewer.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface CredentialRenewer: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterTypeCredentialRenewer.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface CredentialRenewer: handle missing in uniffiClone")
+            }
+        },
+        renew: { (
+            uniffiHandle: UInt64,
+            refused: RustBuffer,
+            uniffiOutReturn: UnsafeMutablePointer<RustBuffer>,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> String in
+                guard let uniffiObj = try? FfiConverterTypeCredentialRenewer.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return try uniffiObj.renew(
+                     refused: try FfiConverterString.lift(refused)
+                )
+            }
+
+            
+            let writeReturn = { uniffiOutReturn.pointee = FfiConverterString.lower($0) }
+            uniffiTraitInterfaceCallWithError(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn,
+                lowerError: FfiConverterTypeRenewalError_lower
+            )
+        }
+    )
+
+    // Rust stores this pointer for future callback invocations, so it must live
+    // for the process lifetime (not just for the init function call).
+    static let vtablePtr: UnsafePointer<UniffiVTableCallbackInterfaceCredentialRenewer> = {
+        let ptr = UnsafeMutablePointer<UniffiVTableCallbackInterfaceCredentialRenewer>.allocate(capacity: 1)
+        ptr.initialize(to: vtable)
+        return UnsafePointer(ptr)
+    }()
+}
+
+private func uniffiCallbackInitCredentialRenewer() {
+    uniffi_marfa_core_ffi_fn_init_callback_vtable_credentialrenewer(UniffiCallbackInterfaceCredentialRenewer.vtablePtr)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCredentialRenewer: FfiConverter {
+    fileprivate static let handleMap = UniffiHandleMap<CredentialRenewer>()
+
+    typealias FfiType = UInt64
+    typealias SwiftType = CredentialRenewer
+
+    public static func lift(_ handle: UInt64) throws -> CredentialRenewer {
+        if ((handle & 1) == 0) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return CredentialRenewerImpl(unsafeFromHandle: handle)
+        } else {
+            // Swift-generated handle, get the object from the handle map
+            return try handleMap.remove(handle: handle)
+        }
+    }
+
+    public static func lower(_ value: CredentialRenewer) -> UInt64 {
+         if let rustImpl = value as? CredentialRenewerImpl {
+             // Rust-implemented object.  Clone the handle and return it
+            return rustImpl.uniffiCloneHandle()
+         } else {
+            // Swift object, generate a new vtable handle and return that.
+            return handleMap.insert(obj: value)
+         }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CredentialRenewer {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: CredentialRenewer, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCredentialRenewer_lift(_ handle: UInt64) throws -> CredentialRenewer {
+    return try FfiConverterTypeCredentialRenewer.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCredentialRenewer_lower(_ value: CredentialRenewer) -> UInt64 {
+    return FfiConverterTypeCredentialRenewer.lower(value)
+}
+
+
+
+
+
+
+/**
  * What an app hands `watch`: told of each event on a thread of the core's,
  * and once when the watch ends, with the error that ended it or none where
  * it was stopped.
@@ -2592,13 +2856,17 @@ open class Folders: FoldersProtocol, @unchecked Sendable {
     /**
      * `url` and `key` go together; without them only `list`, `status`,
      * `confirm_first_sync`, `confirm`, `restore` and `remove` work.
+     * `renewer` renews `key` when the server refuses it, for every folder
+     * these calls and watches work, as `CredentialRenewer` describes; it needs
+     * `url` and `key`.
      */
-public convenience init(url: String?, key: String?)throws  {
+public convenience init(url: String?, key: String?, renewer: CredentialRenewer? = nil)throws  {
     let handle =
         try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_constructor_folders_new(
         FfiConverterOptionString.lower(url),
-        FfiConverterOptionString.lower(key),$0
+        FfiConverterOptionString.lower(key),
+        FfiConverterOptionTypeCredentialRenewer.lower(renewer),$0
     )
 }
     self.init(unsafeFromHandle: handle)
@@ -9991,6 +10259,120 @@ public func FfiConverterTypeMarfaError_lower(_ value: MarfaError) -> RustBuffer 
     return FfiConverterTypeMarfaError.lower(value)
 }
 
+
+/**
+ * Why an app's `CredentialRenewer` could not renew, so the core can tell a
+ * sign-in that ended from one the network interrupted.
+ */
+public enum RenewalError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    /**
+     * The server ended the sign-in, as a token endpoint's `invalid_grant`
+     * or `invalid_client` says. Renewing again cannot help: the call that
+     * asked throws `SignedOut`, and every later refusal throws it without
+     * asking the renewer again, until the app signs in again and opens the
+     * copy with the new credential.
+     */
+    case Ended(message: String
+    )
+    /**
+     * The renewal could not finish now, as with no network or a token
+     * endpoint that did not answer. Queued writes stay queued, the call
+     * throws `Network`, and the next refusal asks the renewer again.
+     */
+    case Unavailable(message: String
+    )
+    /**
+     * Any other failure. The call throws `Invalid` with `message`, queued
+     * writes stay queued, and the next refusal asks the renewer again.
+     */
+    case Failed(message: String
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension RenewalError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRenewalError: FfiConverterRustBuffer {
+    typealias SwiftType = RenewalError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RenewalError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .Ended(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 2: return .Unavailable(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 3: return .Failed(
+            message: try FfiConverterString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RenewalError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .Ended(message):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Unavailable(message):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Failed(message):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(message, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenewalError_lift(_ buf: RustBuffer) throws -> RenewalError {
+    return try FfiConverterTypeRenewalError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenewalError_lower(_ value: RenewalError) -> RustBuffer {
+    return FfiConverterTypeRenewalError.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -10820,6 +11202,30 @@ fileprivate struct FfiConverterOptionString: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterString.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeCredentialRenewer: FfiConverterRustBuffer {
+    typealias SwiftType = CredentialRenewer?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeCredentialRenewer.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeCredentialRenewer.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -12253,7 +12659,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 17682) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 16044) {
+    if (uniffi_marfa_core_ffi_checksum_method_credentialrenewer_renew() != 48172) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 18143) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_core_open_reader() != 60011) {
@@ -12262,11 +12671,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 38220) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 33553) {
         return InitializationResult.apiChecksumMismatch
     }
 
     uniffiCallbackInitChangeListener()
+    uniffiCallbackInitCredentialRenewer()
     uniffiCallbackInitFolderListener()
     return InitializationResult.ok
 }()
