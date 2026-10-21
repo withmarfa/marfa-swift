@@ -230,3 +230,32 @@ private struct NullOnlyFields: Codable {
         try decoder.decode(NullOnlyFields.self, from: Data(#"{"required":null,"optional":false}"#.utf8))
     }
 }
+
+@Test(arguments: [
+    (#"{"kind":"browser","id":"s1","name":"Safari"}"#, "s1"),
+    (#"{"kind":"server","id":"server","name":"Marfa"}"#, "server"),
+    ("null", nil as String?),
+])
+func anAuditActorDecodesAsEitherSignInShapeOrNull(actor: String, id: String?) throws {
+    let wire =
+        #"{"actor":\#(actor),"id":"a","created_at":"now","key_id":null,"action":"owner.claimed","#
+        + #""resource_type":"owner","resource_id":null,"client_ip":null,"details":{}}"#
+    let entry = try JSONDecoder().decode(Components.Schemas.AuditEntry.self, from: Data(wire.utf8))
+    let kept = entry.actor.value
+    #expect((kept?.value1?.id ?? kept?.value2?.id.rawValue) == id)
+    #expect((entry.actor == .null) == (id == nil))
+    let encoded = try JSONEncoder().encode(entry)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    #expect(object["actor"] is NSNull == (id == nil))
+    #expect(try JSONDecoder().decode(Components.Schemas.AuditEntry.self, from: encoded) == entry)
+}
+
+@Test(arguments: ["", #""actor":{"kind":"server"},"#, #""actor":"Safari","#])
+func anAuditEntryRequiresAnActorOfTheDocumentedShape(actor: String) {
+    let wire =
+        "{" + actor + #""id":"a","created_at":"now","key_id":null,"action":"owner.claimed","#
+        + #""resource_type":"owner","resource_id":null,"client_ip":null,"details":{}}"#
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(Components.Schemas.AuditEntry.self, from: Data(wire.utf8))
+    }
+}
