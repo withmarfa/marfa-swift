@@ -26,6 +26,7 @@ let package = Package(
         .target(
             name: "Marfa",
             dependencies: ["MarfaCore"],
+            resources: [.process("PrivacyInfo.xcprivacy")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
