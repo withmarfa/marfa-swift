@@ -344,7 +344,6 @@ struct TokenRenewal {
                 return !message.contains("rt-1") && !message.contains("at-1")
             }
             #expect(try authorization.place.read() == nil)
-            #expect(try authorization.place.read() == nil)
         }
     }
 
