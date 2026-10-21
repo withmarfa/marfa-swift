@@ -38,7 +38,9 @@ final class RenewalLease: Sendable {
         self.lifetime = lifetime
         self.gate = gate
         state = Mutex(State(label: label))
-        let beat = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        // At the renewal's own priority: a heartbeat below the work it guards waits behind it, and the lease
+        // lapses under a holder that is still running.
+        let beat = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
         let every = DispatchTimeInterval.nanoseconds(Int(Self.nanoseconds(lifetime) / 3))
         beat.schedule(deadline: .now() + every, repeating: every)
         beat.setEventHandler { [weak self] in self?.moveLapseOn() }
