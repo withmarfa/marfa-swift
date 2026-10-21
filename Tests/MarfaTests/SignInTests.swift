@@ -661,8 +661,8 @@ struct TokenRenewal {
             let (authorization, credential) = try signedIn(server, keychain, transport: transport)
             let place = authorization.place
             let boot = RenewalLease.bootSession
-            let held = "other \(boot) \(RenewalLease.now() + 600_000_000_000)"
-            #expect(try keychain.add(label: held, service: service, account: place.leaseAccount))
+            let other = try anotherProcess(keychain, server, transport).place
+            let held = try await background { try RenewalLease.take(other, transport) }
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
@@ -670,12 +670,15 @@ struct TokenRenewal {
                 return true
             }
             #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
-            #expect(try keychain.label(service: service, account: place.leaseAccount) == held)
+            #expect(try held.whileHeld { true } == true)
+            held.release()
 
-            // Lapsed on the shared clock; written before a restart, whose clock has started again; unreadable.
+            // Lapsed on the shared clock; written before a restart, whose clock has started again; further ahead
+            // than any lease lasts, as one written before a restart whose boot could not be told apart; unreadable.
             for left in [
                 "dead \(boot) \(RenewalLease.now() - 1_000_000_000)",
                 "before-restart 00000000-0000-0000-0000-000000000000 \(RenewalLease.now() + 600_000_000_000)",
+                "too-far-ahead \(boot) \(RenewalLease.now() + 600_000_000_000)",
                 "unreadable",
             ] {
                 try keychain.delete(service: service, account: place.leaseAccount)
@@ -696,7 +699,7 @@ struct TokenRenewal {
         // The clock the lease's heartbeat runs on, which stops while the device sleeps, as the heartbeat does.
         let now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
         #expect(lapses > now + 59_000_000_000 && lapses <= now + 60_000_000_000)
-        #expect(!RenewalLease.lapsed(label))
+        #expect(!RenewalLease.lapsed(label, lifetime: .seconds(60)))
     }
 }
 

@@ -62,7 +62,7 @@ final class RenewalLease: Sendable {
                 }
                 guard let held = try place.keychain.label(service: place.service, account: place.leaseAccount)
                 else { continue }
-                if lapsed(held) {
+                if lapsed(held, lifetime: lifetime) {
                     try place.keychain.delete(label: held, service: place.service, account: place.leaseAccount)
                     continue
                 }
@@ -82,7 +82,7 @@ final class RenewalLease: Sendable {
     /// take the lease between the check and the write.
     func whileHeld<T>(_ work: () throws -> T) throws -> T? {
         try state.withLock { state in
-            guard !state.released, !state.lost, !Self.lapsed(state.label, within: Self.nanoseconds(lifetime) / 3),
+            guard !state.released, !state.lost, !Self.lapsed(state.label, lifetime: lifetime, within: lifetime / 3),
                 try place.keychain.label(service: place.service, account: place.leaseAccount) == state.label
             else { return nil }
             return try work()
@@ -146,11 +146,15 @@ final class RenewalLease: Sendable {
         "\(UUID().uuidString) \(bootSession) \(now() + nanoseconds(lifetime))"
     }
 
-    /// Whether the lease `label` names lapses within `margin` nanoseconds from now, or already has.
-    static func lapsed(_ label: String, within margin: UInt64 = 0) -> Bool {
+    /// Whether the lease `label` names lapses within `margin` from now, or already has.
+    ///
+    /// A lapse more than one `lifetime` ahead was never written on this boot's clock, since every holder writes
+    /// now plus one lifetime: it is left from before a restart, where the boot's identifier could not be read.
+    static func lapsed(_ label: String, lifetime: Duration, within margin: Duration = .zero) -> Bool {
         let parts = label.split(separator: " ")
         guard parts.count == 3, parts[1] == bootSession, let lapses = UInt64(parts[2]) else { return true }
-        return lapses <= now() + margin
+        let now = now()
+        return lapses <= now + nanoseconds(margin) || lapses > now + nanoseconds(lifetime)
     }
 
     private static func nanoseconds(_ duration: Duration) -> UInt64 {
