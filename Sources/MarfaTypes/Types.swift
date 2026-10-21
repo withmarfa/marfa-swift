@@ -18,6 +18,48 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
     func getInstance(_ input: Operations.GetInstance.Input) async throws -> Operations.GetInstance.Output
+    /// List the trash
+    ///
+    /// Returns a page of trash summaries, newest creation first, without item content. Only the owner or a local command can use this operation.
+    ///
+    /// - Remark: HTTP `GET /trash`.
+    /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
+    func listTrash(_ input: Operations.ListTrash.Input) async throws -> Operations.ListTrash.Output
+    /// Move an item to the trash
+    ///
+    /// Moves the item and its cascading children to the trash. Returns only a summary. Requires the version from the listing.
+    ///
+    /// - Remark: HTTP `POST /items/summaries/{id}/trash`.
+    /// - Remark: Generated from `#/paths//items/summaries/{id}/trash/post(trashItemSummary)`.
+    func trashItemSummary(_ input: Operations.TrashItemSummary.Input) async throws -> Operations.TrashItemSummary.Output
+    /// Restore an item from the trash
+    ///
+    /// Restores the item and the children its trash took. Returns only a summary. Requires the version from the listing.
+    ///
+    /// - Remark: HTTP `POST /items/summaries/{id}/restore`.
+    /// - Remark: Generated from `#/paths//items/summaries/{id}/restore/post(restoreItemSummary)`.
+    func restoreItemSummary(_ input: Operations.RestoreItemSummary.Input) async throws -> Operations.RestoreItemSummary.Output
+    /// Purge a trashed item
+    ///
+    /// Deletes one item permanently if it is still in the trash at the listed version. Returns only a summary.
+    ///
+    /// - Remark: HTTP `POST /items/summaries/{id}/purge`.
+    /// - Remark: Generated from `#/paths//items/summaries/{id}/purge/post(purgeItemSummary)`.
+    func purgeItemSummary(_ input: Operations.PurgeItemSummary.Input) async throws -> Operations.PurgeItemSummary.Output
+    /// Empty a page of the trash
+    ///
+    /// Deletes up to 200 trash items permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed during the operation may remain.
+    ///
+    /// - Remark: HTTP `POST /trash/empty`.
+    /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
+    func emptyTrash(_ input: Operations.EmptyTrash.Input) async throws -> Operations.EmptyTrash.Output
+    /// List item summaries
+    ///
+    /// Returns item names, types, versions, sources and creation times, newest first. Only the owner or a local command can use this operation. Trashed and system items are excluded.
+    ///
+    /// - Remark: HTTP `GET /items/summaries`.
+    /// - Remark: Generated from `#/paths//items/summaries/get(listItemSummaries)`.
+    func listItemSummaries(_ input: Operations.ListItemSummaries.Input) async throws -> Operations.ListItemSummaries.Output
     /// List items
     ///
     /// Returns a page of the items you can read that match the filters. System items are left out unless you ask for them with `include=system`. Use `include` to add edges, metadata or extensions to each item.
@@ -307,7 +349,7 @@ public protocol APIProtocol: Sendable {
     func replaceType(_ input: Operations.ReplaceType.Input) async throws -> Operations.ReplaceType.Output
     /// Delete a type
     ///
-    /// Deletes a type. With `force=true`, items of the type stay, but writes that create them or set their properties fail with `unknown_type` until the type is registered again.
+    /// Deletes an unused type. A key can use `force=true` to keep existing items without their type; new writes then fail until it is registered again. A recent owner session or local command can remove only unused types.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -550,6 +592,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /connectors/{id}/agreements/lookup`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)`.
     func lookupConnectorAgreements(_ input: Operations.LookupConnectorAgreements.Input) async throws -> Operations.LookupConnectorAgreements.Output
+    /// List folders
+    ///
+    /// Returns active folder summaries, newest first, for the owner or a private local command. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
+    ///
+    /// - Remark: HTTP `GET /folders`.
+    /// - Remark: Generated from `#/paths//folders/get(listFolders)`.
+    func listFolders(_ input: Operations.ListFolders.Input) async throws -> Operations.ListFolders.Output
     /// Create a folder
     ///
     /// Creates a folder: a `system.folder` item whose properties are the settings every machine bound to the folder shares. The item endpoints can't write one.
@@ -627,9 +676,16 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.
     func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    func updateConfig(_ input: Operations.UpdateConfig.Input) async throws -> Operations.UpdateConfig.Output
     /// Replace the configuration
     ///
-    /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. Requires `config.manage`.
+    /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. To change only some settings, use `PATCH`. Requires `config.manage`.
     ///
     /// - Remark: HTTP `PUT /config`.
     /// - Remark: Generated from `#/paths//config/put(replaceConfig)`.
@@ -732,6 +788,27 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportData)`.
     func exportData(_ input: Operations.ExportData.Input) async throws -> Operations.ExportData.Output
+    /// List app grants
+    ///
+    /// Returns every active app grant in one page. Requires `grants.manage` or direct authority.
+    ///
+    /// - Remark: HTTP `GET /auth/grants`.
+    /// - Remark: Generated from `#/paths//auth/grants/get(listAppGrants)`.
+    func listAppGrants(_ input: Operations.ListAppGrants.Input) async throws -> Operations.ListAppGrants.Output
+    /// Narrow an app grant
+    ///
+    /// Narrows standing access. Requires a recent owner sign-in or private authority. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    ///
+    /// - Remark: HTTP `PATCH /auth/grants/{id}`.
+    /// - Remark: Generated from `#/paths//auth/grants/{id}/patch(narrowAppGrant)`.
+    func narrowAppGrant(_ input: Operations.NarrowAppGrant.Input) async throws -> Operations.NarrowAppGrant.Output
+    /// Revoke an app grant
+    ///
+    /// Revokes the app's tokens and consent. Requires `grants.manage` or direct authority; an owner browser needs a sign-in within five minutes.
+    ///
+    /// - Remark: HTTP `DELETE /auth/grants/{id}`.
+    /// - Remark: Generated from `#/paths//auth/grants/{id}/delete(revokeAppGrant)`.
+    func revokeAppGrant(_ input: Operations.RevokeAppGrant.Input) async throws -> Operations.RevokeAppGrant.Output
     /// Register an OAuth client
     ///
     /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
@@ -748,7 +825,7 @@ public protocol APIProtocol: Sendable {
     func streamEvents(_ input: Operations.StreamEvents.Input) async throws -> Operations.StreamEvents.Output
     /// List webhooks
     ///
-    /// Returns every webhook that belongs to you, with each `secret` shortened to its last four characters.
+    /// Returns webhooks and their makers, with secrets redacted. The owner's browser session and local command see every subscription; keys and apps see only their own.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -762,7 +839,7 @@ public protocol APIProtocol: Sendable {
     func createWebhook(_ input: Operations.CreateWebhook.Input) async throws -> Operations.CreateWebhook.Output
     /// Get a webhook
     ///
-    /// Returns a webhook, with its `secret` shortened to its last four characters.
+    /// Returns a webhook and its maker, with its secret redacted. The owner's browser session and local command can read any subscription; keys and apps can read only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -783,14 +860,14 @@ public protocol APIProtocol: Sendable {
     func deleteWebhook(_ input: Operations.DeleteWebhook.Input) async throws -> Operations.DeleteWebhook.Output
     /// List webhook deliveries
     ///
-    /// Returns a page of a webhook's deliveries, newest first. Marfa deletes a delivery that isn't `pending` once it's older than the instance's audit retention.
+    /// Returns delivery metadata without event payloads, newest first. The owner's browser session and local command can inspect any subscription; keys and apps can inspect only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
     func listWebhookDeliveries(_ input: Operations.ListWebhookDeliveries.Input) async throws -> Operations.ListWebhookDeliveries.Output
     /// Redeliver a failed delivery
     ///
-    /// Sends a `dead_letter` delivery again, to the webhook's current `url`, and returns it as `pending`. The delivery keeps its ID, and Marfa makes up to 8 more attempts.
+    /// Queues a failed delivery again at the current URL. The owner's recently authenticated browser session or local command can retry any subscription; keys and apps can retry only their own.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -821,6 +898,102 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths///get(getInstance)`.
     public func getInstance(headers: Operations.GetInstance.Input.Headers = .init()) async throws -> Operations.GetInstance.Output {
         try await getInstance(Operations.GetInstance.Input(headers: headers))
+    }
+    /// List the trash
+    ///
+    /// Returns a page of trash summaries, newest creation first, without item content. Only the owner or a local command can use this operation.
+    ///
+    /// - Remark: HTTP `GET /trash`.
+    /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
+    public func listTrash(
+        query: Operations.ListTrash.Input.Query = .init(),
+        headers: Operations.ListTrash.Input.Headers = .init()
+    ) async throws -> Operations.ListTrash.Output {
+        try await listTrash(Operations.ListTrash.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Move an item to the trash
+    ///
+    /// Moves the item and its cascading children to the trash. Returns only a summary. Requires the version from the listing.
+    ///
+    /// - Remark: HTTP `POST /items/summaries/{id}/trash`.
+    /// - Remark: Generated from `#/paths//items/summaries/{id}/trash/post(trashItemSummary)`.
+    public func trashItemSummary(
+        path: Operations.TrashItemSummary.Input.Path,
+        query: Operations.TrashItemSummary.Input.Query,
+        headers: Operations.TrashItemSummary.Input.Headers = .init()
+    ) async throws -> Operations.TrashItemSummary.Output {
+        try await trashItemSummary(Operations.TrashItemSummary.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Restore an item from the trash
+    ///
+    /// Restores the item and the children its trash took. Returns only a summary. Requires the version from the listing.
+    ///
+    /// - Remark: HTTP `POST /items/summaries/{id}/restore`.
+    /// - Remark: Generated from `#/paths//items/summaries/{id}/restore/post(restoreItemSummary)`.
+    public func restoreItemSummary(
+        path: Operations.RestoreItemSummary.Input.Path,
+        query: Operations.RestoreItemSummary.Input.Query,
+        headers: Operations.RestoreItemSummary.Input.Headers = .init()
+    ) async throws -> Operations.RestoreItemSummary.Output {
+        try await restoreItemSummary(Operations.RestoreItemSummary.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Purge a trashed item
+    ///
+    /// Deletes one item permanently if it is still in the trash at the listed version. Returns only a summary.
+    ///
+    /// - Remark: HTTP `POST /items/summaries/{id}/purge`.
+    /// - Remark: Generated from `#/paths//items/summaries/{id}/purge/post(purgeItemSummary)`.
+    public func purgeItemSummary(
+        path: Operations.PurgeItemSummary.Input.Path,
+        query: Operations.PurgeItemSummary.Input.Query,
+        headers: Operations.PurgeItemSummary.Input.Headers = .init()
+    ) async throws -> Operations.PurgeItemSummary.Output {
+        try await purgeItemSummary(Operations.PurgeItemSummary.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Empty a page of the trash
+    ///
+    /// Deletes up to 200 trash items permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed during the operation may remain.
+    ///
+    /// - Remark: HTTP `POST /trash/empty`.
+    /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
+    public func emptyTrash(
+        query: Operations.EmptyTrash.Input.Query = .init(),
+        headers: Operations.EmptyTrash.Input.Headers = .init()
+    ) async throws -> Operations.EmptyTrash.Output {
+        try await emptyTrash(Operations.EmptyTrash.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// List item summaries
+    ///
+    /// Returns item names, types, versions, sources and creation times, newest first. Only the owner or a local command can use this operation. Trashed and system items are excluded.
+    ///
+    /// - Remark: HTTP `GET /items/summaries`.
+    /// - Remark: Generated from `#/paths//items/summaries/get(listItemSummaries)`.
+    public func listItemSummaries(
+        query: Operations.ListItemSummaries.Input.Query = .init(),
+        headers: Operations.ListItemSummaries.Input.Headers = .init()
+    ) async throws -> Operations.ListItemSummaries.Output {
+        try await listItemSummaries(Operations.ListItemSummaries.Input(
+            query: query,
+            headers: headers
+        ))
     }
     /// List items
     ///
@@ -1465,7 +1638,7 @@ extension APIProtocol {
     }
     /// Delete a type
     ///
-    /// Deletes a type. With `force=true`, items of the type stay, but writes that create them or set their properties fail with `unknown_type` until the type is registered again.
+    /// Deletes an unused type. A key can use `force=true` to keep existing items without their type; new writes then fail until it is registered again. A recent owner session or local command can remove only unused types.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -1984,6 +2157,21 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// List folders
+    ///
+    /// Returns active folder summaries, newest first, for the owner or a private local command. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
+    ///
+    /// - Remark: HTTP `GET /folders`.
+    /// - Remark: Generated from `#/paths//folders/get(listFolders)`.
+    public func listFolders(
+        query: Operations.ListFolders.Input.Query = .init(),
+        headers: Operations.ListFolders.Input.Headers = .init()
+    ) async throws -> Operations.ListFolders.Output {
+        try await listFolders(Operations.ListFolders.Input(
+            query: query,
+            headers: headers
+        ))
+    }
     /// Create a folder
     ///
     /// Creates a folder: a `system.folder` item whose properties are the settings every machine bound to the folder shares. The item endpoints can't write one.
@@ -2137,9 +2325,24 @@ extension APIProtocol {
     public func getConfig(headers: Operations.GetConfig.Input.Headers = .init()) async throws -> Operations.GetConfig.Output {
         try await getConfig(Operations.GetConfig.Input(headers: headers))
     }
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    public func updateConfig(
+        headers: Operations.UpdateConfig.Input.Headers = .init(),
+        body: Operations.UpdateConfig.Input.Body
+    ) async throws -> Operations.UpdateConfig.Output {
+        try await updateConfig(Operations.UpdateConfig.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// Replace the configuration
     ///
-    /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. Requires `config.manage`.
+    /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. To change only some settings, use `PATCH`. Requires `config.manage`.
     ///
     /// - Remark: HTTP `PUT /config`.
     /// - Remark: Generated from `#/paths//config/put(replaceConfig)`.
@@ -2344,6 +2547,49 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// List app grants
+    ///
+    /// Returns every active app grant in one page. Requires `grants.manage` or direct authority.
+    ///
+    /// - Remark: HTTP `GET /auth/grants`.
+    /// - Remark: Generated from `#/paths//auth/grants/get(listAppGrants)`.
+    public func listAppGrants(headers: Operations.ListAppGrants.Input.Headers = .init()) async throws -> Operations.ListAppGrants.Output {
+        try await listAppGrants(Operations.ListAppGrants.Input(headers: headers))
+    }
+    /// Narrow an app grant
+    ///
+    /// Narrows standing access. Requires a recent owner sign-in or private authority. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    ///
+    /// - Remark: HTTP `PATCH /auth/grants/{id}`.
+    /// - Remark: Generated from `#/paths//auth/grants/{id}/patch(narrowAppGrant)`.
+    public func narrowAppGrant(
+        path: Operations.NarrowAppGrant.Input.Path,
+        headers: Operations.NarrowAppGrant.Input.Headers = .init(),
+        body: Operations.NarrowAppGrant.Input.Body
+    ) async throws -> Operations.NarrowAppGrant.Output {
+        try await narrowAppGrant(Operations.NarrowAppGrant.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Revoke an app grant
+    ///
+    /// Revokes the app's tokens and consent. Requires `grants.manage` or direct authority; an owner browser needs a sign-in within five minutes.
+    ///
+    /// - Remark: HTTP `DELETE /auth/grants/{id}`.
+    /// - Remark: Generated from `#/paths//auth/grants/{id}/delete(revokeAppGrant)`.
+    public func revokeAppGrant(
+        path: Operations.RevokeAppGrant.Input.Path,
+        query: Operations.RevokeAppGrant.Input.Query = .init(),
+        headers: Operations.RevokeAppGrant.Input.Headers = .init()
+    ) async throws -> Operations.RevokeAppGrant.Output {
+        try await revokeAppGrant(Operations.RevokeAppGrant.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
     /// Register an OAuth client
     ///
     /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
@@ -2376,7 +2622,7 @@ extension APIProtocol {
     }
     /// List webhooks
     ///
-    /// Returns every webhook that belongs to you, with each `secret` shortened to its last four characters.
+    /// Returns webhooks and their makers, with secrets redacted. The owner's browser session and local command see every subscription; keys and apps see only their own.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -2400,7 +2646,7 @@ extension APIProtocol {
     }
     /// Get a webhook
     ///
-    /// Returns a webhook, with its `secret` shortened to its last four characters.
+    /// Returns a webhook and its maker, with its secret redacted. The owner's browser session and local command can read any subscription; keys and apps can read only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -2447,7 +2693,7 @@ extension APIProtocol {
     }
     /// List webhook deliveries
     ///
-    /// Returns a page of a webhook's deliveries, newest first. Marfa deletes a delivery that isn't `pending` once it's older than the instance's audit retention.
+    /// Returns delivery metadata without event payloads, newest first. The owner's browser session and local command can inspect any subscription; keys and apps can inspect only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -2464,7 +2710,7 @@ extension APIProtocol {
     }
     /// Redeliver a failed delivery
     ///
-    /// Sends a `dead_letter` delivery again, to the webhook's current `url`, and returns it as `pending`. The delivery keeps its ID, and Marfa makes up to 8 more attempts.
+    /// Queues a failed delivery again at the current URL. The owner's recently authenticated browser session or local command can retry any subscription; keys and apps can retry only their own.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
