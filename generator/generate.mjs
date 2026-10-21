@@ -47,7 +47,28 @@ export function prepare(document) {
     "then",
     "else",
   ]);
-  function schema(value, inUnion = false, optionalProperty = false) {
+  // A schema with no name of its own becomes a component named by its content.
+  const inlineSchema = (target) => {
+    const hash = createHash("sha256")
+      .update(JSON.stringify(canonical(target)))
+      .digest("hex")
+      .slice(0, 16);
+    const name = `MarfaInline${hash}`;
+    inline.set(name, target);
+    return name;
+  };
+  const nullableOf = (target) => {
+    const name = `MarfaNullable${target}`;
+    nullable.set(name, {
+      target,
+      schema: {
+        anyOf: [{ $ref: `#/components/schemas/${target}` }, { $ref: nullRef }],
+      },
+    });
+    usesNull = true;
+    return name;
+  };
+  function schema(value, inUnion = false, optionalProperty = false, mapValue = false) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
     if (value.type === "null" && !inUnion) {
@@ -73,7 +94,9 @@ export function prepare(document) {
           schema(member, key === "oneOf" || key === "anyOf"),
         );
       } else {
-        result[key] = schemaValues.has(key) ? schema(child) : child;
+        result[key] = schemaValues.has(key)
+          ? schema(child, false, false, key === "additionalProperties")
+          : child;
       }
     }
     if (
@@ -97,20 +120,7 @@ export function prepare(document) {
       };
       if (Array.isArray(targetSchema.enum))
         targetSchema.enum = targetSchema.enum.filter((value) => value !== null);
-      const hash = createHash("sha256")
-        .update(JSON.stringify(canonical(targetSchema)))
-        .digest("hex")
-        .slice(0, 16);
-      const target = `MarfaInline${hash}`;
-      const name = `MarfaNullable${target}`;
-      inline.set(target, targetSchema);
-      nullable.set(name, {
-        target,
-        schema: {
-          anyOf: [{ $ref: `#/components/schemas/${target}` }, { $ref: nullRef }],
-        },
-      });
-      usesNull = true;
+      const name = nullableOf(inlineSchema(targetSchema));
       return { ...annotations, $ref: `#/components/schemas/${name}` };
     }
     if (Array.isArray(result.allOf) && result.allOf.length >= 2) {
@@ -153,11 +163,11 @@ export function prepare(document) {
     }
     const unionKey = Array.isArray(result.oneOf) ? "oneOf" : "anyOf";
     const union = result[unionKey];
-    if (Array.isArray(union) && union.length === 2) {
-      const nulls = union.filter(
-        (entry) => entry.type === "null" && Object.keys(entry).length === 1,
-      );
-      const values = union.filter((entry) => entry.type !== "null");
+    if (Array.isArray(union)) {
+      const isNull = (entry) =>
+        entry.type === "null" && Object.keys(entry).length === 1;
+      const nulls = union.filter(isNull);
+      const values = union.filter((entry) => !isNull(entry));
       if (
         nulls.length === 1 &&
         values.length === 1 &&
@@ -167,14 +177,18 @@ export function prepare(document) {
         const target = values[0].$ref.replace(/^#\/components\/schemas\//, "");
         if (!/^[A-Z][A-Za-z0-9_]*$/.test(target))
           throw new Error(`unsupported nullable reference: ${values[0].$ref}`);
-        const name = `MarfaNullable${target}`;
-        usesNull = true;
-        nullable.set(name, {
-          target,
-          schema: { anyOf: [values[0], { $ref: nullRef }] },
-        });
         delete result[unionKey];
-        result.$ref = `#/components/schemas/${name}`;
+        result.$ref = `#/components/schemas/${nullableOf(target)}`;
+      } else if (!mapValue && nulls.length > 0 && values.length > 0) {
+        // Members without a name of their own go into a component, so the generator's own type for
+        // one member, or its anyOf or oneOf type for several, sits inside the nullable. The generator
+        // reads no type from a union under additionalProperties and makes a container of the object,
+        // so a component there would be unused.
+        const target = inlineSchema(
+          values.length === 1 ? values[0] : { [unionKey]: values },
+        );
+        delete result[unionKey];
+        result.$ref = `#/components/schemas/${nullableOf(target)}`;
       }
     }
     return result;

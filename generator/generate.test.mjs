@@ -140,15 +140,100 @@ test(
       const nullFields = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
       assert.match(nullFields, /nextCursor: Components\.Schemas\.MarfaNull[^?]/);
       assert.match(nullFields, /optional: Components\.Schemas\.MarfaNull\?/);
+      writeFileSync(source, JSON.stringify(document({
+        type: "object",
+        properties: {
+          actor: {
+            anyOf: [
+              { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+              { type: "object", properties: { kind: { type: "string", enum: ["server"] } }, required: ["kind"] },
+              { type: "null" },
+            ],
+          },
+          label: { oneOf: [{ type: "string" }, { type: "null" }] },
+        },
+        required: ["actor", "label"],
+      })));
+      generate(process.env.MARFA_GENERATOR_BIN, source, output);
+      const unions = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
+      assert.match(unions, /actor: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
+      assert.match(unions, /label: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
   },
 );
 
-test("leaves other unsupported null schemas for the diagnostic guard", () => {
-  const input = document({ anyOf: [{ type: "string" }, { type: "null" }] });
+test("leaves a union of only null for the diagnostic guard", () => {
+  const input = document({ anyOf: [{ type: "null" }] });
   assert.deepEqual(prepare(input).document, input);
+});
+
+test("reads an anyOf or oneOf of one inline schema and null as that schema or null", () => {
+  for (const key of ["anyOf", "oneOf"]) {
+    const input = document({
+      type: "object",
+      properties: {
+        label: { [key]: [{ type: "string", maxLength: 8 }, { type: "null" }], description: "kept" },
+      },
+    });
+    const before = JSON.stringify(input);
+    const { document: output, nullable } = prepare(input);
+    const field = output.components.schemas.Fixture.properties.label;
+    assert.equal(field.description, "kept");
+    assert.ok(!(key in field));
+    const name = field.$ref.split("/").at(-1);
+    assert.deepEqual(output.components.schemas[name], {
+      anyOf: [{ $ref: `#/components/schemas/${nullable.get(name).target}` }, { $ref: "#/components/schemas/MarfaNull" }],
+    });
+    assert.deepEqual(output.components.schemas[nullable.get(name).target], { type: "string", maxLength: 8 });
+    assert.equal(JSON.stringify(input), before);
+  }
+});
+
+test("reads a union of several schemas and null as that union or null", () => {
+  for (const key of ["anyOf", "oneOf"]) {
+    const members = [
+      { type: "object", properties: { kind: { type: "string" } }, required: ["kind"] },
+      { type: "number" },
+    ];
+    const input = document({
+      type: "object",
+      properties: { actor: { [key]: [...members, { type: "null" }] } },
+      required: ["actor"],
+    });
+    const { document: output, nullable } = prepare(input);
+    const name = output.components.schemas.Fixture.properties.actor.$ref.split("/").at(-1);
+    assert.deepEqual(output.components.schemas[nullable.get(name).target], { [key]: members });
+    assert.deepEqual(prepare(input).document, output);
+  }
+});
+
+test("reads null inside a nested union member's own properties", () => {
+  const input = document({
+    type: "object",
+    properties: {
+      actor: {
+        anyOf: [
+          { type: "object", properties: { id: { anyOf: [{ type: "string" }, { type: "null" }] } } },
+          { type: "number" },
+          { type: "null" },
+        ],
+      },
+    },
+  });
+  const { document: output, nullable } = prepare(input);
+  const name = output.components.schemas.Fixture.properties.actor.$ref.split("/").at(-1);
+  const union = output.components.schemas[nullable.get(name).target].anyOf;
+  assert.match(union[0].properties.id.$ref, /MarfaNullableMarfaInline/);
+});
+
+test("leaves a union under additionalProperties as it was, because the generator reads no type from it", () => {
+  const input = document({
+    type: "object",
+    additionalProperties: { anyOf: [{ type: "number" }, { type: "string" }, { type: "null" }] },
+  });
+  assert.deepEqual(prepare(input).document.components.schemas.Fixture, input.components.schemas.Fixture);
 });
 
 test("treats a oneOf of a reference and null as nullable", () => {
