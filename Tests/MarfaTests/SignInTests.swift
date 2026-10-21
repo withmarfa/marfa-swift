@@ -46,7 +46,8 @@ private func signedIn(
         server: server.url, client: client, keychain: keychain, service: service, transport: transport)
     try authorization.place.keep(
         KeptSignIn(
-            clientId: "client-1", redirect: client.redirect?.absoluteString, accessToken: access,
+            clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
+            redirect: client.redirect?.absoluteString, accessToken: access,
             refreshToken: refresh, scope: "core.note:read offline_access",
             tokenEndpoint: "\(server.origin)/auth/oauth2/token",
             revocationEndpoint: "\(server.origin)/auth/oauth2/revoke"))
@@ -93,10 +94,9 @@ struct BrowserSignIn {
             let registered = try #require(server.requests(to: "/auth/oauth2/register").first).json
             #expect(registered["application_type"] as? String == "native")
             #expect(registered["token_endpoint_auth_method"] as? String == "none")
-            #expect(
-                registered["grant_types"] as? [String] == [
-                    "authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code",
-                ])
+            // marfa lists a client that holds the device grant as a command-line tool.
+            #expect(registered["grant_types"] as? [String] == ["authorization_code", "refresh_token"])
+            #expect(registered["response_types"] as? [String] == ["code"])
             #expect(registered["redirect_uris"] as? [String] == ["so.marfa.tests:/signed-in"])
 
             let exchange = try #require(server.requests(to: "/auth/oauth2/token").first).form
@@ -112,6 +112,48 @@ struct BrowserSignIn {
             #expect(kept.accessToken == "at-1")
             #expect(kept.refreshToken == "rt-1")
             #expect(!"\(credential)".contains("at-1"))
+        }
+    }
+
+    @Test func aSignInReusesTheKeptRegistrationOnlyWhenItHoldsTheGrantTheFlowNeeds() async throws {
+        let server = ScriptedAuthServer()
+        let origin = server.origin
+        marfa(server) { request in
+            switch request.path {
+            case "/auth/oauth2/token": tokens("at-1", "rt-1")
+            case "/auth/device/code":
+                .json(
+                    200,
+                    [
+                        "device_code": "device-1", "user_code": "ABCD-EFGH", "verification_uri": "\(origin)/auth/device",
+                        "expires_in": 600, "interval": 5,
+                    ])
+            default: .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            let approve: @MainActor @Sendable (URL, String) async throws -> URL = { url, _ in
+                let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first { $0.name == "state" }?.value
+                return URL(string: "so.marfa.tests:/signed-in?code=the-code&state=\(state ?? "")")!
+            }
+            _ = try await authorization.signIn(browser: approve)
+            _ = try await authorization.signIn(browser: approve)
+            #expect(server.requests(to: "/auth/oauth2/register").count == 1)
+
+            _ = try await authorization.startDeviceSignIn().credential()
+            let registered = server.requests(to: "/auth/oauth2/register").map(\.json)
+            #expect(registered.count == 2)
+            #expect(registered.last?["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
+            #expect(registered.last?["redirect_uris"] == nil)
+            _ = try await authorization.startDeviceSignIn().credential()
+            #expect(server.requests(to: "/auth/oauth2/register").count == 2)
+
+            _ = try await authorization.signIn(browser: approve)
+            #expect(server.requests(to: "/auth/oauth2/register").count == 3)
         }
     }
 
@@ -236,7 +278,7 @@ struct DeviceSignInPolling {
 
             let registered = try #require(server.requests(to: "/auth/oauth2/register").first).json
             #expect(registered["redirect_uris"] == nil)
-            #expect(registered["grant_types"] as? [String] == ["refresh_token", deviceCodeGrant])
+            #expect(registered["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
         }
     }
 

@@ -44,6 +44,8 @@ func origin(of url: URL) -> String? {
 /// One keychain item holds all of it, so a reader never sees a token beside another sign-in's client.
 struct KeptSignIn: Codable, Sendable, Equatable {
     var clientId: String
+    /// The grants the client was registered for.
+    var grantTypes: [String]
     var redirect: String?
     var accessToken: String
     var refreshToken: String?
@@ -53,6 +55,7 @@ struct KeptSignIn: Codable, Sendable, Equatable {
 
     enum CodingKeys: String, CodingKey {
         case clientId = "client_id"
+        case grantTypes = "grant_types"
         case redirect
         case accessToken = "access_token"
         case refreshToken = "refresh_token"

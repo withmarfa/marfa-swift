@@ -3,8 +3,9 @@ import Foundation
 
 /// Signs an app in to one Marfa server, with the owner's approval, and keeps the sign-in in the keychain.
 ///
-/// The app registers with the server as a native client the first time it signs in, and the
-/// registration is kept with the tokens, so it registers again only after it signs out or the sign-in ends.
+/// The app registers with the server as a native client the first time it signs in, for the grant that
+/// sign-in uses, and the registration is kept with the tokens. It registers again after it signs out or the
+/// sign-in ends, and when it signs in another way than the kept registration allows.
 /// Sign in with a browser through ``signIn(presentingFrom:prefersEphemeralWebBrowserSession:)`` or
 /// ``signIn(using:)``, or, without a browser, through ``startDeviceSignIn()``. Then open a copy with
 /// ``Server/init(url:credential:)``: the copy renews the access token with the kept refresh token whenever the
@@ -96,7 +97,8 @@ public struct Authorization: Sendable {
             preconditionFailure("a browser sign-in needs Client.redirect")
         }
         let discovery = try await Discovery.read(place.account, transport)
-        let clientId = try await registration(discovery)
+        let registered = try await registration(discovery, for: "authorization_code")
+        let clientId = registered.clientId
         let proof = ProofKey()
         let state = randomText()
         guard var authorize = URLComponents(string: discovery.authorizationEndpoint) else {
@@ -138,7 +140,7 @@ public struct Authorization: Sendable {
                     ("client_id", clientId), ("code_verifier", proof.verifier),
                 ]), transport)
         guard exchanged.status == 200 else { throw exchanged.refusal() }
-        return try await keep(TokenAnswer.read(exchanged), clientId: clientId, discovery: discovery)
+        return try await keep(TokenAnswer.read(exchanged), registered: registered, discovery: discovery)
     }
 
     /// Starts the device grant (RFC 8628), for an app that cannot show a browser: show the person
@@ -146,10 +148,11 @@ public struct Authorization: Sendable {
     /// ``DeviceSignIn/credential()``.
     public func startDeviceSignIn() async throws -> DeviceSignIn {
         let discovery = try await Discovery.read(place.account, transport)
-        let clientId = try await registration(discovery)
+        let registered = try await registration(discovery, for: deviceCodeGrant)
         let started = try await send(
             try formRequest(
-                discovery.deviceAuthorizationEndpoint, [("client_id", clientId), ("scope", client.scope)]),
+                discovery.deviceAuthorizationEndpoint,
+                [("client_id", registered.clientId), ("scope", client.scope)]),
             transport)
         guard started.status == 200 else { throw started.refusal() }
         guard let object = started.object, let deviceCode = object["device_code"] as? String,
@@ -166,7 +169,7 @@ public struct Authorization: Sendable {
             userCode: userCode, verificationURL: verification, verificationURLComplete: complete,
             expiresAt: transport.now().addingTimeInterval(expiresIn),
             polling: DeviceSignIn.Polling(
-                authorization: self, discovery: discovery, clientId: clientId, deviceCode: deviceCode,
+                authorization: self, discovery: discovery, registered: registered, deviceCode: deviceCode,
                 interval: .seconds(interval)))
     }
 
@@ -200,29 +203,30 @@ public struct Authorization: Sendable {
         }
     }
 
-    /// The client registered for this server.
+    /// The client registered for this server that may use `grant`.
     ///
-    /// The kept one while a sign-in holds it, so a grant names it, and a new one otherwise. A registration
-    /// nothing has approved can be removed by the server, so one is never kept apart from a sign-in.
-    private func registration(_ discovery: Discovery) async throws -> String {
+    /// The kept one while a sign-in holds it and it was registered for `grant`, so a grant names it, and a
+    /// new one otherwise. A registration nothing has approved can be removed by the server, so one is never
+    /// kept apart from a sign-in. Each registration names only the grant its flow uses, because the server
+    /// tells the owner what kind of app it approved from the grants the app registered.
+    private func registration(_ discovery: Discovery, for grant: String) async throws -> Registered {
         let place = place
-        if let kept = try await background({ try place.read() }), kept.redirect == client.redirect?.absoluteString {
-            return kept.clientId
+        let redirect = grant == "authorization_code" ? client.redirect?.absoluteString : nil
+        if let kept = try await background({ try place.read() }), kept.grantTypes.contains(grant),
+            kept.redirect == redirect
+        {
+            return Registered(clientId: kept.clientId, grantTypes: kept.grantTypes, redirect: kept.redirect)
         }
+        let grantTypes = [grant, "refresh_token"]
         var metadata: [String: Any] = [
             "client_name": client.name,
             "application_type": "native",
             "token_endpoint_auth_method": "none",
             "scope": client.scope,
+            "grant_types": grantTypes,
+            "response_types": redirect == nil ? [String]() : ["code"],
         ]
-        if let redirect = client.redirect {
-            metadata["grant_types"] = ["authorization_code", "refresh_token", deviceCodeGrant]
-            metadata["response_types"] = ["code"]
-            metadata["redirect_uris"] = [redirect.absoluteString]
-        } else {
-            metadata["grant_types"] = ["refresh_token", deviceCodeGrant]
-            metadata["response_types"] = [String]()
-        }
+        if let redirect { metadata["redirect_uris"] = [redirect] }
         guard let at = URL(string: discovery.registrationEndpoint) else {
             throw SignInError.unreadable(message: "\(discovery.registrationEndpoint) is not an address")
         }
@@ -235,12 +239,22 @@ public struct Authorization: Sendable {
         guard let clientId = answer.object?["client_id"] as? String, !clientId.isEmpty else {
             throw SignInError.unreadable(message: "the registration answered no client_id")
         }
-        return clientId
+        return Registered(clientId: clientId, grantTypes: grantTypes, redirect: redirect)
     }
 
-    fileprivate func keep(_ token: TokenAnswer, clientId: String, discovery: Discovery) async throws -> Credential {
+    /// A client registered for one sign-in flow.
+    struct Registered: Sendable {
+        let clientId: String
+        let grantTypes: [String]
+        let redirect: String?
+    }
+
+    fileprivate func keep(_ token: TokenAnswer, registered: Registered, discovery: Discovery) async throws
+        -> Credential
+    {
         let kept = KeptSignIn(
-            clientId: clientId, redirect: client.redirect?.absoluteString, accessToken: token.accessToken,
+            clientId: registered.clientId, grantTypes: registered.grantTypes, redirect: registered.redirect,
+            accessToken: token.accessToken,
             refreshToken: token.refreshToken, scope: token.scope ?? client.scope,
             tokenEndpoint: discovery.tokenEndpoint, revocationEndpoint: discovery.revocationEndpoint)
         let place = place
@@ -264,7 +278,7 @@ public struct DeviceSignIn: Sendable {
     struct Polling: Sendable {
         let authorization: Authorization
         let discovery: Discovery
-        let clientId: String
+        let registered: Authorization.Registered
         let deviceCode: String
         let interval: Duration
     }
@@ -292,14 +306,14 @@ public struct DeviceSignIn: Sendable {
                         polling.discovery.tokenEndpoint,
                         [
                             ("grant_type", deviceCodeGrant), ("device_code", polling.deviceCode),
-                            ("client_id", polling.clientId),
+                            ("client_id", polling.registered.clientId),
                         ]), transport)
             } catch .canceled {
                 throw CancellationError()
             }
             if answer.status == 200 {
                 return try await polling.authorization.keep(
-                    TokenAnswer.read(answer), clientId: polling.clientId, discovery: polling.discovery)
+                    TokenAnswer.read(answer), registered: polling.registered, discovery: polling.discovery)
             }
             switch (answer.status, answer.code) {
             case (_, "authorization_pending"): continue
