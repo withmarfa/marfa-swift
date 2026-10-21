@@ -125,7 +125,8 @@ struct BrowserSignIn {
                 .json(
                     200,
                     [
-                        "device_code": "device-1", "user_code": "ABCD-EFGH", "verification_uri": "\(origin)/auth/device",
+                        "device_code": "device-1", "user_code": "ABCD-EFGH",
+                        "verification_uri": "\(origin)/auth/device",
                         "expires_in": 600, "interval": 5,
                     ])
             default: .json(404, [:])
@@ -489,6 +490,23 @@ struct SigningOut {
             #expect(!"\(made)".contains("at-1"))
             try await authorization.signOut()
             #expect(throws: SignInError.notSignedIn) { try Server(url: server.url, credential: credential) }
+        }
+    }
+
+    @Test func aCopyOrFoldersOpenedAfterSignOutIsNotSignedInRatherThanSendingTheOldToken() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(200, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            let made = try Server(url: server.url, credential: credential)
+            try await authorization.signOut()
+            let store = FileManager.default.temporaryDirectory.appending(path: "marfa-signed-out-\(UUID()).db")
+            defer { try? FileManager.default.removeItem(at: store) }
+            await #expect(throws: SignInError.notSignedIn) { try await WorkingCopy.open(store: store, server: made) }
+            #if os(macOS)
+            _ = FolderFixture.registry
+            await #expect(throws: SignInError.notSignedIn) { try await Folders(server: made).list() }
+            #endif
         }
     }
 }

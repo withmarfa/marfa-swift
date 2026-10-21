@@ -122,13 +122,12 @@ public struct Folders: Sendable {
     }
 
     private func run<T: Sendable>(_ work: @escaping @Sendable (MarfaCore.Folders) throws -> T) async throws -> T {
-        let url = server?.url.absoluteString
-        let key = server?.key
-        let credential = server?.credential
+        let server = server
         return try await background {
             try work(
                 MarfaCore.Folders(
-                    url: url, key: try credential?.accessToken() ?? key, renewer: credential.map(TokenRenewer.init)))
+                    url: server?.url.absoluteString, key: try server?.openingToken(),
+                    renewer: server?.credential.map(TokenRenewer.init)))
         }
     }
 }

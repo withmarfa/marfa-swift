@@ -31,6 +31,16 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
         self.credential = credential
     }
 
+    /// The token a copy or ``Folders`` opens with: the key, or the access token the keychain holds now.
+    ///
+    /// Throws ``SignInError/notSignedIn`` once the sign-in is gone, rather than sending the token ``key``
+    /// held when the server was made.
+    func openingToken() throws -> String {
+        guard let credential else { return key }
+        guard let token = try credential.accessToken() else { throw SignInError.notSignedIn }
+        return token
+    }
+
     /// Neither case repeats a value, which could be a key.
     public enum EnvironmentError: Error, Hashable, CustomStringConvertible {
         /// One of `MARFA_API_URL` and `MARFA_API_KEY` is set and the other is missing or empty.
