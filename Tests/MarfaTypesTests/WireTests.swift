@@ -249,3 +249,13 @@ func anAuditActorDecodesAsEitherSignInShapeOrNull(actor: String, id: String?) th
     #expect(object["actor"] is NSNull == (id == nil))
     #expect(try JSONDecoder().decode(Components.Schemas.AuditEntry.self, from: encoded) == entry)
 }
+
+@Test(arguments: ["", #""actor":{"kind":"server"},"#, #""actor":"Safari","#])
+func anAuditEntryRequiresAnActorOfTheDocumentedShape(actor: String) {
+    let wire =
+        "{" + actor + #""id":"a","created_at":"now","key_id":null,"action":"owner.claimed","#
+        + #""resource_type":"owner","resource_id":null,"client_ip":null,"details":{}}"#
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(Components.Schemas.AuditEntry.self, from: Data(wire.utf8))
+    }
+}
