@@ -52,6 +52,42 @@ for note in try await copy.items.list(ListFilters(type: "core.note")) {
 
 `storeURL` is where the working copy keeps its SQLite file, and `serverURL` is your instance's address. Keep `key` in the keychain between launches with `Keychain.system`; the copy holds it in memory and never writes it to its store.
 
+## Sign in
+
+An app that people install signs in to their instance instead of asking them for a key. The owner approves the app in the browser, and the package keeps the sign-in in the keychain and renews it when the instance stops accepting its access token.
+
+1. Choose a redirect address whose scheme is a reverse domain name you control, such as `com.example.notes:/signed-in`, and add the scheme to your app's `CFBundleURLTypes`.
+2. Sign in, and open the working copy with the credential:
+
+   ```swift
+   import Marfa
+
+   let authorization = try Authorization(
+       server: serverURL,
+       client: .init(
+           name: "Notes",
+           redirect: URL(string: "com.example.notes:/signed-in"),
+           scopes: ["core.note:read", "core.note:write"]),
+       service: "com.example.notes")
+
+   let credential: Credential
+   if let kept = try authorization.credential() {
+       credential = kept
+   } else {
+       credential = try await authorization.signIn(presentingFrom: window)
+   }
+   let server = try Server(url: serverURL, credential: credential)
+   let copy = try await WorkingCopy.open(store: storeURL, server: server)
+   ```
+
+   In SwiftUI, pass the `webAuthenticationSession` environment value to `signIn(using:)` instead.
+
+An app without a browser, such as one on a TV or a command-line tool, uses `startDeviceSignIn()`: show the person its `userCode` and `verificationURL`, then wait on `credential()` while they approve on another device.
+
+When the instance ends the sign-in, for example because the owner revoked the app, calls throw `MarfaError.signedOut` and the keychain no longer holds it; sign in again and open the copy with the new credential. `signOut()` deletes the sign-in from the keychain and revokes it at the instance.
+
+To share the sign-in with your app's extensions, pass `keychain: Keychain(accessGroup:)` with an access group that every target's entitlements name.
+
 ## Test and preview
 
 The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. Its module compiles empty in a release build, so nothing from it ships; wrap its uses in `#if DEBUG`. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:

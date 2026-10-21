@@ -3,11 +3,42 @@ import Foundation
 /// A working copy holds the key in memory and never writes it to its store.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
     public var url: URL
+    /// An API key, or for a server made from a credential, the access token kept when it was made.
     public var key: String
+    /// The sign-in the server was made from, which a copy or ``Folders`` renews when the server refuses its
+    /// access token; `nil` for a server made from a key.
+    public let credential: Credential?
 
     public init(url: URL, key: String) {
         self.url = url
         self.key = key
+        credential = nil
+    }
+
+    /// The server at `url`, signed in to with `credential`.
+    ///
+    /// A ``WorkingCopy`` or ``Folders`` opened on it sends the access token kept at the time and renews it
+    /// whenever the server refuses it. Once the server ends the sign-in, calls throw
+    /// ``MarfaError/signedOut(origin:message:)`` until the app signs in again.
+    ///
+    /// Throws ``SignInError/otherServer`` when `url` is not on the server the credential is for, and
+    /// ``SignInError/notSignedIn`` when the keychain no longer holds the sign-in.
+    public init(url: URL, credential: Credential) throws {
+        guard origin(of: url) == credential.place.account else { throw SignInError.otherServer }
+        guard let token = try credential.accessToken() else { throw SignInError.notSignedIn }
+        self.url = url
+        key = token
+        self.credential = credential
+    }
+
+    /// The token a copy or ``Folders`` opens with: the key, or the access token the keychain holds now.
+    ///
+    /// Throws ``SignInError/notSignedIn`` once the sign-in is gone, rather than sending the token ``key``
+    /// held when the server was made.
+    func openingToken() throws -> String {
+        guard let credential else { return key }
+        guard let token = try credential.accessToken() else { throw SignInError.notSignedIn }
+        return token
     }
 
     /// Neither case repeats a value, which could be a key.

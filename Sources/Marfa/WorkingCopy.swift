@@ -58,16 +58,21 @@ public final class WorkingCopy: Sendable {
     ///
     /// Throws `MarfaError.store` when the store's lock file exists but cannot
     /// be opened for writing, rather than opening a copy that holds a lock it
-    /// cannot keep.
+    /// cannot keep. Throws `SignInError.notSignedIn` for a server made from a
+    /// credential whose sign-in the keychain no longer holds.
     public static func open(store: URL, server: Server? = nil) async throws -> WorkingCopy {
         let path = store.path
-        let key = server?.key
         guard let server else {
-            let core = try await background { try Core.open(path: path, url: nil, key: key) }
+            let core = try await background { try Core.open(path: path, url: nil, key: nil) }
             return WorkingCopy(holder: CoreHolder(core), hasServer: false)
         }
         let url = server.url.absoluteString
-        let core = try await background { try Core.open(path: path, url: url, key: key) }
+        let credential = server.credential
+        let core = try await background {
+            try Core.open(
+                path: path, url: url, key: try server.openingToken(), renewer: credential.map(TokenRenewer.init))
+        }
+        // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
         let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
             try Core.open(path: path, url: url, key: key)
         }

@@ -128664,12 +128664,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/owner/POST/responses/401/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/owner/POST/responses/401/content/application\/json`.
-                    case json(Components.Schemas.UnauthorizedRefusal)
+                    case json(Components.Schemas.SetupProofInvalidRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.UnauthorizedRefusal {
+                    public var json: Components.Schemas.SetupProofInvalidRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -153493,7 +153493,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `conflict`: the delivery isn't `dead_letter`, it's older than the instance's audit retention, or the webhook is turned off.
+            /// - `conflict`: Marfa can't send it again. `details.reason` is the first that applies: `webhook_inactive`; `credential_unavailable`, the registering key or app is gone or lacks `webhooks.manage`; `delivery_not_failed`; `delivery_expired`, past audit retention; or `delivery_not_retained`, its event is no longer held.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/409`.
             ///
