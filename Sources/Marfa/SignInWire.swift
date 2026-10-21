@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Synchronization
 
 /// What the HTTP calls of a sign-in and a renewal run on.
 ///
@@ -9,7 +8,12 @@ struct SignInTransport: Sendable {
     var session: URLSession
     /// The longest a token request may take before a renewal gives up and reports the server unavailable.
     var timeLimit: Duration = .seconds(30)
-    /// How long one renewal may hold the keychain's renewal lease before another process may take it.
+    /// The longest a token request may run in all.
+    ///
+    /// A renewal that gives up at `timeLimit` leaves its request running, still holding the lease, until it
+    /// answers or this passes.
+    var requestLimit: Duration = .seconds(90)
+    /// How long a ``RenewalLease`` lasts unless its holder moves it on, after which another holder may take it.
     var leaseLifetime: Duration = .seconds(60)
     var leasePoll: Duration = .milliseconds(100)
     var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
@@ -88,55 +92,14 @@ struct SignInPlace: Sendable, Hashable {
         try keychain.delete(service: service, account: account)
     }
 
-    /// Runs `work` while this process holds the place's lock, and the keychain holds this process's lease.
+    /// Runs `work` while holding the place's ``RenewalLease``, so no renewal or other sign-in write of this
+    /// process or another runs at the same time.
     ///
-    /// The lock serializes every renewal and sign-in write in the process. The lease does the same across
-    /// processes that share the keychain, such as an app and its extensions: the keychain refuses a second
-    /// item under one service and account, so whichever process adds the lease item first holds it. A lease
-    /// names the moment it lapses, so one left by a process that died is taken over once it lapses.
-    ///
-    /// Blocks the calling thread while another holder renews; never call it on the main thread.
+    /// Blocks the calling thread while another holder has the lease; never call it on the main thread.
     func exclusively<T>(_ transport: SignInTransport, _ work: () throws -> T) throws -> T {
-        let lock = Self.lock(for: self)
-        lock.lock()
-        defer { lock.unlock() }
-        let mine = try takeLease(transport)
-        defer { try? keychain.delete(label: mine, service: service, account: leaseAccount) }
+        let lease = try RenewalLease.take(self, transport)
+        defer { lease.release() }
         return try work()
-    }
-
-    private func takeLease(_ transport: SignInTransport) throws -> String {
-        let lifetime = transport.leaseLifetime.seconds
-        // Wall time, not `transport.now`: another process reads the moment a lease lapses.
-        let giveUp = Date().addingTimeInterval(lifetime * 2)
-        while true {
-            let now = Date()
-            let mine = "\(UUID().uuidString) \(Int64((now.timeIntervalSince1970 + lifetime) * 1000))"
-            if try keychain.add(label: mine, service: service, account: leaseAccount) { return mine }
-            guard let held = try keychain.label(service: service, account: leaseAccount) else { continue }
-            let lapses = held.split(separator: " ").last.flatMap { Int64($0) }.map {
-                Date(timeIntervalSince1970: Double($0) / 1000)
-            }
-            if lapses.map({ $0 <= now }) ?? true {
-                try keychain.delete(label: held, service: service, account: leaseAccount)
-                continue
-            }
-            if now >= giveUp { throw LeaseHeld() }
-            Thread.sleep(forTimeInterval: transport.leasePoll.seconds)
-        }
-    }
-
-    struct LeaseHeld: Error {}
-
-    private static let locks = Mutex<[SignInPlace: NSLock]>([:])
-
-    private static func lock(for place: SignInPlace) -> NSLock {
-        locks.withLock { locks in
-            if let lock = locks[place] { return lock }
-            let lock = NSLock()
-            locks[place] = lock
-            return lock
-        }
     }
 }
 

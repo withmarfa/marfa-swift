@@ -127,6 +127,18 @@ public struct Keychain: Sendable, Hashable {
         if status != errSecItemNotFound { try Self.check(status) }
     }
 
+    /// Changes the item's label from `from` to `to`, only while it still carries `from`.
+    ///
+    /// Answers whether it did: `false` when the item is gone or carries another label.
+    func relabel(from: String, to: String, service: String, account: String) throws -> Bool {
+        var query = try searching(service: service, account: account)
+        query[kSecAttrLabel] = from
+        let status = SecItemUpdate(query as CFDictionary, [kSecAttrLabel: to] as CFDictionary)
+        if status == errSecItemNotFound { return false }
+        try Self.check(status)
+        return true
+    }
+
     private func attributes(service: String, account: String?) throws -> [String: Any]? {
         var query = try searching(service: service, account: account)
         query[kSecReturnAttributes] = true

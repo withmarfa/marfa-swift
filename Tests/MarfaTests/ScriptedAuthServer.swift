@@ -8,11 +8,13 @@ import Synchronization
 /// It is reached through a `URLSession` whose requests never leave the process. Each server has a host of its
 /// own, so tests that run at once never share one.
 final class ScriptedAuthServer: Sendable {
-    enum Reply: Sendable {
+    indirect enum Reply: Sendable {
         case json(Int, [String: any Sendable], headers: [String: String] = [:])
         /// Never answers, as a server that has gone quiet.
         case silence
         case failure(URLError.Code)
+        /// Answers `reply` once `delay` has passed, unless the request was canceled first.
+        case delayed(Duration, Reply)
     }
 
     struct Request: Sendable {
@@ -62,6 +64,7 @@ final class ScriptedAuthServer: Sendable {
         configuration.protocolClasses = [ScriptedProtocol.self]
         var transport = SignInTransport(session: URLSession(configuration: configuration))
         transport.timeLimit = .milliseconds(500)
+        transport.requestLimit = .seconds(3)
         transport.leaseLifetime = .seconds(1)
         transport.leasePoll = .milliseconds(20)
         transport.sleep = { duration in
@@ -110,6 +113,8 @@ final class TestClock: Sendable {
 }
 
 final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
+    private let stopped = Mutex(false)
+
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
@@ -134,9 +139,16 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
         let headers = (request.allHTTPHeaderFields ?? [:])
         let reply = server.handle(
             .init(method: request.httpMethod ?? "GET", path: url.path(), headers: headers, body: body))
+        deliver(reply, for: url)
+    }
+
+    private func deliver(_ reply: ScriptedAuthServer.Reply, for url: URL) {
+        if stopped.withLock({ $0 }) { return }
         switch reply {
         case .silence:
             return
+        case .delayed(let delay, let later):
+            DispatchQueue.global().asyncAfter(deadline: .now() + delay.seconds) { self.deliver(later, for: url) }
         case .failure(let code):
             client?.urlProtocol(self, didFailWithError: URLError(code))
         case .json(let status, let object, let extra):
@@ -155,5 +167,7 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
         }
     }
 
-    override func stopLoading() {}
+    override func stopLoading() {
+        stopped.withLock { $0 = true }
+    }
 }

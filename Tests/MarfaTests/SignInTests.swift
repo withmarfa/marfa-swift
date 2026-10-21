@@ -54,6 +54,14 @@ private func signedIn(
     return (authorization, try #require(try authorization.credential()))
 }
 
+extension KeptSignIn {
+    func with(accessToken: String) -> KeptSignIn {
+        var changed = self
+        changed.accessToken = accessToken
+        return changed
+    }
+}
+
 /// Runs `renew` off the main thread, as the core does.
 private func renew(_ credential: Credential, refused: String) async throws -> String {
     let renewer = TokenRenewer(credential)
@@ -447,6 +455,113 @@ struct TokenRenewal {
         }
     }
 
+    /// The same keychain file as `keychain`, reached as another process reaches it: no lock of this process's
+    /// renewals is shared with it.
+    private func anotherProcess(_ keychain: Keychain, _ server: ScriptedAuthServer, _ transport: SignInTransport)
+        throws -> Credential
+    {
+        let authorization = try Authorization(
+            server: server.url, client: client, keychain: Keychain(narrow: keychain.narrow), service: service,
+            transport: transport)
+        return try #require(try authorization.credential())
+    }
+
+    @Test func aRenewalWhoseRequestOutlivesItsLeaseSpendsTheRefreshTokenOnce() async throws {
+        let server = ScriptedAuthServer()
+        // Longer than the lease's lifetime, so a lease that lapsed while its holder waited would be taken.
+        marfa(server) { _ in .delayed(.milliseconds(1500), tokens("at-2", "rt-2")) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = server.transport()
+            let (authorization, holder) = try signedIn(server, keychain, transport: transport)
+            let other = try anotherProcess(keychain, server, transport)
+            await #expect {
+                try await renew(holder, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try await renew(other, refused: "at-1") == "at-2")
+            #expect(server.requests(to: "/auth/oauth2/token").map { $0.form["refresh_token"] } == ["rt-1"])
+            #expect(try authorization.place.read()?.refreshToken == "rt-2")
+        }
+    }
+
+    @Test func aRenewalThatGaveUpKeepsTheAnswerThatArrivesLate() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .delayed(.milliseconds(800), tokens("at-2", "rt-2")) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            try await eventually("the late answer is kept", within: 5) {
+                (try? authorization.place.read()?.refreshToken) == "rt-2"
+            }
+            #expect(try authorization.place.read()?.accessToken == "at-2")
+            try await eventually("the lease is let go", within: 5) {
+                (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
+            }
+        }
+    }
+
+    @Test func aRenewalWritesNothingOverASignInThatChangedWhileItAsked() async throws {
+        let renewedElsewhere = KeptSignIn(
+            clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
+            redirect: client.redirect?.absoluteString, accessToken: "at-9", refreshToken: "rt-9", scope: nil,
+            tokenEndpoint: "https://unused.example/token", revocationEndpoint: nil)
+        // While the request is out: another process renews, signs out, or takes the lease.
+        let changes: [(String, @Sendable (SignInPlace) throws -> Void)] = [
+            ("renewed", { try $0.keep(renewedElsewhere) }),
+            ("signed out", { try $0.drop() }),
+            (
+                "lease taken",
+                { place in
+                    try place.keychain.delete(service: place.service, account: place.leaseAccount)
+                    _ = try place.keychain.add(label: "taken", service: place.service, account: place.leaseAccount)
+                }
+            ),
+        ]
+        for (change, apply) in changes {
+            for reply in [tokens("at-2", "rt-2"), oauthError("invalid_grant")] {
+                let server = ScriptedAuthServer()
+                try await inIsolatedKeychainAsync { keychain, _ async throws in
+                    let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+                    let place = authorization.place
+                    marfa(server) { _ in
+                        try? apply(place)
+                        return reply
+                    }
+                    let original = try place.read()
+                    var renewed: String?
+                    var failure: (any Error)?
+                    do { renewed = try await renew(credential, refused: "at-1") } catch { failure = error }
+                    switch change {
+                    case "signed out":
+                        if case RenewalError.Ended? = failure as? RenewalError {
+                        } else {
+                            Issue.record(
+                                "\(change): renewed \(String(describing: renewed)), \(String(describing: failure))")
+                        }
+                        #expect(try place.read() == nil)
+                    case "renewed":
+                        #expect(renewed == "at-9", "\(change)")
+                        #expect(try place.read() == renewedElsewhere, "\(change)")
+                    default:
+                        #expect(renewed == "at-1", "\(change)")
+                        #expect(try place.read() == original, "\(change)")
+                    }
+                    if change == "lease taken" {
+                        #expect(try keychain.label(service: service, account: place.leaseAccount) == "taken")
+                    }
+                }
+            }
+        }
+    }
+
     @Test func aRenewalOnTheMainThreadIsRefusedRatherThanBlockingIt() async throws {
         let server = ScriptedAuthServer()
         marfa(server) { _ in tokens("at-2", "rt-2") }
@@ -472,8 +587,9 @@ struct TokenRenewal {
             let transport = server.transport()
             let (authorization, credential) = try signedIn(server, keychain, transport: transport)
             let place = authorization.place
-            let lapses = Int64((Date().timeIntervalSince1970 + 600) * 1000)
-            #expect(try keychain.add(label: "other \(lapses)", service: service, account: place.leaseAccount))
+            let boot = RenewalLease.bootSession
+            let held = "other \(boot) \(RenewalLease.now() + 600_000_000_000)"
+            #expect(try keychain.add(label: held, service: service, account: place.leaseAccount))
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
@@ -481,14 +597,32 @@ struct TokenRenewal {
                 return true
             }
             #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
-            #expect(try keychain.label(service: service, account: place.leaseAccount) == "other \(lapses)")
+            #expect(try keychain.label(service: service, account: place.leaseAccount) == held)
 
-            try keychain.delete(service: service, account: place.leaseAccount)
-            let lapsed = Int64((Date().timeIntervalSince1970 - 1) * 1000)
-            #expect(try keychain.add(label: "dead \(lapsed)", service: service, account: place.leaseAccount))
-            #expect(try await renew(credential, refused: "at-1") == "at-2")
-            #expect(try keychain.label(service: service, account: place.leaseAccount) == nil)
+            // Lapsed on the shared clock; written before a restart, whose clock has started again; unreadable.
+            for left in [
+                "dead \(boot) \(RenewalLease.now() - 1_000_000_000)",
+                "before-restart 00000000-0000-0000-0000-000000000000 \(RenewalLease.now() + 600_000_000_000)",
+                "unreadable",
+            ] {
+                try keychain.delete(service: service, account: place.leaseAccount)
+                try authorization.place.keep(try #require(try authorization.place.read()).with(accessToken: "at-1"))
+                #expect(try keychain.add(label: left, service: service, account: place.leaseAccount))
+                #expect(try await renew(credential, refused: "at-1") == "at-2", "\(left)")
+                #expect(try keychain.label(service: service, account: place.leaseAccount) == nil, "\(left)")
+            }
         }
+    }
+
+    @Test func aLeaseLabelNamesThisBootAndALapseOnTheSharedClock() throws {
+        let label = RenewalLease.label(lapsingIn: .seconds(60))
+        let parts = label.split(separator: " ").map(String.init)
+        #expect(parts.count == 3)
+        #expect(UUID(uuidString: parts[1]) != nil)
+        let lapses = try #require(UInt64(parts[2]))
+        let now = clock_gettime_nsec_np(CLOCK_MONOTONIC)
+        #expect(lapses > now + 59_000_000_000 && lapses <= now + 60_000_000_000)
+        #expect(!RenewalLease.lapsed(label))
     }
 }
 
