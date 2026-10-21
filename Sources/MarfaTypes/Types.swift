@@ -671,7 +671,7 @@ public protocol APIProtocol: Sendable {
     func revokeKey(_ input: Operations.RevokeKey.Input) async throws -> Operations.RevokeKey.Output
     /// Get the configuration
     ///
-    /// Returns the instance configuration: its display name, enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
     ///
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.
@@ -2318,7 +2318,7 @@ extension APIProtocol {
     }
     /// Get the configuration
     ///
-    /// Returns the instance configuration: its display name, enforcement levers and retention settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
     ///
     /// - Remark: HTTP `GET /config`.
     /// - Remark: Generated from `#/paths//config/get(getConfig)`.

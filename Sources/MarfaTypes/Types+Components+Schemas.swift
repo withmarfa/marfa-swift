@@ -1216,7 +1216,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Version/writer`.
             public struct WriterPayload: Codable, Hashable, Sendable {
-                /// What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Version/writer/kind`.
                 @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -1225,7 +1225,7 @@ extension Components {
                     case key = "key"
                     case local = "local"
                 }
-                /// What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Version/writer/kind`.
                 public var kind: Components.Schemas.Version.WriterPayload.KindPayload
@@ -1233,16 +1233,16 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/Version/writer/id`.
                 public var id: Swift.String
-                /// The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Version/writer/name`.
                 public var name: Swift.String
                 /// Creates a new `WriterPayload`.
                 ///
                 /// - Parameters:
-                ///   - kind: What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                 ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-                ///   - name: The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 public init(
                     kind: Components.Schemas.Version.WriterPayload.KindPayload,
                     id: Swift.String,
@@ -1715,6 +1715,89 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
+        /// Whether Marfa ships the type, and the sign-in that first registered it when known.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeProvenance`.
+        public struct TypeProvenance: Codable, Hashable, Sendable {
+            /// Where the type came from: shipped by Marfa, registered by a caller, or unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeProvenance/origin`.
+            @frozen public enum OriginPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case platform = "platform"
+                case user = "user"
+                case unknown = "unknown"
+            }
+            /// Where the type came from: shipped by Marfa, registered by a caller, or unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeProvenance/origin`.
+            public var origin: Components.Schemas.TypeProvenance.OriginPayload
+            /// The sign-in that first registered the type, or null when none is recorded.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by`.
+            public struct CreatedByPayload: Codable, Hashable, Sendable {
+                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case browser = "browser"
+                    case app = "app"
+                    case key = "key"
+                    case local = "local"
+                }
+                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by/kind`.
+                public var kind: Components.Schemas.TypeProvenance.CreatedByPayload.KindPayload
+                /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by/id`.
+                public var id: Swift.String
+                /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by/name`.
+                public var name: Swift.String
+                /// Creates a new `CreatedByPayload`.
+                ///
+                /// - Parameters:
+                ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                public init(
+                    kind: Components.Schemas.TypeProvenance.CreatedByPayload.KindPayload,
+                    id: Swift.String,
+                    name: Swift.String
+                ) {
+                    self.kind = kind
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case kind
+                    case id
+                    case name
+                }
+            }
+            /// The sign-in that first registered the type, or null when none is recorded.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by`.
+            public var createdBy: Components.Schemas.TypeProvenance.CreatedByPayload?
+            /// Creates a new `TypeProvenance`.
+            ///
+            /// - Parameters:
+            ///   - origin: Where the type came from: shipped by Marfa, registered by a caller, or unknown.
+            ///   - createdBy: The sign-in that first registered the type, or null when none is recorded.
+            public init(
+                origin: Components.Schemas.TypeProvenance.OriginPayload,
+                createdBy: Components.Schemas.TypeProvenance.CreatedByPayload? = nil
+            ) {
+                self.origin = origin
+                self.createdBy = createdBy
+            }
+            public enum CodingKeys: String, CodingKey {
+                case origin
+                case createdBy = "created_by"
+            }
+        }
         /// The source's current problems, by opaque key. Each message is at most 500 UTF-16 code units. The map has at most 200 entries and 512 KiB serialized as UTF-8. An empty map means no current problems.
         ///
         /// - Remark: Generated from `#/components/schemas/ConnectorProblems`.
@@ -2096,7 +2179,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_by`.
                 public struct TrashedByPayload: Codable, Hashable, Sendable {
-                    /// What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                    /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                     ///
                     /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_by/kind`.
                     @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -2105,7 +2188,7 @@ extension Components {
                         case key = "key"
                         case local = "local"
                     }
-                    /// What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                    /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                     ///
                     /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_by/kind`.
                     public var kind: Components.Schemas.TrashSummary.Value2Payload.TrashedByPayload.KindPayload
@@ -2113,16 +2196,16 @@ extension Components {
                     ///
                     /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_by/id`.
                     public var id: Swift.String
-                    /// The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                    /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                     ///
                     /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_by/name`.
                     public var name: Swift.String
                     /// Creates a new `TrashedByPayload`.
                     ///
                     /// - Parameters:
-                    ///   - kind: What wrote the version. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                    ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                     ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-                    ///   - name: The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                    ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                     public init(
                         kind: Components.Schemas.TrashSummary.Value2Payload.TrashedByPayload.KindPayload,
                         id: Swift.String,
@@ -6908,7 +6991,7 @@ extension Components {
             /// Every type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/data`.
-            public var data: [Components.Schemas.TypeDefinition]
+            public var data: [Components.Schemas.RegisteredType]
             /// Always `null`: Marfa returns every type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/next_cursor`.
@@ -6919,7 +7002,7 @@ extension Components {
             ///   - data: Every type.
             ///   - nextCursor: Always `null`: Marfa returns every type in one page.
             public init(
-                data: [Components.Schemas.TypeDefinition],
+                data: [Components.Schemas.RegisteredType],
                 nextCursor: Swift.String? = nil
             ) {
                 self.data = data
@@ -6932,139 +7015,48 @@ extension Components {
         }
         /// A type says which fields the items of that type hold, and what else Marfa does for them.
         ///
-        /// - Remark: Generated from `#/components/schemas/TypeDefinition`.
-        public struct TypeDefinition: Codable, Hashable, Sendable {
-            /// Unique identifier for the type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/id`.
-            public var id: Swift.String
-            /// The type's name for people to read.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/label`.
-            public var label: Swift.String?
-            /// What the type is for.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/description`.
-            public var description: Swift.String?
-            /// The identifier of the type this one inherits from.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/parent`.
-            public var parent: Swift.String?
-            /// The types this one is a structural superset of.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/compatible_with`.
-            public var compatibleWith: [Swift.String]?
-            /// The structural roles the type plays, including those it inherits.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/roles`.
-            public var roles: [Components.Schemas.TypeRole]?
-            /// The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
-            public struct FieldsPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.FieldDefinition]
-                /// Creates a new `FieldsPayload`.
+        /// - Remark: Generated from `#/components/schemas/RegisteredType`.
+        public struct RegisteredType: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value1`.
+            public var value1: Components.Schemas.TypeDefinition
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// The type's recorded origin and creator.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/provenance`.
+                public var provenance: Components.Schemas.TypeProvenance
+                /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.FieldDefinition] = .init()) {
-                    self.additionalProperties = additionalProperties
+                ///   - provenance: The type's recorded origin and creator.
+                public init(provenance: Components.Schemas.TypeProvenance) {
+                    self.provenance = provenance
                 }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
+                public enum CodingKeys: String, CodingKey {
+                    case provenance
                 }
             }
-            /// The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
-            public var fields: Components.Schemas.TypeDefinition.FieldsPayload
-            /// The version number the type was last saved with.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
-            public var version: Swift.Int
-            /// Which fields clients show as an item's title and body.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
-            public var displayHints: Components.Schemas.DisplayHints?
-            /// The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/link_field`.
-            public var linkField: Swift.String?
-            /// How long Marfa keeps the versions of the type's items.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/version_policy`.
-            public var versionPolicy: Components.Schemas.VersionPolicy?
-            /// How Marfa merges conflicting edits to the type's items.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy`.
-            public var mergePolicy: Components.Schemas.MergePolicy?
-            /// How long Marfa keeps the type's items in the feed tier.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/retention_policy`.
-            public var retentionPolicy: Components.Schemas.RetentionPolicy?
-            /// Creates a new `TypeDefinition`.
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+            public var value2: Components.Schemas.RegisteredType.Value2Payload
+            /// Creates a new `RegisteredType`.
             ///
             /// - Parameters:
-            ///   - id: Unique identifier for the type.
-            ///   - label: The type's name for people to read.
-            ///   - description: What the type is for.
-            ///   - parent: The identifier of the type this one inherits from.
-            ///   - compatibleWith: The types this one is a structural superset of.
-            ///   - roles: The structural roles the type plays, including those it inherits.
-            ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
-            ///   - version: The version number the type was last saved with.
-            ///   - displayHints: Which fields clients show as an item's title and body.
-            ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
-            ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
-            ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
-            ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
+            ///   - value1:
+            ///   - value2:
             public init(
-                id: Swift.String,
-                label: Swift.String? = nil,
-                description: Swift.String? = nil,
-                parent: Swift.String? = nil,
-                compatibleWith: [Swift.String]? = nil,
-                roles: [Components.Schemas.TypeRole]? = nil,
-                fields: Components.Schemas.TypeDefinition.FieldsPayload,
-                version: Swift.Int,
-                displayHints: Components.Schemas.DisplayHints? = nil,
-                linkField: Swift.String? = nil,
-                versionPolicy: Components.Schemas.VersionPolicy? = nil,
-                mergePolicy: Components.Schemas.MergePolicy? = nil,
-                retentionPolicy: Components.Schemas.RetentionPolicy? = nil
+                value1: Components.Schemas.TypeDefinition,
+                value2: Components.Schemas.RegisteredType.Value2Payload
             ) {
-                self.id = id
-                self.label = label
-                self.description = description
-                self.parent = parent
-                self.compatibleWith = compatibleWith
-                self.roles = roles
-                self.fields = fields
-                self.version = version
-                self.displayHints = displayHints
-                self.linkField = linkField
-                self.versionPolicy = versionPolicy
-                self.mergePolicy = mergePolicy
-                self.retentionPolicy = retentionPolicy
+                self.value1 = value1
+                self.value2 = value2
             }
-            public enum CodingKeys: String, CodingKey {
-                case id
-                case label
-                case description
-                case parent
-                case compatibleWith = "compatible_with"
-                case roles
-                case fields
-                case version
-                case displayHints = "display_hints"
-                case linkField = "link_field"
-                case versionPolicy = "version_policy"
-                case mergePolicy = "merge_policy"
-                case retentionPolicy = "retention_policy"
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
             }
         }
         /// A structural role a type plays. `container`: the type can be the target of an `in-collection` edge.
@@ -7280,6 +7272,143 @@ extension Components {
                     forKey: .maxItems
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// A type says which fields the items of that type hold, and what else Marfa does for them.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeDefinition`.
+        public struct TypeDefinition: Codable, Hashable, Sendable {
+            /// Unique identifier for the type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/id`.
+            public var id: Swift.String
+            /// The type's name for people to read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/label`.
+            public var label: Swift.String?
+            /// What the type is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/description`.
+            public var description: Swift.String?
+            /// The identifier of the type this one inherits from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/parent`.
+            public var parent: Swift.String?
+            /// The types this one is a structural superset of.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/compatible_with`.
+            public var compatibleWith: [Swift.String]?
+            /// The structural roles the type plays, including those it inherits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/roles`.
+            public var roles: [Components.Schemas.TypeRole]?
+            /// The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
+            public struct FieldsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.FieldDefinition]
+                /// Creates a new `FieldsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.FieldDefinition] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
+            public var fields: Components.Schemas.TypeDefinition.FieldsPayload
+            /// The version number the type was last saved with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
+            public var version: Swift.Int
+            /// Which fields clients show as an item's title and body.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
+            public var displayHints: Components.Schemas.DisplayHints?
+            /// The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/link_field`.
+            public var linkField: Swift.String?
+            /// How long Marfa keeps the versions of the type's items.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/version_policy`.
+            public var versionPolicy: Components.Schemas.VersionPolicy?
+            /// How Marfa merges conflicting edits to the type's items.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/merge_policy`.
+            public var mergePolicy: Components.Schemas.MergePolicy?
+            /// How long Marfa keeps the type's items in the feed tier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/retention_policy`.
+            public var retentionPolicy: Components.Schemas.RetentionPolicy?
+            /// Creates a new `TypeDefinition`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the type.
+            ///   - label: The type's name for people to read.
+            ///   - description: What the type is for.
+            ///   - parent: The identifier of the type this one inherits from.
+            ///   - compatibleWith: The types this one is a structural superset of.
+            ///   - roles: The structural roles the type plays, including those it inherits.
+            ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///   - version: The version number the type was last saved with.
+            ///   - displayHints: Which fields clients show as an item's title and body.
+            ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
+            ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
+            ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
+            ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
+            public init(
+                id: Swift.String,
+                label: Swift.String? = nil,
+                description: Swift.String? = nil,
+                parent: Swift.String? = nil,
+                compatibleWith: [Swift.String]? = nil,
+                roles: [Components.Schemas.TypeRole]? = nil,
+                fields: Components.Schemas.TypeDefinition.FieldsPayload,
+                version: Swift.Int,
+                displayHints: Components.Schemas.DisplayHints? = nil,
+                linkField: Swift.String? = nil,
+                versionPolicy: Components.Schemas.VersionPolicy? = nil,
+                mergePolicy: Components.Schemas.MergePolicy? = nil,
+                retentionPolicy: Components.Schemas.RetentionPolicy? = nil
+            ) {
+                self.id = id
+                self.label = label
+                self.description = description
+                self.parent = parent
+                self.compatibleWith = compatibleWith
+                self.roles = roles
+                self.fields = fields
+                self.version = version
+                self.displayHints = displayHints
+                self.linkField = linkField
+                self.versionPolicy = versionPolicy
+                self.mergePolicy = mergePolicy
+                self.retentionPolicy = retentionPolicy
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case label
+                case description
+                case parent
+                case compatibleWith = "compatible_with"
+                case roles
+                case fields
+                case version
+                case displayHints = "display_hints"
+                case linkField = "link_field"
+                case versionPolicy = "version_policy"
+                case mergePolicy = "merge_policy"
+                case retentionPolicy = "retention_policy"
             }
         }
         /// An error response.
@@ -7927,12 +8056,12 @@ extension Components {
             /// The type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeResponse/type`.
-            public var _type: Components.Schemas.TypeDefinition
+            public var _type: Components.Schemas.RegisteredType
             /// Creates a new `TypeResponse`.
             ///
             /// - Parameters:
             ///   - _type: The type.
-            public init(_type: Components.Schemas.TypeDefinition) {
+            public init(_type: Components.Schemas.RegisteredType) {
                 self._type = _type
             }
             public enum CodingKeys: String, CodingKey {
@@ -8313,6 +8442,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/retention_policy`.
             public var retentionPolicy: Components.Schemas.RetentionPolicy?
+            /// The recorded origin and creator, accepted when replacing a read response. This field cannot change either value.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/provenance`.
+            public var provenance: Components.Schemas.TypeProvenance?
             /// The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/id`.
@@ -8333,6 +8466,7 @@ extension Components {
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
             ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
+            ///   - provenance: The recorded origin and creator, accepted when replacing a read response. This field cannot change either value.
             ///   - id: The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             public init(
                 fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload,
@@ -8348,6 +8482,7 @@ extension Components {
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
                 retentionPolicy: Components.Schemas.RetentionPolicy? = nil,
+                provenance: Components.Schemas.TypeProvenance? = nil,
                 id: Swift.String? = nil
             ) {
                 self.fields = fields
@@ -8363,6 +8498,7 @@ extension Components {
                 self.versionPolicy = versionPolicy
                 self.mergePolicy = mergePolicy
                 self.retentionPolicy = retentionPolicy
+                self.provenance = provenance
                 self.id = id
             }
             public enum CodingKeys: String, CodingKey {
@@ -8379,6 +8515,7 @@ extension Components {
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
                 case retentionPolicy = "retention_policy"
+                case provenance
                 case id
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -8435,6 +8572,10 @@ extension Components {
                     Components.Schemas.RetentionPolicy.self,
                     forKey: .retentionPolicy
                 )
+                self.provenance = try container.decodeIfPresent(
+                    Components.Schemas.TypeProvenance.self,
+                    forKey: .provenance
+                )
                 self.id = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .id
@@ -8453,6 +8594,7 @@ extension Components {
                     "version_policy",
                     "merge_policy",
                     "retention_policy",
+                    "provenance",
                     "id"
                 ])
             }
@@ -11968,7 +12110,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/id`.
                 public var id: Swift.String
-                /// The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 ///
                 /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/name`.
                 public var name: Swift.String
@@ -11977,7 +12119,7 @@ extension Components {
                 /// - Parameters:
                 ///   - kind: browser: owner browser session; app: signed-in app grant; key: API key.
                 ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-                ///   - name: The sign-in's name when it wrote the version, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 public init(
                     kind: Components.Schemas.FolderStatusGroup.SignInPayload.KindPayload,
                     id: Swift.String,
@@ -12705,7 +12847,7 @@ extension Components {
                 case error
             }
         }
-        /// The instance configuration: its display name, enforcement levers and retention settings, with the instance's ID.
+        /// The instance configuration: its display name, enforcement levers and live settings, with the instance's ID.
         ///
         /// - Remark: Generated from `#/components/schemas/InstanceConfig`.
         public struct InstanceConfig: Codable, Hashable, Sendable {
@@ -12713,6 +12855,42 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/instance_id`.
             public var instanceId: Swift.String
+            /// Days within which every version is kept. Zero makes this window empty. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/version_recent_days`.
+            public var versionRecentDays: Swift.Int?
+            /// Days within which a daily version is kept. Must be at least `version_recent_days`. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/version_daily_snapshot_days`.
+            public var versionDailySnapshotDays: Swift.Int?
+            /// Days within which a weekly version is kept. Must be at least `version_daily_snapshot_days`. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/version_weekly_snapshot_days`.
+            public var versionWeeklySnapshotDays: Swift.Int?
+            /// Maximum versions per item, after applying the time windows. Per-type policy overrides these instance defaults.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/version_max_versions`.
+            public var versionMaxVersions: Swift.Int?
+            /// Disconnect apps unused for this many days. Zero disables retirement.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/grant_inactivity_days`.
+            public var grantInactivityDays: Swift.Int?
+            /// `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_enabled`.
+            public var enrichmentEnabled: Swift.Bool?
+            /// `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_ocr_enabled`.
+            public var enrichmentOcrEnabled: Swift.Bool?
+            /// `true` if error alerts and exception reports are sent. Enabling requires a configured receiver. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/error_reporting_enabled`.
+            public var errorReportingEnabled: Swift.Bool?
+            /// `true` if scheduled heartbeat requests are sent. Enabling requires a configured receiver. Absent: the environment default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/heartbeat_enabled`.
+            public var heartbeatEnabled: Swift.Bool?
             /// The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/name`.
@@ -12782,6 +12960,15 @@ extension Components {
             ///
             /// - Parameters:
             ///   - instanceId: Unique identifier for the instance, the same value `GET /` returns.
+            ///   - versionRecentDays: Days within which every version is kept. Zero makes this window empty. Absent: the environment default applies.
+            ///   - versionDailySnapshotDays: Days within which a daily version is kept. Must be at least `version_recent_days`. Absent: the environment default applies.
+            ///   - versionWeeklySnapshotDays: Days within which a weekly version is kept. Must be at least `version_daily_snapshot_days`. Absent: the environment default applies.
+            ///   - versionMaxVersions: Maximum versions per item, after applying the time windows. Per-type policy overrides these instance defaults.
+            ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement.
+            ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
+            ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
+            ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires a configured receiver. Absent: the environment default applies.
+            ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires a configured receiver. Absent: the environment default applies.
             ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
             ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
             ///   - auditRetentionDays: Days Marfa keeps audit log entries and outbound webhook delivery history. `0` keeps them with no age limit. Absent: the server's default applies.
@@ -12791,6 +12978,15 @@ extension Components {
             ///   - inboundPendingRetentionDays: Days Marfa keeps inbound webhook deliveries no connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
             public init(
                 instanceId: Swift.String,
+                versionRecentDays: Swift.Int? = nil,
+                versionDailySnapshotDays: Swift.Int? = nil,
+                versionWeeklySnapshotDays: Swift.Int? = nil,
+                versionMaxVersions: Swift.Int? = nil,
+                grantInactivityDays: Swift.Int? = nil,
+                enrichmentEnabled: Swift.Bool? = nil,
+                enrichmentOcrEnabled: Swift.Bool? = nil,
+                errorReportingEnabled: Swift.Bool? = nil,
+                heartbeatEnabled: Swift.Bool? = nil,
                 name: Swift.String? = nil,
                 enforcement: Components.Schemas.InstanceConfig.EnforcementPayload? = nil,
                 auditRetentionDays: Swift.Int? = nil,
@@ -12800,6 +12996,15 @@ extension Components {
                 inboundPendingRetentionDays: Swift.Int? = nil
             ) {
                 self.instanceId = instanceId
+                self.versionRecentDays = versionRecentDays
+                self.versionDailySnapshotDays = versionDailySnapshotDays
+                self.versionWeeklySnapshotDays = versionWeeklySnapshotDays
+                self.versionMaxVersions = versionMaxVersions
+                self.grantInactivityDays = grantInactivityDays
+                self.enrichmentEnabled = enrichmentEnabled
+                self.enrichmentOcrEnabled = enrichmentOcrEnabled
+                self.errorReportingEnabled = errorReportingEnabled
+                self.heartbeatEnabled = heartbeatEnabled
                 self.name = name
                 self.enforcement = enforcement
                 self.auditRetentionDays = auditRetentionDays
@@ -12810,6 +13015,15 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case instanceId = "instance_id"
+                case versionRecentDays = "version_recent_days"
+                case versionDailySnapshotDays = "version_daily_snapshot_days"
+                case versionWeeklySnapshotDays = "version_weekly_snapshot_days"
+                case versionMaxVersions = "version_max_versions"
+                case grantInactivityDays = "grant_inactivity_days"
+                case enrichmentEnabled = "enrichment_enabled"
+                case enrichmentOcrEnabled = "enrichment_ocr_enabled"
+                case errorReportingEnabled = "error_reporting_enabled"
+                case heartbeatEnabled = "heartbeat_enabled"
                 case name
                 case enforcement
                 case auditRetentionDays = "audit_retention_days"
@@ -15033,6 +15247,10 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/AuditEntry`.
         public struct AuditEntry: Codable, Hashable, Sendable {
+            /// The sign-in name and kind recorded when the action happened, Marfa for server work, or null when unknown.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AuditEntry/actor`.
+            public var actor: Components.Schemas.MarfaNullableMarfaInlined4567187ff0a66df
             /// Unique identifier for the entry.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/id`.
@@ -15088,6 +15306,7 @@ extension Components {
             /// Creates a new `AuditEntry`.
             ///
             /// - Parameters:
+            ///   - actor: The sign-in name and kind recorded when the action happened, Marfa for server work, or null when unknown.
             ///   - id: Unique identifier for the entry.
             ///   - createdAt: When Marfa recorded the entry, in UTC.
             ///   - keyId: The ID of the credential that acted, or `null` if the entry names none, as for Marfa's own housekeeping.
@@ -15097,6 +15316,7 @@ extension Components {
             ///   - clientIp: The IP address of the request that acted, or `null` if the entry records none.
             ///   - details: More about the action. What it holds depends on `action`.
             public init(
+                actor: Components.Schemas.MarfaNullableMarfaInlined4567187ff0a66df,
                 id: Swift.String,
                 createdAt: Swift.String,
                 keyId: Swift.String? = nil,
@@ -15106,6 +15326,7 @@ extension Components {
                 clientIp: Swift.String? = nil,
                 details: Components.Schemas.AuditEntry.DetailsPayload
             ) {
+                self.actor = actor
                 self.id = id
                 self.createdAt = createdAt
                 self.keyId = keyId
@@ -15116,6 +15337,7 @@ extension Components {
                 self.details = details
             }
             public enum CodingKeys: String, CodingKey {
+                case actor
                 case id
                 case createdAt = "created_at"
                 case keyId = "key_id"
@@ -16289,6 +16511,12 @@ extension Components {
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaInline00404e686415370f`.
         public typealias MarfaInline00404e686415370f = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline0606c3c8f2e5ac06`.
+        public typealias MarfaInline0606c3c8f2e5ac06 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlineea288f4ef558f5f1`.
+        public typealias MarfaInlineea288f4ef558f5f1 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInline7cb541e84f226754`.
+        public typealias MarfaInline7cb541e84f226754 = Swift.Bool
         /// - Remark: Generated from `#/components/schemas/MarfaInline52ba84a4bbf396ba`.
         public typealias MarfaInline52ba84a4bbf396ba = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlineaeb0b69539bcab54`.
@@ -16346,24 +16574,168 @@ extension Components {
                 ])
             }
         }
-        /// - Remark: Generated from `#/components/schemas/MarfaInline0606c3c8f2e5ac06`.
-        public typealias MarfaInline0606c3c8f2e5ac06 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline9983a886c97e38f1`.
         public typealias MarfaInline9983a886c97e38f1 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline59652345197f6db0`.
         public typealias MarfaInline59652345197f6db0 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlinecddf8275afa15408`.
         public typealias MarfaInlinecddf8275afa15408 = Swift.Double
+        /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df`.
+        public struct MarfaInlined4567187ff0a66df: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1`.
+            public struct Value1Payload: Codable, Hashable, Sendable {
+                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case browser = "browser"
+                    case app = "app"
+                    case key = "key"
+                    case local = "local"
+                }
+                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/kind`.
+                public var kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload.KindPayload
+                /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/id`.
+                public var id: Swift.String
+                /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/name`.
+                public var name: Swift.String
+                /// Creates a new `Value1Payload`.
+                ///
+                /// - Parameters:
+                ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+                ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+                ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+                public init(
+                    kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload.KindPayload,
+                    id: Swift.String,
+                    name: Swift.String
+                ) {
+                    self.kind = kind
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case kind
+                    case id
+                    case name
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1`.
+            public var value1: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload?
+            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// Marfa acting without a sign-in.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case server = "server"
+                }
+                /// Marfa acting without a sign-in.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/kind`.
+                public var kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.KindPayload
+                /// The server actor identifier.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/id`.
+                @frozen public enum IdPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case server = "server"
+                }
+                /// The server actor identifier.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/id`.
+                public var id: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.IdPayload
+                /// The server actor name.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/name`.
+                @frozen public enum NamePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case marfa = "Marfa"
+                }
+                /// The server actor name.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/name`.
+                public var name: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.NamePayload
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - kind: Marfa acting without a sign-in.
+                ///   - id: The server actor identifier.
+                ///   - name: The server actor name.
+                public init(
+                    kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.KindPayload,
+                    id: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.IdPayload,
+                    name: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.NamePayload
+                ) {
+                    self.kind = kind
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case kind
+                    case id
+                    case name
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2`.
+            public var value2: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload?
+            /// Creates a new `MarfaInlined4567187ff0a66df`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload? = nil,
+                value2: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload? = nil
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                var errors: [any Swift.Error] = []
+                do {
+                    self.value1 = try .init(from: decoder)
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self.value2 = try .init(from: decoder)
+                } catch {
+                    errors.append(error)
+                }
+                try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                    [
+                        self.value1,
+                        self.value2
+                    ],
+                    type: Self.self,
+                    codingPath: decoder.codingPath,
+                    errors: errors
+                )
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1?.encode(to: encoder)
+                try self.value2?.encode(to: encoder)
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline00404e686415370f`.
         public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.
+        public typealias MarfaNullableMarfaInline0606c3c8f2e5ac06 = MarfaNullable<Components.Schemas.MarfaInline0606c3c8f2e5ac06>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineea288f4ef558f5f1`.
+        public typealias MarfaNullableMarfaInlineea288f4ef558f5f1 = MarfaNullable<Components.Schemas.MarfaInlineea288f4ef558f5f1>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline7cb541e84f226754`.
+        public typealias MarfaNullableMarfaInline7cb541e84f226754 = MarfaNullable<Components.Schemas.MarfaInline7cb541e84f226754>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline52ba84a4bbf396ba`.
         public typealias MarfaNullableMarfaInline52ba84a4bbf396ba = MarfaNullable<Components.Schemas.MarfaInline52ba84a4bbf396ba>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineaeb0b69539bcab54`.
         public typealias MarfaNullableMarfaInlineaeb0b69539bcab54 = MarfaNullable<Components.Schemas.MarfaInlineaeb0b69539bcab54>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.
-        public typealias MarfaNullableMarfaInline0606c3c8f2e5ac06 = MarfaNullable<Components.Schemas.MarfaInline0606c3c8f2e5ac06>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline9983a886c97e38f1`.
         public typealias MarfaNullableMarfaInline9983a886c97e38f1 = MarfaNullable<Components.Schemas.MarfaInline9983a886c97e38f1>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline59652345197f6db0`.
@@ -16378,6 +16750,8 @@ extension Components {
         public typealias MarfaNullableHousekeepingReport = MarfaNullable<Components.Schemas.HousekeepingReport>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorRun`.
         public typealias MarfaNullableConnectorRun = MarfaNullable<Components.Schemas.ConnectorRun>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlined4567187ff0a66df`.
+        public typealias MarfaNullableMarfaInlined4567187ff0a66df = MarfaNullable<Components.Schemas.MarfaInlined4567187ff0a66df>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMetadata`.
         public typealias MarfaNullableMetadata = MarfaNullable<Components.Schemas.Metadata>
     }
