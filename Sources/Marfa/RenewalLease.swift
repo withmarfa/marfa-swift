@@ -10,9 +10,11 @@ import Synchronization
 /// process that died is taken over once it lapses. While it is held, the holder moves that moment on every third
 /// of the lifetime, so a request that runs longer than the lifetime keeps it.
 ///
-/// The moment is read on a clock every process on the device shares, which counts while the device sleeps and
-/// starts again at boot, with the boot's identifier beside it: a changed wall clock, a sleep or a restart never
-/// makes a lease read as held longer than it is.
+/// The moment is read on the clock the heartbeat runs on, which every process on the device shares, which stops
+/// while the device sleeps and starts again at boot, with the boot's identifier beside it. A sleep stops the
+/// lapse and the heartbeat together, so a holder never wakes to find its lease lapsed mid-request, and a changed
+/// wall clock or a restart never makes a lease read as held longer than it is. A holder whose own lapse has
+/// passed writes nothing.
 final class RenewalLease: Sendable {
     struct Held: Error {}
 
@@ -73,13 +75,14 @@ final class RenewalLease: Sendable {
         }
     }
 
-    /// Runs `work` only while the keychain still shows this holder's lease, and answers `nil` otherwise.
+    /// Runs `work` only while the keychain still shows this holder's lease with at least a third of its
+    /// lifetime left, and answers `nil` otherwise.
     ///
-    /// The lapse is not moved on while `work` runs, and it was last moved at most a third of the lifetime ago,
-    /// so no other holder can take the lease between the check and the write.
+    /// The lapse is not moved on while `work` runs, and a third of the lifetime is left, so no other holder can
+    /// take the lease between the check and the write.
     func whileHeld<T>(_ work: () throws -> T) throws -> T? {
         try state.withLock { state in
-            guard !state.released, !state.lost,
+            guard !state.released, !state.lost, !Self.lapsed(state.label, within: Self.nanoseconds(lifetime) / 3),
                 try place.keychain.label(service: place.service, account: place.leaseAccount) == state.label
             else { return nil }
             return try work()
@@ -123,9 +126,10 @@ final class RenewalLease: Sendable {
         }
     }
 
-    /// The clock leases are read on, in nanoseconds: `CLOCK_MONOTONIC`, which on Apple platforms counts
-    /// while the device sleeps and is the same in every process until the device restarts.
-    static func now() -> UInt64 { clock_gettime_nsec_np(CLOCK_MONOTONIC) }
+    /// The clock leases are read on, in nanoseconds: `CLOCK_UPTIME_RAW`, which is `mach_absolute_time()`, the
+    /// clock Dispatch runs the heartbeat on. It is the same in every process, stops while the device sleeps
+    /// and starts again at boot.
+    static func now() -> UInt64 { clock_gettime_nsec_np(CLOCK_UPTIME_RAW) }
 
     /// This boot's identifier, so a lease written before a restart, on a clock that has since started again,
     /// reads as lapsed.
@@ -142,10 +146,11 @@ final class RenewalLease: Sendable {
         "\(UUID().uuidString) \(bootSession) \(now() + nanoseconds(lifetime))"
     }
 
-    static func lapsed(_ label: String) -> Bool {
+    /// Whether the lease `label` names lapses within `margin` nanoseconds from now, or already has.
+    static func lapsed(_ label: String, within margin: UInt64 = 0) -> Bool {
         let parts = label.split(separator: " ")
         guard parts.count == 3, parts[1] == bootSession, let lapses = UInt64(parts[2]) else { return true }
-        return lapses <= now()
+        return lapses <= now() + margin
     }
 
     private static func nanoseconds(_ duration: Duration) -> UInt64 {

@@ -600,6 +600,7 @@ struct TokenRenewal {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             var transport = server.transport()
             transport.timeLimit = .seconds(3)
+            transport.leaseLifetime = .seconds(3)
             let (authorization, _) = try signedIn(server, keychain, transport: transport)
             let place = authorization.place
             let faulty = try Authorization(
@@ -609,10 +610,28 @@ struct TokenRenewal {
             // While the request is out, the lease's next move fails once; it outlasts a third of the lifetime.
             marfa(server) { _ in
                 fault.fail(1)
-                return .delayed(.milliseconds(500), tokens("at-2", "rt-2"))
+                return .delayed(.milliseconds(1300), tokens("at-2", "rt-2"))
             }
             #expect(try await renew(credential, refused: "at-1") == "at-2")
             #expect(try place.read()?.refreshToken == "rt-2")
+        }
+    }
+
+    @Test func aHolderWhoseLeaseLapsedBeforeItsHeartbeatMovedItWritesNothing() async throws {
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = ScriptedAuthServer().transport()
+            let account = "https://lease.example"
+            let place = SignInPlace(
+                keychain: fault.on(keychain, account: "\(account) renewing"), service: service, account: account)
+            let lease = try await background { try RenewalLease.take(place, transport) }
+            defer { lease.release() }
+            #expect(try lease.whileHeld { true } == true)
+            // Every move of the lapse fails until it has passed, as when a heartbeat cannot run in time.
+            fault.fail()
+            try await Task.sleep(for: transport.leaseLifetime + .milliseconds(300))
+            fault.stop()
+            #expect(try lease.whileHeld { true } == nil)
         }
     }
 
@@ -674,7 +693,8 @@ struct TokenRenewal {
         #expect(parts.count == 3)
         #expect(UUID(uuidString: parts[1]) != nil)
         let lapses = try #require(UInt64(parts[2]))
-        let now = clock_gettime_nsec_np(CLOCK_MONOTONIC)
+        // The clock the lease's heartbeat runs on, which stops while the device sleeps, as the heartbeat does.
+        let now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
         #expect(lapses > now + 59_000_000_000 && lapses <= now + 60_000_000_000)
         #expect(!RenewalLease.lapsed(label))
     }
