@@ -62,7 +62,7 @@ An app that people install signs in to their instance instead of asking them for
    ```swift
    import Marfa
 
-   let authorization = Authorization(
+   let authorization = try Authorization(
        server: serverURL,
        client: .init(
            name: "Notes",

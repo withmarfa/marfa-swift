@@ -42,7 +42,7 @@ private func signedIn(
     _ server: ScriptedAuthServer, _ keychain: Keychain, transport: SignInTransport, access: String = "at-1",
     refresh: String? = "rt-1"
 ) throws -> (Authorization, Credential) {
-    let authorization = Authorization(
+    let authorization = try Authorization(
         server: server.url, client: client, keychain: keychain, service: service, transport: transport)
     try authorization.place.keep(
         KeptSignIn(
@@ -68,7 +68,7 @@ struct BrowserSignIn {
             request.path == "/auth/oauth2/token" ? tokens("at-1", "rt-1") : .json(404, [:])
         }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service,
                 transport: server.transport())
             let asked = Mutex<URL?>(nil)
@@ -132,7 +132,7 @@ struct BrowserSignIn {
             }
         }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service,
                 transport: server.transport())
             let approve: @MainActor @Sendable (URL, String) async throws -> URL = { url, _ in
@@ -161,7 +161,7 @@ struct BrowserSignIn {
         let server = ScriptedAuthServer()
         marfa(server) { _ in tokens("at-1", "rt-1") }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service,
                 transport: server.transport())
             for returned in [
@@ -181,7 +181,7 @@ struct BrowserSignIn {
         let server = ScriptedAuthServer()
         marfa(server) { _ in tokens("at-1", "rt-1") }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service,
                 transport: server.transport())
             await #expect(throws: SignInError.denied) {
@@ -201,7 +201,7 @@ struct BrowserSignIn {
         let foreign = server.discovery(issuer: "https://elsewhere.example/auth")
         server.answer { _ in foreign }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service,
                 transport: server.transport())
             await #expect {
@@ -258,7 +258,7 @@ struct DeviceSignInPolling {
         }
         let clock = TestClock()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
                 keychain: keychain, service: service, transport: server.transport(clock: clock))
             let started = try await authorization.startDeviceSignIn()
@@ -288,7 +288,7 @@ struct DeviceSignInPolling {
                 poll == 1 ? oauthError("authorization_pending") : oauthError(code)
             }
             try await inIsolatedKeychainAsync { keychain, _ async throws in
-                let authorization = Authorization(
+                let authorization = try Authorization(
                     server: server.url, client: client, keychain: keychain, service: service,
                     transport: server.transport())
                 let started = try await authorization.startDeviceSignIn()
@@ -302,7 +302,7 @@ struct DeviceSignInPolling {
         let server = deviceServer(expiresIn: 12) { _ in oauthError("authorization_pending") }
         let clock = TestClock()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service,
                 transport: server.transport(clock: clock))
             let started = try await authorization.startDeviceSignIn()
@@ -317,7 +317,7 @@ struct DeviceSignInPolling {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             var transport = server.transport()
             transport.sleep = { try await Task.sleep(for: $0 * 1000) }
-            let authorization = Authorization(
+            let authorization = try Authorization(
                 server: server.url, client: client, keychain: keychain, service: service, transport: transport)
             let started = try await authorization.startDeviceSignIn()
             let waiting = Task { try await started.credential() }
@@ -489,6 +489,43 @@ struct SigningOut {
             #expect(!"\(made)".contains("at-1"))
             try await authorization.signOut()
             #expect(throws: SignInError.notSignedIn) { try Server(url: server.url, credential: credential) }
+        }
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct UntidyAddresses {
+    @Test(arguments: ["marfa.example.com", "ftp://marfa.example.com", "https:///no-host", "file:///tmp/marfa"])
+    func anAddressThatNamesNoServerIsRefused(address: String) throws {
+        let url = try #require(URL(string: address))
+        #expect(throws: SignInError.notAServer) {
+            try Authorization(server: url, client: client, keychain: Keychain(), service: service)
+        }
+    }
+
+    @Test func aCredentialIsRefusedOnAnotherServer() async throws {
+        let server = ScriptedAuthServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (_, credential) = try signedIn(server, keychain, transport: server.transport())
+            for other in ["https://elsewhere.example", "http://\(server.url.host() ?? "")", "\(server.origin):8443"] {
+                #expect(throws: SignInError.otherServer) {
+                    try Server(url: try #require(URL(string: other)), credential: credential)
+                }
+            }
+            #expect(try Server(url: server.url.appending(path: "some/path"), credential: credential).url.host() != nil)
+        }
+    }
+
+    @Test func aBrowserSignInWithoutARedirectIsRefusedBeforeAnyRequest() async throws {
+        let server = ScriptedAuthServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: server.transport())
+            await #expect(throws: SignInError.noRedirect) {
+                try await authorization.signIn { url, _ in url }
+            }
+            #expect(server.requests.isEmpty)
         }
     }
 }

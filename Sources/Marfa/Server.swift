@@ -21,11 +21,10 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// whenever the server refuses it. Once the server ends the sign-in, calls throw
     /// ``MarfaError/signedOut(origin:message:)`` until the app signs in again.
     ///
-    /// Throws ``SignInError/notSignedIn`` when the keychain no longer holds the sign-in. `url` must be on
-    /// the server the credential is for.
+    /// Throws ``SignInError/otherServer`` when `url` is not on the server the credential is for, and
+    /// ``SignInError/notSignedIn`` when the keychain no longer holds the sign-in.
     public init(url: URL, credential: Credential) throws {
-        precondition(
-            origin(of: url) == credential.place.account, "a credential is used only on the server it is for")
+        guard origin(of: url) == credential.place.account else { throw SignInError.otherServer }
         guard let token = try credential.accessToken() else { throw SignInError.notSignedIn }
         self.url = url
         key = token

@@ -52,14 +52,16 @@ public struct Authorization: Sendable {
     /// server's origin as the account.
     ///
     /// Choose a `service` of the app's own, such as its bundle identifier, so no other app's items share it.
-    public init(server: URL, client: Client, keychain: Keychain = .system, service: String) {
-        self.init(server: server, client: client, keychain: keychain, service: service, transport: .standard)
+    ///
+    /// Throws ``SignInError/notAServer`` when `server` is not an `http` or `https` address with a host.
+    public init(server: URL, client: Client, keychain: Keychain = .system, service: String) throws(SignInError) {
+        try self.init(server: server, client: client, keychain: keychain, service: service, transport: .standard)
     }
 
-    init(server: URL, client: Client, keychain: Keychain, service: String, transport: SignInTransport) {
-        guard let origin = origin(of: server), let url = URL(string: origin) else {
-            preconditionFailure("an Authorization needs an http or https server address with a host")
-        }
+    init(server: URL, client: Client, keychain: Keychain, service: String, transport: SignInTransport)
+        throws(SignInError)
+    {
+        guard let origin = origin(of: server), let url = URL(string: origin) else { throw .notAServer }
         self.server = url
         self.client = client
         place = SignInPlace(keychain: keychain, service: service, account: origin)
@@ -76,8 +78,8 @@ public struct Authorization: Sendable {
     /// approval pages over `anchor`.
     ///
     /// Throws ``SignInError/canceled`` when the person closes the browser, ``SignInError/denied`` when they
-    /// decline, and ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
-    /// ask for.
+    /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
+    /// ask for, and ``SignInError/noRedirect`` when the client names no redirect.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -93,9 +95,7 @@ public struct Authorization: Sendable {
     func signIn(
         browser: @MainActor @Sendable (_ authorize: URL, _ scheme: String) async throws -> URL
     ) async throws -> Credential {
-        guard let redirect = client.redirect, let scheme = redirect.scheme else {
-            preconditionFailure("a browser sign-in needs Client.redirect")
-        }
+        guard let redirect = client.redirect, let scheme = redirect.scheme else { throw SignInError.noRedirect }
         let discovery = try await Discovery.read(place.account, transport)
         let registered = try await registration(discovery, for: "authorization_code")
         let clientId = registered.clientId
@@ -369,6 +369,13 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     case stateMismatch
     /// The keychain holds no sign-in for the server.
     case notSignedIn
+    /// The address is not an `http` or `https` address with a host, so it names no server to sign in to.
+    case notAServer
+    /// The address is on another server than the one the sign-in is for.
+    case otherServer
+    /// A browser sign-in needs ``Authorization/Client/redirect``, an address with a scheme, and the client
+    /// names none.
+    case noRedirect
     /// The server refused, with the OAuth error `code`.
     case refused(code: String, message: String)
     /// The server could not be reached.
@@ -384,6 +391,9 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .expired: "The code expired before the app was approved."
         case .stateMismatch: "The approval was not for this sign-in."
         case .notSignedIn: "The app is not signed in to this server."
+        case .notAServer: "The address is not an http or https server address."
+        case .otherServer: "The sign-in is for another server."
+        case .noRedirect: "The app names no redirect address for a browser sign-in."
         case .refused(let code, let message): "The server refused the sign-in (\(code)): \(message)"
         case .unavailable(let message), .unreadable(let message): message
         }

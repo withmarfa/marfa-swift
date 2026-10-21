@@ -28,7 +28,7 @@ struct LiveSignIn {
     }
 
     private static func run(_ own: OwnServer, _ keychain: Keychain) async throws {
-        let authorization = Authorization(
+        let authorization = try Authorization(
             server: own.url,
             client: Authorization.Client(
                 name: "marfa-swift live tests", scopes: ["core.note:read", "core.note:write"]),
