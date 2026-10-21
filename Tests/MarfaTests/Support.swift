@@ -445,20 +445,42 @@ final class OwnServer: Sendable {
     let state: URL
     let url: URL
     let key: String
+    /// The server's control socket, which serves the test hooks when the server was booted with them.
+    let socket: String?
+    let owner: (email: String, password: String)?
+    private let testHooks: Bool
     var server: Server { Server(url: url, key: key) }
     private var env: URL { state.appending(path: "env") }
 
-    private init(state: URL, url: URL, key: String) {
+    private init(state: URL, exports: [String: String], testHooks: Bool) throws {
         self.state = state
-        self.url = url
-        self.key = key
+        url = try #require(exports["MARFA_TEST_URL"].flatMap(URL.init(string:)))
+        key = try #require(exports["MARFA_TEST_KEY"])
+        socket = exports["MARFA_TEST_SOCKET"]
+        owner = exports["MARFA_TEST_OWNER_EMAIL"].flatMap { email in
+            exports["MARFA_TEST_OWNER_PASSWORD"].map { (email, $0) }
+        }
+        self.testHooks = testHooks
     }
 
-    static func boot() async throws -> OwnServer {
+    /// `testHooks` boots the server with `MARFA_TEST_HOOKS`, so ``advanceClock(by:)`` can move its clock.
+    static func boot(testHooks: Bool = false) async throws -> OwnServer {
         let state = FileManager.default.temporaryDirectory.appending(path: "marfa-own-server-\(UUID())")
-        let exports = try await up(state)
-        let url = try #require(exports["MARFA_TEST_URL"].flatMap(URL.init(string:)))
-        return OwnServer(state: state, url: url, key: try #require(exports["MARFA_TEST_KEY"]))
+        let exports = try await up(state, testHooks: testHooks)
+        return try OwnServer(state: state, exports: exports, testHooks: testHooks)
+    }
+
+    /// Moves the server's clock on, through the test hook on its control socket.
+    func advanceClock(by duration: Duration) async throws {
+        let socket = try #require(socket, "the server printed no control socket")
+        let body = "{\"advance_ms\":\(Int64(duration.components.seconds) * 1000)}"
+        let printed = try await Self.run(
+            "/usr/bin/curl",
+            [
+                "--silent", "--show-error", "--fail", "--unix-socket", socket, "-X", "POST", "-H",
+                "Content-Type: application/json", "--data", body, "http://localhost/_control/test/clock",
+            ], environment: [:])
+        try #require(printed.contains("offset_ms"), "the clock hook answered \(printed)")
     }
 
     func stop() async throws {
@@ -466,7 +488,7 @@ final class OwnServer: Sendable {
     }
 
     func start() async throws {
-        let exports = try await Self.up(state)
+        let exports = try await Self.up(state, testHooks: testHooks)
         try #require(exports["MARFA_TEST_URL"] == url.absoluteString, "the server came back at another address")
     }
 
@@ -476,8 +498,8 @@ final class OwnServer: Sendable {
         try? FileManager.default.removeItem(at: state)
     }
 
-    private static func up(_ state: URL) async throws -> [String: String] {
-        let printed = try await script("server-up.sh", [], keep: state)
+    private static func up(_ state: URL, testHooks: Bool) async throws -> [String: String] {
+        let printed = try await script("server-up.sh", [], keep: state, testHooks: testHooks)
         var exports: [String: String] = [:]
         for line in printed.split(separator: "\n") where line.hasPrefix("export ") {
             let pair = line.dropFirst("export ".count).split(separator: "=", maxSplits: 1)
@@ -487,16 +509,28 @@ final class OwnServer: Sendable {
         return exports
     }
 
-    private static func script(_ name: String, _ arguments: [String], keep: URL) async throws -> String {
+    private static func script(_ name: String, _ arguments: [String], keep: URL, testHooks: Bool = false)
+        async throws -> String
+    {
         let monorepo = try #require(monorepo, "MARFA_MONOREPO names no checkout")
-        let process = Process()
-        process.executableURL = URL(filePath: "/bin/bash")
-        process.arguments = [monorepo.appending(path: "core/scripts/\(name)").path] + arguments
         var environment = ProcessInfo.processInfo.environment
         environment["MARFA_SERVER_KEEP"] = keep.path
         environment["MARFA_SERVER_ENV"] = keep.appending(path: "env").path
         environment.removeValue(forKey: "PORT")
-        process.environment = environment
+        if testHooks { environment["MARFA_TEST_HOOKS"] = "true" }
+        return try await run(
+            "/bin/bash", [monorepo.appending(path: "core/scripts/\(name)").path] + arguments,
+            environment: environment)
+    }
+
+    private static func run(_ executable: String, _ arguments: [String], environment: [String: String])
+        async throws -> String
+    {
+        let name = URL(filePath: executable).lastPathComponent
+        let process = Process()
+        process.executableURL = URL(filePath: executable)
+        process.arguments = arguments
+        process.environment = environment.isEmpty ? nil : environment
         let output = Pipe()
         process.standardOutput = output
         // A failed boot writes the server's log here, its secret redacted.
