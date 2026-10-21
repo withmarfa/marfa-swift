@@ -32,12 +32,14 @@ final class RenewalLease: Sendable {
 
     private let place: SignInPlace
     private let lifetime: Duration
+    private let clock: @Sendable () -> UInt64
     private let gate: DispatchSemaphore
     private let state: Mutex<State>
 
-    private init(place: SignInPlace, lifetime: Duration, label: String, gate: DispatchSemaphore) {
+    private init(place: SignInPlace, transport: SignInTransport, label: String, gate: DispatchSemaphore) {
         self.place = place
-        self.lifetime = lifetime
+        lifetime = transport.leaseLifetime
+        clock = transport.leaseClock
         self.gate = gate
         state = Mutex(State(label: label))
         let beat = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
@@ -53,22 +55,23 @@ final class RenewalLease: Sendable {
     /// Blocks the calling thread while it waits; never call it on the main thread.
     static func take(_ place: SignInPlace, _ transport: SignInTransport) throws -> RenewalLease {
         let lifetime = transport.leaseLifetime
-        let giveUp = now() + nanoseconds(lifetime * 2)
+        // How long this caller waits is its own matter, not the lease's, so it is measured on Dispatch's clock.
+        let giveUp = DispatchTime.now() + (lifetime * 2).seconds
         let gate = gate(for: place)
-        guard gate.wait(timeout: .now() + (lifetime * 2).seconds) == .success else { throw Held() }
+        guard gate.wait(timeout: giveUp) == .success else { throw Held() }
         do {
             while true {
-                let mine = label(lapsingIn: lifetime)
+                let mine = label(lapsingAt: transport.leaseClock() + nanoseconds(lifetime))
                 if try place.keychain.add(label: mine, service: place.service, account: place.leaseAccount) {
-                    return RenewalLease(place: place, lifetime: lifetime, label: mine, gate: gate)
+                    return RenewalLease(place: place, transport: transport, label: mine, gate: gate)
                 }
                 guard let held = try place.keychain.label(service: place.service, account: place.leaseAccount)
                 else { continue }
-                if lapsed(held, lifetime: lifetime) {
+                if lapsed(held, lifetime: lifetime, now: transport.leaseClock()) {
                     try place.keychain.delete(label: held, service: place.service, account: place.leaseAccount)
                     continue
                 }
-                if now() >= giveUp { throw Held() }
+                if DispatchTime.now() >= giveUp { throw Held() }
                 Thread.sleep(forTimeInterval: transport.leasePoll.seconds)
             }
         } catch {
@@ -120,7 +123,7 @@ final class RenewalLease: Sendable {
     ///
     /// Answers whether it did. Where the item is gone or carries another label, this holder has lost the lease.
     private func moveLapseOn(_ state: inout State) throws -> Bool {
-        let moved = Self.label(lapsingIn: lifetime)
+        let moved = Self.label(lapsingAt: clock() + Self.nanoseconds(lifetime))
         if try place.keychain.relabel(
             from: state.label, to: moved, service: place.service, account: place.leaseAccount)
         {
@@ -133,11 +136,11 @@ final class RenewalLease: Sendable {
         return false
     }
 
-    /// The clock leases are read on, in nanoseconds.
+    /// The clock leases lapse on, in nanoseconds, unless a transport names another.
     ///
     /// `CLOCK_UPTIME_RAW` is `mach_absolute_time()`, the clock Dispatch runs the heartbeat on. It is the same
     /// in every process, stops while the device sleeps and starts again at boot.
-    static func now() -> UInt64 { clock_gettime_nsec_np(CLOCK_UPTIME_RAW) }
+    static func uptime() -> UInt64 { clock_gettime_nsec_np(CLOCK_UPTIME_RAW) }
 
     /// This boot's identifier, so a lease written before a restart, on a clock that has since started again,
     /// reads as lapsed.
@@ -149,23 +152,22 @@ final class RenewalLease: Sendable {
         return String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
     }()
 
-    /// `<holder> <boot session> <lapses at>`, the last on ``now()``.
-    static func label(lapsingIn lifetime: Duration) -> String {
-        "\(UUID().uuidString) \(bootSession) \(now() + nanoseconds(lifetime))"
+    /// `<holder> <boot session> <lapses at>`, the last on the lease's clock.
+    static func label(lapsingAt lapse: UInt64) -> String {
+        "\(UUID().uuidString) \(bootSession) \(lapse)"
     }
 
-    /// Whether the lease `label` names has lapsed.
+    /// Whether the lease `label` names has lapsed at `now` on the lease's clock.
     ///
     /// A lapse more than one `lifetime` ahead was never written on this boot's clock, since every holder writes
     /// now plus one lifetime: it is left from before a restart, where the boot's identifier could not be read.
-    static func lapsed(_ label: String, lifetime: Duration) -> Bool {
+    static func lapsed(_ label: String, lifetime: Duration, now: UInt64) -> Bool {
         let parts = label.split(separator: " ")
         guard parts.count == 3, parts[1] == bootSession, let lapses = UInt64(parts[2]) else { return true }
-        let now = now()
         return lapses <= now || lapses > now + nanoseconds(lifetime)
     }
 
-    private static func nanoseconds(_ duration: Duration) -> UInt64 {
+    static func nanoseconds(_ duration: Duration) -> UInt64 {
         let (seconds, attoseconds) = duration.components
         return UInt64(max(0, seconds)) * 1_000_000_000 + UInt64(max(0, attoseconds) / 1_000_000_000)
     }

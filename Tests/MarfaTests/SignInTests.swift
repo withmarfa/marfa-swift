@@ -54,6 +54,14 @@ private func signedIn(
     return (authorization, try #require(try authorization.credential()))
 }
 
+extension SignInTransport {
+    func with(leaseLifetime: Duration) -> SignInTransport {
+        var changed = self
+        changed.leaseLifetime = leaseLifetime
+        return changed
+    }
+}
+
 extension KeptSignIn {
     func with(accessToken: String) -> KeptSignIn {
         var changed = self
@@ -64,16 +72,20 @@ extension KeptSignIn {
 
 /// Keychain errors a test turns on for one account's lookups, as a keychain that fails for a moment does.
 private final class KeychainFault: Sendable {
-    private let left = Mutex(0)
+    private let counts = Mutex((left: 0, failed: 0))
 
     /// Fails the next `count` lookups.
-    func fail(_ count: Int = .max) { left.withLock { $0 = count } }
-    func stop() { left.withLock { $0 = 0 } }
+    func fail(_ count: Int = .max) { counts.withLock { $0.left = count } }
+    func stop() { counts.withLock { $0.left = 0 } }
+
+    /// How many lookups have failed so far.
+    var failed: Int { counts.withLock { $0.failed } }
 
     fileprivate func take() -> Bool {
-        left.withLock { left in
-            guard left > 0 else { return false }
-            left -= 1
+        counts.withLock { counts in
+            guard counts.left > 0 else { return false }
+            counts.left -= 1
+            counts.failed += 1
             return true
         }
     }
@@ -92,6 +104,8 @@ private final class KeychainFault: Sendable {
 }
 
 /// Takes the lease on `place` as another process sharing its keychain would, sharing no lock of this one.
+///
+/// It stays held for as long as the test runs, since a test's leases lapse only when the test moves their clock.
 private func heldElsewhere(_ place: SignInPlace, _ transport: SignInTransport) async throws -> RenewalLease {
     let other = SignInPlace(
         keychain: Keychain(narrow: place.keychain.narrow), service: place.service, account: place.account)
@@ -334,7 +348,8 @@ struct DeviceSignInPolling {
     @Test func anApprovalThatCannotBeKeptIsRevokedRatherThanLeftStanding() async throws {
         let server = deviceServer { _ in tokens("at-1", "rt-1") }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let transport = server.transport()
+            var transport = server.transport()
+            transport.leaseLifetime = .seconds(1)
             let authorization = try Authorization(
                 server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
                 keychain: keychain, service: service, transport: transport)
@@ -500,7 +515,10 @@ struct TokenRenewal {
             let server = ScriptedAuthServer()
             marfa(server) { _ in reply }
             try await inIsolatedKeychainAsync { keychain, _ async throws in
-                let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+                var transport = server.transport()
+                transport.timeLimit = .milliseconds(500)
+                transport.requestLimit = .seconds(1)
+                let (authorization, credential) = try signedIn(server, keychain, transport: transport)
                 await #expect {
                     try await renew(credential, refused: "at-1")
                 } throws: { error in
@@ -523,12 +541,13 @@ struct TokenRenewal {
         return try #require(try authorization.credential())
     }
 
-    @Test func aRenewalWhoseRequestOutlivesItsLeaseSpendsTheRefreshTokenOnce() async throws {
+    @Test func aRenewalWhoseRequestOutlivesItsWaitSpendsTheRefreshTokenOnce() async throws {
         let server = ScriptedAuthServer()
-        // Longer than the lease's lifetime, so a lease that lapsed while its holder waited would be taken.
-        marfa(server) { _ in .delayed(.milliseconds(1500), tokens("at-2", "rt-2")) }
+        let answer = Hold()
+        marfa(server) { _ in .held(answer, tokens("at-2", "rt-2")) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let transport = server.transport()
+            var transport = server.transport()
+            transport.timeLimit = .milliseconds(200)
             let (authorization, holder) = try signedIn(server, keychain, transport: transport)
             let other = try anotherProcess(keychain, server, transport)
             await #expect {
@@ -537,7 +556,9 @@ struct TokenRenewal {
                 guard case RenewalError.Unavailable = error else { return false }
                 return true
             }
-            #expect(try await renew(other, refused: "at-1") == "at-2")
+            let renewed = Task { try await renew(other, refused: "at-1") }
+            answer.release()
+            #expect(try await renewed.value == "at-2")
             #expect(server.requests(to: "/auth/oauth2/token").map { $0.form["refresh_token"] } == ["rt-1"])
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
         }
@@ -545,9 +566,12 @@ struct TokenRenewal {
 
     @Test func aRenewalThatGaveUpKeepsTheAnswerThatArrivesLate() async throws {
         let server = ScriptedAuthServer()
-        marfa(server) { _ in .delayed(.milliseconds(800), tokens("at-2", "rt-2")) }
+        let answer = Hold()
+        marfa(server) { _ in .held(answer, tokens("at-2", "rt-2")) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            var transport = server.transport()
+            transport.timeLimit = .milliseconds(200)
+            let (authorization, credential) = try signedIn(server, keychain, transport: transport)
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
@@ -555,11 +579,12 @@ struct TokenRenewal {
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
-            try await eventually("the late answer is kept", within: 5) {
+            answer.release()
+            try await eventually("the late answer is kept", within: 30) {
                 (try? authorization.place.read()?.refreshToken) == "rt-2"
             }
             #expect(try authorization.place.read()?.accessToken == "at-2")
-            try await eventually("the lease is let go", within: 5) {
+            try await eventually("the lease is let go", within: 30) {
                 (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
             }
         }
@@ -624,25 +649,35 @@ struct TokenRenewal {
         }
     }
 
+    /// A sign-in whose lease is reached through `fault`, renewed by the credential it answers.
+    private func faultyRenewal(
+        _ server: ScriptedAuthServer, _ keychain: Keychain, _ transport: SignInTransport, _ fault: KeychainFault
+    ) throws -> (SignInPlace, Credential) {
+        let (authorization, _) = try signedIn(server, keychain, transport: transport)
+        let place = authorization.place
+        let faulty = try Authorization(
+            server: server.url, client: client, keychain: fault.on(keychain, account: place.leaseAccount),
+            service: service, transport: transport)
+        return (place, try #require(try faulty.credential()))
+    }
+
     @Test func aKeychainErrorWhileTheLeaseIsMovedOnKeepsTheRenewedSignIn() async throws {
         let server = ScriptedAuthServer()
         let fault = KeychainFault()
+        let answer = Hold()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             var transport = server.transport()
-            transport.timeLimit = .seconds(3)
-            transport.leaseLifetime = .seconds(3)
-            let (authorization, _) = try signedIn(server, keychain, transport: transport)
-            let place = authorization.place
-            let faulty = try Authorization(
-                server: server.url, client: client, keychain: fault.on(keychain, account: place.leaseAccount),
-                service: service, transport: transport)
-            let credential = try #require(try faulty.credential())
-            // While the request is out, the lease's next move fails once; it outlasts a third of the lifetime.
+            transport.leaseLifetime = .milliseconds(300)
+            let (place, credential) = try faultyRenewal(server, keychain, transport, fault)
+            // While the request is out, only the heartbeat moves the lease, and its next move fails once.
             marfa(server) { _ in
                 fault.fail(1)
-                return .delayed(.milliseconds(1300), tokens("at-2", "rt-2"))
+                return .held(answer, tokens("at-2", "rt-2"))
             }
-            #expect(try await renew(credential, refused: "at-1") == "at-2")
+            let renewed = Task { try await renew(credential, refused: "at-1") }
+            try await eventually("a heartbeat meets the keychain error", within: 30) { fault.failed == 1 }
+            answer.release()
+            #expect(try await renewed.value == "at-2")
             #expect(try place.read()?.refreshToken == "rt-2")
         }
     }
@@ -650,24 +685,26 @@ struct TokenRenewal {
     @Test func aRenewalAnsweredAfterItsHeartbeatsFailedKeepsTheRenewedSignIn() async throws {
         let server = ScriptedAuthServer()
         let fault = KeychainFault()
+        let answer = Hold()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            var transport = server.transport()
-            transport.timeLimit = .seconds(5)
-            transport.leaseLifetime = .seconds(3)
-            let (authorization, _) = try signedIn(server, keychain, transport: transport)
-            let place = authorization.place
-            let faulty = try Authorization(
-                server: server.url, client: client, keychain: fault.on(keychain, account: place.leaseAccount),
-                service: service, transport: transport)
-            let credential = try #require(try faulty.credential())
-            // Both moves of the lapse while the request is out fail, and the answer comes with less than a third
-            // of the lifetime left; the server has spent rt-1 by then.
+            let leases = LeaseClock()
+            var transport = server.transport(leases: leases)
+            transport.leaseLifetime = .milliseconds(300)
+            let (place, credential) = try faultyRenewal(server, keychain, transport, fault)
             marfa(server) { _ in
                 fault.fail()
-                DispatchQueue.global().asyncAfter(deadline: .now() + 2.1) { fault.stop() }
-                return .delayed(.milliseconds(2200), tokens("at-2", "rt-2"))
+                return .held(answer, tokens("at-2", "rt-2"))
             }
-            #expect(try await renew(credential, refused: "at-1") == "at-2")
+            // Every move of the lapse while the request is out fails, until the lease has lapsed; the server has
+            // spent rt-1 by the time it answers.
+            let renewed = Task { try await renew(credential, refused: "at-1") }
+            try await eventually("two heartbeats meet keychain errors", within: 30) { fault.failed >= 2 }
+            leases.advance(transport.leaseLifetime * 2)
+            let label = try #require(try keychain.label(service: service, account: place.leaseAccount))
+            #expect(RenewalLease.lapsed(label, lifetime: transport.leaseLifetime, now: leases.now))
+            fault.stop()
+            answer.release()
+            #expect(try await renewed.value == "at-2")
             #expect(try place.read()?.refreshToken == "rt-2")
         }
     }
@@ -680,7 +717,8 @@ struct TokenRenewal {
         _ body: (RenewalLease, SignInPlace, SignInTransport, KeychainFault) async throws -> Void
     ) async throws {
         let fault = KeychainFault()
-        let transport = ScriptedAuthServer().transport()
+        let leases = LeaseClock()
+        let transport = ScriptedAuthServer().transport(leases: leases)
         let account = "https://lease.example"
         let place = SignInPlace(
             keychain: fault.on(keychain, account: "\(account) renewing"), service: service, account: account)
@@ -688,9 +726,9 @@ struct TokenRenewal {
         defer { lease.release() }
         #expect(try lease.whileHeld { true } == true)
         fault.fail()
-        try await Task.sleep(for: transport.leaseLifetime + .milliseconds(300))
+        leases.advance(transport.leaseLifetime + .milliseconds(300))
         let label = try #require(try keychain.label(service: service, account: place.leaseAccount))
-        #expect(RenewalLease.lapsed(label, lifetime: transport.leaseLifetime))
+        #expect(RenewalLease.lapsed(label, lifetime: transport.leaseLifetime, now: leases.now))
         try await body(lease, place, transport, fault)
     }
 
@@ -716,7 +754,7 @@ struct TokenRenewal {
                 fault.stop()
                 #expect(try lease.whileHeld { true } == true)
                 let label = try #require(try keychain.label(service: service, account: place.leaseAccount))
-                #expect(!RenewalLease.lapsed(label, lifetime: transport.leaseLifetime))
+                #expect(!RenewalLease.lapsed(label, lifetime: transport.leaseLifetime, now: transport.leaseClock()))
             }
         }
     }
@@ -739,11 +777,37 @@ struct TokenRenewal {
         }
     }
 
+    @Test func aHeldLeaseIsMovedOnByItsHeartbeatSoNoOneTakesIt() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let leases = LeaseClock()
+            let transport = ScriptedAuthServer().transport(leases: leases).with(leaseLifetime: .milliseconds(600))
+            let place = SignInPlace(keychain: keychain, service: service, account: "https://lease.example")
+            let held = try await background { try RenewalLease.take(place, transport) }
+            defer { held.release() }
+            let first = try #require(try keychain.label(service: service, account: place.leaseAccount))
+            leases.advance(transport.leaseLifetime * 2)
+            #expect(RenewalLease.lapsed(first, lifetime: transport.leaseLifetime, now: leases.now))
+            try await eventually("the heartbeat moves the lapse on", within: 30) {
+                guard let label = try keychain.label(service: service, account: place.leaseAccount) else {
+                    return false
+                }
+                return !RenewalLease.lapsed(label, lifetime: transport.leaseLifetime, now: leases.now)
+            }
+            let other = SignInPlace(
+                keychain: Keychain(narrow: keychain.narrow), service: place.service, account: place.account)
+            await #expect(throws: RenewalLease.Held.self) {
+                try await background { try RenewalLease.take(other, transport) }
+            }
+            #expect(try held.whileHeld { true } == true)
+        }
+    }
+
     @Test func aLeaseAnotherProcessHoldsIsWaitedOnAndALapsedOneTaken() async throws {
         let server = ScriptedAuthServer()
         marfa(server) { _ in tokens("at-2", "rt-2") }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let transport = server.transport()
+            let leases = LeaseClock()
+            let transport = server.transport(leases: leases).with(leaseLifetime: .seconds(1))
             let (authorization, credential) = try signedIn(server, keychain, transport: transport)
             let place = authorization.place
             let boot = RenewalLease.bootSession
@@ -762,9 +826,9 @@ struct TokenRenewal {
             // Lapsed on the shared clock; written before a restart, whose clock has started again; further ahead
             // than any lease lasts, as one written before a restart whose boot could not be told apart; unreadable.
             for left in [
-                "dead \(boot) \(RenewalLease.now() - 1_000_000_000)",
-                "before-restart 00000000-0000-0000-0000-000000000000 \(RenewalLease.now() + 600_000_000_000)",
-                "too-far-ahead \(boot) \(RenewalLease.now() + 600_000_000_000)",
+                "dead \(boot) \(leases.now - 1_000_000_000)",
+                "before-restart 00000000-0000-0000-0000-000000000000 \(leases.now + 600_000_000_000)",
+                "too-far-ahead \(boot) \(leases.now + 600_000_000_000)",
                 "unreadable",
             ] {
                 try keychain.delete(service: service, account: place.leaseAccount)
@@ -776,16 +840,24 @@ struct TokenRenewal {
         }
     }
 
-    @Test func aLeaseLabelNamesThisBootAndALapseOnTheSharedClock() throws {
-        let label = RenewalLease.label(lapsingIn: .seconds(60))
-        let parts = label.split(separator: " ").map(String.init)
-        #expect(parts.count == 3)
-        #expect(UUID(uuidString: parts[1]) != nil)
-        let lapses = try #require(UInt64(parts[2]))
-        // The clock the lease's heartbeat runs on, which stops while the device sleeps, as the heartbeat does.
-        let now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
-        #expect(lapses > now + 59_000_000_000 && lapses <= now + 60_000_000_000)
-        #expect(!RenewalLease.lapsed(label, lifetime: .seconds(60)))
+    @Test func aLeaseLabelNamesThisBootAndALapseOnTheSharedClock() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = SignInTransport.standard
+            let place = SignInPlace(keychain: keychain, service: service, account: "https://lease.example")
+            // The clock the lease's heartbeat runs on, which stops while the device sleeps, as the heartbeat does.
+            let before = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
+            let lease = try await background { try RenewalLease.take(place, transport) }
+            defer { lease.release() }
+            let after = clock_gettime_nsec_np(CLOCK_UPTIME_RAW)
+            let label = try #require(try keychain.label(service: service, account: place.leaseAccount))
+            let parts = label.split(separator: " ").map(String.init)
+            #expect(parts.count == 3)
+            #expect(UUID(uuidString: parts[1]) != nil)
+            let lapses = try #require(UInt64(parts[2]))
+            #expect(lapses >= before + 60_000_000_000 && lapses <= after + 60_000_000_000)
+            #expect(!RenewalLease.lapsed(label, lifetime: .seconds(60), now: after))
+            #expect(RenewalLease.lapsed(label, lifetime: .seconds(60), now: lapses))
+        }
     }
 }
 
@@ -807,7 +879,8 @@ struct SigningOut {
         let server = ScriptedAuthServer()
         marfa(server) { _ in .json(200, [:]) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let transport = server.transport()
+            var transport = server.transport()
+            transport.leaseLifetime = .seconds(1)
             let (authorization, _) = try signedIn(server, keychain, transport: transport)
             let held = try await heldElsewhere(authorization.place, transport)
             defer { held.release() }

@@ -15,6 +15,8 @@ final class ScriptedAuthServer: Sendable {
         case failure(URLError.Code)
         /// Answers `reply` once `delay` has passed, unless the request was canceled first.
         case delayed(Duration, Reply)
+        /// Answers `reply` once the test lets `hold` go, unless the request was canceled first.
+        case held(Hold, Reply)
     }
 
     struct Request: Sendable {
@@ -57,16 +59,20 @@ final class ScriptedAuthServer: Sendable {
     var requests: [Request] { seen.withLock { $0 } }
     func requests(to path: String) -> [Request] { requests.filter { $0.path == path } }
 
-    /// The transport a sign-in under test uses: requests reach this process's scripted servers, and a pause
-    /// moves `clock` on instead of waiting.
-    func transport(clock: TestClock = TestClock()) -> SignInTransport {
+    /// The transport a sign-in under test uses: requests reach this process's scripted servers, a pause moves
+    /// `clock` on instead of waiting, and leases lapse only when the test moves `leases` on.
+    ///
+    /// Its limits are far beyond what a test takes on a loaded machine. A test of a limit sets it, and holds
+    /// back what must come after it rather than racing it.
+    func transport(clock: TestClock = TestClock(), leases: LeaseClock = LeaseClock()) -> SignInTransport {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [ScriptedProtocol.self]
         var transport = SignInTransport(session: URLSession(configuration: configuration))
-        transport.timeLimit = .milliseconds(500)
-        transport.requestLimit = .seconds(3)
-        transport.leaseLifetime = .seconds(1)
+        transport.timeLimit = .seconds(40)
+        transport.requestLimit = .seconds(50)
+        transport.leaseLifetime = .seconds(30)
         transport.leasePoll = .milliseconds(20)
+        transport.leaseClock = { leases.now }
         transport.sleep = { duration in
             try Task.checkCancellation()
             clock.advance(duration)
@@ -112,6 +118,42 @@ final class TestClock: Sendable {
     }
 }
 
+/// The clock a test's leases lapse on, which stands still until the test moves it.
+///
+/// Whether a lease has lapsed then never depends on how quickly a loaded machine runs the heartbeat.
+final class LeaseClock: Sendable {
+    private let moment = Mutex(RenewalLease.uptime())
+
+    var now: UInt64 { moment.withLock { $0 } }
+
+    func advance(_ duration: Duration) {
+        moment.withLock { $0 += RenewalLease.nanoseconds(duration) }
+    }
+}
+
+/// A reply held back until the test lets it go.
+final class Hold: Sendable {
+    private let waiting = Mutex<(released: Bool, deliveries: [@Sendable () -> Void])>((false, []))
+
+    func release() {
+        let deliveries = waiting.withLock { waiting in
+            waiting.released = true
+            defer { waiting.deliveries = [] }
+            return waiting.deliveries
+        }
+        for deliver in deliveries { deliver() }
+    }
+
+    fileprivate func then(_ deliver: @escaping @Sendable () -> Void) {
+        let now = waiting.withLock { waiting in
+            if waiting.released { return true }
+            waiting.deliveries.append(deliver)
+            return false
+        }
+        if now { deliver() }
+    }
+}
+
 final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
     private let stopped = Mutex(false)
 
@@ -149,6 +191,8 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
             return
         case .delayed(let delay, let later):
             DispatchQueue.global().asyncAfter(deadline: .now() + delay.seconds) { self.deliver(later, for: url) }
+        case .held(let hold, let later):
+            hold.then { self.deliver(later, for: url) }
         case .failure(let code):
             client?.urlProtocol(self, didFailWithError: URLError(code))
         case .json(let status, let object, let extra):

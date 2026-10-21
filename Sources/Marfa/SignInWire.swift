@@ -16,6 +16,9 @@ struct SignInTransport: Sendable {
     /// How long a ``RenewalLease`` lasts unless its holder moves it on, after which another holder may take it.
     var leaseLifetime: Duration = .seconds(60)
     var leasePoll: Duration = .milliseconds(100)
+    /// The clock a ``RenewalLease`` lapses on, in nanoseconds, which every process sharing the keychain must
+    /// read alike.
+    var leaseClock: @Sendable () -> UInt64 = RenewalLease.uptime
     var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     var now: @Sendable () -> Date = { Date() }
 
