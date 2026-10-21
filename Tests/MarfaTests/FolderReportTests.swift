@@ -8,12 +8,13 @@ import Testing
 /// A core pass with nothing in it, for a test to set what it looks at.
 private func corePass(
     drain: MarfaCore.DrainReport = coreDrain(), flagged: [MarfaCore.FlaggedFile] = [], removed: UInt64 = 0,
-    purged: UInt64 = 0
+    purged: UInt64 = 0, unchanged: UInt64 = 0, waiting: UInt64 = 0
 ) -> MarfaCore.FolderPass {
     MarfaCore.FolderPass(
         settings: MarfaCore.SettingsFileOutcome(sent: false, written: false, flagged: nil, unwritten: nil),
         scan: MarfaCore.FolderScan(
-            created: 0, updated: 0, renamed: 0, unchanged: 0, missing: 0, deleted: 0, skipped: 0, movedAway: 0,
+            created: 0, updated: 0, renamed: 0, unchanged: unchanged, waiting: waiting, missing: 0, deleted: 0,
+            skipped: 0, movedAway: 0,
             paused: 0, trashed: [], secrets: [], warnings: [], rootGone: nil),
         drain: drain, rebased: 0, gaveWay: 0,
         pull: MarfaCore.FolderPull(
@@ -36,6 +37,13 @@ private func coreDrain(
     #expect(pass.pull?.removed == 5)
     #expect(pass.pull?.purged == 2, "of the removed, not on top of them")
     #expect(Marfa.FolderPass(corePass()).pull?.purged == 0)
+}
+
+@Test func aPassCountsFilesWithAWriteWaitingApartFromUnchangedOnes() {
+    let scan = Marfa.FolderPass(corePass(unchanged: 3, waiting: 2)).scan
+    #expect(scan.unchanged == 3, "waiting files are not unchanged")
+    #expect(scan.waiting == 2)
+    #expect(Marfa.FolderPass(corePass()).scan.waiting == 0)
 }
 
 @Test(arguments: ["unwritten", "outside", "unsuited", "absent", "retained"])

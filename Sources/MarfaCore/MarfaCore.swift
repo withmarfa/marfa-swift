@@ -5264,7 +5264,15 @@ public struct FolderScan: Equatable, Hashable {
     public var created: UInt64
     public var updated: UInt64
     public var renamed: UInt64
+    /**
+     * Files whose bytes are as they were and have no write waiting.
+     */
     public var unchanged: UInt64
+    /**
+     * Files whose bytes are as they were but whose item's create or edit the
+     * server has not answered yet. Not counted in `unchanged`.
+     */
+    public var waiting: UInt64
     public var missing: UInt64
     public var deleted: UInt64
     public var skipped: UInt64
@@ -5292,7 +5300,14 @@ public struct FolderScan: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(created: UInt64, updated: UInt64, renamed: UInt64, unchanged: UInt64, missing: UInt64, deleted: UInt64, skipped: UInt64, 
+    public init(created: UInt64, updated: UInt64, renamed: UInt64, 
+        /**
+         * Files whose bytes are as they were and have no write waiting.
+         */unchanged: UInt64, 
+        /**
+         * Files whose bytes are as they were but whose item's create or edit the
+         * server has not answered yet. Not counted in `unchanged`.
+         */waiting: UInt64, missing: UInt64, deleted: UInt64, skipped: UInt64, 
         /**
          * Files moved to another folder on this machine, so nothing was trashed.
          */movedAway: UInt64, 
@@ -5312,6 +5327,7 @@ public struct FolderScan: Equatable, Hashable {
         self.updated = updated
         self.renamed = renamed
         self.unchanged = unchanged
+        self.waiting = waiting
         self.missing = missing
         self.deleted = deleted
         self.skipped = skipped
@@ -5343,6 +5359,7 @@ public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
                 updated: FfiConverterUInt64.read(from: &buf), 
                 renamed: FfiConverterUInt64.read(from: &buf), 
                 unchanged: FfiConverterUInt64.read(from: &buf), 
+                waiting: FfiConverterUInt64.read(from: &buf), 
                 missing: FfiConverterUInt64.read(from: &buf), 
                 deleted: FfiConverterUInt64.read(from: &buf), 
                 skipped: FfiConverterUInt64.read(from: &buf), 
@@ -5360,6 +5377,7 @@ public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.updated, into: &buf)
         FfiConverterUInt64.write(value.renamed, into: &buf)
         FfiConverterUInt64.write(value.unchanged, into: &buf)
+        FfiConverterUInt64.write(value.waiting, into: &buf)
         FfiConverterUInt64.write(value.missing, into: &buf)
         FfiConverterUInt64.write(value.deleted, into: &buf)
         FfiConverterUInt64.write(value.skipped, into: &buf)
