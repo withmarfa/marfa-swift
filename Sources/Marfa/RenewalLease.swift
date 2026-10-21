@@ -13,8 +13,10 @@ import Synchronization
 /// The moment is read on the clock the heartbeat runs on, which every process on the device shares, which stops
 /// while the device sleeps and starts again at boot, with the boot's identifier beside it. A sleep stops the
 /// lapse and the heartbeat together, so a holder never wakes to find its lease lapsed mid-request, and a changed
-/// wall clock or a restart never makes a lease read as held longer than it is. A holder whose own lapse has
-/// passed writes nothing.
+/// wall clock or a restart never makes a lease read as held longer than it is.
+///
+/// Every change to the lease item names the label it expects, so moving the lapse on or deleting the item is a
+/// compare-and-swap: a holder whose lease lapsed and was taken finds another label and changes nothing.
 final class RenewalLease: Sendable {
     struct Held: Error {}
 
@@ -43,7 +45,7 @@ final class RenewalLease: Sendable {
         let beat = DispatchSource.makeTimerSource(queue: .global(qos: .userInitiated))
         let every = DispatchTimeInterval.nanoseconds(Int(Self.nanoseconds(lifetime) / 3))
         beat.schedule(deadline: .now() + every, repeating: every)
-        beat.setEventHandler { [weak self] in self?.moveLapseOn() }
+        beat.setEventHandler { [weak self] in self?.heartbeat() }
         state.withLock { $0.beat = beat }
         beat.resume()
     }
@@ -77,16 +79,18 @@ final class RenewalLease: Sendable {
         }
     }
 
-    /// Runs `work` only while the keychain still shows this holder's lease with at least a third of its
-    /// lifetime left, and answers `nil` otherwise.
+    /// Moves the lapse on a full lifetime and runs `work`, only while the keychain still shows this holder's
+    /// lease; answers `nil` otherwise.
     ///
-    /// The lapse is not moved on while `work` runs, and a third of the lifetime is left, so no other holder can
-    /// take the lease between the check and the write.
+    /// A lease that lapsed but that no other holder took is still this holder's, so the work runs. Another
+    /// holder cannot take it while `work` runs, since a full lifetime is left and the heartbeat waits.
+    ///
+    /// Throws, writing nothing, when the keychain fails to move the lapse on: that proves nothing about who
+    /// holds the lease, so this holder is not marked as having lost it.
     func whileHeld<T>(_ work: () throws -> T) throws -> T? {
         try state.withLock { state in
-            guard !state.released, !state.lost, !Self.lapsed(state.label, lifetime: lifetime, within: lifetime / 3),
-                try place.keychain.label(service: place.service, account: place.leaseAccount) == state.label
-            else { return nil }
+            guard !state.released, !state.lost else { return nil }
+            guard try moveLapseOn(&state) else { return nil }
             return try work()
         }
     }
@@ -105,27 +109,30 @@ final class RenewalLease: Sendable {
         gate.signal()
     }
 
-    private func moveLapseOn() {
+    private func heartbeat() {
         state.withLock { state in
             guard !state.released, !state.lost else { return }
-            let moved = Self.label(lapsingIn: lifetime)
-            let kept: Bool
-            do {
-                kept = try place.keychain.relabel(
-                    from: state.label, to: moved, service: place.service, account: place.leaseAccount)
-            } catch {
-                // A keychain that failed for a moment proves nothing about who holds the lease; the next beat
-                // tries again, and the lapse in the label still bounds how long this holder may write.
-                return
-            }
-            if kept {
-                state.label = moved
-            } else {
-                state.lost = true
-                state.beat?.cancel()
-                state.beat = nil
-            }
+            // A keychain that failed for a moment proves nothing about who holds the lease; the next beat tries
+            // again, and the lapse in the label still bounds how long another holder waits.
+            _ = try? moveLapseOn(&state)
         }
+    }
+
+    /// Relabels the lease item with a lapse a full lifetime away, only while it carries this holder's label.
+    ///
+    /// Answers whether it did. Where the item is gone or carries another label, this holder has lost the lease.
+    private func moveLapseOn(_ state: inout State) throws -> Bool {
+        let moved = Self.label(lapsingIn: lifetime)
+        if try place.keychain.relabel(
+            from: state.label, to: moved, service: place.service, account: place.leaseAccount)
+        {
+            state.label = moved
+            return true
+        }
+        state.lost = true
+        state.beat?.cancel()
+        state.beat = nil
+        return false
     }
 
     /// The clock leases are read on, in nanoseconds.
@@ -149,15 +156,15 @@ final class RenewalLease: Sendable {
         "\(UUID().uuidString) \(bootSession) \(now() + nanoseconds(lifetime))"
     }
 
-    /// Whether the lease `label` names lapses within `margin` from now, or already has.
+    /// Whether the lease `label` names has lapsed.
     ///
     /// A lapse more than one `lifetime` ahead was never written on this boot's clock, since every holder writes
     /// now plus one lifetime: it is left from before a restart, where the boot's identifier could not be read.
-    static func lapsed(_ label: String, lifetime: Duration, within margin: Duration = .zero) -> Bool {
+    static func lapsed(_ label: String, lifetime: Duration) -> Bool {
         let parts = label.split(separator: " ")
         guard parts.count == 3, parts[1] == bootSession, let lapses = UInt64(parts[2]) else { return true }
         let now = now()
-        return lapses <= now + nanoseconds(margin) || lapses > now + nanoseconds(lifetime)
+        return lapses <= now || lapses > now + nanoseconds(lifetime)
     }
 
     private static func nanoseconds(_ duration: Duration) -> UInt64 {
