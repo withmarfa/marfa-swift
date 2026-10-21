@@ -67,7 +67,13 @@ public final class WorkingCopy: Sendable {
             return WorkingCopy(holder: CoreHolder(core), hasServer: false)
         }
         let url = server.url.absoluteString
-        let core = try await background { try Core.open(path: path, url: url, key: key) }
+        let credential = server.credential
+        let core = try await background {
+            try Core.open(
+                path: path, url: url, key: try credential?.accessToken() ?? key,
+                renewer: credential.map(TokenRenewer.init))
+        }
+        // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
         let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
             try Core.open(path: path, url: url, key: key)
         }

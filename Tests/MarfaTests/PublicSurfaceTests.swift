@@ -212,3 +212,23 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         }
     return [verdictRead, originRead, errorRead].filter { $0 }.count
 }
+
+/// The sign-in surface as an app sees it, without `@testable`.
+@Suite struct PublicSignIn {
+    @Test func anAppDescribesItselfAndChoosesWhereItsSignInIsKept() throws {
+        let client = Authorization.Client(
+            name: "Notes", redirect: URL(string: "com.example.notes:/signed-in"), scopes: ["core.note:read"])
+        let authorization = Authorization(
+            server: try #require(URL(string: "https://Marfa.Example:443/some/path")), client: client,
+            keychain: Keychain(accessGroup: "ABCDE12345.com.example.notes"), service: "com.example.notes")
+        #expect(authorization.server.absoluteString == "https://marfa.example")
+        #expect(authorization.client == client)
+        #expect(Keychain(accessGroup: "a") == Keychain(accessGroup: "a"))
+        #expect(Keychain(accessGroup: "a") != Keychain.system)
+        let errors: [SignInError] = [
+            .canceled, .denied, .expired, .stateMismatch, .notSignedIn, .refused(code: "invalid_scope", message: "m"),
+            .unavailable(message: "offline"), .unreadable(message: "unreadable"),
+        ]
+        #expect(Set(errors.map(\.description)).count == errors.count)
+    }
+}
