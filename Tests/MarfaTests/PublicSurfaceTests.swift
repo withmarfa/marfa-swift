@@ -160,8 +160,9 @@ import Testing
     #expect(cause)
     let status = FolderStatus(
         files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: PausedRemoval(disk: 2),
-        firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0)))
+        firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0, left: 1)))
     #expect(status.firstSync?.plan?.send == 2)
+    #expect(status.firstSync?.plan?.left == 1)
     #expect(status.paused.isPaused)
     #expect(!PausedRemoval().isPaused)
     let read: Bool =
@@ -169,7 +170,7 @@ import Testing
         case .inStep, .waiting, .held, .unmatched, .unreached, .outside: true
         }
     #expect(read)
-    let sync = FolderSyncResult.awaitingConfirmation(FirstSyncPlan(write: 1, send: 2, beside: 0))
+    let sync = FolderSyncResult.awaitingConfirmation(FirstSyncPlan(write: 1, send: 2, beside: 0, left: 1))
     let syncRead: Bool =
         switch sync {
         case .synced, .awaitingConfirmation: true

@@ -234,7 +234,7 @@ extension LiveWorkingCopies {
                 Issue.record("the first sync ran without being confirmed: \(waiting)")
                 return
             }
-            #expect(plan == FirstSyncPlan(write: 0, send: 1, beside: 0))
+            #expect(plan == FirstSyncPlan(write: 0, send: 1, beside: 0, left: 0))
             #expect(try await folders.status(of: directory).firstSync?.plan == plan)
             await #expect {
                 try await folders.watch(directory)
