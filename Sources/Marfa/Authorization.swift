@@ -288,6 +288,9 @@ public struct DeviceSignIn: Sendable {
     /// Asks the server at the interval it gives until the person decides, slowing by 5 seconds each time
     /// the server says `slow_down`, and keeps the sign-in once they approve.
     ///
+    /// When the server cannot be reached or fails with a 5xx status, it doubles the interval and keeps
+    /// asking, as RFC 8628 section 3.5 recommends, until the code expires.
+    ///
     /// Throws ``SignInError/denied`` when the person declines and ``SignInError/expired`` once the code
     /// expires. Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
@@ -310,6 +313,10 @@ public struct DeviceSignIn: Sendable {
                         ]), transport)
             } catch .canceled {
                 throw CancellationError()
+            } catch .unavailable {
+                interval *= 2
+                pause = interval
+                continue
             }
             if answer.status == 200 {
                 return try await polling.authorization.keep(
@@ -323,6 +330,9 @@ public struct DeviceSignIn: Sendable {
             case (429, _): pause = max(interval, answer.retryAfter ?? .zero)
             case (_, "access_denied"): throw SignInError.denied
             case (_, "expired_token"): throw SignInError.expired
+            case (500..., _):
+                interval *= 2
+                pause = interval
             default: throw answer.refusal()
             }
         }

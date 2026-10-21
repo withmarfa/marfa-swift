@@ -283,6 +283,43 @@ struct DeviceSignInPolling {
         }
     }
 
+    @Test func aServerOutOfReachOrFailingSlowsThePollingAndItKeepsAsking() async throws {
+        let server = deviceServer { poll in
+            switch poll {
+            case 1: .failure(.notConnectedToInternet)
+            case 2: oauthError("server_error", status: 503)
+            case 3: .failure(.timedOut)
+            case 4: oauthError("authorization_pending")
+            default: tokens("at-1", "rt-1")
+            }
+        }
+        let clock = TestClock()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport(clock: clock))
+            let started = try await authorization.startDeviceSignIn()
+            _ = try await started.credential()
+            // RFC 8628 section 3.5: the interval doubles on each failure to reach the server.
+            #expect(clock.pauses == [.seconds(5), .seconds(10), .seconds(20), .seconds(40), .seconds(40)])
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func aServerThatStaysOutOfReachIsAskedUntilTheCodeExpires() async throws {
+        let server = deviceServer(expiresIn: 30) { _ in .failure(.cannotConnectToHost) }
+        let clock = TestClock()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport(clock: clock))
+            let started = try await authorization.startDeviceSignIn()
+            await #expect(throws: SignInError.expired) { try await started.credential() }
+            #expect(clock.pauses == [.seconds(5), .seconds(10), .seconds(15)])
+            #expect(server.requests(to: "/auth/oauth2/token").count == 3)
+        }
+    }
+
     @Test func aDeclinedGrantIsDeniedAndAnExpiredOneExpired() async throws {
         for (code, expected) in [("access_denied", SignInError.denied), ("expired_token", .expired)] {
             let server = deviceServer { poll in
