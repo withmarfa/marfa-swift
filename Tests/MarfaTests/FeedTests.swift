@@ -421,6 +421,27 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 
+    @Test func clearingWritesFromTheQueueIsToldOnceForEachCallThatCleared() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let heard = Heard(copy.changes())
+        core.state.withLock {
+            $0.answered = ["a", "b", "c"]
+            $0.refused = ["r"]
+        }
+        #expect(try await copy.queue.forgetAnswered(ids: ["a", "absent"]) == 1)
+        #expect(try await copy.queue.forgetAnswered() == 2)
+        #expect(try await copy.queue.discard("r"))
+        // The same calls with nothing left to clear.
+        #expect(try await copy.queue.forgetAnswered(ids: ["a"]) == 0)
+        #expect(try await copy.queue.forgetAnswered() == 0)
+        #expect(try await copy.queue.discard("r") == false)
+        try await eventually("the clearing was told") { heard.all.count >= 3 }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(heard.all == [refreshed(.forgotten), refreshed(.forgotten), refreshed(.forgotten)])
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func closingReturnsOnceEveryPlaceInTheWatchHasEnded() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
