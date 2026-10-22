@@ -486,25 +486,32 @@ public enum FolderSyncResult: Sendable, Hashable {
 
 /// What a folder's first sync will do, read from the folder as it stands.
 public struct FirstSyncPlan: Sendable, Hashable {
-    /// Files it will write into the directory.
+    /// Files it will write into the directory, not counting those `left` counts.
     public let write: UInt64
     /// Files in the directory it will send, as new items or as the edits of the items they name.
     public let send: UInt64
-    /// How many of the files it will write take a path a file already in the directory has.
+    /// How many of the files it will write take a path a file it sends already has.
     ///
     /// Both end up in the folder, one of the two with a number in its name, and none is written over.
     public let beside: UInt64
+    /// Items whose file it will not write, because a file it does not send is at that path.
+    ///
+    /// That file is one it holds back, such as one it cannot read, or one it takes no part in. The file stays
+    /// as it is, and no file with a number in its name is written beside it.
+    public let left: UInt64
 
-    public init(write: UInt64, send: UInt64, beside: UInt64) {
+    public init(write: UInt64, send: UInt64, beside: UInt64, left: UInt64) {
         self.write = write
         self.send = send
         self.beside = beside
+        self.left = left
     }
 
     init(_ core: MarfaCore.FirstSyncPlan) {
         write = core.write
         send = core.send
         beside = core.beside
+        left = core.left
     }
 }
 
