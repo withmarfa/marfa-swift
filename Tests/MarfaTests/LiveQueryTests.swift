@@ -135,6 +135,7 @@ struct LiveQueries {
         told(.refreshed(.caughtUp)),
         told(.refreshed(.drained)),
         told(.refreshed(.withdrawn)),
+        told(.refreshed(.forgotten)),
         told(.refreshed(.pinned)),
         told(.refreshed(.unpinned)),
         told(.refreshed(.purged)),

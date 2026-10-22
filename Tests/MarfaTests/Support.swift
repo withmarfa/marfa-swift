@@ -144,6 +144,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var watchGate: DispatchSemaphore?
         var watchGated = false
         var withdrawable: Set<String> = []
+        var answered: Set<String> = []
+        var refused: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
         var declarations: [JSONObject] = []
@@ -270,6 +272,25 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func withdraw(id: String) throws -> Bool {
         state.withLock { $0.withdrawable.remove(id) != nil }
+    }
+
+    override func forgetAnswered() throws -> UInt64 {
+        state.withLock { state in
+            defer { state.answered = [] }
+            return UInt64(state.answered.count)
+        }
+    }
+
+    override func forgetAnsweredIds(ids: [String]) throws -> UInt64 {
+        state.withLock { state in
+            let named = state.answered.intersection(ids)
+            state.answered.subtract(named)
+            return UInt64(named.count)
+        }
+    }
+
+    override func discard(id: String) throws -> Bool {
+        state.withLock { $0.refused.remove(id) != nil }
     }
 
     override func drain(stop: MarfaCore.Stop?) throws -> MarfaCore.DrainReport {

@@ -142,6 +142,7 @@ import Testing
         #expect(Change.Refresh.catalog != .hydrated)
         #expect(Change.Origin.serverUnreachable(.network(message: "m")) != .serverReachable)
         #expect(Change.Refresh.purged != .unpinned)
+        #expect(Change.Refresh.forgotten != .withdrawn)
     }
 }
 

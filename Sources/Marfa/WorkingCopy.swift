@@ -330,6 +330,9 @@ public struct Change: Sendable, Hashable {
         case caughtUp
         case drained
         case withdrawn
+        /// Answered or refused writes left the queue, through `forgetAnswered()`,
+        /// `forgetAnswered(ids:)` or `discard(_:)`; read the queue again.
+        case forgotten
         case pinned
         case unpinned
         /// An item, named by `itemId`, was purged and left the copy.
@@ -747,8 +750,13 @@ public struct Queue: Sendable {
     /// Blocked and dead writes stay until released or withdrawn, as does an
     /// answered write a waiting write depends on, and a refused write that
     /// carried content stays, its `body` readable, until `discard(_:)`.
+    ///
+    /// Tells every held stream `.refreshed(.forgotten)` when it cleared a
+    /// write, and nothing when it cleared none.
     public func forgetAnswered() async throws -> UInt64 {
-        try await holder.run { core in try core.forgetAnswered() }
+        let forgotten = try await holder.run { core in try core.forgetAnswered() }
+        announceForgotten(forgotten > 0)
+        return forgotten
     }
 
     /// Clears only the named answered writes, under the rules
@@ -758,9 +766,13 @@ public struct Queue: Sendable {
     /// has read; a drain that ran since, such as the one a held `changes()`
     /// stream makes when its server is back, leaves its answers for the next
     /// read. An id that names no write, or a write with no answer yet, is
-    /// ignored, and an empty list clears nothing.
+    /// ignored, and an empty list clears nothing. It tells every held stream
+    /// `.refreshed(.forgotten)` when it cleared a write, and nothing when it
+    /// cleared none.
     public func forgetAnswered(ids: [String]) async throws -> UInt64 {
-        try await holder.run { core in try core.forgetAnsweredIds(ids: ids) }
+        let forgotten = try await holder.run { core in try core.forgetAnsweredIds(ids: ids) }
+        announceForgotten(forgotten > 0)
+        return forgotten
     }
 
     /// Takes a refused write, and the content it carried, out of the queue.
@@ -772,8 +784,18 @@ public struct Queue: Sendable {
     /// unsent. A create's discard first waits for a drain already running to
     /// end.
     /// The copy's row already shows what the server holds.
+    ///
+    /// Tells every held stream `.refreshed(.forgotten)` when it took the
+    /// write, and nothing when it returns `false`.
     public func discard(_ id: String) async throws -> Bool {
-        try await holder.run { core in try core.discard(id: id) }
+        let discarded = try await holder.run { core in try core.discard(id: id) }
+        announceForgotten(discarded)
+        return discarded
+    }
+
+    private func announceForgotten(_ cleared: Bool) {
+        guard cleared else { return }
+        feed.announce(Change(origin: .refreshed(.forgotten), itemId: nil, edgeId: nil))
     }
 }
 
