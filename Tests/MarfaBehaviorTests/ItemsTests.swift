@@ -202,9 +202,6 @@ struct ItemsOffline {
         let replaced = try await copy.metadata.replaceTags(of: id, with: ["q"])
         #expect(replaced.kind == .replaceMetadata && replaced.body == ["tags": ["q"]])
         #expect(try await copy.items.get(id)?.tags == ["q"])
-        let merged = try await copy.metadata.mergeTags(["r", "q"], into: id)
-        #expect(merged.kind == .mergeMetadata && merged.body == ["tags": ["r", "q"]])
-        #expect(try await copy.items.get(id)?.tags == ["q", "r"])
         await #expect {
             _ = try await copy.tags.add("z", to: "absent")
         } throws: { Self.notFound("item_not_found")($0) }
@@ -459,7 +456,6 @@ struct ItemsOffline {
         let calls: [@Sendable () async throws -> Void] = [
             { _ = try await copy.tags.add(tag.0, to: id) },
             { _ = try await copy.metadata.replaceTags(of: id, with: [tag.0]) },
-            { _ = try await copy.metadata.mergeTags([tag.0], into: id) },
             { _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"], tags: [tag.0])) },
         ]
         for call in calls {
@@ -469,6 +465,43 @@ struct ItemsOffline {
             _ = try await copy.tags.add(String(repeating: "a", count: 129), to: id)
         } throws: { Self.refused("validation_error", containing: "at most 128 UTF-16 code units")($0) }
         #expect(try await copy.queue.all() == before)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func addingTagsOneByOneIsRefusedAtTheHundredthTagAndKeepsTheTagsAddedBeforeIt(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy, tags: (1...98).map { "t\($0)" })
+        let before = try await copy.queue.all()
+
+        var added: [QueuedWrite] = []
+        var refusal: (any Error)?
+        for tag in ["u1", "u2", "u3"] {
+            do { added.append(try await copy.tags.add(tag, to: id)) } catch {
+                refusal = error
+                break
+            }
+        }
+        let overBound = "tags: Maximum 100 tags per item (including existing tags)"
+        #expect(
+            refusal.map(Self.refused("validation_error", containing: overBound)) == true,
+            "\(String(describing: refusal))")
+        #expect(added.map(\.tag) == ["u1", "u2"])
+        #expect(try await copy.queue.all() == before + added)
+        let tags = try #require(try await copy.items.get(id)).tags
+        #expect(tags.count == 100 && tags.contains("u2") && !tags.contains("u3"))
+        _ = try await copy.tags.remove("u2", from: id)
+
+        await #expect {
+            _ = try await copy.metadata.replaceTags(of: id, with: [""] + (1...100).map { "r\($0)" })
+        } throws: {
+            Self.refused(
+                "validation_error", containing: "tags: Maximum 100 tags per item; tags[0]: A tag must not be empty")($0)
+        }
+        await #expect {
+            _ = try await copy.tags.add("..", to: id)
+        } throws: { Self.refused("validation_error", containing: #"tags[0]: A tag must not be "..""#)($0) }
+        #expect(try await copy.items.get(id)?.tags.count == 99)
         await copy.close()
     }
 

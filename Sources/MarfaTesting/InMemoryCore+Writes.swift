@@ -184,17 +184,14 @@ extension InMemoryCore {
         return try tagged(id, .replaceMetadata, tag: nil, body: Self.tags(tags), .replace(tags))
     }
 
-    func mergeMetadata(id: String, tags: [String]) throws -> QueuedWrite {
-        try Checks.tags(tags)
-        return try tagged(id, .mergeMetadata, tag: nil, body: Self.tags(tags), .merge(tags))
-    }
-
     private func tagged(
         _ id: String, _ kind: WriteKind, tag: String?, body: JsonObject, _ change: InMemoryCore.TagChange
     ) throws -> QueuedWrite {
         try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
+            let before = held.tags.count
             held.tags = Self.applying(change, to: held.tags)
+            try Checks.tagCount(before: before, after: held.tags.count)
             state.items[id] = held
             return state.append(
                 kind, item: id, tag: tag, body: body, dependsOn: state.pendingCreates(of: id), effect: .tags(change))
@@ -413,7 +410,6 @@ extension InMemoryCore {
         case .add(let tag): held[Array(tag.utf8)] = tag
         case .remove(let tag): held[Array(tag.utf8)] = nil
         case .replace(let tags): held = Dictionary(tags.map { (Array($0.utf8), $0) }) { first, _ in first }
-        case .merge(let tags): for tag in tags { held[Array(tag.utf8)] = tag }
         }
         return held.values.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
     }
@@ -555,7 +551,6 @@ extension WriteKind {
         case .updateEdge: "update_edge"
         case .deleteEdge: "delete_edge"
         case .replaceMetadata: "replace_metadata"
-        case .mergeMetadata: "merge_metadata"
         case .addTag: "add_tag"
         case .removeTag: "remove_tag"
         case .writeExtension: "write_extension"

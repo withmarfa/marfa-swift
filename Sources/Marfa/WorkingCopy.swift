@@ -59,7 +59,10 @@ public final class WorkingCopy: Sendable {
     /// Throws `MarfaError.store` when the store's lock file exists but cannot
     /// be opened for writing, rather than opening a copy that holds a lock it
     /// cannot keep. Throws `SignInError.notSignedIn` for a server made from a
-    /// credential whose sign-in the keychain no longer holds.
+    /// credential whose sign-in the keychain no longer holds. Throws
+    /// `MarfaError.wrongSchema` for a store another build of the core made,
+    /// and leaves the store as it is: its `unsent` counts the writes the
+    /// server has not taken, which only that build can send.
     public static func open(store: URL, server: Server? = nil) async throws -> WorkingCopy {
         let path = store.path
         guard let server else {
@@ -627,6 +630,13 @@ public struct Tags: Sendable {
     let holder: CoreHolder
     let feed: Feed
 
+    /// Queues one write that adds one tag, leaving the item's other tags.
+    ///
+    /// Adding several tags takes one call for each, and each is checked on
+    /// its own: a call that would add a tag to an item that would then hold more
+    /// than 100 throws `validation_error`, and the tags added before it stay
+    /// added and queued.
+    /// To set every tag in one write, use ``Metadata/replaceTags(of:with:)``.
     public func add(_ tag: String, to id: String) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in try core.addTag(id: id, tag: tag) }
     }
@@ -642,10 +652,6 @@ public struct Metadata: Sendable {
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in try core.replaceMetadata(id: id, tags: tags) }
-    }
-
-    public func mergeTags(_ tags: [String], into id: String) async throws -> QueuedWrite {
-        try await queued(holder, feed) { core in try core.mergeMetadata(id: id, tags: tags) }
     }
 }
 

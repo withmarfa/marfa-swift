@@ -234,7 +234,7 @@ extension LiveWorkingCopies {
                 Issue.record("the first sync ran without being confirmed: \(waiting)")
                 return
             }
-            #expect(plan == FirstSyncPlan(write: 0, send: 1, beside: 0))
+            #expect(plan == FirstSyncPlan(write: 0, send: 1, beside: 0, left: 0))
             #expect(try await folders.status(of: directory).firstSync?.plan == plan)
             await #expect {
                 try await folders.watch(directory)
@@ -276,6 +276,34 @@ extension LiveWorkingCopies {
             let status = try await folders.status(of: directory)
             #expect(status.files.map(\.path).sorted() == ["Alpha.md", "Beta.md"])
             #expect(status.files.allSatisfy { $0.state == .inStep }, "\(status.files)")
+        }
+
+        @Test func aFirstSyncLeavesAFileItCannotSendWhereAnItemsFileWouldGo() async throws {
+            let (folderId, tag) = try await FolderFixture.folder()
+            let writer = try await Live.hydrated()
+            for title in ["Alpha", "Beta"] {
+                _ = try await writer.items.create(FolderFixture.note(title, tagged: tag))
+            }
+            #expect(try await writer.queue.drain().verdicts.allSatisfy { $0.verdict == .accepted })
+            await writer.close()
+
+            let directory = FolderFixture.directory()
+            _ = try await folders.add(directory, following: folderId)
+            let broken = "---\ntitle: [unclosed\n---\nthe person's words\n"
+            let held = directory.appending(path: "Alpha.md")
+            try Data(broken.utf8).write(to: held)
+            let waiting = try await folders.sync(directory)
+            guard case .awaitingConfirmation(let plan) = waiting else {
+                Issue.record("the first sync ran without being confirmed: \(waiting)")
+                return
+            }
+            #expect(plan == FirstSyncPlan(write: 1, send: 0, beside: 0, left: 1))
+
+            try await folders.confirmFirstSync(in: directory)
+            _ = try await FolderFixture.sync(directory)
+            #expect(try String(contentsOf: held, encoding: .utf8) == broken)
+            #expect(!FileManager.default.fileExists(atPath: directory.appending(path: "Alpha (2).md").path()))
+            #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Beta.md").path()))
         }
 
         @Test func aSyncNamesTheItemItsPullDidNotWriteAtASecretsName() async throws {
