@@ -741,18 +741,39 @@ public protocol APIProtocol: Sendable {
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
     /// Update the owner
     ///
-    /// Updates the owner's email, name, or picture URL and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    /// Updates the owner's email or name, or removes the picture. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
     ///
     /// - Remark: HTTP `PATCH /owner`.
     /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
     func updateOwner(_ input: Operations.UpdateOwner.Input) async throws -> Operations.UpdateOwner.Output
     /// Update the owner's profile
     ///
-    /// Updates the owner's name or avatar and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    /// Updates the owner's name or removes the picture and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
     func updateProfile(_ input: Operations.UpdateProfile.Input) async throws -> Operations.UpdateProfile.Output
+    /// Get the owner's picture
+    ///
+    /// Returns the owner's picture as an image download. Requires an owner sign-in or a credential with profile read permission for the avatar. Send `If-None-Match` to revalidate.
+    ///
+    /// - Remark: HTTP `GET /owner/picture`.
+    /// - Remark: Generated from `#/paths//owner/picture/get(getOwnerPicture)`.
+    func getOwnerPicture(_ input: Operations.GetOwnerPicture.Input) async throws -> Operations.GetOwnerPicture.Output
+    /// Replace the owner's picture
+    ///
+    /// Stores the request body as the owner's picture and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority.
+    ///
+    /// - Remark: HTTP `PUT /owner/picture`.
+    /// - Remark: Generated from `#/paths//owner/picture/put(replaceOwnerPicture)`.
+    func replaceOwnerPicture(_ input: Operations.ReplaceOwnerPicture.Input) async throws -> Operations.ReplaceOwnerPicture.Output
+    /// Replace the picture as an app
+    ///
+    /// Stores the request body as the owner's picture and returns `ok: true`. Requires profile write permission for the avatar.
+    ///
+    /// - Remark: HTTP `PUT /profile/picture`.
+    /// - Remark: Generated from `#/paths//profile/picture/put(replaceProfilePicture)`.
+    func replaceProfilePicture(_ input: Operations.ReplaceProfilePicture.Input) async throws -> Operations.ReplaceProfilePicture.Output
     /// List sign-ins
     ///
     /// Returns every browser, app and key that can reach Marfa, marking the browser that sent the request. Requires the owner's browser session or the local command.
@@ -2468,7 +2489,7 @@ extension APIProtocol {
     }
     /// Update the owner
     ///
-    /// Updates the owner's email, name, or picture URL and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    /// Updates the owner's email or name, or removes the picture. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
     ///
     /// - Remark: HTTP `PATCH /owner`.
     /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
@@ -2483,7 +2504,7 @@ extension APIProtocol {
     }
     /// Update the owner's profile
     ///
-    /// Updates the owner's name or avatar and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    /// Updates the owner's name or removes the picture and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -2492,6 +2513,45 @@ extension APIProtocol {
         body: Operations.UpdateProfile.Input.Body
     ) async throws -> Operations.UpdateProfile.Output {
         try await updateProfile(Operations.UpdateProfile.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get the owner's picture
+    ///
+    /// Returns the owner's picture as an image download. Requires an owner sign-in or a credential with profile read permission for the avatar. Send `If-None-Match` to revalidate.
+    ///
+    /// - Remark: HTTP `GET /owner/picture`.
+    /// - Remark: Generated from `#/paths//owner/picture/get(getOwnerPicture)`.
+    public func getOwnerPicture(headers: Operations.GetOwnerPicture.Input.Headers = .init()) async throws -> Operations.GetOwnerPicture.Output {
+        try await getOwnerPicture(Operations.GetOwnerPicture.Input(headers: headers))
+    }
+    /// Replace the owner's picture
+    ///
+    /// Stores the request body as the owner's picture and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority.
+    ///
+    /// - Remark: HTTP `PUT /owner/picture`.
+    /// - Remark: Generated from `#/paths//owner/picture/put(replaceOwnerPicture)`.
+    public func replaceOwnerPicture(
+        headers: Operations.ReplaceOwnerPicture.Input.Headers = .init(),
+        body: Operations.ReplaceOwnerPicture.Input.Body
+    ) async throws -> Operations.ReplaceOwnerPicture.Output {
+        try await replaceOwnerPicture(Operations.ReplaceOwnerPicture.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Replace the picture as an app
+    ///
+    /// Stores the request body as the owner's picture and returns `ok: true`. Requires profile write permission for the avatar.
+    ///
+    /// - Remark: HTTP `PUT /profile/picture`.
+    /// - Remark: Generated from `#/paths//profile/picture/put(replaceProfilePicture)`.
+    public func replaceProfilePicture(
+        headers: Operations.ReplaceProfilePicture.Input.Headers = .init(),
+        body: Operations.ReplaceProfilePicture.Input.Body
+    ) async throws -> Operations.ReplaceProfilePicture.Output {
+        try await replaceProfilePicture(Operations.ReplaceProfilePicture.Input(
             headers: headers,
             body: body
         ))

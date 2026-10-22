@@ -1298,6 +1298,27 @@ public static func openReader(path: String)throws  -> Core  {
 })
 }
     
+    /**
+     * Replaces the store at `path` that `open` refuses with `WrongSchema`
+     * by an empty one, and opens it, taking `url`, `key` and `renewer` as
+     * `open` does. Refuses with `ReadingHandle` while another process
+     * writes the store, with `WrongSchema` and its `unsent` count while it
+     * holds a write the server has not taken, and with `Invalid` where
+     * `open` would not refuse it, leaving the store as it is. The new store
+     * is empty, so what only the old store held, such as pins, is lost: read
+     * it first.
+     */
+public static func replaceRefused(path: String, url: String?, key: String?, renewer: CredentialRenewer? = nil)throws  -> Core  {
+    return try  FfiConverterTypeCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_constructor_core_replace_refused(
+        FfiConverterString.lower(path),
+        FfiConverterOptionString.lower(url),
+        FfiConverterOptionString.lower(key),
+        FfiConverterOptionTypeCredentialRenewer.lower(renewer),$0
+    )
+})
+}
+    
 
     
     /**
@@ -12652,6 +12673,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_core_open_reader() != 60011) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_constructor_core_replace_refused() != 17577) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {
