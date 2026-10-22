@@ -633,8 +633,9 @@ public struct Tags: Sendable {
     /// Queues one write that adds one tag, leaving the item's other tags.
     ///
     /// Adding several tags takes one call for each, and each is checked on
-    /// its own: a call that would leave the item more than 100 tags throws
-    /// `validation_error`, and the tags added before it stay added and queued.
+    /// its own: a call that would add a tag to an item that would then hold more
+    /// than 100 throws `validation_error`, and the tags added before it stay
+    /// added and queued.
     /// To set every tag in one write, use ``Metadata/replaceTags(of:with:)``.
     public func add(_ tag: String, to id: String) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in try core.addTag(id: id, tag: tag) }
