@@ -72,7 +72,7 @@ struct Closing {
         await refused("edges.ofType") { _ = try await copy.edges.ofType("attached-to") }
         await refused("edges.create") { _ = try await copy.edges.create(from: "a", to: "b", type: "attached-to") }
         await refused("tags.add") { _ = try await copy.tags.add("t", to: "a") }
-        await refused("metadata.mergeTags") { _ = try await copy.metadata.mergeTags(["t"], into: "a") }
+        await refused("metadata.replaceTags") { _ = try await copy.metadata.replaceTags(of: "a", with: ["t"]) }
         await refused("extensions.write") { _ = try await copy.extensions.write("n", [:], on: "a") }
         await refused("extensions.delete") { _ = try await copy.extensions.delete("n", from: "a") }
         await refused("blobs.get") { _ = try await copy.blobs.get("h") }

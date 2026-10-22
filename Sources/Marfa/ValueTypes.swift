@@ -56,7 +56,6 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
     case updateEdge
     case deleteEdge
     case replaceMetadata
-    case mergeMetadata
     case addTag
     case removeTag
     case writeExtension
@@ -74,7 +73,6 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
         case .updateEdge: self = .updateEdge
         case .deleteEdge: self = .deleteEdge
         case .replaceMetadata: self = .replaceMetadata
-        case .mergeMetadata: self = .mergeMetadata
         case .addTag: self = .addTag
         case .removeTag: self = .removeTag
         case .writeExtension: self = .writeExtension
@@ -94,7 +92,6 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
         case .updateEdge: .updateEdge
         case .deleteEdge: .deleteEdge
         case .replaceMetadata: .replaceMetadata
-        case .mergeMetadata: .mergeMetadata
         case .addTag: .addTag
         case .removeTag: .removeTag
         case .writeExtension: .writeExtension

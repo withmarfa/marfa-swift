@@ -1018,11 +1018,6 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func list(filters: ListFilters, sort: Sort) throws  -> [Item]
     
     /**
-     * Adds the named tags, leaving the rest.
-     */
-    func mergeMetadata(id: String, tags: [String]) throws  -> QueuedWrite
-    
-    /**
      * The ID of the item a conflicted copy was made from, or `nil` where
      * `id` is not a held conflicted copy outside the bin.
      */
@@ -1741,19 +1736,6 @@ open func list(filters: ListFilters, sort: Sort)throws  -> [Item]  {
             self.uniffiCloneHandle(),
         FfiConverterTypeListFilters_lower(filters),
         FfiConverterTypeSort_lower(sort),$0
-    )
-})
-}
-    
-    /**
-     * Adds the named tags, leaving the rest.
-     */
-open func mergeMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
-    return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_core_merge_metadata(
-            self.uniffiCloneHandle(),
-        FfiConverterString.lower(id),
-        FfiConverterSequenceString.lower(tags),$0
     )
 })
 }
@@ -4976,7 +4958,7 @@ public func FfiConverterTypeFileStatus_lower(_ value: FileStatus) -> RustBuffer 
  */
 public struct FirstSyncPlan: Equatable, Hashable {
     /**
-     * Files it will write into the directory.
+     * Files it will write into the directory. Not those `left` counts.
      */
     public var write: UInt64
     /**
@@ -4985,30 +4967,42 @@ public struct FirstSyncPlan: Equatable, Hashable {
      */
     public var send: UInt64
     /**
-     * Of the files it will write, those whose path a file already in the
-     * directory has. Both end up in the folder, and one of the two takes a
-     * number in its name; none is written over.
+     * Of the files it will write, those whose path a file it sends already
+     * has. Both end up in the folder, and one of the two takes a number in
+     * its name; none is written over.
      */
     public var beside: UInt64
+    /**
+     * Items whose file it will not write, because a file it does not send
+     * is at the path: one it holds back, or one it takes no part in. That
+     * file stays as it is and no number is added.
+     */
+    public var left: UInt64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         /**
-         * Files it will write into the directory.
+         * Files it will write into the directory. Not those `left` counts.
          */write: UInt64, 
         /**
          * Files in the directory it will send, as new items or as the edits of
          * the items they name.
          */send: UInt64, 
         /**
-         * Of the files it will write, those whose path a file already in the
-         * directory has. Both end up in the folder, and one of the two takes a
-         * number in its name; none is written over.
-         */beside: UInt64) {
+         * Of the files it will write, those whose path a file it sends already
+         * has. Both end up in the folder, and one of the two takes a number in
+         * its name; none is written over.
+         */beside: UInt64, 
+        /**
+         * Items whose file it will not write, because a file it does not send
+         * is at the path: one it holds back, or one it takes no part in. That
+         * file stays as it is and no number is added.
+         */left: UInt64) {
         self.write = write
         self.send = send
         self.beside = beside
+        self.left = left
     }
 
     
@@ -5029,7 +5023,8 @@ public struct FfiConverterTypeFirstSyncPlan: FfiConverterRustBuffer {
             try FirstSyncPlan(
                 write: FfiConverterUInt64.read(from: &buf), 
                 send: FfiConverterUInt64.read(from: &buf), 
-                beside: FfiConverterUInt64.read(from: &buf)
+                beside: FfiConverterUInt64.read(from: &buf), 
+                left: FfiConverterUInt64.read(from: &buf)
         )
     }
 
@@ -5037,6 +5032,7 @@ public struct FfiConverterTypeFirstSyncPlan: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.write, into: &buf)
         FfiConverterUInt64.write(value.send, into: &buf)
         FfiConverterUInt64.write(value.beside, into: &buf)
+        FfiConverterUInt64.write(value.left, into: &buf)
     }
 }
 
@@ -10919,7 +10915,6 @@ public enum WriteKind: Equatable, Hashable, CaseIterable {
     case updateEdge
     case deleteEdge
     case replaceMetadata
-    case mergeMetadata
     case addTag
     case removeTag
     case writeExtension
@@ -10964,17 +10959,15 @@ public struct FfiConverterTypeWriteKind: FfiConverterRustBuffer {
         
         case 9: return .replaceMetadata
         
-        case 10: return .mergeMetadata
+        case 10: return .addTag
         
-        case 11: return .addTag
+        case 11: return .removeTag
         
-        case 12: return .removeTag
+        case 12: return .writeExtension
         
-        case 13: return .writeExtension
+        case 13: return .deleteExtension
         
-        case 14: return .deleteExtension
-        
-        case 15: return .uploadBlob
+        case 14: return .uploadBlob
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -11020,28 +11013,24 @@ public struct FfiConverterTypeWriteKind: FfiConverterRustBuffer {
             writeInt(&buf, Int32(9))
         
         
-        case .mergeMetadata:
+        case .addTag:
             writeInt(&buf, Int32(10))
         
         
-        case .addTag:
+        case .removeTag:
             writeInt(&buf, Int32(11))
         
         
-        case .removeTag:
+        case .writeExtension:
             writeInt(&buf, Int32(12))
         
         
-        case .writeExtension:
+        case .deleteExtension:
             writeInt(&buf, Int32(13))
         
         
-        case .deleteExtension:
-            writeInt(&buf, Int32(14))
-        
-        
         case .uploadBlob:
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(14))
         
         }
     }
@@ -12531,9 +12520,6 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_list() != 38444) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_marfa_core_ffi_checksum_method_core_merge_metadata() != 31075) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_original_of_conflicted_copy() != 44658) {

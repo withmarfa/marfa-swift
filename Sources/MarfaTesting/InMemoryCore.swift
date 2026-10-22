@@ -13,7 +13,6 @@ final class InMemoryCore: CoreProtocol, Sendable {
         case add(String)
         case remove(String)
         case replace([String])
-        case merge([String])
     }
 
     /// What a write does to the rows, so the rows can be worked out again from

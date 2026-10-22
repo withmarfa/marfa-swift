@@ -7,20 +7,38 @@ import MarfaCore
 /// They cover the inputs the fake can judge as the core does. An input it cannot judge throws
 /// `FakeCopyError.unsupported` instead of being answered differently.
 enum Checks {
-    /// A tag the core refuses, by its position in the list.
+    /// The server's `MAX_TAGS_PER_ITEM`.
+    static let tagsPerItem = 100
+
+    /// The tags a write carries that the core refuses: every problem, joined as the core joins them.
     static func tags(_ tags: [String]) throws {
+        var problems: [String] = tags.count > tagsPerItem ? ["tags: Maximum \(tagsPerItem) tags per item"] : []
         for (position, tag) in tags.enumerated() {
-            if tag.isEmpty { throw Refuse.validation("validation_error", "tags[\(position)]: A tag must not be empty") }
-            if tag.unicodeScalars.allSatisfy(isSpace) {
-                throw Refuse.validation("validation_error", "tags[\(position)]: A tag must not be blank")
-            }
-            if tag.utf16.count > 128 {
-                throw Refuse.validation(
-                    "validation_error", "tags[\(position)]: A tag must contain at most 128 UTF-16 code units")
-            }
-            if tag.unicodeScalars.first.map(isSpace) == true || tag.unicodeScalars.last.map(isSpace) == true {
+            let problem: String
+            if tag.isEmpty {
+                problem = "A tag must not be empty"
+            } else if tag.unicodeScalars.allSatisfy(isSpace) {
+                problem = "A tag must not be blank"
+            } else if tag == "." || tag == ".." {
+                problem = "A tag must not be \"\(tag)\", which a URL path cannot name"
+            } else if tag.utf16.count > 128 {
+                problem = "A tag must contain at most 128 UTF-16 code units"
+            } else if tag.unicodeScalars.first.map(isSpace) == true || tag.unicodeScalars.last.map(isSpace) == true {
                 throw FakeCopyError.unsupported(call: "a tag with surrounding whitespace")
+            } else {
+                continue
             }
+            problems.append("tags[\(position)]: \(problem)")
+        }
+        if !problems.isEmpty { throw Refuse.validation("validation_error", problems.joined(separator: "; ")) }
+    }
+
+    /// A tag write that leaves an item more tags than the bound, refused only where it holds
+    /// more than it did, so a row restored over the bound can still shed them.
+    static func tagCount(before: Int, after: Int) throws {
+        if after > tagsPerItem && after > before {
+            throw Refuse.validation(
+                "validation_error", "tags: Maximum \(tagsPerItem) tags per item (including existing tags)")
         }
     }
 
