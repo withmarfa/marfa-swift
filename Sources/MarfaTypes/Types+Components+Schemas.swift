@@ -413,14 +413,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
             public var email: Components.Schemas.ProfilePermissions.EmailPayload?
-            /// Access to the owner's avatar URL.
+            /// Access to the owner's profile picture.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/avatar`.
             @frozen public enum AvatarPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case read = "read"
                 case write = "write"
             }
-            /// Access to the owner's avatar URL.
+            /// Access to the owner's profile picture.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/avatar`.
             public var avatar: Components.Schemas.ProfilePermissions.AvatarPayload?
@@ -430,7 +430,7 @@ extension Components {
             ///   - _ast_: Access to every profile field. write changes only name and avatar.
             ///   - name: Access to the owner's name.
             ///   - email: Read access to the owner's email address.
-            ///   - avatar: Access to the owner's avatar URL.
+            ///   - avatar: Access to the owner's profile picture.
             public init(
                 _ast_: Components.Schemas.ProfilePermissions._ast_Payload? = nil,
                 name: Components.Schemas.ProfilePermissions.NamePayload? = nil,
@@ -13553,7 +13553,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
             public var name: Swift.String
-            /// The owner's picture URL, or `null` when none is set.
+            /// The address of the owner's picture on this instance, or `null` when none is set. Fetch it with `GET /owner/picture`.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/avatar`.
             public var avatar: Swift.String?
@@ -13567,7 +13567,7 @@ extension Components {
             ///   - id: Unique identifier for the owner.
             ///   - email: Email address used to sign in.
             ///   - name: Display name of the owner.
-            ///   - avatar: The owner's picture URL, or `null` when none is set.
+            ///   - avatar: The address of the owner's picture on this instance, or `null` when none is set. Fetch it with `GET /owner/picture`.
             ///   - createdAt: When the owner was created, in UTC.
             public init(
                 id: Swift.String,
@@ -14272,6 +14272,88 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.PasskeyNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NotFoundRefusal`.
+        public struct NotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case notFound = "not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error/code`.
+                public var code: Components.Schemas.NotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error/details`.
+                public var details: Components.Schemas.NotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.NotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.NotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotFoundRefusal/error`.
+            public var error: Components.Schemas.NotFoundRefusal._ErrorPayload
+            /// Creates a new `NotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.NotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -16699,8 +16781,6 @@ extension Components {
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaInline00404e686415370f`.
         public typealias MarfaInline00404e686415370f = Swift.String
-        /// - Remark: Generated from `#/components/schemas/MarfaInline59652345197f6db0`.
-        public typealias MarfaInline59652345197f6db0 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaInline0606c3c8f2e5ac06 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInlineea288f4ef558f5f1`.
@@ -16914,8 +16994,6 @@ extension Components {
         public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline59652345197f6db0`.
-        public typealias MarfaNullableMarfaInline59652345197f6db0 = MarfaNullable<Components.Schemas.MarfaInline59652345197f6db0>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaNullableMarfaInline0606c3c8f2e5ac06 = MarfaNullable<Components.Schemas.MarfaInline0606c3c8f2e5ac06>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineea288f4ef558f5f1`.
