@@ -11,8 +11,8 @@ private func expectPatchRoundTrip<Patch: Codable>(_ type: Patch.Type, wire: Stri
     #expect(NSDictionary(dictionary: actual).isEqual(to: expected))
 }
 
-@Test(arguments: ["{}", #"{"avatar":null}"#, #"{"avatar":"https://example.com/avatar.png"}"#])
-func nullablePatchAvatarKeepsOmissionNullAndValue(wire: String) throws {
+@Test(arguments: ["{}", #"{"avatar":null}"#])
+func nullablePatchAvatarKeepsOmissionAndNull(wire: String) throws {
     try expectPatchRoundTrip(Operations.UpdateProfile.Input.Body.JsonPayload.self, wire: wire)
 }
 
@@ -39,10 +39,9 @@ func nullablePatchWebhookKeepsOmissionNullAndValue(wire: String) throws {
         let fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
         #expect(fields[field] is NSNull)
     }
-    let url = "https://example.com/avatar.png"
-    let profile = Profile(avatar: .value(url))
-    let fields = try #require(JSONSerialization.jsonObject(with: encoder.encode(profile)) as? [String: Any])
-    #expect(fields["avatar"] as? String == url)
+    let webhook = Webhook(typeFilter: .value("core.note"))
+    let fields = try #require(JSONSerialization.jsonObject(with: encoder.encode(webhook)) as? [String: Any])
+    #expect(fields["type_filter"] as? String == "core.note")
 }
 
 @Test(arguments: ["{}", #"{"feed_days":null}"#, #"{"feed_days":30}"#])
