@@ -197,7 +197,7 @@ extension LiveWorkingCopies {
             _ = try await copy.items.update(
                 id, Edit(properties: ["title": "a task"], baseVersion: now.version, type: "core.task", tier: .feed))
             // A retype changes what the copy's reach covers, so the read
-            // after the answer expires the copy (`device/view-changed`): the
+            // after the answer expires the copy (`device/reach-changed`): the
             // write is answered, and the app hydrates again.
             await #expect {
                 _ = try await copy.queue.drain()

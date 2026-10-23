@@ -330,7 +330,7 @@ struct LiveRestart {
 
             try await own.start()
             // The retype expires the copy once answered
-            // (`device/view-changed`), so the drain may end there with every
+            // (`device/reach-changed`), so the drain may end there with every
             // write answered.
             do {
                 _ = try await copy.queue.drain()
