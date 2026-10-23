@@ -152,21 +152,21 @@ public enum Operations {
             public var query: Operations.ListItems.Input.Query
             /// - Remark: Generated from `#/paths/items/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/items/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/items/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItems.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItems.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -208,10 +208,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -220,21 +220,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -380,7 +380,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a query parameter is unknown or invalid, `updated_after` comes with a different `sort` or `direction`, `cursor` came from another ordering or listing, or `X-Marfa-Read-View` comes without `include=metadata`.
+            /// - `validation_error`: a query parameter is unknown or invalid, `updated_after` comes with a different `sort` or `direction`, `cursor` came from another ordering or listing, or `X-Marfa-Reach` comes without `include=metadata`.
             /// - `unknown_type`: `type` is a concrete type that nothing registers.
             ///
             /// - Remark: Generated from `#/paths//items/get(listItems)/responses/400`.
@@ -540,10 +540,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/GET/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/GET/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -553,7 +553,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -561,7 +561,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -569,7 +569,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -687,12 +687,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -716,7 +716,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//items/get(listItems)/responses/409`.
             ///
@@ -3164,21 +3164,21 @@ public enum Operations {
             public var query: Operations.GetItem.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/items/{id}/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/items/{id}/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItem.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetItem.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -3223,10 +3223,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -3235,21 +3235,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -3555,10 +3555,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -3568,7 +3568,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -3576,7 +3576,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -3584,7 +3584,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -3671,10 +3671,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/404/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/{id}/GET/responses/404/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -3684,7 +3684,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -3692,7 +3692,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -3700,7 +3700,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -3817,12 +3817,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -3846,7 +3846,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/get(getItem)/responses/409`.
             ///
@@ -14903,10 +14903,10 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/bulk-get/POST/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/items/bulk-get/POST/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/items/bulk-get/POST/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///
                 /// - Remark: Generated from `#/paths/items/bulk-get/POST/header/X-Marfa-Instance-Id`.
@@ -14915,15 +14915,15 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     xMarfaInstanceId: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.BulkGetItems.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.xMarfaInstanceId = xMarfaInstanceId
                     self.accept = accept
                 }
@@ -15025,10 +15025,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15037,21 +15037,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -15068,7 +15068,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/content/json/metadata`.
                         public var metadata: [Components.Schemas.Metadata]?
-                        /// For each item returned, in the same order: `true` if listings show you the item, `false` if `source_filter` leaves it out of them. Present only when you send `X-Marfa-Read-View`.
+                        /// For each item returned, in the same order: `true` if listings show you the item, `false` if `source_filter` leaves it out of them. Present only when you send `X-Marfa-Reach`.
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/200/content/json/listed`.
                         public var listed: [Swift.Bool]?
@@ -15077,7 +15077,7 @@ public enum Operations {
                         /// - Parameters:
                         ///   - items: The items you can read, in the order `ids` named them, each once. IDs that name nothing, a trashed item or an item whose type you can't read are left out.
                         ///   - metadata: The metadata of each item returned, in the same order. Present only when `include` has `metadata`.
-                        ///   - listed: For each item returned, in the same order: `true` if listings show you the item, `false` if `source_filter` leaves it out of them. Present only when you send `X-Marfa-Read-View`.
+                        ///   - listed: For each item returned, in the same order: `true` if listings show you the item, `false` if `source_filter` leaves it out of them. Present only when you send `X-Marfa-Reach`.
                         public init(
                             items: [Components.Schemas.Item],
                             metadata: [Components.Schemas.Metadata]? = nil,
@@ -15123,7 +15123,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the items you can read, `metadata` if you asked for it, and `listed` if you sent `X-Marfa-Read-View`.
+            /// Returns the items you can read, `metadata` if you asked for it, and `listed` if you sent `X-Marfa-Reach`.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/200`.
             ///
@@ -15393,10 +15393,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -15406,7 +15406,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -15414,7 +15414,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -15422,7 +15422,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -15541,7 +15541,7 @@ public enum Operations {
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
                         /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/json/value1`.
-                        public var value1: Components.Schemas.ReadViewChangedRefusal?
+                        public var value1: Components.Schemas.ReachChangedRefusal?
                         /// - Remark: Generated from `#/paths/items/bulk-get/POST/responses/409/content/json/value2`.
                         public var value2: Components.Schemas.InstanceChangedRefusal?
                         /// Creates a new `JsonPayload`.
@@ -15550,7 +15550,7 @@ public enum Operations {
                         ///   - value1:
                         ///   - value2:
                         public init(
-                            value1: Components.Schemas.ReadViewChangedRefusal? = nil,
+                            value1: Components.Schemas.ReachChangedRefusal? = nil,
                             value2: Components.Schemas.InstanceChangedRefusal? = nil
                         ) {
                             self.value1 = value1
@@ -15613,7 +15613,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/409`.
             ///
@@ -44783,21 +44783,21 @@ public enum Operations {
             public var query: Operations.ListEdges.Input.Query
             /// - Remark: Generated from `#/paths/edges/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/edges/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/edges/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdges.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdges.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -44839,10 +44839,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/edges/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -44851,21 +44851,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -45170,10 +45170,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/edges/GET/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/edges/GET/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -45183,7 +45183,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -45191,7 +45191,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -45199,7 +45199,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -45316,12 +45316,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edges/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edges/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -45345,7 +45345,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//edges/get(listEdges)/responses/409`.
             ///
@@ -47679,21 +47679,21 @@ public enum Operations {
             public var path: Operations.GetEdge.Input.Path
             /// - Remark: Generated from `#/paths/edges/{id}/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/edges/{id}/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/edges/{id}/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetEdge.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetEdge.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -47735,10 +47735,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -47747,21 +47747,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -48066,10 +48066,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -48079,7 +48079,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -48087,7 +48087,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -48095,7 +48095,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -48182,10 +48182,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/404/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/404/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -48195,7 +48195,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -48203,7 +48203,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -48211,7 +48211,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -48328,12 +48328,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edges/{id}/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -48357,7 +48357,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//edges/{id}/get(getEdge)/responses/409`.
             ///
@@ -53583,21 +53583,21 @@ public enum Operations {
             public var query: Operations.ListItemEdges.Input.Query
             /// - Remark: Generated from `#/paths/items/{id}/edges/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/items/{id}/edges/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/items/{id}/edges/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItemEdges.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListItemEdges.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -53642,10 +53642,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -53654,21 +53654,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -53974,10 +53974,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -53987,7 +53987,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -53995,7 +53995,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -54003,7 +54003,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -54090,10 +54090,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/404/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/404/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/404/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -54103,7 +54103,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -54111,7 +54111,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -54119,7 +54119,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -54236,12 +54236,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/items/{id}/edges/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -54265,7 +54265,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/edges/get(listItemEdges)/responses/409`.
             ///
@@ -56906,21 +56906,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/types/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/types/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/types/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListTypes.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListTypes.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -56957,10 +56957,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/types/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/types/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/types/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -56969,21 +56969,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -57318,12 +57318,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -57347,7 +57347,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//types/get(listTypes)/responses/409`.
             ///
@@ -64313,21 +64313,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/edge-types/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/edge-types/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/edge-types/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdgeTypes.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListEdgeTypes.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -64364,10 +64364,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/edge-types/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/edge-types/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -64376,21 +64376,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -64725,12 +64725,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/edge-types/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -64754,7 +64754,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//edge-types/get(listEdgeTypes)/responses/409`.
             ///
@@ -75838,13 +75838,13 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/events/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Set to `1` for a copy stream, which a working copy follows. It takes `edges=all` and no other parameter. Its `stream_cursor` and `stream_live` carry `instance_id` and `read_view`, and its item frames carry `listed`.
+                /// Set to `1` for a copy stream, which a working copy follows. It takes `edges=all` and no other parameter. Its `stream_cursor` and `stream_live` carry `instance_id` and `reach`, and its item frames carry `listed`.
                 ///
                 /// - Remark: Generated from `#/paths/events/GET/query/copy`.
                 @frozen public enum CopyPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case _1 = "1"
                 }
-                /// Set to `1` for a copy stream, which a working copy follows. It takes `edges=all` and no other parameter. Its `stream_cursor` and `stream_live` carry `instance_id` and `read_view`, and its item frames carry `listed`.
+                /// Set to `1` for a copy stream, which a working copy follows. It takes `edges=all` and no other parameter. Its `stream_cursor` and `stream_live` carry `instance_id` and `reach`, and its item frames carry `listed`.
                 ///
                 /// - Remark: Generated from `#/paths/events/GET/query/copy`.
                 public var copy: Operations.StreamEvents.Input.Query.CopyPayload?
@@ -75866,7 +75866,7 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - copy: Set to `1` for a copy stream, which a working copy follows. It takes `edges=all` and no other parameter. Its `stream_cursor` and `stream_live` carry `instance_id` and `read_view`, and its item frames carry `listed`.
+                ///   - copy: Set to `1` for a copy stream, which a working copy follows. It takes `edges=all` and no other parameter. Its `stream_cursor` and `stream_live` carry `instance_id` and `reach`, and its item frames carry `listed`.
                 ///   - _type: Only send item events for these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A pattern matches the types you can read. Edge events aren't filtered. Leave it out for every type.
                 ///   - edges: Set to `none` to leave out edge events. You receive an edge event only if you could read the edge with `GET /edges/{id}`.
                 public init(
@@ -75882,10 +75882,10 @@ public enum Operations {
             public var query: Operations.StreamEvents.Input.Query
             /// - Remark: Generated from `#/paths/events/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// On a copy stream, the `read_view` from the last `stream_cursor` or `stream_live` you received. Send it with `Last-Event-ID` to resume, and leave both out to start a new copy.
+                /// On a copy stream, the `reach` from the last `stream_cursor` or `stream_live` you received. Send it with `Last-Event-ID` to resume, and leave both out to start a new copy.
                 ///
-                /// - Remark: Generated from `#/paths/events/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/events/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 /// The ID of the last event you received. Marfa replays every event after it that the log still holds, then goes live. Send it as the stream wrote it. Empty means none, except on a copy stream.
                 ///
                 /// - Remark: Generated from `#/paths/events/GET/header/Last-Event-ID`.
@@ -75894,15 +75894,15 @@ public enum Operations {
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: On a copy stream, the `read_view` from the last `stream_cursor` or `stream_live` you received. Send it with `Last-Event-ID` to resume, and leave both out to start a new copy.
+                ///   - xMarfaReach: On a copy stream, the `reach` from the last `stream_cursor` or `stream_live` you received. Send it with `Last-Event-ID` to resume, and leave both out to start a new copy.
                 ///   - lastEventID: The ID of the last event you received. Marfa replays every event after it that the log still holds, then goes live. Send it as the stream wrote it. Empty means none, except on a copy stream.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     lastEventID: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.StreamEvents.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.lastEventID = lastEventID
                     self.accept = accept
                 }
@@ -76005,7 +76005,7 @@ public enum Operations {
             /// - `stream_cursor`: first, where the log stands.
             /// - An event, such as `item.created`, with its event ID as `id:`.
             /// - `stream_live`: once the catch-up is over.
-            /// - `stream_incomplete`, `catchup_too_old`, `cursor_ahead` or `read_view_changed`: last, before the stream closes.
+            /// - `stream_incomplete`, `catchup_too_old`, `cursor_ahead` or `reach_changed`: last, before the stream closes.
             ///
             /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/200`.
             ///
@@ -76114,7 +76114,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a parameter or header is invalid, or not one this endpoint takes. For example, `type` has more than 10 entries or is `*`, or `Last-Event-ID` isn't an event ID. A copy stream takes only `copy=1` and `edges=all`, and both resume headers or neither; another stream takes no `X-Marfa-Read-View`.
+            /// - `validation_error`: a parameter or header is invalid, or not one this endpoint takes. For example, `type` has more than 10 entries or is `*`, or `Last-Event-ID` isn't an event ID. A copy stream takes only `copy=1` and `edges=all`, and both resume headers or neither; another stream takes no `X-Marfa-Reach`.
             /// - `unknown_type`: a `type` entry isn't registered.
             ///
             /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/400`.
@@ -76413,12 +76413,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/events/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/events/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -76442,7 +76442,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//events/get(streamEvents)/responses/409`.
             ///
@@ -121234,21 +121234,21 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/keys/current/GET/header`.
             public struct Headers: Sendable, Hashable {
-                /// A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                /// The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///
-                /// - Remark: Generated from `#/paths/keys/current/GET/header/X-Marfa-Read-View`.
-                public var xMarfaReadView: Swift.String?
+                /// - Remark: Generated from `#/paths/keys/current/GET/header/X-Marfa-Reach`.
+                public var xMarfaReach: Swift.String?
                 public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCurrentKey.AcceptableContentType>]
                 /// Creates a new `Headers`.
                 ///
                 /// - Parameters:
-                ///   - xMarfaReadView: A read-view certificate from a copy stream, for a working copy. Marfa reads the current data and checks the view in one snapshot, and returns `409 read_view_changed` if the view has changed. Leave it out for an ordinary read.
+                ///   - xMarfaReach: The reach from a copy stream, for a working copy. Marfa reads the current data and checks the reach in one snapshot, and returns `409 reach_changed` if it has changed. Leave it out for an ordinary read.
                 ///   - accept:
                 public init(
-                    xMarfaReadView: Swift.String? = nil,
+                    xMarfaReach: Swift.String? = nil,
                     accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.GetCurrentKey.AcceptableContentType>] = .defaultValues()
                 ) {
-                    self.xMarfaReadView = xMarfaReadView
+                    self.xMarfaReach = xMarfaReach
                     self.accept = accept
                 }
             }
@@ -121285,10 +121285,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/current/GET/responses/200/headers/X-RateLimit-Reset`.
                     public var xRateLimitReset: Components.Headers.XRateLimitReset?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/200/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/200/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -121297,21 +121297,21 @@ public enum Operations {
                     ///   - xRateLimitLimit: How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
                         xRateLimitLimit: Components.Headers.XRateLimitLimit? = nil,
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xRateLimitLimit = xRateLimitLimit
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -121616,10 +121616,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/current/GET/responses/403/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    /// The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     ///
-                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/403/headers/X-Marfa-Read-View`.
-                    public var xMarfaReadView: Components.Headers.XMarfaReadView?
+                    /// - Remark: Generated from `#/paths/keys/current/GET/responses/403/headers/X-Marfa-Reach`.
+                    public var xMarfaReach: Components.Headers.XMarfaReach?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
@@ -121629,7 +121629,7 @@ public enum Operations {
                     ///   - xRateLimitRemaining: Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
                     ///   - xRateLimitReset: Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - xMarfaReadView: A matching opaque read-view certificate, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
+                    ///   - xMarfaReach: The matching opaque reach, supplied only after a conditional copy read and its snapshot have completed. Successful conditional reads and snapshot-attributed resource refusals carry it with Cache-Control: no-store. Ordinary reads and write receipts carry none.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -121637,7 +121637,7 @@ public enum Operations {
                         xRateLimitRemaining: Components.Headers.XRateLimitRemaining? = nil,
                         xRateLimitReset: Components.Headers.XRateLimitReset? = nil,
                         xErrorCode: Components.Headers.XErrorCode? = nil,
-                        xMarfaReadView: Components.Headers.XMarfaReadView? = nil
+                        xMarfaReach: Components.Headers.XMarfaReach? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
@@ -121645,7 +121645,7 @@ public enum Operations {
                         self.xRateLimitRemaining = xRateLimitRemaining
                         self.xRateLimitReset = xRateLimitReset
                         self.xErrorCode = xErrorCode
-                        self.xMarfaReadView = xMarfaReadView
+                        self.xMarfaReach = xMarfaReach
                     }
                 }
                 /// Received HTTP response headers
@@ -121762,12 +121762,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/keys/current/GET/responses/409/content/application\/json`.
-                    case json(Components.Schemas.ReadViewChangedRefusal)
+                    case json(Components.Schemas.ReachChangedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.ReadViewChangedRefusal {
+                    public var json: Components.Schemas.ReachChangedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -121791,7 +121791,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `read_view_changed`: the read view in `X-Marfa-Read-View` has changed. Rebuild the working copy.
+            /// `reach_changed`: the reach in `X-Marfa-Reach` has changed. Rebuild the working copy.
             ///
             /// - Remark: Generated from `#/paths//keys/current/get(getCurrentKey)/responses/409`.
             ///

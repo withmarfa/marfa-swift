@@ -3637,14 +3637,14 @@ extension Components {
             public var value1: Components.Schemas.ItemWithMetadata
             /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata/value2`.
             public struct Value2Payload: Codable, Hashable, Sendable {
-                /// `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Read-View`.
+                /// `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Reach`.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ItemReadWithMetadata/value2/listed`.
                 public var listed: Swift.Bool?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
-                ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Read-View`.
+                ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Reach`.
                 public init(listed: Swift.Bool? = nil) {
                     self.listed = listed
                 }
@@ -3795,7 +3795,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/backrefs`.
             public var backrefs: Components.Schemas.ItemDetail.BackrefsPayload?
-            /// `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Read-View`.
+            /// `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Reach`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/listed`.
             public var listed: Swift.Bool?
@@ -3821,7 +3821,7 @@ extension Components {
             ///   - item: The item, with its outbound edges.
             ///   - metadata: The item's metadata.
             ///   - backrefs: The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
-            ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Read-View`.
+            ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Reach`.
             ///   - neighbors: The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
             ///   - neighborsTruncated: `true` if this answer's edges reach more than 100 items, so `neighbors` leaves some out. Page `GET /items/{id}/edges` and `GET /items/{id}/backrefs` for the rest. Present with `include=neighbors`.
             ///   - neighborsOmitted: How many neighbors `neighbors` leaves out because you can't read their type. Present with `include=neighbors`.
@@ -15803,29 +15803,29 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal`.
-        public struct ReadViewChangedRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal`.
+        public struct ReachChangedRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case readViewChanged = "read_view_changed"
+                    case reachChanged = "reach_changed"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/code`.
-                public var code: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error/code`.
+                public var code: Components.Schemas.ReachChangedRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -15845,8 +15845,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error/details`.
-                public var details: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error/details`.
+                public var details: Components.Schemas.ReachChangedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -15854,9 +15854,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.ReachChangedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ReadViewChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.ReachChangedRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -15870,13 +15870,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ReadViewChangedRefusal/error`.
-            public var error: Components.Schemas.ReadViewChangedRefusal._ErrorPayload
-            /// Creates a new `ReadViewChangedRefusal`.
+            /// - Remark: Generated from `#/components/schemas/ReachChangedRefusal/error`.
+            public var error: Components.Schemas.ReachChangedRefusal._ErrorPayload
+            /// Creates a new `ReachChangedRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.ReadViewChangedRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.ReachChangedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -16270,33 +16270,33 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StreamCursorFrame/instance_id`.
             public var instanceId: Swift.String?
-            /// Only on a copy stream: the read view to send as `X-Marfa-Read-View`, to resume or to read the working copy's data.
+            /// Only on a copy stream: the reach to send as `X-Marfa-Reach`, to resume or to read the working copy's data.
             ///
-            /// - Remark: Generated from `#/components/schemas/StreamCursorFrame/read_view`.
-            public var readView: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StreamCursorFrame/reach`.
+            public var reach: Swift.String?
             /// Creates a new `StreamCursorFrame`.
             ///
             /// - Parameters:
             ///   - eventType: The frame's name, which is also its `event:`.
             ///   - cursor: The ID of the latest event in the log, or `0` if it's empty. Read state after this frame, and you can resume from this ID without missing a change.
             ///   - instanceId: Only on a copy stream: the instance's ID, as `GET /` returns it.
-            ///   - readView: Only on a copy stream: the read view to send as `X-Marfa-Read-View`, to resume or to read the working copy's data.
+            ///   - reach: Only on a copy stream: the reach to send as `X-Marfa-Reach`, to resume or to read the working copy's data.
             public init(
                 eventType: Components.Schemas.StreamCursorFrame.EventTypePayload,
                 cursor: Swift.String,
                 instanceId: Swift.String? = nil,
-                readView: Swift.String? = nil
+                reach: Swift.String? = nil
             ) {
                 self.eventType = eventType
                 self.cursor = cursor
                 self.instanceId = instanceId
-                self.readView = readView
+                self.reach = reach
             }
             public enum CodingKeys: String, CodingKey {
                 case eventType = "event_type"
                 case cursor
                 case instanceId = "instance_id"
-                case readView = "read_view"
+                case reach
             }
         }
         /// Sent once, with no `id:`, when the catch-up is over: everything up to `cursor` has been sent or withheld, and what follows is live. A stream that ends early never sends it.
@@ -16321,33 +16321,33 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/instance_id`.
             public var instanceId: Swift.String?
-            /// Only on a copy stream: the read view to send as `X-Marfa-Read-View`, to resume or to read the working copy's data.
+            /// Only on a copy stream: the reach to send as `X-Marfa-Reach`, to resume or to read the working copy's data.
             ///
-            /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/read_view`.
-            public var readView: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/reach`.
+            public var reach: Swift.String?
             /// Creates a new `StreamLiveFrame`.
             ///
             /// - Parameters:
             ///   - eventType: The frame's name, which is also its `event:`.
             ///   - cursor: A position you can resume from without receiving again what the catch-up covered. `null` only when Marfa couldn't read the log in time and had nothing to replay.
             ///   - instanceId: Only on a copy stream: the instance's ID, as `GET /` returns it.
-            ///   - readView: Only on a copy stream: the read view to send as `X-Marfa-Read-View`, to resume or to read the working copy's data.
+            ///   - reach: Only on a copy stream: the reach to send as `X-Marfa-Reach`, to resume or to read the working copy's data.
             public init(
                 eventType: Components.Schemas.StreamLiveFrame.EventTypePayload,
                 cursor: Swift.String? = nil,
                 instanceId: Swift.String? = nil,
-                readView: Swift.String? = nil
+                reach: Swift.String? = nil
             ) {
                 self.eventType = eventType
                 self.cursor = cursor
                 self.instanceId = instanceId
-                self.readView = readView
+                self.reach = reach
             }
             public enum CodingKeys: String, CodingKey {
                 case eventType = "event_type"
                 case cursor
                 case instanceId = "instance_id"
-                case readView = "read_view"
+                case reach
             }
         }
         /// The last frame, with no `id:`, when the stream can no longer deliver what it opened with. Marfa sends nothing past the gap, so reconnect with the last `id:` you received. `reader_behind` comes when 4 MiB of frames wait unread, or when you take none for 30 seconds during the catch-up.
@@ -16490,25 +16490,25 @@ extension Components {
                 case head
             }
         }
-        /// The last frame of a copy stream, with no `id:`, when its read view changes, such as after a retype or a narrowed key. Rebuild the working copy.
+        /// The last frame of a copy stream, with no `id:`, when its reach changes, such as after a retype or a narrowed key. Rebuild the working copy.
         ///
-        /// - Remark: Generated from `#/components/schemas/ReadViewChangedFrame`.
-        public struct ReadViewChangedFrame: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/ReachChangedFrame`.
+        public struct ReachChangedFrame: Codable, Hashable, Sendable {
             /// The frame's name, which is also its `event:`.
             ///
-            /// - Remark: Generated from `#/components/schemas/ReadViewChangedFrame/event_type`.
+            /// - Remark: Generated from `#/components/schemas/ReachChangedFrame/event_type`.
             @frozen public enum EventTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case readViewChanged = "read_view_changed"
+                case reachChanged = "reach_changed"
             }
             /// The frame's name, which is also its `event:`.
             ///
-            /// - Remark: Generated from `#/components/schemas/ReadViewChangedFrame/event_type`.
-            public var eventType: Components.Schemas.ReadViewChangedFrame.EventTypePayload
-            /// Creates a new `ReadViewChangedFrame`.
+            /// - Remark: Generated from `#/components/schemas/ReachChangedFrame/event_type`.
+            public var eventType: Components.Schemas.ReachChangedFrame.EventTypePayload
+            /// Creates a new `ReachChangedFrame`.
             ///
             /// - Parameters:
             ///   - eventType: The frame's name, which is also its `event:`.
-            public init(eventType: Components.Schemas.ReadViewChangedFrame.EventTypePayload) {
+            public init(eventType: Components.Schemas.ReachChangedFrame.EventTypePayload) {
                 self.eventType = eventType
             }
             public enum CodingKeys: String, CodingKey {
@@ -16534,7 +16534,7 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case7`.
             case CursorAheadFrame(Components.Schemas.CursorAheadFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case8`.
-            case ReadViewChangedFrame(Components.Schemas.ReadViewChangedFrame)
+            case ReachChangedFrame(Components.Schemas.ReachChangedFrame)
             public init(from decoder: any Swift.Decoder) throws {
                 var errors: [any Swift.Error] = []
                 do {
@@ -16580,7 +16580,7 @@ extension Components {
                     errors.append(error)
                 }
                 do {
-                    self = .ReadViewChangedFrame(try .init(from: decoder))
+                    self = .ReachChangedFrame(try .init(from: decoder))
                     return
                 } catch {
                     errors.append(error)
@@ -16607,7 +16607,7 @@ extension Components {
                     try value.encode(to: encoder)
                 case let .CursorAheadFrame(value):
                     try value.encode(to: encoder)
-                case let .ReadViewChangedFrame(value):
+                case let .ReachChangedFrame(value):
                     try value.encode(to: encoder)
                 }
             }
