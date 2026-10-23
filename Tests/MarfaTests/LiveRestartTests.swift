@@ -334,7 +334,7 @@ struct LiveRestart {
             // write answered.
             do {
                 _ = try await copy.queue.drain()
-            } catch MarfaError.copyExpired(reason: "read_view_changed", _) {
+            } catch MarfaError.copyExpired(reason: "reach_changed", _) {
                 _ = try await copy.hydrate(types: ["core.note"], tier: .library)
                 _ = try await copy.queue.drain()
             }

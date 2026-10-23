@@ -381,7 +381,7 @@ func write(_ kind: Marfa.WriteKind, item: String?, target: String? = nil, edge: 
 ///
 /// Every answer names `contract`.
 struct LocalServer: Sendable {
-    static let readView = String(repeating: "a", count: 64)
+    static let reach = String(repeating: "a", count: 64)
     typealias Answer = (status: Int, type: String, body: String)
 
     let url: URL
@@ -404,7 +404,7 @@ struct LocalServer: Sendable {
 
     static func start(
         contract: Int,
-        headers: String = "x-marfa-read-view: \(LocalServer.readView)\r\ncache-control: no-store\r\n",
+        headers: String = "x-marfa-reach: \(LocalServer.reach)\r\ncache-control: no-store\r\n",
         holdsResponse: Bool = false,
         answer: @escaping @Sendable (_ method: String, _ path: String) -> Answer = emptyPage
     ) async throws -> LocalServer {

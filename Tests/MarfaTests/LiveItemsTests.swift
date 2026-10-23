@@ -5,7 +5,7 @@ import Testing
 @testable import Marfa
 
 extension LiveWorkingCopies {
-    /// Registering a type changes the read view every copy here hydrated
+    /// Registering a type changes the reach every copy here hydrated
     /// under, so these run with the other structural suites.
     @Suite(
         .serialized,
@@ -196,13 +196,13 @@ extension LiveWorkingCopies {
 
             _ = try await copy.items.update(
                 id, Edit(properties: ["title": "a task"], baseVersion: now.version, type: "core.task", tier: .feed))
-            // A retype changes what the copy's read view covers, so the read
+            // A retype changes what the copy's reach covers, so the read
             // after the answer expires the copy (`device/view-changed`): the
             // write is answered, and the app hydrates again.
             await #expect {
                 _ = try await copy.queue.drain()
             } throws: { error in
-                if case MarfaError.copyExpired(reason: "read_view_changed", _) = error { true } else { false }
+                if case MarfaError.copyExpired(reason: "reach_changed", _) = error { true } else { false }
             }
             #expect(try await copy.queue.all().map(\.verdict).allSatisfy { $0 == .accepted })
             let moved = try #require(try await Self.answered(id))

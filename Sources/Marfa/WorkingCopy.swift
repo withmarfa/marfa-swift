@@ -49,7 +49,7 @@ public final class WorkingCopy: Sendable {
     /// Opens the store at `store`, making it when absent.
     ///
     /// A new store reads and queues writes before its first hydration. A store
-    /// whose hydration was interrupted or whose read view expired requires a
+    /// whose hydration was interrupted or whose reach expired requires a
     /// completed hydration before reads and writes resume.
     /// A server lets the copy hydrate, catch up and drain
     /// when the app calls them, and lets a held `changes()` follow its

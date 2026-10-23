@@ -760,7 +760,7 @@ extension LiveWorkingCopies {
             let heard = Heard(copy.changes())
             let refused = try await copy.items.create(
                 Draft(type: type, properties: ["title": "Too many", "serves": "many"], tier: .feed))
-            // A field change preserves the read view, but the server validates
+            // A field change preserves the reach, but the server validates
             // queued content against its current schema when it arrives.
             try await Live.writeDefinition(
                 ["id": type, "fields": ["title": ["type": "string"], "serves": ["type": "integer"]]],
@@ -940,7 +940,7 @@ extension LiveWorkingCopies {
             let late = "user.late\(UUID().uuidString.prefix(8).lowercased())"
             try await Live.writeDefinition(["id": late, "label": "Late", "fields": ["title": ["type": "string"]]])
             await #expect { try await copy.catchUp() } throws: { error in
-                if case MarfaError.copyExpired(let reason, _) = error { reason == "read_view_changed" } else { false }
+                if case MarfaError.copyExpired(let reason, _) = error { reason == "reach_changed" } else { false }
             }
             let waiting = try #require(try await copy.queue.all().first { $0.id == queued.id })
             #expect(waiting.idempotencyKey == queued.idempotencyKey)

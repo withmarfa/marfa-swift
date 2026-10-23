@@ -40,7 +40,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case wrongSchema(path: String, reason: String, unsent: UInt64?, message: String)
     case readingHandle(message: String)
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
-    /// is an open string, such as `read_view_changed` or `instance_changed`.
+    /// is an open string, such as `reach_changed` or `instance_changed`.
     case copyExpired(reason: String, message: String)
     case streamIncomplete(reason: String, message: String)
     case wrongServer(expected: String, got: String, message: String)
@@ -229,7 +229,7 @@ extension MarfaCore.Edge: Identifiable {}
 ///
 /// Once the server accepts a source move, the copy expires. The drain sends
 /// the writes queued behind the move first, then throws
-/// `MarfaError.copyExpired` with the reason `read_view_changed` once, after
+/// `MarfaError.copyExpired` with the reason `reach_changed` once, after
 /// the last. The writes are answered, and the app hydrates again. A drain
 /// that ends with a wait, an unreachable server, a stopped credential or a
 /// write left undelivered returns its report instead, and the next call
