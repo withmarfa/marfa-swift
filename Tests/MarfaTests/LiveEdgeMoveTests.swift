@@ -21,13 +21,13 @@ extension LiveWorkingCopies {
             return (parent, other, child, edge)
         }
 
-        /// A source move changes the structural generation of the server's read view, so the read after its answer
-        /// expires the copy (`device/view-changed`): the write is answered, and the app hydrates again.
+        /// A source move changes the structural generation of the server's reach, so the read after its answer
+        /// expires the copy (`device/reach-changed`): the write is answered, and the app hydrates again.
         static func drainAfterASourceMove(_ copy: WorkingCopy) async throws {
             await #expect {
                 _ = try await copy.queue.drain()
             } throws: { error in
-                if case MarfaError.copyExpired(reason: "read_view_changed", _) = error { true } else { false }
+                if case MarfaError.copyExpired(reason: "reach_changed", _) = error { true } else { false }
             }
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         }

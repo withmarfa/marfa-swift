@@ -330,11 +330,11 @@ struct LiveRestart {
 
             try await own.start()
             // The retype expires the copy once answered
-            // (`device/view-changed`), so the drain may end there with every
+            // (`device/reach-changed`), so the drain may end there with every
             // write answered.
             do {
                 _ = try await copy.queue.drain()
-            } catch MarfaError.copyExpired(reason: "read_view_changed", _) {
+            } catch MarfaError.copyExpired(reason: "reach_changed", _) {
                 _ = try await copy.hydrate(types: ["core.note"], tier: .library)
                 _ = try await copy.queue.drain()
             }

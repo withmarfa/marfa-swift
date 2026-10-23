@@ -14,7 +14,7 @@ struct Waiting {
                 200, "text/event-stream",
                 ["stream_cursor", "stream_live"].map { kind in
                     "event: \(kind)\ndata: {\"event_type\":\"\(kind)\",\"cursor\":\"10\","
-                        + "\"instance_id\":\"test-instance\",\"read_view\":\"\(LocalServer.readView)\"}\n\n"
+                        + "\"instance_id\":\"test-instance\",\"reach\":\"\(LocalServer.reach)\"}\n\n"
                 }.joined()
             )
         case "/types":
