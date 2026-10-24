@@ -74,9 +74,9 @@ jobs:
 
       - name: Check what the pin generates
         run: |
-          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
-            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
-            echo "::error::The glue or the wire types are not what the pinned commit generates."
+          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated)" ]]; then
+            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
+            echo "::error::The glue, the wire types or the client are not what the pinned commit generates."
             exit 1
           fi
 
