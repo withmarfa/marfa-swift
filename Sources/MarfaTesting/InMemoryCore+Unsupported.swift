@@ -22,7 +22,7 @@ extension InMemoryCore {
     }
 
     func blob(hash: String) throws -> BlobPath {
-        try unsupported("blobs.get")
+        try unsupported("blobs.withFile")
     }
 
     func blobHeld(hash: String) throws -> Bool {

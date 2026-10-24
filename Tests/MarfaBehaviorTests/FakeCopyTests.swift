@@ -103,7 +103,7 @@ struct FakeCopyBehavior {
             ("items.original", { _ = try await copy.items.original(ofConflictedCopy: id) }),
             ("items.conflictedCopies", { _ = try await copy.items.conflictedCopies(of: id) }),
             ("blobs.put", { _ = try await copy.blobs.put(file: file) }),
-            ("blobs.get", { _ = try await copy.blobs.get("hash") }),
+            ("blobs.withFile", { try await copy.blobs.withFile("hash") { _ in } }),
             ("blobs.isHeld", { _ = try await copy.blobs.isHeld("hash") }),
             ("queue.release", { _ = try await copy.queue.release(id) }),
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),
