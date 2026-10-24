@@ -1,5 +1,6 @@
 import Foundation
 import MarfaCore
+import Synchronization
 import Testing
 
 @testable import Marfa
@@ -674,6 +675,70 @@ struct ARefill {
         copy.feed.resume(readsOnly: false)
         try await eventually("the stop reached the app") { heard.stops == [stopped(Self.agedOutTold)] }
         #expect(core.state.withLock { $0.hydrations.count } == 1)
+        await copy.close()
+    }
+
+    @Test func aKeyChangedWhileTheRefillAsksWhichInstanceAnswersLeavesTheRefillToTheApp() async throws {
+        let core = Self.stale()
+        let asked = Mutex(false)
+        let answer = DispatchSemaphore(value: 0)
+        let copy = WorkingCopy(
+            holder: CoreHolder(core), hasServer: true, refillPace: Self.pace,
+            instanceAt: { _ in
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global().async {
+                        asked.withLock { $0 = true }
+                        answer.wait()
+                        continuation.resume()
+                    }
+                }
+                return Self.instance
+            })
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill asks which instance answers") { asked.withLock { $0 } }
+        try await copy.feed.suspend()
+        copy.feed.resume(readsOnly: false)
+        // The new key's follow is answered by the server too, so only the key change itself can tell.
+        core.change(1, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        answer.signal()
+        try await eventually("the stop reached the app") { heard.stops == [stopped(Self.agedOutTold)] }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(core.state.withLock { $0.hydrations.count } == 0)
+        await copy.close()
+    }
+
+    @Test func aCatchUpMadeWhileARefillRunsWaitsForIt() async throws {
+        let core = Self.stale()
+        let gate = Self.gate(core)
+        let copy = Self.copy(core)
+        _ = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill is running") { Self.gated(core) }
+        let app = Task { try await copy.catchUp() }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(core.state.withLock { $0.catchUps } == 0)
+        gate.signal()
+        _ = try await bounded("the app's catch-up") { try await app.value }
+        #expect(core.state.withLock { $0.catchUps } == 1)
+        #expect(core.state.withLock { $0.hydrations.count } == 1)
+        await copy.close()
+    }
+
+    @Test func anAppHydrationAfterAKeyChangeIsMadeUnderTheNewKey() async throws {
+        let core = Self.stale()
+        let gate = Self.gate(core)
+        let copy = Self.copy(core)
+        let first = Task { try await copy.hydrate(types: ["core.note"], tier: .library) }
+        try await eventually("the first hydration is running") { Self.gated(core) }
+        let second = Task { try await copy.hydrate(types: ["core.note"], tier: .library) }
+        try await Task.sleep(for: .milliseconds(100))
+        try await copy.feed.suspend()
+        gate.signal()
+        _ = try await bounded("the first hydration") { try await first.value }
+        copy.feed.resume(readsOnly: false)
+        _ = try await bounded("the second hydration") { try await second.value }
+        #expect(core.state.withLock { $0.hydrations.count } == 2)
         await copy.close()
     }
 

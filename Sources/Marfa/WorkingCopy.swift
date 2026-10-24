@@ -170,8 +170,9 @@ public final class WorkingCopy: Sendable {
     /// one, and edge writes throw `hydrationIncomplete`.
     ///
     /// The copy runs one hydration at a time. A call made while another runs, such as the refill a held `changes()`
-    /// stream starts, waits for it and then runs. When the one it waited for completed over the same slice and the
-    /// copy is still whole, the call returns that hydration's report instead of filling the copy again.
+    /// stream starts, waits for it and then runs. When the one it waited for completed over the same slice under
+    /// the same key and the copy is still whole, the call returns that hydration's report instead of filling the
+    /// copy again. A hydration also waits for a `catchUp()` that is running.
     ///
     /// The call announces `.refreshed(.hydrated)` when it completes, and `.refreshed(.unfinished)` when it fails or
     /// is canceled, because the rows it wrote stay.
@@ -214,15 +215,21 @@ public final class WorkingCopy: Sendable {
 
     /// Reads the type catalog again, then applies every event since the
     /// last hydration or catch-up.
+    ///
+    /// A catch-up made while a hydration runs, such as the refill a held
+    /// `changes()` stream starts, waits for it and then catches up from the
+    /// cursor it left.
     public func catchUp() async throws -> CatchUpReport {
         // The core commits a new catalog before it applies anything, so a
         // catch-up that then fails has still changed it, and says so.
-        let (caughtUp, catalogChanged) = try await holder.runUntilCanceled { core, stop in
-            do {
-                let report = try core.catchUp(stop: stop)
-                return (Result<CatchUpReport, MarfaError>.success(CatchUpReport(report)), report.catalogChanged)
-            } catch MarfaCore.CatchUpError.Failed(let error, let catalogChanged) {
-                return (.failure(MarfaError(error)), catalogChanged)
+        let (caughtUp, catalogChanged) = try await feed.catchUp {
+            try await holder.runUntilCanceled { core, stop in
+                do {
+                    let report = try core.catchUp(stop: stop)
+                    return (Result<CatchUpReport, MarfaError>.success(CatchUpReport(report)), report.catalogChanged)
+                } catch MarfaCore.CatchUpError.Failed(let error, let catalogChanged) {
+                    return (.failure(MarfaError(error)), catalogChanged)
+                }
             }
         }
         if catalogChanged {

@@ -63,6 +63,8 @@ final class Feed: Sendable {
         /// Holds every stream out of the watch, as a key change does while the
         /// core is replaced.
         var suspends = 0
+        /// Counts every suspension, so work begun under one key can tell that another may since have replaced it.
+        var suspensions = 0
         var registrations = 0
         /// Places the core has not yet let go; the store is free when none is left.
         var open: Set<Int> = []
@@ -70,10 +72,10 @@ final class Feed: Sendable {
         /// Told once the lock is let go; `nil` ends the stream.
         var told: [(AsyncStream<Change>.Continuation, Change?)] = []
         var refill = Refill()
-        /// A hydration runs; the core holds one at a time and refuses the next `invalid`.
+        /// A hydration or catch-up runs; the core runs one at a time and refuses the next `invalid`.
         var filling = false
         var fillWaiters: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)] = []
-        /// The most recent hydration, where it completed.
+        /// The hydration that held the turn last, where it completed.
         var lastFill: Fill?
     }
 
@@ -82,7 +84,12 @@ final class Feed: Sendable {
         let tier: MarfaCore.SliceTier
         let edgeTypes: [String]
         let report: MarfaCore.HydrateReport
+        /// `suspensions` when it began.
+        let suspensions: Int
     }
+
+    /// A refill that found the key changed before its fill began.
+    private struct KeyChanged: Error {}
 
     let holder: CoreHolder
     /// Whether the core has a watch to give: a writer with a server, or a reader.
@@ -184,6 +191,7 @@ final class Feed: Sendable {
         let leaving = try locked { state -> [MarfaCore.Subscription] in
             guard !state.closed else { throw MarfaError.closed(message: CoreHolder.closedMessage) }
             state.suspends += 1
+            state.suspensions += 1
             // A new key may read under another reach than the one the server last answered for.
             state.refill.vouched = false
             var leaving: [MarfaCore.Subscription] = []
@@ -298,24 +306,38 @@ final class Feed: Sendable {
         }
     }
 
-    /// Runs the app's hydration, after any other one this copy is running, and tells every stream how it ended.
+    /// Runs the app's hydration, after any other hydration or catch-up this copy is running, and tells every stream
+    /// how it ended.
     ///
-    /// One that waited, for the same slice as a hydration that just completed, returns that one's report while the
-    /// copy is still whole.
+    /// One that waited, for the same slice as a hydration that just completed under the same key, returns that one's
+    /// report while the copy is still whole.
     func hydrate(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String]) async throws
         -> MarfaCore.HydrateReport
     {
         let waited = try await takeFill()
         defer { releaseFill() }
-        if waited, let filled = locked({ $0.lastFill }), filled.types == types, filled.tier == tier,
-            filled.edgeTypes == edgeTypes, (try? await holder.run({ try $0.status() }).hydration) == .complete
+        let underThisKey = { (state: inout State) in
+            state.lastFill.flatMap { $0.suspensions == state.suspensions ? $0 : nil }
+        }
+        if waited, let filled = locked(underThisKey),
+            filled.types == types, filled.tier == tier, filled.edgeTypes == edgeTypes,
+            (try? await holder.run({ try $0.status() }).hydration) == .complete
         {
             return filled.report
         }
         return try await fill(types: types, tier: tier, edgeTypes: edgeTypes, byRefill: false)
     }
 
-    /// Waits until no other hydration of this copy runs, and says whether it had to.
+    /// Runs the app's catch-up after any hydration or catch-up this copy is running, since the core refuses one
+    /// that meets another.
+    func catchUp<T: Sendable>(_ work: () async throws -> T) async throws -> T {
+        _ = try await takeFill()
+        defer { releaseFill() }
+        locked { $0.lastFill = nil }
+        return try await work()
+    }
+
+    /// Waits until no other hydration or catch-up of this copy runs, and says whether it had to.
     private func takeFill() async throws -> Bool {
         let id = UUID()
         var waited = false
@@ -343,7 +365,7 @@ final class Feed: Sendable {
         return waited
     }
 
-    /// Hands the turn to the next waiting hydration.
+    /// Hands the turn to the next waiting hydration or catch-up.
     private func releaseFill() {
         let next = locked { state -> CheckedContinuation<Void, any Error>? in
             guard !state.fillWaiters.isEmpty else {
@@ -356,23 +378,34 @@ final class Feed: Sendable {
     }
 
     /// Runs a hydration, holding the turn `takeFill` gave, and tells every stream how it ended.
-    private func fill(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], byRefill: Bool)
-        async throws -> MarfaCore.HydrateReport
-    {
-        locked { state in
+    ///
+    /// `admitted` is asked under the core's lease, which a key change waits for, so the fill runs under the key it
+    /// approved; where it answers `false` the fill throws `KeyChanged` and tells nothing.
+    private func fill(
+        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], byRefill: Bool,
+        admitted: @escaping @Sendable () -> Bool = { true }
+    ) async throws -> MarfaCore.HydrateReport {
+        let suspensions = locked { state in
             state.lastFill = nil
             if !byRefill { state.refill.unfinished = false }
+            return state.suspensions
         }
         let report: MarfaCore.HydrateReport
         do {
             report = try await holder.runUntilCanceled { core, stop in
-                try core.hydrateWith(types: types, tier: tier, edgeTypes: edgeTypes, stop: stop)
+                guard admitted() else { throw KeyChanged() }
+                return try core.hydrateWith(types: types, tier: tier, edgeTypes: edgeTypes, stop: stop)
             }
+        } catch let error as KeyChanged {
+            throw error
         } catch {
             announce(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
             throw error
         }
-        locked { $0.lastFill = Fill(types: types, tier: tier, edgeTypes: edgeTypes, report: report) }
+        locked {
+            $0.lastFill = Fill(
+                types: types, tier: tier, edgeTypes: edgeTypes, report: report, suspensions: suspensions)
+        }
         announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }
@@ -431,6 +464,7 @@ final class Feed: Sendable {
     /// One attempt, holding the hydration turn: `nil` where the copy is whole or filling, or was filled, and
     /// otherwise the stop to tell.
     private func refillOnce() async throws -> MarfaError? {
+        let suspensions = locked { $0.suspensions }
         let status = try await holder.run { try $0.status() }
         let reason = locked { $0.refill.reason } ?? .copyExpired(reason: "catchup_too_old", message: "")
         switch status.hydration {
@@ -451,8 +485,14 @@ final class Feed: Sendable {
                     message: "another instance answers at the copy's server; hydrate to replace the copy")
             }
             do {
+                // A key changed since this attempt began may read under another reach than the one vouched for.
                 _ = try await fill(
-                    types: status.sliceTypes, tier: tier, edgeTypes: status.sliceEdgeTypes, byRefill: true)
+                    types: status.sliceTypes, tier: tier, edgeTypes: status.sliceEdgeTypes, byRefill: true,
+                    admitted: { [self] in
+                        locked { $0.suspensions == suspensions && $0.refill.vouched }
+                    })
+            } catch is KeyChanged {
+                return reason
             } catch let error as MarfaError where Self.mendsItself(error) {
                 locked { $0.refill.unfinished = true }
                 throw error

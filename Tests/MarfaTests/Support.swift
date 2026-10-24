@@ -148,6 +148,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var refused: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
+        var catchUps = 0
         var hydrateFails: MarfaCore.MarfaError?
         var hydrateInPlace = false
         var hydration = MarfaCore.Hydration.complete
@@ -328,6 +329,13 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
         try state.withLock { state in
+            // The core's catch-up claims the stream a hydration holds (`claim_stream(Mover::CatchUp)`).
+            guard !state.hydrating else {
+                throw MarfaCore.CatchUpError.Failed(
+                    error: .Invalid(message: "this working copy is already hydrating, catching up or following"),
+                    catalogChanged: false)
+            }
+            state.catchUps += 1
             if let failure = state.catchUpFails {
                 throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: state.catchUpChangesCatalog)
             }
