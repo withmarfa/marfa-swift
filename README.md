@@ -52,6 +52,16 @@ for note in try await copy.items.list(ListFilters(type: "core.note")) {
 
 `storeURL` is where the working copy keeps its SQLite file, and `serverURL` is your instance's address. Keep `key` in the keychain between launches with `Keychain.system`; the copy holds it in memory and never writes it to its store.
 
+## Fill a large library
+
+Use `hydrate(types: ["*"], tier: .all)` for every type except `system.*`. Add a system type explicitly when needed, such as `["*", "system.view"]` for saved views. During a fill, compare `status().itemsListed` with `itemsExpected` when both are available; `items` also includes pinned rows and local creates.
+
+Lists and searches return `Rows`, with `.complete`, `.partial` or `.stale` completeness. Read the rows as a collection, or use `.rows` when an API requires an array. Saved-view reads carry completeness too, including `LiveQuery<Rows<ViewGroup>>` for groups.
+
+An interrupted hydration resumes when its slice is unchanged. Its report distinguishes `pages` read by this call from `pagesTotal`, including earlier calls, and says whether it `resumed` or why it `restarted`. After `copyExpired`, read `status().hydration`: if it is `.stale`, hydrate the same slice again to refill over the existing rows. The report says `inPlace`. Item edits and creates remain queued through a fill or refill.
+
+Set `fileBudget` when opening a copy, or leave it `nil` to keep the store's choice and use the default for a new store. `blobs.cache()` reports held bytes and attachment counts, including why some attachments are not held. `blobs.fetchKept()` fetches those attachments; they stay outside the cache budget. See the [Swift SDK reference](https://docs.marfa.so/swift-sdk) for progress, refill and file-policy details.
+
 ## Identify the connected instance
 
 Read the server's public description to display its configured name:

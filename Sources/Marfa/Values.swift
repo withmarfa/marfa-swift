@@ -45,6 +45,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
     /// is an open string, such as `reach_changed`, `instance_changed` or `catchup_too_old`. A stale copy
     /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
+    /// The catch-up that first detects an aged-out cursor gives a descriptive reason; read `status().hydration`
+    /// to distinguish `.stale` from other expired copies.
     case copyExpired(reason: String, message: String)
     case streamIncomplete(reason: String, message: String)
     case wrongServer(expected: String, got: String, message: String)
