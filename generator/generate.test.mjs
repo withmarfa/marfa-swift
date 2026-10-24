@@ -7,9 +7,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { generate, prepare } from "./generate.mjs";
+import { clientOperations, generate, prepare } from "./generate.mjs";
 
 const nullable = {
   anyOf: [
@@ -379,5 +380,53 @@ test("optional nullable type arrays keep presence, constraints, and annotations"
     const collision = structuredClone(input);
     collision.components.schemas[reserved] = { type: "string" };
     assert.throws(() => prepare(collision), /already defines/);
+  }
+});
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+test("the client keeps what an app's credential calls on the server and a working copy does not do", () => {
+  const operation = (operationId, tags, security = [{ bearerAuth: [] }]) => ({
+    operationId, tags, security, responses: {},
+  });
+  const input = {
+    openapi: "3.1.0",
+    info: { title: "Fixture", version: "1" },
+    paths: {
+      "/types": { post: operation("registerType", ["Types"]) },
+      "/items": { post: operation("createItem", ["Items"]) },
+      "/items/{id}/versions": { get: operation("listItemVersions", ["Items"]) },
+      "/items/new": { get: operation("aNewItemsOperation", ["Items"]) },
+      "/items/bulk-actions": { post: operation("applyBulkAction", ["Bulk actions"]) },
+      "/connectors": { post: operation("registerConnector", ["Connectors"]) },
+      "/owner": { get: operation("getOwner", ["Owner"], [{ ownerSession: [] }]) },
+      "/": { get: operation("getInstance", ["Instance"], []) },
+      "/blobs": { post: operation("uploadBlob", ["Blobs"]) },
+      "/blobs/stores": { get: operation("listBlobStores", ["Blobs"]) },
+      "/new": { get: operation("aNewServerOperation", ["Something new"]) },
+    },
+  };
+  assert.deepEqual(clientOperations(input), [
+    "aNewServerOperation", "listBlobStores", "listItemVersions", "registerType",
+  ]);
+});
+
+test("the committed client makes what the rule keeps from the pinned document", () => {
+  const generated = (file) => [
+    ...readFileSync(join(root, file), "utf8").matchAll(/- Remark: Generated from `#\/paths\/[^`]*\((\w+)\)`/g),
+  ].map((match) => match[1]);
+  const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
+  // The wire types describe every operation, so each absence below is the client's own.
+  const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
+  for (const kept of ["registerType", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
+  for (const left of ["createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance"]) {
+    assert.ok(wire.has(left), left);
+    assert.ok(!client.has(left), left);
+  }
+  const openapi = join(root, ".build/marfa/openapi.json");
+  try {
+    assert.deepEqual([...client].sort(), clientOperations(JSON.parse(readFileSync(openapi, "utf8"))));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
   }
 });

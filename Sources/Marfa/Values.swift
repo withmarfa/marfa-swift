@@ -69,6 +69,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The working copy was closed, or failed to reopen its store with a new
     /// key; it is gone for good, and the app opens the store again.
     case closed(message: String)
+    /// A call that needs the server found the device offline, so nothing was sent.
+    case noConnection(message: String)
 
     /// Fit to show a person.
     public var message: String {
@@ -85,7 +87,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
             .invalid(let message),
-            .closed(let message):
+            .closed(let message), .noConnection(let message):
             message
         }
     }
@@ -136,6 +138,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
         case .closed: return "closed"
+        case .noConnection: return "no_connection"
         }
         return core.code()
     }

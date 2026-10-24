@@ -41,4 +41,5 @@ scratch="${MARFA_GENERATOR_BUILD:-${root}/generator/.build}"
 swift build --quiet -c release --package-path "${root}/generator" --scratch-path "${scratch}" \
   --product swift-openapi-generator
 node "${root}/generator/generate.mjs" \
-  "${scratch}/release/swift-openapi-generator" "${src}/openapi.json" "${root}/Sources/MarfaTypes"
+  "${scratch}/release/swift-openapi-generator" "${src}/openapi.json" "${root}/Sources/MarfaTypes" \
+  "${root}/Sources/MarfaAPI/Generated"

@@ -25,7 +25,7 @@ extension Server {
     /// The rule is the command line's. `https`, `localhost`, any address in `127.0.0.0/8` and `::1` are not; every
     /// other host name and address is, including an IPv4-mapped IPv6 address such as `::ffff:127.0.0.1`.
     public var isPlainHTTPToAnotherHost: Bool {
-        origin != nil
+        plainHTTPOrigin != nil
     }
 
     /// The notice for this address the first time any server with the same origin asks in this process, and `nil`
@@ -33,14 +33,14 @@ extension Server {
     ///
     /// Call it where the app first opens a copy or signs in on the server, and show what it returns.
     public func takePlainHTTPNotice() -> PlainHTTPNotice? {
-        guard let origin, Self.noticed.withLock({ $0.insert(origin).inserted }) else { return nil }
+        guard let origin = plainHTTPOrigin, Self.noticed.withLock({ $0.insert(origin).inserted }) else { return nil }
         return PlainHTTPNotice(origin: origin)
     }
 
     private static let noticed = Mutex<Set<String>>([])
 
     /// The origin of a plain http address on another host, as the command line names it in its warning.
-    private var origin: String? {
+    private var plainHTTPOrigin: String? {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
             components.scheme?.lowercased() == "http", var host = components.host?.lowercased(), !host.isEmpty
         else { return nil }

@@ -33,6 +33,13 @@ In a `Package.swift`, add the package and the product:
 
 Each release includes the core prebuilt, so your app needs no Rust toolchain.
 
+The package has four products:
+
+- `Marfa`: the working copy, sign-in and folders.
+- `MarfaAPI`: a client for the calls only the instance can answer. See [Call the server directly](#call-the-server-directly).
+- `MarfaTypes`: the instance's wire types, generated from its `openapi.json`. `MarfaAPI` includes them.
+- `MarfaTesting`: a working copy for tests and previews. See [Test and preview](#test-and-preview).
+
 ## Example
 
 This opens a working copy, fills it with the notes on your instance, and prints their titles. You need a running instance and a key that can read `core.note`; the [Quickstart](https://docs.marfa.so/quickstart) makes both.
@@ -115,6 +122,21 @@ An app without a browser, such as one on a TV or a command-line tool, uses `star
 When the instance ends the sign-in, for example because the owner revoked the app, calls throw `MarfaError.signedOut` and the keychain no longer holds it; sign in again and open the copy with the new credential. `signOut()` deletes the sign-in from the keychain and revokes it at the instance.
 
 To share the sign-in with your app's extensions, pass `keychain: Keychain(accessGroup:)` with an access group that every target's entitlements name.
+
+## Call the server directly
+
+Some calls only the instance can answer, such as registering an item type, managing keys and webhooks, or reading the audit log. The `MarfaAPI` product provides `Client`, which sends these calls straight to the instance with the server's key or sign-in. Add it to your app's target next to `Marfa`:
+
+```swift
+import MarfaAPI
+
+let api = Client(server)
+let title = Components.Schemas.FieldDefinition(_type: .string, required: true)
+_ = try await api.register(
+    itemType: .init(fields: .init(additionalProperties: ["title": title]), id: "app.example.entry"))
+```
+
+`Client` has no call that creates, gets, changes or deletes one item or edge, and none for search or events: those go through the working copy, so each item has one path. It offers no bulk changes either. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect, and it waits 30 seconds for the instance to send more; pass `Client(_:timeout:)` a longer time for a call such as `runHousekeeping(_:)` that answers only when its work is done.
 
 ## Test and preview
 

@@ -161,7 +161,7 @@ jobs:
         run: |
           patch="${RUNNER_TEMP}/bump/bump.patch"
           outside="$(git apply --numstat -z "${patch}" | tr '\0' '\n' | awk -F'\t' 'NF >= 3 { print $3 }' |
-            grep -Ev '^(core\.pin|Sources/MarfaCore/.*|Sources/MarfaTypes/.*)$' || true)"
+            grep -Ev '^(core\.pin|Sources/MarfaCore/.*|Sources/MarfaTypes/.*|Sources/MarfaAPI/Generated/.*)$' || true)"
           if [[ -n "${outside}" ]]; then
             echo "::error::The bump changes paths other than the pin and the generated sources:"
             echo "${outside}"
@@ -203,12 +203,12 @@ jobs:
           {
             echo "## Summary"
             echo
-            echo "Moves \`core.pin\` to marfa \`${short}\`, the head of marfa's \`main\` with a green \`ci.yml\` run, and regenerates the glue and the wire types it generates."
+            echo "Moves \`core.pin\` to marfa \`${short}\`, the head of marfa's \`main\` with a green \`ci.yml\` run, and regenerates the glue, the wire types and the client it generates."
             echo
             echo "## Changes"
             echo
             echo "- \`core.pin\` names \`${HEAD}\`."
-            echo "- \`Sources/MarfaCore\` and \`Sources/MarfaTypes\` are what that commit generates."
+            echo "- \`Sources/MarfaCore\`, \`Sources/MarfaTypes\` and \`Sources/MarfaAPI/Generated\` are what that commit generates."
             echo
             echo "## Testing"
             echo

@@ -128,6 +128,7 @@ import Testing
         #expect(UnregisteredType(id: "app.no", code: "forbidden", message: "m").code == "forbidden")
         #expect(MarfaError.canceled(message: "m").code() == "canceled")
         #expect(MarfaError.closed(message: "m").code() == "closed")
+        #expect(MarfaError.noConnection(message: "m").code() == "no_connection")
         #expect(PinReport(pinned: true, wasPinned: false).pinned)
         #expect(ListFilters(state: .archived, tier: .feed).state == .archived)
         #expect(SearchFilters(state: .trashed).state == .trashed)
@@ -208,7 +209,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
             .readingHandle,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,
             .firstSyncWaiting, .invalid,
-            .closed:
+            .closed, .noConnection:
             true
         }
     return [verdictRead, originRead, errorRead].filter { $0 }.count

@@ -7,10 +7,13 @@ let package = Package(
     products: [
         .library(name: "Marfa", targets: ["Marfa"]),
         .library(name: "MarfaTypes", targets: ["MarfaTypes"]),
+        .library(name: "MarfaAPI", targets: ["MarfaAPI"]),
         .library(name: "MarfaTesting", targets: ["MarfaTesting"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0")
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.3.2"),
+        .package(url: "https://github.com/apple/swift-http-types", from: "1.0.0"),
     ],
     targets: [
         .binaryTarget(name: "MarfaCoreFFI", path: "Frameworks/MarfaCoreFFI.xcframework"),
@@ -39,9 +42,20 @@ let package = Package(
             dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "MarfaAPI",
+            dependencies: [
+                "Marfa",
+                "MarfaTypes",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+            ],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "MarfaTests",
-            dependencies: ["Marfa", "MarfaCore", "MarfaTypes"],
+            dependencies: ["Marfa", "MarfaAPI", "MarfaCore", "MarfaTypes"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

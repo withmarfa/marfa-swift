@@ -60,6 +60,7 @@ jobs:
             Frameworks/MarfaCoreFFI.xcframework
             Sources/MarfaCore
             Sources/MarfaTypes
+            Sources/MarfaAPI/Generated
           key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
       - uses: actions/setup-node@v7
         with:

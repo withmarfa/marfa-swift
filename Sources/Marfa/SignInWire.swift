@@ -35,7 +35,7 @@ struct SignInTransport: Sendable {
 let deviceCodeGrant = "urn:ietf:params:oauth:grant-type:device_code"
 
 /// `scheme://host[:port]`, lowercased, with the scheme's default port left out.
-func origin(of url: URL) -> String? {
+package func origin(of url: URL) -> String? {
     guard let scheme = url.scheme?.lowercased(), ["http", "https"].contains(scheme),
         let host = url.host(percentEncoded: false)?.lowercased(), !host.isEmpty
     else { return nil }

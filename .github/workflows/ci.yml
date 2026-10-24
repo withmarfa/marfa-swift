@@ -96,7 +96,7 @@ jobs:
       - name: Lint
         run: |
           swift format lint --strict --configuration .swift-format -r \
-            Package.swift Sources/Marfa Sources/MarfaTesting Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
+            Package.swift Sources/Marfa Sources/MarfaAPI/*.swift Sources/MarfaTesting Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
 
       # The steps from here on are for a pull request that is ready for
       # review and for a push. A draft ends here and passes; `Full CI`, named
@@ -138,7 +138,7 @@ jobs:
       # deleted whatever comes next.
       - name: Empty what the core generates
         if: ${{ !github.event.pull_request.draft }}
-        run: rm -rf Sources/MarfaCore Sources/MarfaTypes
+        run: rm -rf Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
 
       # What core.sh makes depends only on the pin, the script and the
       # generator, so a change that leaves them alone reuses what it made
@@ -152,6 +152,7 @@ jobs:
             Frameworks/MarfaCoreFFI.xcframework
             Sources/MarfaCore
             Sources/MarfaTypes
+            Sources/MarfaAPI/Generated
           key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
 
       - name: Add the iOS targets
@@ -230,9 +231,9 @@ jobs:
       - name: Check what the pin generates
         if: ${{ !github.event.pull_request.draft }}
         run: |
-          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes)" ]]; then
-            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes
-            echo "::error::The glue or the wire types are not what the pinned commit generates. Run scripts/core.sh and commit them."
+          if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated)" ]]; then
+            git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
+            echo "::error::The glue, the wire types or the client are not what the pinned commit generates. Run scripts/core.sh and commit them."
             exit 1
           fi
 
@@ -262,7 +263,7 @@ jobs:
           swift build 2>&1 | tee "${RUNNER_TEMP}/swift-build.log"
           # What the package writes by hand builds without a warning. The generated wire types are out of
           # this check: their warnings come from the pinned generator, and `scripts/core.sh` rewrites them.
-          if grep -E '^[^ ]+: warning: ' "${RUNNER_TEMP}/swift-build.log" | grep -v '/Sources/MarfaTypes/'; then
+          if grep -E '^[^ ]+: warning: ' "${RUNNER_TEMP}/swift-build.log" | grep -v -e '/Sources/MarfaTypes/' -e '/Sources/MarfaAPI/Generated/'; then
             echo "::error::The package builds with warnings."
             exit 1
           fi

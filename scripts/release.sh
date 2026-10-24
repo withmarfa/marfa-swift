@@ -93,6 +93,7 @@ let package = Package(
             name: "Consumer",
             dependencies: [
                 .product(name: "Marfa", package: "marfa-swift"),
+                .product(name: "MarfaAPI", package: "marfa-swift"),
                 .product(name: "MarfaTypes", package: "marfa-swift"),
                 .product(name: "MarfaTesting", package: "marfa-swift"),
             ],
@@ -106,11 +107,13 @@ SWIFT
   cat >"${dir}/Sources/Consumer/Consumer.swift" <<'SWIFT'
 import Foundation
 import Marfa
+import MarfaAPI
 import MarfaTesting
 import MarfaTypes
 
 public func check(store: URL) async throws -> String {
     checkImports()
+    _ = Client(Server(url: store, key: "unused"))
     let copy = try await WorkingCopy.open(store: store)
     let status = try await copy.status()
     await copy.close()
