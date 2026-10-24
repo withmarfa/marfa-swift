@@ -33,6 +33,13 @@ In a `Package.swift`, add the package and the product:
 
 Each release includes the core prebuilt, so your app needs no Rust toolchain.
 
+The package has four products:
+
+- `Marfa`: the working copy, sign-in and folders.
+- `MarfaAPI`: a client for the calls only the instance can answer. See [Call the server directly](#call-the-server-directly).
+- `MarfaTypes`: the instance's wire types, generated from its `openapi.json`. `MarfaAPI` includes them.
+- `MarfaTesting`: a working copy for tests and previews. See [Test and preview](#test-and-preview).
+
 ## Example
 
 This opens a working copy, fills it with the notes on your instance, and prints their titles. You need a running instance and a key that can read `core.note`; the [Quickstart](https://docs.marfa.so/quickstart) makes both.
