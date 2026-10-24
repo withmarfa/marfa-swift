@@ -44,8 +44,9 @@ struct FakeCopyBehavior {
         let copy = fake.copy
 
         #expect(try await copy.items.get(Self.note.id) == Self.note)
-        #expect(
-            try await copy.items.list(sort: Sort(field: .occurredAt, direction: .ascending)) == [Self.note, Self.other])
+        let listed = try await copy.items.list(sort: Sort(field: .occurredAt, direction: .ascending))
+        #expect(listed.rows == [Self.note, Self.other])
+        #expect(listed.completeness == .complete)
         #expect(try await copy.edges.from(Self.note.id) == [Self.edge])
         #expect(try await copy.edges.to(Self.other.id) == [Self.edge])
         #expect(try await copy.edges.ofType("references") == [Self.edge])
@@ -105,6 +106,10 @@ struct FakeCopyBehavior {
             ("blobs.put", { _ = try await copy.blobs.put(file: file) }),
             ("blobs.withFile", { try await copy.blobs.withFile("hash") { _ in } }),
             ("blobs.isHeld", { _ = try await copy.blobs.isHeld("hash") }),
+            ("blobs.cache", { _ = try await copy.blobs.cache() }),
+            ("blobs.setBudget", { _ = try await copy.blobs.setBudget(.keepAll) }),
+            ("blobs.trim", { _ = try await copy.blobs.trim() }),
+            ("blobs.fetchKept", { _ = try await copy.blobs.fetchKept() }),
             ("queue.release", { _ = try await copy.queue.release(id) }),
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),
             ("items.list(filter:)", { _ = try await copy.items.list(ListFilters(filter: "x")) }),
@@ -681,7 +686,7 @@ final class NotesModel {
     }
 
     func load() async {
-        titles = ((try? await copy.items.list(ListFilters(type: "core.note"))) ?? []).compactMap(\.title)
+        titles = (try? await copy.items.list(ListFilters(type: "core.note")))?.compactMap(\.title) ?? []
     }
 
     func add(title: String) async {

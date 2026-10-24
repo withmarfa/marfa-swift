@@ -285,17 +285,17 @@ extension LiveWorkingCopies {
             let secondHash = try #require(second.blob)
 
             let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
-            _ = try await fresh.holder.run { try $0.setFileBudget(budget: .bytes(bytes: 1)) }
+            _ = try await fresh.blobs.setBudget(.bytes(bytes: 1))
 
             let inUse = try await fresh.blobs.withFile(firstHash) { held in
                 try await fresh.blobs.withFile(secondHash) { _ in }
-                _ = try await fresh.holder.run { try $0.trimFiles() }
+                _ = try await fresh.blobs.trim()
                 return (url: held, bytes: try? Data(contentsOf: held))
             }
             #expect(inUse.bytes == Data(firstText.utf8), "the file was trimmed while its call was still running")
 
             // The witness: the same trim takes the file once nothing holds it.
-            _ = try await fresh.holder.run { try $0.trimFiles() }
+            _ = try await fresh.blobs.trim()
             #expect(!FileManager.default.fileExists(atPath: inUse.url.path))
         }
 

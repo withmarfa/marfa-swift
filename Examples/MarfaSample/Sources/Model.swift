@@ -6,7 +6,7 @@ import Observation
 final class Model {
     let configuration: Configuration
     private(set) var copy: WorkingCopy?
-    private(set) var notes: LiveQuery<[Item]>?
+    private(set) var notes: LiveQuery<Rows<Item>>?
     private(set) var queued: LiveQuery<[QueuedWrite]>?
     private(set) var message = ""
     var searchText = "" {
@@ -29,7 +29,7 @@ final class Model {
         }
     }
 
-    private var noteReading: Reading<[Item]> {
+    private var noteReading: Reading<Rows<Item>> {
         searchText.isEmpty
             ? .list(ListFilters(type: "core.note", tier: .feed))
             : .search(searchText, filters: SearchFilters(type: "core.note"))

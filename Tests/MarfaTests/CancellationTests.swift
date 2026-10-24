@@ -6,7 +6,7 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct Cancellation {
-    @Test(arguments: ["hydrate", "catchUp", "drain"])
+    @Test(arguments: ["hydrate", "catchUp", "drain", "fetchKept"])
     func anAlreadyCancelledTaskRefusesTheCall(operation: String) async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
@@ -14,6 +14,7 @@ struct Cancellation {
             switch operation {
             case "hydrate": _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
             case "catchUp": _ = try await copy.catchUp()
+            case "fetchKept": _ = try await copy.blobs.fetchKept()
             default: _ = try await copy.queue.drain()
             }
         }

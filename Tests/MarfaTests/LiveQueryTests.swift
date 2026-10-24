@@ -68,7 +68,7 @@ struct LiveQueries {
         try #require(try await copy.items.create(Draft(type: "app.test.entry", properties: properties)).itemId)
     }
 
-    static let entries = Reading<[Item]>.list(ListFilters(type: "app.test.entry"))
+    static let entries = Reading<Rows<Item>>.list(ListFilters(type: "app.test.entry"))
 
     /// Once its first read has ended, so a change told next is one the query has a stream for.
     static func settled<Value>(_ query: LiveQuery<Value>) async throws {
@@ -132,6 +132,7 @@ struct LiveQueries {
         told(.queueDrained(Marfa.DrainReport())),
         told(.queueNotDrained(.network(message: "away"))),
         told(.refreshed(.hydrated)),
+        told(.refreshed(.unfinished)),
         told(.refreshed(.caughtUp)),
         told(.refreshed(.drained)),
         told(.refreshed(.withdrawn)),
@@ -208,7 +209,7 @@ struct LiveQueries {
     @Test func aSearchAnItemAndTheQueueAreReadings() async throws {
         let copy = try await Self.open()
         let id = try await Self.make(copy, ["title": "zebra crossing"])
-        let search = LiveQuery(copy, reading: Reading<[Item]>.search("zebra"))
+        let search = LiveQuery(copy, reading: Reading<Rows<Item>>.search("zebra"))
         let item = LiveQuery(copy, reading: Reading<Item?>.item(id))
         let queue = LiveQuery(copy, reading: Reading<[Marfa.QueuedWrite]>.queue)
         try await eventually("all three read") {
@@ -427,6 +428,20 @@ struct LiveQueries {
         try await bounded("close") { await copy.close() }
     }
 
+    @Test func aHydrationThatFailsAfterAWatchFailureLeavesTheFailureShown() async throws {
+        let (core, copy) = Self.fake()
+        let probe = Probe()
+        let query = LiveQuery(copy, reading: probe.reading("A"))
+        try await Self.settled(query)
+        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
+        try await eventually("the failure is shown") { query.following == .stopped(.network(message: "dropped")) }
+        let reads = probe.reads
+        copy.feed.announce(told(.refreshed(.unfinished)))
+        try await eventually("the unfinished fill was read") { probe.reads > reads && !query.isLoading }
+        #expect(query.following == .stopped(.network(message: "dropped")), "a failed fill cleared the follow failure")
+        try await bounded("close") { await copy.close() }
+    }
+
     @Test func aCoreFaultEndsTheStreamAndNothingAsksAgainUntilRefresh() async throws {
         let (core, copy) = Self.fake()
         let probe = Probe()
@@ -517,7 +532,7 @@ struct LiveQueries {
 
     @Test func aRealCopyIsLetGoOfWhenItsQueryIs() async throws {
         let copy = try await Self.open()
-        var query: LiveQuery<[Item]>? = LiveQuery(copy, reading: Self.entries)
+        var query: LiveQuery<Rows<Item>>? = LiveQuery(copy, reading: Self.entries)
         try await Self.settled(try #require(query))
         #expect(copy.feed.count == 1)
         query = nil

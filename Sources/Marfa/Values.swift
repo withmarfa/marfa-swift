@@ -32,6 +32,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case redirected(origin: String, status: UInt16, location: String?, message: String)
     case noServer(message: String)
     case noCursor(message: String)
+    /// A read by id asked for a row this copy does not hold while a hydration is still filling it, so the row may
+    /// yet arrive. Reads that list or search answer the rows that have arrived and say `.partial` instead. An edge
+    /// write throws it too until the copy is whole, as does an item write to a row the copy does not hold.
     case hydrationIncomplete(message: String)
     /// The copy holds no type catalog; a hydration reads the server's catalog.
     case noCatalog(message: String)
@@ -40,7 +43,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case wrongSchema(path: String, reason: String, unsent: UInt64?, message: String)
     case readingHandle(message: String)
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
-    /// is an open string, such as `reach_changed` or `instance_changed`.
+    /// is an open string, such as `reach_changed`, `instance_changed` or `catchup_too_old`. A stale copy
+    /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
     case copyExpired(reason: String, message: String)
     case streamIncomplete(reason: String, message: String)
     case wrongServer(expected: String, got: String, message: String)
@@ -190,30 +194,53 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
 /// stored properties could not be read.
 public typealias Item = MarfaCore.Item
 
-extension MarfaCore.Listing {
-    /// The items, where the copy was whole.
-    ///
-    /// Throws `MarfaError.hydrationIncomplete` while a hydration is still filling the copy, which would answer only
-    /// the rows that have arrived.
-    func whole() throws -> [Item] {
-        try refuseUnlessWhole(completeness)
-        return items
+/// Whether a read was answered from a whole copy; from one a hydration is still filling, which holds only the rows
+/// that have arrived (`.partial`); or from one the server's event log no longer reaches, which holds the rows it
+/// held then, some since changed or gone on the server, until a hydration has filled it again (`.stale`).
+public typealias Completeness = MarfaCore.Completeness
+
+/// The rows a read of the copy answered, and whether the copy was whole when it answered.
+///
+/// A list or a search made while a hydration fills the copy answers the rows that have arrived and says
+/// `.partial`, so an app can show them with a sign that more are coming, and read again on
+/// `.refreshed(.hydrated)`. A copy whose cursor the event log let go answers what it held and says `.stale`. `Rows` is a random-access collection of its `rows`, so it iterates, maps and counts as an
+/// array does.
+public struct Rows<Row: Sendable>: Sendable {
+    public var rows: [Row]
+    public var completeness: Completeness
+
+    public init(_ rows: [Row] = [], completeness: Completeness = .complete) {
+        self.rows = rows
+        self.completeness = completeness
     }
+}
+
+extension Rows {
+    /// What a ``Reading`` shows until its first read ends: no rows, and `.partial` because nothing has been read.
+    public static var unread: Rows { Rows(completeness: .partial) }
+}
+
+extension Rows: Equatable where Row: Equatable {}
+extension Rows: Hashable where Row: Hashable {}
+
+extension Rows: ExpressibleByArrayLiteral {
+    public init(arrayLiteral rows: Row...) {
+        self.init(rows)
+    }
+}
+
+extension Rows: RandomAccessCollection {
+    public var startIndex: Int { rows.startIndex }
+    public var endIndex: Int { rows.endIndex }
+    public subscript(position: Int) -> Row { rows[position] }
+}
+
+extension MarfaCore.Listing {
+    var answer: Rows<Item> { Rows(items, completeness: completeness) }
 }
 
 extension MarfaCore.Found {
-    /// The hits, where the copy was whole, as `Listing.whole()` answers the items.
-    func whole() throws -> [SearchHit] {
-        try refuseUnlessWhole(completeness)
-        return hits
-    }
-}
-
-func refuseUnlessWhole(_ completeness: MarfaCore.Completeness) throws {
-    guard completeness == .complete else {
-        throw MarfaError.hydrationIncomplete(
-            message: "a hydration is still filling this working copy, so the answer would hold only some rows")
-    }
+    var answer: Rows<SearchHit> { Rows(hits, completeness: completeness) }
 }
 
 /// One page of the server's bin.

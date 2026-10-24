@@ -132,17 +132,17 @@ enum Scenario {
     }
 
     @MainActor
-    static func following(_ copy: WorkingCopy) -> LiveQuery<[Item]> {
+    static func following(_ copy: WorkingCopy) -> LiveQuery<Rows<Item>> {
         LiveQuery(copy, reading: .list(ListFilters(type: "core.note", tier: .feed)))
     }
 
     /// The query shows what the copy holds, after writes, hydrations, drains and
     /// catch-ups the phase made with no call to the query.
     static func checkLive(
-        _ live: LiveQuery<[Item]>, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
+        _ live: LiveQuery<Rows<Item>>, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
         let held = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
-        var shown: [Item] = []
+        var shown: Rows<Item> = []
         for _ in 0..<250 {
             shown = await live.value
             if shown == held { break }
@@ -176,7 +176,7 @@ enum Scenario {
     ) async throws {
         let notes = try await copy.search("offline", filters: SearchFilters(type: "core.note"))
         let favorites = try await copy.search("offline", filters: SearchFilters(type: "core.note", tags: ["favorite"]))
-        let titles = { (hits: [SearchHit]) in hits.map { $0.item.title ?? "-" } }
+        let titles = { (hits: Rows<SearchHit>) in hits.map { $0.item.title ?? "-" } }
         print("searched for offline: \(titles(notes)), narrowed to favorites: \(titles(favorites))")
         expect(Set([first, kept]).isSubset(of: Set(notes.map(\.item.id))), "a search of the notes did not find both")
         expect(favorites.map(\.item.id) == [first], "a search narrowed to favorites did not find the first note alone")

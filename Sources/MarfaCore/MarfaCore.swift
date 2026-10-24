@@ -3425,7 +3425,7 @@ public func FfiConverterTypeFolders_lower(_ value: Folders) -> UInt64 {
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
  * a hydration left unfinished answers lists and searches marked partial and
- * refuses writes until a hydration completes (the next one of the same slice carries on from the page it reached where it can), a catch-up keeps the cursor it reached, and a drain leaves what it had not sent queued, and an upload or
+ * takes writes only to the rows it holds and new ones, and no edge writes, until a hydration completes (the next one of the same slice carries on from the page it reached where it can), a catch-up keeps the cursor it reached, and a drain leaves what it had not sent queued, and an upload or
  * item or edge write it had in flight queued as sent, for the next drain to
  * send again under the same key. A raised `Stop` stays raised, so a call given one afterwards
  * ends at once.
@@ -3439,7 +3439,7 @@ public protocol StopProtocol: AnyObject, Sendable {
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
  * a hydration left unfinished answers lists and searches marked partial and
- * refuses writes until a hydration completes (the next one of the same slice carries on from the page it reached where it can), a catch-up keeps the cursor it reached, and a drain leaves what it had not sent queued, and an upload or
+ * takes writes only to the rows it holds and new ones, and no edge writes, until a hydration completes (the next one of the same slice carries on from the page it reached where it can), a catch-up keeps the cursor it reached, and a drain leaves what it had not sent queued, and an upload or
  * item or edge write it had in flight queued as sent, for the next drain to
  * send again under the same key. A raised `Stop` stays raised, so a call given one afterwards
  * ends at once.
@@ -6762,6 +6762,13 @@ public struct HydrateReport: Equatable, Hashable {
      * rather than resumed, such as `slice_changed` or `head_aged_out`.
      */
     public var restarted: String?
+    /**
+     * Whether the copy was filled again over the rows it held, which it
+     * answered marked stale meanwhile, rather than cleared first: so it is
+     * filled when the event log let its cursor go and the instance, the reach
+     * and the slice are those it was built under.
+     */
+    public var inPlace: Bool
     public var cursor: String
     /**
      * Types the app declared that the instance did not hold and now does.
@@ -6790,7 +6797,13 @@ public struct HydrateReport: Equatable, Hashable {
         /**
          * Why an interrupted hydration was filled again from the first page
          * rather than resumed, such as `slice_changed` or `head_aged_out`.
-         */restarted: String?, cursor: String, 
+         */restarted: String?, 
+        /**
+         * Whether the copy was filled again over the rows it held, which it
+         * answered marked stale meanwhile, rather than cleared first: so it is
+         * filled when the event log let its cursor go and the instance, the reach
+         * and the slice are those it was built under.
+         */inPlace: Bool, cursor: String, 
         /**
          * Types the app declared that the instance did not hold and now does.
          */registeredTypes: [String], 
@@ -6806,6 +6819,7 @@ public struct HydrateReport: Equatable, Hashable {
         self.pagesTotal = pagesTotal
         self.resumed = resumed
         self.restarted = restarted
+        self.inPlace = inPlace
         self.cursor = cursor
         self.registeredTypes = registeredTypes
         self.unregisteredTypes = unregisteredTypes
@@ -6836,6 +6850,7 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
                 pagesTotal: FfiConverterUInt64.read(from: &buf), 
                 resumed: FfiConverterBool.read(from: &buf), 
                 restarted: FfiConverterOptionString.read(from: &buf), 
+                inPlace: FfiConverterBool.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
                 registeredTypes: FfiConverterSequenceString.read(from: &buf), 
                 unregisteredTypes: FfiConverterSequenceTypeUnregisteredType.read(from: &buf)
@@ -6852,6 +6867,7 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.pagesTotal, into: &buf)
         FfiConverterBool.write(value.resumed, into: &buf)
         FfiConverterOptionString.write(value.restarted, into: &buf)
+        FfiConverterBool.write(value.inPlace, into: &buf)
         FfiConverterString.write(value.cursor, into: &buf)
         FfiConverterSequenceString.write(value.registeredTypes, into: &buf)
         FfiConverterSequenceTypeUnregisteredType.write(value.unregisteredTypes, into: &buf)
@@ -9947,14 +9963,18 @@ public func FfiConverterTypeChange_lower(_ value: Change) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
- * Whether a local list or search was read from a whole copy, or from one a
- * hydration is still filling, which holds only the rows that have arrived.
+ * Whether a local list or search was read from a whole copy; from one a
+ * hydration is still filling, which holds only the rows that have arrived;
+ * or from one the server's event log no longer reaches, which holds the rows
+ * it held then, some since changed or gone on the server, until a hydration
+ * has filled it again.
  */
 
 public enum Completeness: Equatable, Hashable, CaseIterable {
     
     case complete
     case partial
+    case stale
 
 
 
@@ -9980,6 +10000,8 @@ public struct FfiConverterTypeCompleteness: FfiConverterRustBuffer {
         
         case 2: return .partial
         
+        case 3: return .stale
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -9994,6 +10016,10 @@ public struct FfiConverterTypeCompleteness: FfiConverterRustBuffer {
         
         case .partial:
             writeInt(&buf, Int32(2))
+        
+        
+        case .stale:
+            writeInt(&buf, Int32(3))
         
         }
     }
@@ -10881,6 +10907,7 @@ public enum Hydration: Equatable, Hashable, CaseIterable {
     case inProgress
     case complete
     case expired
+    case stale
 
 
 
@@ -10910,6 +10937,8 @@ public struct FfiConverterTypeHydration: FfiConverterRustBuffer {
         
         case 4: return .expired
         
+        case 5: return .stale
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -10932,6 +10961,10 @@ public struct FfiConverterTypeHydration: FfiConverterRustBuffer {
         
         case .expired:
             writeInt(&buf, Int32(4))
+        
+        
+        case .stale:
+            writeInt(&buf, Int32(5))
         
         }
     }

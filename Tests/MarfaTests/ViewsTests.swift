@@ -145,7 +145,7 @@ import Testing
 }
 
 /// A core whose reads answer from a copy a hydration is still filling, or from a whole one.
-private final class FillingCore: Core, @unchecked Sendable {
+final class FillingCore: Core, @unchecked Sendable {
     let completeness: MarfaCore.Completeness
 
     init(_ completeness: MarfaCore.Completeness) {
@@ -169,6 +169,12 @@ private final class FillingCore: Core, @unchecked Sendable {
 
     override func search(query: String, filters: SearchFilters, limit: UInt32) throws -> MarfaCore.Found {
         Found(hits: [SearchHit(item: Self.item, score: 1, snippet: "")], completeness: completeness)
+    }
+
+    override func get(id: String) throws -> Item? {
+        if id == Self.item.id { return Self.item }
+        if completeness == .partial { throw MarfaCore.MarfaError.HydrationIncomplete(message: "still filling") }
+        return nil
     }
 
     override func listViews() throws -> MarfaCore.Views {
@@ -196,33 +202,76 @@ private final class FillingCore: Core, @unchecked Sendable {
 }
 
 @Suite(.timeLimit(.minutes(1))) struct ReadsOfAFillingCopy {
-    private static let reads: [(String, @Sendable (WorkingCopy) async throws -> Int)] = [
-        ("items.list", { try await $0.items.list().count }),
-        ("search", { try await $0.search("x").count }),
-        ("items.views", { try await $0.items.views().count }),
-        ("items.list(inView:)", { try await $0.items.list(inView: "v").count }),
-        ("search(inView:)", { try await $0.search("x", inView: "v").count }),
-        ("items.groups(inView:)", { try await $0.items.groups(inView: "v", layout: "a").count }),
+    private static func shape<Row>(_ rows: Rows<Row>) -> (count: Int, Completeness) {
+        (rows.count, rows.completeness)
+    }
+
+    private static let reads: [(String, @Sendable (WorkingCopy) async throws -> (count: Int, Completeness))] = [
+        ("items.list", { shape(try await $0.items.list()) }),
+        ("search", { shape(try await $0.search("x")) }),
+        ("items.views", { shape(try await $0.items.views()) }),
+        ("items.list(inView:)", { shape(try await $0.items.list(inView: "v")) }),
+        ("search(inView:)", { shape(try await $0.search("x", inView: "v")) }),
+        ("items.groups(inView:)", { shape(try await $0.items.groups(inView: "v", layout: "a")) }),
     ]
 
-    @Test func aReadFromACopyAHydrationStillFillsIsRefusedNeverAnsweredInPart() async throws {
+    @Test func aReadFromACopyAHydrationStillFillsAnswersTheRowsThatArrivedMarkedPartial() async throws {
         let copy = WorkingCopy(holder: CoreHolder(FillingCore(.partial)), hasServer: false)
         for (call, read) in Self.reads {
-            await #expect("\(call) is refused") {
-                _ = try await read(copy)
-            } throws: { error in
-                if case .hydrationIncomplete = error as? Marfa.MarfaError { true } else { false }
-            }
+            let (count, completeness) = try await read(copy)
+            #expect(count == 1, "\(call) answers the row that arrived")
+            #expect(completeness == .partial, "\(call) says it is partial")
         }
         await copy.close()
     }
 
-    @Test func theSameReadsAnswerFromAWholeCopy() async throws {
-        let copy = WorkingCopy(holder: CoreHolder(FillingCore(.complete)), hasServer: false)
+    @Test func aReadFromACopyWhoseCursorAgedOutAnswersWhatItHeldMarkedStale() async throws {
+        let copy = WorkingCopy(holder: CoreHolder(FillingCore(.stale)), hasServer: false)
         for (call, read) in Self.reads {
-            #expect(try await read(copy) == 1, "\(call)")
+            let (count, completeness) = try await read(copy)
+            #expect(count == 1, "\(call) answers the row the copy held")
+            #expect(completeness == .stale, "\(call) says it is stale")
         }
         await copy.close()
+    }
+
+    @Test func theSameReadsOfAWholeCopyAreComplete() async throws {
+        let copy = WorkingCopy(holder: CoreHolder(FillingCore(.complete)), hasServer: false)
+        for (call, read) in Self.reads {
+            let (count, completeness) = try await read(copy)
+            #expect(count == 1, "\(call)")
+            #expect(completeness == .complete, "\(call)")
+        }
+        await copy.close()
+    }
+
+    @Test func aReadByIDOfARowNotYetHeldThrowsAsTheCoreDoes() async throws {
+        let copy = WorkingCopy(holder: CoreHolder(FillingCore(.partial)), hasServer: false)
+        await #expect("a get of a row that has not arrived is refused") {
+            _ = try await copy.items.get("not-yet")
+        } throws: { error in
+            if case .hydrationIncomplete = error as? Marfa.MarfaError { true } else { false }
+        }
+        #expect(try await copy.items.get("i") == FillingCore.item)
+        let whole = WorkingCopy(holder: CoreHolder(FillingCore(.complete)), hasServer: false)
+        #expect(try await whole.items.get("not-yet") == nil)
+        await copy.close()
+        await whole.close()
+    }
+
+    @MainActor @Test func aLiveQueryShowsTheCompletenessOfItsLastRead() async throws {
+        let copy = WorkingCopy(holder: CoreHolder(FillingCore(.partial)), hasServer: false)
+        let query = LiveQuery(copy, reading: Reading<Rows<Item>>.list())
+        #expect(query.value.isEmpty && query.value.completeness == .partial, "nothing is read yet")
+        await query.refresh()
+        #expect(query.value.count == 1 && query.value.completeness == .partial)
+
+        let whole = WorkingCopy(holder: CoreHolder(FillingCore(.complete)), hasServer: false)
+        let settled = LiveQuery(whole, reading: Reading<Rows<Item>>.list())
+        await settled.refresh()
+        #expect(settled.value.count == 1 && settled.value.completeness == .complete)
+        await copy.close()
+        await whole.close()
     }
 }
 

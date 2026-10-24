@@ -27,5 +27,54 @@ extension LiveWorkingCopies {
             let served = try await Live.read("items/\(file)")
             #expect(served["item"]?.object?["properties"]?.object?["size_bytes"]?.integer == length)
         }
+
+        @Test func everyTypeHydrationBringsAttachmentsToBeFetchedAndKeptOutsideTheBudget() async throws {
+            let writer = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            _ = try await writer.hydrate(types: ["core.note", "core.file"], tier: .feed)
+            let note = try #require(try await writer.items.create(Live.note("keeps a file \(UUID())")).itemId)
+            let text = String(repeating: "kept offline \(UUID())\n", count: 8)
+            let attached = try await writer.items.attach(to: note, file: try Live.file(text))
+            let hash = try #require(attached.upload.blob)
+            #expect(try await writer.queue.drain().undelivered == 0)
+
+            let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server, fileBudget: .keepAll)
+            let report = try await copy.hydrate(types: ["*"], tier: .all)
+            #expect(report.types == ["*"] && report.pagesTotal >= report.pages && !report.resumed)
+            let status = try await copy.status()
+            #expect(status.hydration == .complete)
+            #expect(status.sliceTypes == ["*"])
+            let listed = try await copy.items.list(ListFilters(type: "core.note"))
+            #expect(listed.completeness == .complete)
+            #expect(listed.contains { $0.id == note })
+
+            let before = try #require(status.fileCache.attachments)
+            #expect(before.notHeld >= 1)
+            #expect(before.notHeldByReason.contains { $0.reason == .notFetched && $0.attachments >= 1 })
+            #expect(!(try await copy.blobs.isHeld(hash)))
+
+            let fetched = try await copy.blobs.fetchKept()
+            #expect(fetched.fetched >= 1 && fetched.fetchedBytes >= UInt64(text.utf8.count))
+            #expect(try await copy.blobs.isHeld(hash))
+            let after = try #require(try await copy.blobs.cache().attachments)
+            #expect(after.held >= before.held + 1)
+            #expect(after.notHeld < before.notHeld)
+
+            // The budget leaves an attachment's bytes alone, and takes those of any other file.
+            _ = try await copy.blobs.setBudget(.bytes(bytes: 1))
+            _ = try await copy.blobs.trim()
+            #expect(try await copy.blobs.isHeld(hash), "a trim took an attachment's bytes")
+            #expect(try await copy.blobs.cache().setting == .bytes(bytes: 1))
+        }
+
+        @Test func everyTypeBesideAnotherTypeIsRefused() async throws {
+            let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            await #expect {
+                _ = try await copy.hydrate(types: ["*", "core.note"], tier: .all)
+            } throws: { error in
+                if case .invalid? = error as? MarfaError { true } else { false }
+            }
+            _ = try await copy.hydrate(types: ["*", "system.view"], tier: .all)
+            #expect(try await copy.status().sliceTypes.contains("system.view"))
+        }
     }
 }

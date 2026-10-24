@@ -24,12 +24,12 @@ public struct Reading<Value: Sendable & Equatable>: Sendable {
     }
 }
 
-extension Reading where Value == [Item] {
+extension Reading where Value == Rows<Item> {
     /// The items `filters` select, as `items.list(_:sort:)` answers them.
     ///
     /// `filters.limit` and `filters.offset` bound the result.
     public static func list(_ filters: ListFilters = ListFilters(), sort: Sort? = nil) -> Reading {
-        Reading(placeholder: []) { copy in
+        Reading(placeholder: .unread) { copy in
             if let sort {
                 try await copy.items.list(filters, sort: sort)
             } else {
@@ -42,20 +42,23 @@ extension Reading where Value == [Item] {
     ///
     /// Without a `limit` the result holds the copy's default number of hits.
     public static func search(_ text: String, filters: SearchFilters = SearchFilters(), limit: Int? = nil) -> Reading {
-        Reading(placeholder: []) { copy in
+        Reading(placeholder: .unread) { copy in
             let hits =
                 if let limit {
                     try await copy.search(text, filters: filters, limit: limit)
                 } else {
                     try await copy.search(text, filters: filters)
                 }
-            return hits.map(\.item)
+            return Rows(hits.map(\.item), completeness: hits.completeness)
         }
     }
 }
 
 extension Reading where Value == Item? {
     /// One item, `nil` while the copy does not hold it or it is in the bin, as `items.get(_:)` answers.
+    ///
+    /// While a hydration fills the copy, an item not held yet fails the read with `hydrationIncomplete`, which the
+    /// query's `error` reports.
     public static func item(_ id: String) -> Reading {
         Reading(placeholder: nil) { copy in try await copy.items.get(id) }
     }

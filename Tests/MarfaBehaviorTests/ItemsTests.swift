@@ -31,6 +31,18 @@ struct ItemsOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func aListOfACopyNoHydrationIsFillingIsComplete(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let empty = try await copy.items.list()
+        #expect(empty.isEmpty && empty.completeness == .complete)
+        let id = try await Self.note("held", in: copy)
+        let listed = try await copy.items.list(ListFilters(type: "core.note"))
+        #expect(listed.map(\.id) == [id])
+        #expect(listed.completeness == .complete)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func aCreatedItemIsHeldAtOnceAndQueuedWithItsTagsBehindIt(kind: CopyKind) async throws {
         let copy = try await kind.open()
         let write = try await copy.items.create(

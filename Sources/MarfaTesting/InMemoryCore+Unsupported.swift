@@ -132,19 +132,19 @@ extension InMemoryCore {
     }
 
     func fetchKept(stop: Stop?) throws -> KeptFetch {
-        try unsupported("fetchKept")
+        try unsupported("blobs.fetchKept")
     }
 
     func fileCache() throws -> FileCache {
-        try unsupported("fileCache")
+        try unsupported("blobs.cache")
     }
 
     func setFileBudget(budget: FileBudget) throws -> UInt64 {
-        try unsupported("setFileBudget")
+        try unsupported("blobs.setBudget")
     }
 
     func trimFiles() throws -> UInt64 {
-        try unsupported("trimFiles")
+        try unsupported("blobs.trim")
     }
 
     func createView(settings: JsonObject, idempotencyKey: String?) throws -> ViewRow {
