@@ -114,6 +114,12 @@ struct FakeCopyBehavior {
             ),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
+            (
+                "createView",
+                { _ = try await copy.createView(ViewSettings(title: "v", layouts: [ViewLayout(id: "a", kind: .list)])) }
+            ),
+            ("changeView", { _ = try await copy.changeView(id, ViewSettingsChange(title: "w"), baseVersion: 1) }),
+            ("deleteView", { try await copy.deleteView(id) }),
             ("items.views", { _ = try await copy.items.views() }),
             ("items.view", { _ = try await copy.items.view(id) }),
             ("items.list(inView:)", { _ = try await copy.items.list(inView: id) }),

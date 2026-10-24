@@ -86,7 +86,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
                 edges: UInt64(state.edges.count), catalogVersion: nil,
                 fileCache: FileCache(
                     setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
-                    backupMarkFailure: nil))
+                    backupMarkFailure: nil, attachments: nil))
         }
     }
 

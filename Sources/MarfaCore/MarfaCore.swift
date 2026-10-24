@@ -1089,6 +1089,18 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func embedText(id: String, file: String) throws  -> String
     
     /**
+     * Fetches the bytes of every file attached to an item the copy holds
+     * that the cache does not hold whole, smallest first, and answers what
+     * it fetched and the attachments after it, resuming the part of one an
+     * earlier fetch left. Waits out a server that asks for a wait of a
+     * minute or less, and stops at the first the disk has no room for, once
+     * the server cannot be reached, or once it asks for a longer wait; one
+     * that fails otherwise is passed over. Run after a hydration and after
+     * a catch-up. Refused to a reading handle and for a folder's copy.
+     */
+    func fetchKept(stop: Stop?) throws  -> KeptFetch
+    
+    /**
      * The cache of fetched files: its setting, the budget in force and the
      * bytes held.
      */
@@ -1369,6 +1381,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * Refused as `list_in_folder` refuses.
      */
     func searchInFolder(query: String, id: String, limit: UInt32) throws  -> Found
+    
+    func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?) throws  -> ViewRow
+    
+    func createView(settings: JsonObject, idempotencyKey: String?) throws  -> ViewRow
+    
+    func deleteView(id: String, idempotencyKey: String?) throws 
     
     func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?) throws  -> Listing
     
@@ -1795,6 +1813,25 @@ open func embedText(id: String, file: String)throws  -> String  {
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(file),$0
+    )
+})
+}
+    
+    /**
+     * Fetches the bytes of every file attached to an item the copy holds
+     * that the cache does not hold whole, smallest first, and answers what
+     * it fetched and the attachments after it, resuming the part of one an
+     * earlier fetch left. Waits out a server that asks for a wait of a
+     * minute or less, and stops at the first the disk has no room for, once
+     * the server cannot be reached, or once it asks for a longer wait; one
+     * that fails otherwise is passed over. Run after a hydration and after
+     * a catch-up. Refused to a reading handle and for a folder's copy.
+     */
+open func fetchKept(stop: Stop?)throws  -> KeptFetch  {
+    return try  FfiConverterTypeKeptFetch_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_fetch_kept(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionTypeStop.lower(stop),$0
     )
 })
 }
@@ -2388,6 +2425,37 @@ open func searchInFolder(query: String, id: String, limit: UInt32)throws  -> Fou
         FfiConverterUInt32.lower(limit),$0
     )
 })
+}
+    
+open func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?)throws  -> ViewRow  {
+    return try  FfiConverterTypeViewRow_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_change_view(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterTypeJsonObject_lower(changes),
+        FfiConverterInt64.lower(version),
+        FfiConverterOptionString.lower(idempotencyKey),$0
+    )
+})
+}
+    
+open func createView(settings: JsonObject, idempotencyKey: String?)throws  -> ViewRow  {
+    return try  FfiConverterTypeViewRow_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_create_view(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeJsonObject_lower(settings),
+        FfiConverterOptionString.lower(idempotencyKey),$0
+    )
+})
+}
+    
+open func deleteView(id: String, idempotencyKey: String?)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_delete_view(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionString.lower(idempotencyKey),$0
+    )
+}
 }
     
 open func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?)throws  -> Listing  {
@@ -3895,6 +3963,109 @@ public func FfiConverterTypeAttachment_lower(_ value: Attachment) -> RustBuffer 
 
 
 /**
+ * The files attached to items the copy holds.
+ */
+public struct Attachments: Equatable, Hashable {
+    /**
+     * The file items whose bytes the cache holds whole.
+     */
+    public var held: UInt64
+    /**
+     * Their bytes, counted once for files that share them.
+     */
+    public var heldBytes: UInt64
+    /**
+     * The bytes of partial files of attachments.
+     */
+    public var partialBytes: UInt64
+    /**
+     * The attachments whose bytes the cache does not hold whole.
+     */
+    public var notHeld: UInt64
+    /**
+     * The bytes they state, counted once for files that share them.
+     */
+    public var notHeldBytes: UInt64
+    public var notHeldByReason: [NotHeld]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The file items whose bytes the cache holds whole.
+         */held: UInt64, 
+        /**
+         * Their bytes, counted once for files that share them.
+         */heldBytes: UInt64, 
+        /**
+         * The bytes of partial files of attachments.
+         */partialBytes: UInt64, 
+        /**
+         * The attachments whose bytes the cache does not hold whole.
+         */notHeld: UInt64, 
+        /**
+         * The bytes they state, counted once for files that share them.
+         */notHeldBytes: UInt64, notHeldByReason: [NotHeld]) {
+        self.held = held
+        self.heldBytes = heldBytes
+        self.partialBytes = partialBytes
+        self.notHeld = notHeld
+        self.notHeldBytes = notHeldBytes
+        self.notHeldByReason = notHeldByReason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Attachments: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeAttachments: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Attachments {
+        return
+            try Attachments(
+                held: FfiConverterUInt64.read(from: &buf), 
+                heldBytes: FfiConverterUInt64.read(from: &buf), 
+                partialBytes: FfiConverterUInt64.read(from: &buf), 
+                notHeld: FfiConverterUInt64.read(from: &buf), 
+                notHeldBytes: FfiConverterUInt64.read(from: &buf), 
+                notHeldByReason: FfiConverterSequenceTypeNotHeld.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Attachments, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.held, into: &buf)
+        FfiConverterUInt64.write(value.heldBytes, into: &buf)
+        FfiConverterUInt64.write(value.partialBytes, into: &buf)
+        FfiConverterUInt64.write(value.notHeld, into: &buf)
+        FfiConverterUInt64.write(value.notHeldBytes, into: &buf)
+        FfiConverterSequenceTypeNotHeld.write(value.notHeldByReason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAttachments_lift(_ buf: RustBuffer) throws -> Attachments {
+    return try FfiConverterTypeAttachments.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAttachments_lower(_ value: Attachments) -> RustBuffer {
+    return FfiConverterTypeAttachments.lower(value)
+}
+
+
+/**
  * A page of the server's bin.
  */
 public struct BinPage: Equatable, Hashable {
@@ -5198,6 +5369,12 @@ public struct FileCache: Equatable, Hashable {
      * once a fetched file is marked.
      */
     public var backupMarkFailure: String?
+    /**
+     * The files attached to items the copy holds, which stay on the device
+     * outside the budget; none from the start of a hydration until one
+     * completes, for a folder's copy, and where the cache could not be read.
+     */
+    public var attachments: Attachments?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5221,13 +5398,19 @@ public struct FileCache: Equatable, Hashable {
         /**
          * Why the files fetched last could not be kept out of backups; none
          * once a fetched file is marked.
-         */backupMarkFailure: String?) {
+         */backupMarkFailure: String?, 
+        /**
+         * The files attached to items the copy holds, which stay on the device
+         * outside the budget; none from the start of a hydration until one
+         * completes, for a folder's copy, and where the cache could not be read.
+         */attachments: Attachments?) {
         self.setting = setting
         self.budget = budget
         self.held = held
         self.heldUnreadable = heldUnreadable
         self.volumeUnreadable = volumeUnreadable
         self.backupMarkFailure = backupMarkFailure
+        self.attachments = attachments
     }
 
     
@@ -5251,7 +5434,8 @@ public struct FfiConverterTypeFileCache: FfiConverterRustBuffer {
                 held: FfiConverterOptionUInt64.read(from: &buf), 
                 heldUnreadable: FfiConverterOptionString.read(from: &buf), 
                 volumeUnreadable: FfiConverterBool.read(from: &buf), 
-                backupMarkFailure: FfiConverterOptionString.read(from: &buf)
+                backupMarkFailure: FfiConverterOptionString.read(from: &buf), 
+                attachments: FfiConverterOptionTypeAttachments.read(from: &buf)
         )
     }
 
@@ -5262,6 +5446,7 @@ public struct FfiConverterTypeFileCache: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.heldUnreadable, into: &buf)
         FfiConverterBool.write(value.volumeUnreadable, into: &buf)
         FfiConverterOptionString.write(value.backupMarkFailure, into: &buf)
+        FfiConverterOptionTypeAttachments.write(value.attachments, into: &buf)
     }
 }
 
@@ -7119,6 +7304,81 @@ public func FfiConverterTypeJsonObject_lower(_ value: JsonObject) -> RustBuffer 
 
 
 /**
+ * What a fetch of the attachments did.
+ */
+public struct KeptFetch: Equatable, Hashable {
+    /**
+     * The files whose bytes it fetched, counted once for files that share
+     * them.
+     */
+    public var fetched: UInt64
+    public var fetchedBytes: UInt64
+    /**
+     * The attachments after it, as the state report gives them.
+     */
+    public var attachments: Attachments?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The files whose bytes it fetched, counted once for files that share
+         * them.
+         */fetched: UInt64, fetchedBytes: UInt64, 
+        /**
+         * The attachments after it, as the state report gives them.
+         */attachments: Attachments?) {
+        self.fetched = fetched
+        self.fetchedBytes = fetchedBytes
+        self.attachments = attachments
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension KeptFetch: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptFetch: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptFetch {
+        return
+            try KeptFetch(
+                fetched: FfiConverterUInt64.read(from: &buf), 
+                fetchedBytes: FfiConverterUInt64.read(from: &buf), 
+                attachments: FfiConverterOptionTypeAttachments.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KeptFetch, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.fetched, into: &buf)
+        FfiConverterUInt64.write(value.fetchedBytes, into: &buf)
+        FfiConverterOptionTypeAttachments.write(value.attachments, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptFetch_lift(_ buf: RustBuffer) throws -> KeptFetch {
+    return try FfiConverterTypeKeptFetch.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptFetch_lower(_ value: KeptFetch) -> RustBuffer {
+    return FfiConverterTypeKeptFetch.lower(value)
+}
+
+
+/**
  * What a write met that was no answer to it: the HTTP status, absent where
  * nothing answered, and the start of the answer's body when it is text.
  */
@@ -7475,6 +7735,83 @@ public func FfiConverterTypeMissingGrant_lift(_ buf: RustBuffer) throws -> Missi
 #endif
 public func FfiConverterTypeMissingGrant_lower(_ value: MissingGrant) -> RustBuffer {
     return FfiConverterTypeMissingGrant.lower(value)
+}
+
+
+/**
+ * The attachments not held for one reason.
+ */
+public struct NotHeld: Equatable, Hashable {
+    public var reason: NotHeldReason
+    public var attachments: UInt64
+    /**
+     * The bytes they state, counted once for files that share them.
+     */
+    public var bytes: UInt64
+    /**
+     * How many of them state no size, so add nothing to `bytes`.
+     */
+    public var unstated: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(reason: NotHeldReason, attachments: UInt64, 
+        /**
+         * The bytes they state, counted once for files that share them.
+         */bytes: UInt64, 
+        /**
+         * How many of them state no size, so add nothing to `bytes`.
+         */unstated: UInt64) {
+        self.reason = reason
+        self.attachments = attachments
+        self.bytes = bytes
+        self.unstated = unstated
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension NotHeld: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeNotHeld: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NotHeld {
+        return
+            try NotHeld(
+                reason: FfiConverterTypeNotHeldReason.read(from: &buf), 
+                attachments: FfiConverterUInt64.read(from: &buf), 
+                bytes: FfiConverterUInt64.read(from: &buf), 
+                unstated: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: NotHeld, into buf: inout [UInt8]) {
+        FfiConverterTypeNotHeldReason.write(value.reason, into: &buf)
+        FfiConverterUInt64.write(value.attachments, into: &buf)
+        FfiConverterUInt64.write(value.bytes, into: &buf)
+        FfiConverterUInt64.write(value.unstated, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNotHeld_lift(_ buf: RustBuffer) throws -> NotHeld {
+    return try FfiConverterTypeNotHeld.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNotHeld_lower(_ value: NotHeld) -> RustBuffer {
+    return FfiConverterTypeNotHeld.lower(value)
 }
 
 
@@ -11323,6 +11660,135 @@ public func FfiConverterTypeMarfaError_lower(_ value: MarfaError) -> RustBuffer 
     return FfiConverterTypeMarfaError.lower(value)
 }
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Why an attachment's bytes are not held.
+ */
+
+public enum NotHeldReason: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * No fetch of them has been asked for since they became an attachment.
+     */
+    case notFetched
+    /**
+     * The volume had no room for them, or for an attachment before them in
+     * the same fetch.
+     */
+    case noRoom
+    /**
+     * The server, or the link it gave, could not be reached, or the link
+     * stopped sending part way.
+     */
+    case unreachable
+    /**
+     * The server asked for a wait longer than a fetch of attachments
+     * makes, before them or an attachment before them in the same fetch.
+     */
+    case rateLimited
+    /**
+     * The server holds no bytes by that hash.
+     */
+    case absent
+    /**
+     * The fetch failed otherwise.
+     */
+    case failed
+    /**
+     * The edge is held but its file item is not.
+     */
+    case notInCopy
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension NotHeldReason: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeNotHeldReason: FfiConverterRustBuffer {
+    typealias SwiftType = NotHeldReason
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NotHeldReason {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .notFetched
+        
+        case 2: return .noRoom
+        
+        case 3: return .unreachable
+        
+        case 4: return .rateLimited
+        
+        case 5: return .absent
+        
+        case 6: return .failed
+        
+        case 7: return .notInCopy
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: NotHeldReason, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .notFetched:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .noRoom:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unreachable:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .rateLimited:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .absent:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .failed:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .notInCopy:
+            writeInt(&buf, Int32(7))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNotHeldReason_lift(_ buf: RustBuffer) throws -> NotHeldReason {
+    return try FfiConverterTypeNotHeldReason.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeNotHeldReason_lower(_ value: NotHeldReason) -> RustBuffer {
+    return FfiConverterTypeNotHeldReason.lower(value)
+}
+
+
 
 /**
  * Why an app's `CredentialRenewer` could not renew, so the core can tell a
@@ -12315,6 +12781,30 @@ fileprivate struct FfiConverterOptionTypeStop: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeAttachments: FfiConverterRustBuffer {
+    typealias SwiftType = Attachments?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeAttachments.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeAttachments.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeEdgeMove: FfiConverterRustBuffer {
     typealias SwiftType = EdgeMove?
 
@@ -13264,6 +13754,31 @@ fileprivate struct FfiConverterSequenceTypeListedFolder: FfiConverterRustBuffer 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeNotHeld: FfiConverterRustBuffer {
+    typealias SwiftType = [NotHeld]
+
+    public static func write(_ value: [NotHeld], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeNotHeld.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [NotHeld] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [NotHeld]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeNotHeld.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeQueuedWrite: FfiConverterRustBuffer {
     typealias SwiftType = [QueuedWrite]
 
@@ -13647,6 +14162,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_embed_text() != 54663) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_core_fetch_kept() != 6556) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_core_file_cache() != 11121) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -13768,6 +14286,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_search_in_folder() != 25178) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_change_view() != 11627) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_create_view() != 19939) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_delete_view() != 58151) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_list_in_view() != 48867) {

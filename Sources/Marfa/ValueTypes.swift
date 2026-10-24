@@ -754,7 +754,7 @@ public struct Status: Sendable, Hashable {
         edges: UInt64 = 0, catalogVersion: UInt64? = nil, instanceId: String? = nil,
         fileCache: FileCache = FileCache(
             setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
-            backupMarkFailure: nil)
+            backupMarkFailure: nil, attachments: nil)
     ) {
         self.serverOrigin = serverOrigin
         self.instanceId = instanceId

@@ -140,6 +140,7 @@ struct LiveQueries {
         told(.refreshed(.unpinned)),
         told(.refreshed(.purged)),
         told(.refreshed(.folderWritten)),
+        told(.refreshed(.viewWritten)),
         told(.refreshed(.catalog)),
     ]
 

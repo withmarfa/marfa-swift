@@ -222,7 +222,7 @@ struct OwnValueTypes {
             instanceId: "instance",
             fileCache: FileCache(
                 setting: .bytes(bytes: 5), budget: 5, held: 3, heldUnreadable: nil, volumeUnreadable: true,
-                backupMarkFailure: "no"))
+                backupMarkFailure: "no", attachments: nil))
         #expect(Marfa.Status(status.core) == status)
         let unheld = Marfa.Status(hydration: .never)
         #expect(Marfa.Status(unheld.core).catalogVersion == nil)

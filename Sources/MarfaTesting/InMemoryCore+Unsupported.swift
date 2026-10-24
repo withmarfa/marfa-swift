@@ -131,6 +131,10 @@ extension InMemoryCore {
         try unsupported("searchInFolder")
     }
 
+    func fetchKept(stop: Stop?) throws -> KeptFetch {
+        try unsupported("fetchKept")
+    }
+
     func fileCache() throws -> FileCache {
         try unsupported("fileCache")
     }
@@ -141,6 +145,18 @@ extension InMemoryCore {
 
     func trimFiles() throws -> UInt64 {
         try unsupported("trimFiles")
+    }
+
+    func createView(settings: JsonObject, idempotencyKey: String?) throws -> ViewRow {
+        try unsupported("createView")
+    }
+
+    func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?) throws -> ViewRow {
+        try unsupported("changeView")
+    }
+
+    func deleteView(id: String, idempotencyKey: String?) throws {
+        throw FakeCopyError.unsupported(call: "deleteView")
     }
 
     func listViews() throws -> Views {
