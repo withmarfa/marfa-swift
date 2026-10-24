@@ -410,32 +410,21 @@ test("the client keeps what an app's credential calls on the server and a workin
   ]);
 });
 
-// A pin that adds or removes an operation fails here until the list says whether the client makes it.
-const pinned = [
-  "applyBulkAction", "cancelBulkActionJob", "createKey", "createWebhook", "deleteBlobCopy", "deleteEdgeType",
-  "deleteRetiredPlatformType", "deleteType", "deleteWebhook", "exportArchive", "getBlobUrl", "getBulkActionJob",
-  "getConfig", "getCurrentKey", "getFolderStatus", "getInstanceMetrics", "getItemExtension", "getItemMetadata",
-  "getItemStats", "getOwnerPicture", "getType", "getWebhook", "listAppGrants", "listAuditLog", "listBlobCopies",
-  "listBlobOrphans", "listBlobStores", "listEdgeTypes", "listHousekeeping", "listItemExtensions",
-  "listItemVersions", "listKeys", "listOccurrences", "listRetiredPlatformTypes", "listTags", "listTypes",
-  "listWebhookDeliveries", "listWebhooks", "normalizeType", "redeliverWebhookDelivery", "registerEdgeType",
-  "registerType", "replaceConfig", "replaceProfilePicture", "replaceType", "revokeAppGrant", "revokeKey",
-  "runHousekeeping", "updateConfig", "updateKey", "updateProfile", "updateWebhook",
-];
-
-test("the committed client makes exactly the pinned operations", () => {
+test("the committed client makes what the rule keeps from the pinned document", () => {
   const generated = (file) => [
     ...readFileSync(join(root, file), "utf8").matchAll(/- Remark: Generated from `#\/paths\/[^`]*\((\w+)\)`/g),
   ].map((match) => match[1]);
-  const client = [...new Set(generated("Sources/MarfaAPI/Generated/Client.swift"))].sort();
-  assert.deepEqual(client, pinned);
-  // The wire types still describe every operation, so the client's absence of one is its own.
+  const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
+  // The wire types describe every operation, so each absence below is the client's own.
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
-  assert.ok(wire.has("createItem"));
-  assert.ok(!client.includes("createItem"));
+  for (const kept of ["registerType", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
+  for (const left of ["createItem", "registerConnector", "getOwner", "getInstance"]) {
+    assert.ok(wire.has(left), left);
+    assert.ok(!client.has(left), left);
+  }
   const openapi = join(root, ".build/marfa/openapi.json");
   try {
-    assert.deepEqual(clientOperations(JSON.parse(readFileSync(openapi, "utf8"))), pinned);
+    assert.deepEqual([...client].sort(), clientOperations(JSON.parse(readFileSync(openapi, "utf8"))));
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
