@@ -857,6 +857,21 @@ public struct Attached: Sendable, Hashable {
     }
 }
 
+/// A file added as an item of its own: the writes that send it, in the order they go out.
+public struct Added: Sendable, Hashable {
+    public var upload: QueuedWrite
+    public var item: QueuedWrite
+
+    public init(upload: QueuedWrite, item: QueuedWrite) {
+        self.upload = upload
+        self.item = item
+    }
+
+    init(_ core: MarfaCore.Added) {
+        self.init(upload: QueuedWrite(core.upload), item: QueuedWrite(core.item))
+    }
+}
+
 /// An attached file, and the write that put its embed in the item's body.
 public struct Embedded: Sendable, Hashable {
     public var attached: Attached

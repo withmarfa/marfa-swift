@@ -89,10 +89,6 @@ extension InMemoryCore {
         try unsupported("search")
     }
 
-    func serverCatalog(stop: Stop?) throws -> ServerCatalog {
-        try unsupported("serverCatalog")
-    }
-
     func thumbnail(id: String) throws -> Thumbnail? {
         try unsupported("items.thumbnail")
     }
