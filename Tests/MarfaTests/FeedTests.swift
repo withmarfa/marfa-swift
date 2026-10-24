@@ -503,3 +503,119 @@ struct Changes {
         try await bounded("close") { await copy.close() }
     }
 }
+
+/// A follow the core stopped because the server's event log let the copy's cursor go.
+@Suite(.timeLimit(.minutes(1)))
+struct ARefill {
+    static let pace = Feed.RefillPace(first: .milliseconds(100), most: .milliseconds(400), settle: .seconds(5))
+    static let agedOut = MarfaCore.MarfaError.CopyExpired(
+        reason: "the event log no longer holds the cursor 3 (oldest retained id 9)", message: "rebuild the copy")
+
+    static func stale() -> FakeCore {
+        let core = FakeCore.writer()
+        core.state.withLock {
+            $0.hydration = .stale
+            $0.slice = (["core.note"], .library, ["core.link"])
+        }
+        return core
+    }
+
+    static func copy(_ core: FakeCore) -> WorkingCopy {
+        WorkingCopy(holder: CoreHolder(core), hasServer: true, refillPace: pace)
+    }
+
+    static func gaps(_ core: FakeCore) -> [Duration] {
+        let began = core.state.withLock { $0.hydrations }
+        return zip(began, began.dropFirst()).map { $0.duration(to: $1) }
+    }
+
+    @Test func aStaleCopyIsFilledAgainOverItsSliceAndItsStreamsAreNotStopped() async throws {
+        let core = Self.stale()
+        let copy = Self.copy(core)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill was told") { heard.all == [refreshed(.hydrated)] }
+        let options = try #require(core.state.withLock { $0.hydrationOptions })
+        #expect(options.types == ["core.note"] && options.tier == .library && options.edgeTypes == ["core.link"])
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.all == [refreshed(.hydrated)])
+        #expect(core.state.withLock { $0.hydrations.count } == 1)
+        await copy.close()
+    }
+
+    @Test func aRefillTheNetworkKeepsFailingIsTriedFurtherApartEachTime() async throws {
+        let core = Self.stale()
+        core.state.withLock {
+            $0.hydrateFails = .Network(message: "offline")
+            $0.hydrateFailsFirst = 4
+        }
+        let copy = Self.copy(core)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill was made in the end", within: 10) {
+            heard.all.last == refreshed(.hydrated)
+        }
+        let gaps = Self.gaps(core)
+        #expect(gaps.count == 4)
+        for (gap, least) in zip(gaps, [100, 200, 400, 400]) {
+            #expect(gap >= .milliseconds(least), "\(gaps)")
+        }
+        #expect(gaps.last.map { $0 < .milliseconds(800) } == true, "the wait grew past its most: \(gaps)")
+        #expect(heard.stops.isEmpty)
+        #expect(heard.all.filter { $0 == refreshed(.unfinished) }.count == 4)
+        await copy.close()
+    }
+
+    @Test func aFollowThatStopsAgainSoonAfterARefillWaitsBeforeTheNext() async throws {
+        let core = Self.stale()
+        let copy = Self.copy(core)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the first refill was told") { heard.all.count == 1 }
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the second refill was told") { heard.all.count == 2 }
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the third refill was told") { heard.all.count == 3 }
+        let gaps = Self.gaps(core)
+        #expect(gaps.count == 2)
+        #expect(gaps.first.map { $0 >= .milliseconds(100) } == true, "\(gaps)")
+        #expect(gaps.last.map { $0 >= .milliseconds(200) } == true, "\(gaps)")
+        #expect(heard.stops.isEmpty)
+        await copy.close()
+    }
+
+    static let needThePerson: [(MarfaCore.Hydration, MarfaCore.MarfaError?, Marfa.MarfaError)] = [
+        // Another instance answers at the address: the copy must be replaced.
+        (
+            .expired, nil,
+            .copyExpired(
+                reason: "the event log no longer holds the cursor 3 (oldest retained id 9)",
+                message: "rebuild the copy")
+        ),
+        // The refill itself is refused: signed out, or a different instance.
+        (.stale, .Unauthorized(code: "invalid_key", message: "no"), .unauthorized(code: "invalid_key", message: "no")),
+        (
+            .stale, .CopyExpired(reason: "instance_changed", message: "m"),
+            .copyExpired(reason: "instance_changed", message: "m")
+        ),
+    ]
+
+    @Test(arguments: needThePerson)
+    func aStopNoRefillCanMendReachesTheAppOnce(
+        hydration: MarfaCore.Hydration, refillFails: MarfaCore.MarfaError?, told: Marfa.MarfaError
+    ) async throws {
+        let core = Self.stale()
+        core.state.withLock {
+            $0.hydration = hydration
+            $0.hydrateFails = refillFails
+        }
+        let copy = Self.copy(core)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the stop reached the app") { heard.stops == [stopped(told)] }
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(heard.stops == [stopped(told)])
+        #expect(core.state.withLock { $0.hydrations.count } == (refillFails == nil ? 0 : 1))
+        await copy.close()
+    }
+}
