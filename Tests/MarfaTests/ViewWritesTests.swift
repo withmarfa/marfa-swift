@@ -5,7 +5,7 @@ import Testing
 @testable import Marfa
 
 @Suite(.timeLimit(.minutes(1))) struct ViewWritesOffline {
-    @Test func settingsWrittenAreReadBackUnchangedForEveryLayoutKind() throws {
+    @Test func settingsWrittenAreReadBackUnchanged() throws {
         let read = try SavedView(
             MarfaCore.ViewRow(id: "view", version: 1, state: .active, settings: ViewsOffline.settings))
         let sent = read.settings.json
@@ -20,21 +20,29 @@ import Testing
         return String(decoding: try encoder.encode(object), as: UTF8.self)
     }
 
-    @Test func aQueryThatNamesNothingSendsNothing() {
-        let settings = ViewSettings(title: "All", layouts: [ViewLayout(id: "rows", kind: .list)])
-        #expect(settings.json == ["title": "All", "query": [:], "layouts": [["id": "rows", "kind": "list"]]])
+    @Test func aViewWithNoSortOrGroupSendsNeither() {
+        let settings = ViewSettings(title: "All")
+        #expect(settings.json == ["title": "All", "query": [:]])
     }
 
     @Test func aChangeSendsOnlyTheSettingsItNames() {
         #expect(ViewSettingsChange().json == [:])
         #expect(ViewSettingsChange(title: "Renamed").json == ["title": "Renamed"])
-        let layouts = [ViewLayout(id: "board", kind: .board, group: ViewGrouping(by: "properties.status"))]
         #expect(
-            ViewSettingsChange(query: ViewQuery(types: ["core.task"]), layouts: layouts).json
+            ViewSettingsChange(
+                query: ViewQuery(types: ["core.task"]), sort: [ViewSort(by: "title", direction: .descending)],
+                group: .set(ViewGrouping(by: "properties.status", hidden: ["done"]))
+            ).json
                 == [
                     "query": ["types": ["core.task"]],
-                    "layouts": [["id": "board", "kind": "board", "group": ["by": "properties.status"]]],
+                    "sort": [["by": "title", "direction": "desc"]],
+                    "group": ["by": "properties.status", "hidden": ["done"]],
                 ])
+    }
+
+    @Test func aChangeClearsASortWithAnEmptyListAndAGroupWithNull() {
+        #expect(ViewSettingsChange(sort: []).json == ["sort": []])
+        #expect(ViewSettingsChange(group: .clear).json == ["group": .null])
     }
 
     @Test func aCopyWithNoServerWritesNoViewAndQueuesNothing() async throws {
@@ -45,7 +53,7 @@ import Testing
                 "createView",
                 {
                     _ = try await copy.createView(
-                        ViewSettings(title: "Offline", layouts: [ViewLayout(id: "rows", kind: .list)]))
+                        ViewSettings(title: "Offline"))
                 }
             ),
             ("changeView", { _ = try await copy.changeView(id, ViewSettingsChange(title: "x"), baseVersion: 1) }),
@@ -71,7 +79,7 @@ import Testing
                 "createView",
                 {
                     _ = try await copy.createView(
-                        ViewSettings(title: "Away", layouts: [ViewLayout(id: "rows", kind: .list)]))
+                        ViewSettings(title: "Away"))
                 }
             ),
             ("changeView", { _ = try await copy.changeView(id, ViewSettingsChange(title: "x"), baseVersion: 1) }),
@@ -103,12 +111,8 @@ extension LiveWorkingCopies {
         static func settings(_ title: String = "Tasks \(UUID().uuidString.lowercased())") -> ViewSettings {
             ViewSettings(
                 title: title, query: ViewQuery(types: ["core.task"], filter: "tags contains \"writes\""),
-                layouts: [
-                    ViewLayout(
-                        id: "board", kind: .board, sort: [ViewSort(by: "properties.title", direction: .ascending)],
-                        group: ViewGrouping(by: "properties.status", order: ["todo", "done"])),
-                    ViewLayout(id: "rows", kind: .list),
-                ])
+                sort: [ViewSort(by: "properties.title", direction: .ascending)],
+                group: ViewGrouping(by: "properties.status", order: ["todo", "done"], hidden: ["later"]))
         }
 
         @Test func aViewIsMadeAndReadBackWithItsSettings() async throws {
@@ -121,11 +125,13 @@ extension LiveWorkingCopies {
             #expect(made.settings == settings)
             #expect(try await copy.items.view(made.id) == made, "held at once")
             #expect(try await copy.items.views().map(\.id).contains(made.id))
-            #expect(try await copy.items.groups(inView: made.id, layout: "board").isEmpty)
+            #expect(try await copy.items.groups(inView: made.id).isEmpty)
 
             let renamed = try await copy.changeView(made.id, ViewSettingsChange(title: "Renamed"), baseVersion: 1)
             #expect(renamed.version == 2 && renamed.settings.title == "Renamed")
-            #expect(renamed.settings.layouts == settings.layouts, "a setting the change did not name stays")
+            #expect(
+                renamed.settings.sort == settings.sort && renamed.settings.group == settings.group,
+                "a setting the change did not name stays")
             #expect(try await copy.items.view(made.id) == renamed)
 
             try await copy.deleteView(made.id)
@@ -136,6 +142,33 @@ extension LiveWorkingCopies {
                 heard.all.contains(Change(origin: .refreshed(.purged), itemId: made.id, edgeId: nil)),
                 "and the delete")
             #expect(try await copy.queue.all().isEmpty, "nothing was queued")
+            await copy.close()
+        }
+
+        @Test func aChangeReplacesTheSortAndTheGroupAndClearsEach() async throws {
+            let copy = try await Self.copy()
+            let made = try await copy.createView(Self.settings())
+
+            let resorted = try await copy.changeView(
+                made.id,
+                ViewSettingsChange(
+                    sort: [ViewSort(by: "created_at", direction: .descending)],
+                    group: .set(ViewGrouping(by: "created_at", bucket: .month))),
+                baseVersion: made.version)
+            #expect(resorted.settings.sort == [ViewSort(by: "created_at", direction: .descending)])
+            #expect(resorted.settings.group == ViewGrouping(by: "created_at", bucket: .month))
+            #expect(resorted.settings.title == made.settings.title, "a setting the change did not name stays")
+
+            let ungrouped = try await copy.changeView(
+                made.id, ViewSettingsChange(group: .clear), baseVersion: resorted.version)
+            #expect(ungrouped.settings.group == nil && ungrouped.settings.sort == resorted.settings.sort)
+            #expect(try await copy.items.view(made.id) == ungrouped, "held at once")
+
+            let unsorted = try await copy.changeView(
+                made.id, ViewSettingsChange(sort: []), baseVersion: ungrouped.version)
+            #expect(unsorted.settings.sort.isEmpty && unsorted.settings.group == nil)
+            #expect(unsorted.settings.query == made.settings.query)
+            try await copy.deleteView(made.id)
             await copy.close()
         }
 
@@ -215,9 +248,9 @@ extension LiveWorkingCopies {
             let views = await LiveQuery(copy, reading: .views)
             let made = try await copy.createView(Self.settings())
             try await eventually("the new view shows") { await views.value.map(\.id).contains(made.id) }
-            let layouts = await LiveQuery(copy, reading: .groups(inView: made.id, layout: "board"))
-            try await eventually("its groups read") { await !layouts.isLoading }
-            #expect(await layouts.error == nil)
+            let groups = await LiveQuery(copy, reading: .groups(inView: made.id))
+            try await eventually("its groups read") { await !groups.isLoading }
+            #expect(await groups.error == nil)
 
             try await copy.deleteView(made.id)
             try await eventually("the deleted view leaves the query") { await !views.value.map(\.id).contains(made.id) }

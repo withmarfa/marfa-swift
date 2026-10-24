@@ -25,7 +25,10 @@ extension Client {
 
     /// Deletes the item type `id`.
     ///
-    /// With `force`, it is deleted even while items of it exist.
+    /// With `force`, it is deleted even while items of it exist. Without it, a type that items or a folder, view or
+    /// webhook still names is refused with `MarfaError.server` of status 409 and the code `type_in_use`, and the
+    /// message lists each setting that names it. Move the items with ``startMove(ofType:to:properties:)``, which
+    /// rewrites those settings, or change the settings first.
     public func delete(itemType id: String, force: Bool = false) async throws {
         try await answer("deleteType") {
             _ = try await deleteType(path: .init(id: id), query: .init(force: force ? ._true : nil)).ok
@@ -41,6 +44,10 @@ extension Client {
     }
 
     /// Registers an edge type, or answers the one already registered with the same definition.
+    ///
+    /// `label` names the source end and `reverseLabel` the target end. The answer's `reverseLabel` is the one
+    /// registered, or its `label` for a type registered with none, which names both ends alike; a type registered
+    /// with no `label` gets one derived from its id.
     public func register(edgeType definition: Components.Schemas.EdgeTypeRegistrationRequest) async throws
         -> Components.Schemas.EdgeType
     {
@@ -67,7 +74,7 @@ extension Client {
 }
 
 /// Reads a success the server answered with a status the generated client did not expect as ``MarfaError``.
-private func answer<T>(_ operation: String, _ read: () async throws -> T) async throws(MarfaError) -> T {
+func answer<T>(_ operation: String, _ read: () async throws -> T) async throws(MarfaError) -> T {
     do {
         return try await read()
     } catch let error as MarfaError {

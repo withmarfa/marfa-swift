@@ -163,7 +163,7 @@ extension InMemoryCore {
         try unsupported("items.view")
     }
 
-    func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?) throws -> Listing {
+    func listInView(id: String, limit: UInt32?, offset: UInt32?) throws -> Listing {
         try unsupported("items.list(inView:)")
     }
 
@@ -171,7 +171,7 @@ extension InMemoryCore {
         try unsupported("search(inView:)")
     }
 
-    func viewGroups(id: String, layout: String, timeZone: String?) throws -> ViewGroups {
+    func viewGroups(id: String, timeZone: String?) throws -> ViewGroups {
         try unsupported("items.groups(inView:)")
     }
 }

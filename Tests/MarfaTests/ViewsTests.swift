@@ -11,28 +11,10 @@ import Testing
             "types": ["core.task"], "tier": "feed", "state": ["archived"], "filter": "tags contains \"x\"",
             "beneath": "parent",
         ],
-        "layouts": [
-            ["id": "rows", "kind": "list"],
-            [
-                "id": "grid", "kind": "table", "title": "Grid", "shown": ["title", "properties.status"],
-                "sort": [
-                    ["by": "properties.status", "direction": "desc"], ["by": "created_at", "direction": "asc"],
-                ],
-            ],
-            [
-                "id": "board", "kind": "board",
-                "group": ["by": "properties.status", "order": ["todo", nil, 3], "hidden": [false]],
-            ],
-            ["id": "cards", "kind": "gallery", "image": "properties.cover"],
-            ["id": "days", "kind": "calendar", "date": "properties.due", "end": "occurred_at"],
-            ["id": "spans", "kind": "timeline", "start": "created_at", "end": "properties.due"],
-            [
-                "id": "chart", "kind": "chart", "x": "tags", "y": ["sum": "properties.hours"],
-                "group": ["by": "created_at", "bucket": "week"],
-            ],
-            ["id": "count", "kind": "chart", "y": "count"],
-            ["id": "places", "kind": "map", "location": "properties.where"],
+        "sort": [
+            ["by": "properties.status", "direction": "desc"], ["by": "created_at", "direction": "asc"],
         ],
+        "group": ["by": "properties.status", "order": ["todo", nil, 3], "hidden": [false]],
     ]
 
     private func read(_ settings: JSONObject = Self.settings) throws -> SavedView {
@@ -40,7 +22,7 @@ import Testing
             MarfaCore.ViewRow(id: "view", version: 4, state: .active, settings: settings))
     }
 
-    @Test func aViewKeepsEveryLayoutKindWithItsOptions() throws {
+    @Test func aViewKeepsItsQuerySortAndGroup() throws {
         let view = try read()
         #expect(view.id == "view" && view.version == 4 && view.state == .active)
         #expect(view.settings.title == "Everything")
@@ -49,67 +31,43 @@ import Testing
                 == ViewQuery(
                     types: ["core.task"], tier: .feed, states: [.archived], filter: "tags contains \"x\"",
                     beneath: "parent"))
-        let layouts = view.settings.layouts
-        #expect(layouts.map(\.id) == ["rows", "grid", "board", "cards", "days", "spans", "chart", "count", "places"])
         #expect(
-            layouts.map(\.kind) == [
-                .list, .table, .board, .gallery(image: "properties.cover"),
-                .calendar(date: "properties.due", end: "occurred_at"),
-                .timeline(start: "created_at", end: "properties.due"),
-                .chart(x: "tags", y: .sum("properties.hours")), .chart(x: nil, y: .count),
-                .map(location: "properties.where"),
-            ])
-        #expect(layouts[1].title == "Grid" && layouts[1].shown == ["title", "properties.status"])
-        #expect(
-            layouts[1].sort == [
+            view.settings.sort == [
                 ViewSort(by: "properties.status", direction: .descending),
                 ViewSort(by: "created_at", direction: .ascending),
             ], "the keys in their declared order")
         #expect(
-            layouts[2].group
+            view.settings.group
                 == ViewGrouping(by: "properties.status", order: ["todo", nil, 3], hidden: [false]))
-        #expect(layouts[6].group == ViewGrouping(by: "created_at", bucket: .week))
+    }
+
+    @Test func aViewWithNoSortReadsEmptyAndOneWithNoGroupReadsNil() throws {
+        let bare = try read(["title": "Bare"])
+        #expect(bare.settings.sort.isEmpty && bare.settings.group == nil)
+        let sorted = try read(["title": "Sorted", "sort": [["by": "title", "direction": "asc"]]])
+        #expect(sorted.settings.sort == [ViewSort(by: "title", direction: .ascending)] && sorted.settings.group == nil)
+        let dated = try read(["title": "Dated", "group": ["by": "created_at", "bucket": "week"]])
+        #expect(dated.settings.group == ViewGrouping(by: "created_at", bucket: .week) && dated.settings.sort.isEmpty)
     }
 
     @Test func aQueryThatNamesNothingListsEveryTypeAndBothTiers() throws {
-        let view = try read(["title": "All", "layouts": [["id": "rows", "kind": "list"]]])
+        let view = try read(["title": "All"])
         #expect(view.settings.query == ViewQuery())
         #expect(view.settings.query.tier == nil && view.settings.query.states == nil)
     }
 
     @Test(
         arguments: [
-            ("a title that is not text", ["title": 3, "layouts": [["id": "a", "kind": "list"]]], "title"),
-            ("no layouts", ["title": "t", "layouts": []], "layouts"),
+            ("a title that is not text", ["title": 3], "title"),
+            ("a sort that is not a list", ["title": "t", "sort": "title"], "sort"),
             (
-                "a layout of an unknown kind", ["title": "t", "layouts": [["id": "a", "kind": "kanban"]]],
-                "layouts.0.kind"
+                "a sort in no direction", ["title": "t", "sort": [["by": "title", "direction": "up"]]],
+                "sort.0.direction"
             ),
-            ("a board with no group", ["title": "t", "layouts": [["id": "a", "kind": "board"]]], "layouts.0.group"),
-            (
-                "a timeline with no end",
-                ["title": "t", "layouts": [["id": "a", "kind": "timeline", "start": "created_at"]]], "layouts.0.end"
-            ),
-            (
-                "a sort in no direction",
-                [
-                    "title": "t",
-                    "layouts": [["id": "a", "kind": "list", "sort": [["by": "title", "direction": "up"]]]],
-                ],
-                "layouts.0.sort.0.direction"
-            ),
-            (
-                "a bucket of no span",
-                [
-                    "title": "t",
-                    "layouts": [["id": "a", "kind": "list", "group": ["by": "created_at", "bucket": "hour"]]],
-                ],
-                "layouts.0.group.bucket"
-            ),
-            (
-                "a tier no view lists",
-                ["title": "t", "query": ["tier": "everywhere"], "layouts": [["id": "a", "kind": "list"]]], "query.tier"
-            ),
+            ("a sort with no field", ["title": "t", "sort": [["direction": "asc"]]], "sort.0.by"),
+            ("a group that is not an object", ["title": "t", "group": "type"], "group"),
+            ("a bucket of no span", ["title": "t", "group": ["by": "created_at", "bucket": "hour"]], "group.bucket"),
+            ("a tier no view lists", ["title": "t", "query": ["tier": "everywhere"]], "query.tier"),
         ] as [(String, JSONObject, String)])
     func settingsThisBuildCannotReadNameTheSettingAndTheView(_ what: String, _ settings: JSONObject, _ path: String)
         throws
@@ -131,7 +89,7 @@ import Testing
         #expect(try await copy.items.view("01a00000-0000-7000-8000-000000000001") == nil)
         for read in [
             { _ = try await copy.items.list(inView: "01a00000-0000-7000-8000-000000000001") },
-            { _ = try await copy.items.groups(inView: "01a00000-0000-7000-8000-000000000001", layout: "main") },
+            { _ = try await copy.items.groups(inView: "01a00000-0000-7000-8000-000000000001") },
             { _ = try await copy.search("x", inView: "01a00000-0000-7000-8000-000000000001") },
         ] as [() async throws -> Void] {
             await #expect {
@@ -182,11 +140,11 @@ final class FillingCore: Core, @unchecked Sendable {
             views: [
                 ViewRow(
                     id: "v", version: 1, state: .active,
-                    settings: ["title": "t", "layouts": [["id": "a", "kind": "list"]]])
+                    settings: ["title": "t"])
             ], completeness: completeness)
     }
 
-    override func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?) throws
+    override func listInView(id: String, limit: UInt32?, offset: UInt32?) throws
         -> MarfaCore.Listing
     {
         Listing(items: [Self.item], completeness: completeness)
@@ -196,8 +154,8 @@ final class FillingCore: Core, @unchecked Sendable {
         Found(hits: [SearchHit(item: Self.item, score: 1, snippet: "")], completeness: completeness)
     }
 
-    override func viewGroups(id: String, layout: String, timeZone: String?) throws -> MarfaCore.ViewGroups {
-        ViewGroups(groups: [ViewGroup(key: .null, count: 1, sum: nil)], completeness: completeness)
+    override func viewGroups(id: String, timeZone: String?) throws -> MarfaCore.ViewGroups {
+        ViewGroups(groups: [ViewGroup(key: .null, count: 1)], completeness: completeness)
     }
 }
 
@@ -212,7 +170,7 @@ final class FillingCore: Core, @unchecked Sendable {
         ("items.views", { shape(try await $0.items.views()) }),
         ("items.list(inView:)", { shape(try await $0.items.list(inView: "v")) }),
         ("search(inView:)", { shape(try await $0.search("x", inView: "v")) }),
-        ("items.groups(inView:)", { shape(try await $0.items.groups(inView: "v", layout: "a")) }),
+        ("items.groups(inView:)", { shape(try await $0.items.groups(inView: "v")) }),
     ]
 
     @Test func aReadFromACopyAHydrationStillFillsAnswersTheRowsThatArrivedMarkedPartial() async throws {
@@ -313,7 +271,11 @@ extension LiveWorkingCopies {
             let view: String
             let ids: [String: String]
 
-            static func make(_ tasks: [(title: String, status: String)]) async throws -> Board {
+            static func make(
+                _ tasks: [(title: String, status: String)],
+                sort: JSONValue = [["by": "properties.title", "direction": "asc"]],
+                hidden: [JSONValue] = []
+            ) async throws -> Board {
                 let tag = "board\(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: ""))"
                 let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
                 _ = try await copy.hydrate(types: ["core.task", "system.view"], tier: .all)
@@ -331,59 +293,83 @@ extension LiveWorkingCopies {
                 let view = try await Live.writeView([
                     "title": .string("Tasks \(tag)"),
                     "query": ["types": ["core.task"], "filter": .string("tags contains \"\(tag)\"")],
-                    "layouts": [
-                        [
-                            "id": "board", "kind": "board",
-                            "group": ["by": "properties.status", "order": ["todo", "done"]],
-                            "sort": [["by": "properties.title", "direction": "asc"]],
-                        ],
-                        ["id": "newest", "kind": "list", "sort": [["by": "properties.title", "direction": "desc"]]],
-                    ],
+                    "sort": sort,
+                    "group": ["by": "properties.status", "order": ["todo", "done"], "hidden": .array(hidden)],
                 ])
                 _ = try await copy.hydrate(types: ["core.task", "system.view"], tier: .all)
                 return Board(copy: copy, tag: tag, view: view, ids: ids)
             }
         }
 
-        @Test func aViewIsReadWithItsLayoutsItemsAndGroups() async throws {
+        @Test func aViewIsReadWithItsSortItemsAndGroups() async throws {
             let board = try await Board.make([("b", "todo"), ("a", "todo"), ("c", "done"), ("d", "later")])
             let copy = board.copy
 
             let view = try #require(try await copy.items.view(board.view))
-            #expect(
-                view.version == 1 && view.state == .active && view.settings.layouts.map(\.id) == ["board", "newest"])
-            #expect(view.settings.layouts[0].kind == .board)
-            #expect(view.settings.layouts[0].group?.order == ["todo", "done"])
+            #expect(view.version == 1 && view.state == .active)
+            #expect(view.settings.sort == [ViewSort(by: "properties.title", direction: .ascending)])
+            #expect(view.settings.group?.order == ["todo", "done"])
             #expect(try await copy.items.views().map(\.id).contains(board.view))
 
             #expect(
-                try await copy.items.list(inView: board.view, layout: "board").map(\.title) == ["a", "b", "c", "d"],
-                "the board's own sort")
+                try await copy.items.list(inView: board.view).map(\.title) == ["a", "b", "c", "d"], "the view's sort")
             #expect(
-                try await copy.items.list(inView: board.view, layout: "newest").map(\.title) == ["d", "c", "b", "a"],
-                "another layout, another sort")
-            #expect(
-                try await copy.items.list(inView: board.view).map(\.title) == ["a", "b", "c", "d"],
-                "no layout is the first")
-            #expect(
-                try await copy.items.list(inView: board.view, layout: "newest", limit: 2, offset: 1).map(\.title)
-                    == ["c", "b"], "a page of the sorted whole")
+                try await copy.items.list(inView: board.view, limit: 2, offset: 1).map(\.title) == ["b", "c"],
+                "a page of the sorted whole")
 
-            let groups = try await copy.items.groups(inView: board.view, layout: "board")
+            let groups = try await copy.items.groups(inView: board.view)
             #expect(groups.map(\.key) == ["todo", "done", "later"], "the named groups first, then the rest")
             #expect(groups.map(\.count) == [2, 1, 1])
-            #expect(groups.allSatisfy { $0.sum == nil })
 
             #expect(try await copy.search("a", inView: board.view).allSatisfy { $0.item.tags.contains(board.tag) })
             try await Live.deleteView(board.view)
             await copy.close()
         }
 
-        @Test func aLiveQueryOverALayoutFollowsItemsEnteringLeavingAndChangingGroup() async throws {
+        @Test func aViewWithNoSortOrGroupListsEveryItemInOneGroup() async throws {
+            let board = try await Board.make([("b", "todo"), ("a", "done")])
+            let bare = try await Live.writeView([
+                "title": .string("Bare \(board.tag)"),
+                "query": ["types": ["core.task"], "filter": .string("tags contains \"\(board.tag)\"")],
+            ])
+            _ = try await board.copy.hydrate(types: ["core.task", "system.view"], tier: .all)
+            let view = try #require(try await board.copy.items.view(bare))
+            #expect(view.settings.sort.isEmpty && view.settings.group == nil)
+            #expect(try await board.copy.items.list(inView: bare).compactMap(\.title).sorted() == ["a", "b"])
+            let groups = try await board.copy.items.groups(inView: bare)
+            #expect(groups.map(\.key) == [.null] && groups.map(\.count) == [2], "the view groups nothing")
+
+            let sorted = try await Live.writeView([
+                "title": .string("Sorted \(board.tag)"),
+                "query": ["types": ["core.task"], "filter": .string("tags contains \"\(board.tag)\"")],
+                "sort": [["by": "properties.title", "direction": "desc"]],
+            ])
+            _ = try await board.copy.hydrate(types: ["core.task", "system.view"], tier: .all)
+            #expect(try await board.copy.items.list(inView: sorted).map(\.title) == ["b", "a"], "sort without group")
+            #expect(try await board.copy.items.view(sorted)?.settings.group == nil)
+            for id in [board.view, bare, sorted] { try await Live.deleteView(id) }
+            await board.copy.close()
+        }
+
+        @Test func aHiddenGroupLeavesTheGroupsAndNotTheItems() async throws {
+            let board = try await Board.make(
+                [("a", "todo"), ("b", "done"), ("c", "later")], hidden: ["done"])
+            let copy = board.copy
+            let view = try #require(try await copy.items.view(board.view))
+            #expect(view.settings.group?.hidden == ["done"])
+            #expect(try await copy.items.groups(inView: board.view).map(\.key) == ["todo", "later"])
+            #expect(
+                try await copy.items.list(inView: board.view).map(\.title) == ["a", "b", "c"],
+                "the witness: the view still lists the hidden group's items")
+            try await Live.deleteView(board.view)
+            await copy.close()
+        }
+
+        @Test func aLiveQueryOverAViewFollowsItemsEnteringLeavingAndChangingGroup() async throws {
             let board = try await Board.make([("a", "todo"), ("b", "todo"), ("c", "done")])
             let copy = board.copy
-            let groups = await LiveQuery(copy, reading: .groups(inView: board.view, layout: "board"))
-            let items = await LiveQuery(copy, reading: .list(inView: board.view, layout: "board"))
+            let groups = await LiveQuery(copy, reading: .groups(inView: board.view))
+            let items = await LiveQuery(copy, reading: .list(inView: board.view))
             func counts() async -> [String: UInt64] {
                 await Dictionary(
                     uniqueKeysWithValues: groups.value.compactMap { group in
@@ -402,7 +388,7 @@ extension LiveWorkingCopies {
                     type: "core.task", properties: ["title": "d", "status": "todo"], tags: [board.tag], tier: .library))
             let enteredId = try #require(entered.itemId)
             try await eventually("an item entering shows in its group") { await counts() == ["todo": 3, "done": 1] }
-            try await eventually("and in the layout's sort") { await items.value.map(\.title) == ["a", "b", "c", "d"] }
+            try await eventually("and in the view's sort") { await items.value.map(\.title) == ["a", "b", "c", "d"] }
 
             let moved = try #require(board.ids["a"])
             _ = try await copy.items.update(
@@ -418,7 +404,7 @@ extension LiveWorkingCopies {
             try await eventually("an item leaving the view leaves its group") {
                 await counts() == ["todo": 1, "done": 2]
             }
-            try await eventually("and the layout") { await items.value.map(\.title) == ["a", "b", "c"] }
+            try await eventually("and the view") { await items.value.map(\.title) == ["a", "b", "c"] }
 
             _ = try await copy.queue.drain()
             let other = try await WorkingCopy.open(store: Live.store(), server: Live.server)
@@ -443,6 +429,33 @@ extension LiveWorkingCopies {
             await copy.close()
         }
 
+        @Test func aViewFilteredByABackrefIsAnsweredWhereTheCopyHoldsThatEdgeTypeWhole() async throws {
+            let board = try await Board.make([("parent", "todo"), ("child", "todo"), ("loner", "todo")])
+            let copy = board.copy
+            _ = try await copy.edges.create(
+                from: try #require(board.ids["parent"]), to: try #require(board.ids["child"]), type: "parent-of")
+            _ = try await copy.queue.drain()
+            let view = try await Live.writeView([
+                "title": .string("Children \(board.tag)"),
+                "query": [
+                    "types": ["core.task"],
+                    "filter": .string("tags contains \"\(board.tag)\" AND backref[parent-of] exists"),
+                ],
+            ])
+            let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            _ = try await fresh.hydrate(types: ["core.task", "system.view"], tier: .all)
+            await #expect {
+                _ = try await fresh.items.list(inView: view)
+            } throws: { error in
+                if case .invalid = error as? Marfa.MarfaError { true } else { false }
+            }
+            _ = try await fresh.hydrate(types: ["core.task", "system.view"], tier: .all, edgeTypes: ["parent-of"])
+            #expect(try await fresh.items.list(inView: view).compactMap(\.title) == ["child"])
+            for id in [view, board.view] { try await Live.deleteView(id) }
+            await fresh.close()
+            await copy.close()
+        }
+
         @Test func aViewTheCopyCannotAnswerWholeIsRefusedWithItsReason() async throws {
             let board = try await Board.make([("a", "todo")])
             let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
@@ -456,7 +469,7 @@ extension LiveWorkingCopies {
             }
             await #expect(performing: { _ = try await copy.items.list(inView: board.view) }, throws: reason)
             await #expect(
-                performing: { _ = try await copy.items.groups(inView: board.view, layout: "board") }, throws: reason)
+                performing: { _ = try await copy.items.groups(inView: board.view) }, throws: reason)
             await #expect(performing: { _ = try await copy.search("a", inView: board.view) }, throws: reason)
             #expect(try await copy.items.view(board.view) != nil, "the view itself is still read")
 
@@ -464,15 +477,6 @@ extension LiveWorkingCopies {
             #expect(
                 try await copy.items.list(inView: board.view).map(\.title) == ["a"], "the witness: held whole, answered"
             )
-            await #expect {
-                _ = try await copy.items.list(inView: board.view, layout: "missing")
-            } throws: { error in
-                if case .invalid(let message) = error as? Marfa.MarfaError {
-                    message.contains("missing")
-                } else {
-                    false
-                }
-            }
             try await Live.deleteView(board.view)
             await copy.close()
             await board.copy.close()

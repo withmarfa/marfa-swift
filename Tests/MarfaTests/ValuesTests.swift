@@ -275,7 +275,8 @@ struct CatalogTypes {
 
     @Test func anEdgeTypeArrivesWithItsReverseNameAndTheEndThatWritesIt() {
         let core = MarfaCore.EdgeType(
-            id: "mentor-of", label: "Mentor of", description: nil, cardinality: "one-to-many",
+            id: "mentor-of", label: "Mentor of", reverseLabel: "Mentored by", description: nil,
+            cardinality: "one-to-many",
             reverseName: "mentored-by", writtenAt: .target, sourceTypeConstraints: ["core.person"],
             targetTypeConstraints: ["*"], cascadeOnDelete: "block",
             properties: [Self.field("since", declaredBy: "mentor-of", definition: ["type": "string"])],
@@ -284,7 +285,8 @@ struct CatalogTypes {
         #expect(
             type
                 == Marfa.EdgeType(
-                    id: "mentor-of", label: "Mentor of", cardinality: "one-to-many", reverseName: "mentored-by",
+                    id: "mentor-of", label: "Mentor of", reverseLabel: "Mentored by", cardinality: "one-to-many",
+                    reverseName: "mentored-by",
                     writtenAt: .target, sourceTypeConstraints: ["core.person"], targetTypeConstraints: ["*"],
                     cascadeOnDelete: "block",
                     properties: [
@@ -292,6 +294,13 @@ struct CatalogTypes {
                             name: "since", type: "string", required: true, description: "d",
                             declaredBy: "mentor-of", definition: ["type": "string"])
                     ]))
+    }
+
+    @Test func anEdgeTypeWithNoReverseLabelNamesBothEndsByItsLabel() {
+        let type = Marfa.EdgeType(id: "related-to", label: "Related to", cardinality: "many-to-many")
+        #expect(type.reverseLabel == "Related to")
+        let one = Marfa.EdgeType(id: "parent-of", label: "Children", reverseLabel: "Parent", cardinality: "one-to-many")
+        #expect(one.reverseLabel == "Parent", "the witness: a registered reverse label stays")
     }
 
     @Test func aFreshCopyReadsTheBuiltInCatalogWithoutHydration() async throws {

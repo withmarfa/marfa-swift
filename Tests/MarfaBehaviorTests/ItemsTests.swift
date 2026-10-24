@@ -86,10 +86,10 @@ struct ItemsOffline {
             if case .unknownType? = error as? MarfaError { true } else { false }
         }
         await #expect {
-            _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "no body"]))
+            _ = try await copy.items.create(Draft(type: "core.task", properties: ["notes": "no title"]))
         } throws: { error in
             if case .validation("invalid_properties", let message)? = error as? MarfaError {
-                message.contains("body")
+                message.contains("title")
             } else {
                 false
             }
@@ -382,7 +382,9 @@ struct ItemsOffline {
         let copy = try await kind.open()
         let note = try await copy.catalog.itemType("core.note")
         #expect(note.id == "core.note" && note.titleField == "title" && note.bodyField == "body")
-        #expect(note.fields.first { $0.name == "body" }?.required == true)
+        #expect(note.fields.first { $0.name == "body" }?.required == false, "a note needs no body")
+        let task = try await copy.catalog.itemType("core.task")
+        #expect(task.fields.first { $0.name == "title" }?.required == true, "the witness: a task needs its title")
         let ids = try await copy.catalog.itemTypes().map(\.id)
         #expect(ids == ids.sorted() && ids.contains("core.note"))
         let parentOf = try await copy.catalog.edgeType("parent-of")

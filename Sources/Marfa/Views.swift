@@ -1,20 +1,20 @@
 import Foundation
 import MarfaCore
 
-/// What one group of a layout holds: its `key`, how many items are in it, and for a chart that sums a property, the
-/// `sum`.
+/// What one group of a view holds: its `key` and how many items are in it.
 ///
-/// The key is the value the layout groups by: a string, number or boolean, a bucket's first date as `YYYY-MM-DD`, an
+/// The key is the value the view groups by: a string, number or boolean, a bucket's first date as `YYYY-MM-DD`, an
 /// item id for an edge group, or `null` for the items that have none. An item with two tags is in both tag groups.
 public typealias ViewGroup = MarfaCore.ViewGroup
 
-/// A `system.view`: a saved list of items, and the layouts that show it.
+/// A `system.view`: a saved list of items, with the order and grouping every app shows them in.
 ///
 /// It is not called `View`, which would be ambiguous with SwiftUI's in every file that imports both.
 ///
-/// A view says which items to list in its ``ViewSettings/query`` and how each layout shows them, so every app shows
-/// the same list the same way. Read one with ``Items/view(_:)``, its items with ``Items/list(inView:layout:limit:offset:)``
-/// and its groups with ``Items/groups(inView:layout:timeZone:)``. ``WorkingCopy/createView(_:idempotencyKey:)``,
+/// A view says which items to list in its ``ViewSettings/query``, in what order in its ``ViewSettings/sort`` and how
+/// they group in its ``ViewSettings/group``. How an app draws them is the app's own. Read one with
+/// ``Items/view(_:)``, its items with ``Items/list(inView:limit:offset:)`` and its groups with
+/// ``Items/groups(inView:timeZone:)``. ``WorkingCopy/createView(_:idempotencyKey:)``,
 /// ``WorkingCopy/changeView(_:_:baseVersion:idempotencyKey:)`` and ``WorkingCopy/deleteView(_:idempotencyKey:)``
 /// write one.
 public struct SavedView: Sendable, Hashable, Identifiable {
@@ -32,27 +32,31 @@ public struct SavedView: Sendable, Hashable, Identifiable {
     }
 }
 
-/// What a view lists, and how its layouts show it.
+/// What a view lists, in what order, and how it groups.
 public struct ViewSettings: Sendable, Hashable {
     public var title: String
     public var query: ViewQuery
-    /// In order, and at least one.
-    public var layouts: [ViewLayout]
+    /// The keys the view sorts by, first key first; empty keeps the server's default order.
+    public var sort: [ViewSort]
+    /// `nil` groups nothing.
+    public var group: ViewGrouping?
 
-    public init(title: String, query: ViewQuery = ViewQuery(), layouts: [ViewLayout]) {
+    public init(title: String, query: ViewQuery = ViewQuery(), sort: [ViewSort] = [], group: ViewGrouping? = nil) {
         self.title = title
         self.query = query
-        self.layouts = layouts
+        self.sort = sort
+        self.group = group
     }
 
     init(_ core: JSONObject, of view: String) throws {
         let reader = ViewReader(view: view)
         title = try reader.string(core["title"], "title")
         query = try ViewQuery(reader.optionalObject(core["query"], "query"), reader)
-        layouts = try reader.array(core["layouts"], "layouts").enumerated().map { index, layout in
-            try ViewLayout(reader.object(layout, "layouts.\(index)"), reader, path: "layouts.\(index)")
-        }
-        guard !layouts.isEmpty else { throw reader.refusal("layouts", "holds no layout") }
+        sort =
+            try reader.optionalArray(core["sort"], "sort")?.enumerated().map { index, sort in
+                try ViewSort(reader.object(sort, "sort.\(index)"), reader, path: "sort.\(index)")
+            } ?? []
+        group = try reader.optionalObject(core["group"], "group").map { try ViewGrouping($0, reader, path: "group") }
     }
 }
 
@@ -105,95 +109,7 @@ public struct ViewQuery: Sendable, Hashable {
     }
 }
 
-/// One way a view shows its items.
-///
-/// A layout never narrows which items a view lists.
-public struct ViewLayout: Sendable, Hashable, Identifiable {
-    /// Unique in the view, which an app keeps to reopen the layout.
-    public var id: String
-    public var kind: Kind
-    /// `nil` where an app names the layout by its kind.
-    public var title: String?
-    /// The keys the layout sorts by, first key first.
-    public var sort: [ViewSort]
-    public var group: ViewGrouping?
-    /// The fields the layout shows, in order.
-    public var shown: [String]
-
-    /// How a layout shows items.
-    ///
-    /// A kind carries the options it takes. Each option is a field: an own field such as `created_at` or `tags`,
-    /// or `properties.<name>`.
-    public enum Kind: Sendable, Hashable {
-        case list
-        case table
-        /// Columns by the layout's ``ViewLayout/group``, which a board always has.
-        case board
-        /// Cards, with the property that holds each card's image.
-        case gallery(image: String?)
-        /// Items placed on `date`, as spans to `end` where both are set.
-        case calendar(date: String?, end: String?)
-        /// Items as spans from `start` to `end`.
-        case timeline(start: String, end: String)
-        /// Items along `x`, measured by `y`.
-        case chart(x: String?, y: ViewMeasure?)
-        /// Items at the place a property holds.
-        case map(location: String?)
-    }
-
-    public init(
-        id: String, kind: Kind, title: String? = nil, sort: [ViewSort] = [], group: ViewGrouping? = nil,
-        shown: [String] = []
-    ) {
-        self.id = id
-        self.kind = kind
-        self.title = title
-        self.sort = sort
-        self.group = group
-        self.shown = shown
-    }
-
-    fileprivate init(_ core: JSONObject, _ reader: ViewReader, path: String) throws {
-        let kindName = try reader.string(core["kind"], "\(path).kind")
-        let kind: Kind
-        switch kindName {
-        case "list": kind = .list
-        case "table": kind = .table
-        case "board": kind = .board
-        case "gallery": kind = .gallery(image: try reader.optionalString(core["image"], "\(path).image"))
-        case "calendar":
-            kind = .calendar(
-                date: try reader.optionalString(core["date"], "\(path).date"),
-                end: try reader.optionalString(core["end"], "\(path).end"))
-        case "timeline":
-            kind = .timeline(
-                start: try reader.string(core["start"], "\(path).start"),
-                end: try reader.string(core["end"], "\(path).end"))
-        case "chart":
-            kind = .chart(
-                x: try reader.optionalString(core["x"], "\(path).x"),
-                y: try core["y"].map { try ViewMeasure($0, reader, path: "\(path).y") })
-        case "map": kind = .map(location: try reader.optionalString(core["location"], "\(path).location"))
-        default: throw reader.refusal("\(path).kind", "is \(kindName)")
-        }
-        let group = try reader.optionalObject(core["group"], "\(path).group").map {
-            try ViewGrouping($0, reader, path: "\(path).group")
-        }
-        if case .board = kind, group == nil { throw reader.refusal("\(path).group", "is missing from a board") }
-        self.init(
-            id: try reader.string(core["id"], "\(path).id"), kind: kind,
-            title: try reader.optionalString(core["title"], "\(path).title"),
-            sort: try reader.optionalArray(core["sort"], "\(path).sort")?.enumerated().map { index, sort in
-                try ViewSort(reader.object(sort, "\(path).sort.\(index)"), reader, path: "\(path).sort.\(index)")
-            } ?? [],
-            group: group,
-            shown: try reader.optionalArray(core["shown"], "\(path).shown")?.map {
-                try reader.string($0, "\(path).shown")
-            } ?? [])
-    }
-}
-
-/// One key a layout sorts by.
+/// One key a view sorts by.
 public struct ViewSort: Sendable, Hashable {
     /// A field: an own field such as `created_at` or `tags`, or `properties.<name>`.
     public var by: String
@@ -214,7 +130,7 @@ public struct ViewSort: Sendable, Hashable {
     }
 }
 
-/// How a layout groups its items.
+/// How a view groups its items.
 public struct ViewGrouping: Sendable, Hashable {
     /// A field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
     public var by: String
@@ -222,9 +138,9 @@ public struct ViewGrouping: Sendable, Hashable {
     public var bucket: Bucket?
     /// The keys whose groups come first, in this order.
     public var order: [JSONValue]
-    /// The keys whose groups the layout leaves out.
+    /// The keys whose groups the view leaves out.
     ///
-    /// The layout still lists their items.
+    /// The view still lists their items.
     public var hidden: [JSONValue]
 
     public enum Bucket: Sendable, Hashable, CaseIterable {
@@ -256,22 +172,6 @@ public struct ViewGrouping: Sendable, Hashable {
             by: try reader.string(core["by"], "\(path).by"), bucket: bucket,
             order: try reader.optionalArray(core["order"], "\(path).order") ?? [],
             hidden: try reader.optionalArray(core["hidden"], "\(path).hidden") ?? [])
-    }
-}
-
-/// What a chart measures.
-public enum ViewMeasure: Sendable, Hashable {
-    /// The number of items in each group.
-    case count
-    /// The total of a number property, `properties.<name>`, in each group.
-    case sum(String)
-
-    fileprivate init(_ core: JSONValue, _ reader: ViewReader, path: String) throws {
-        if case .string("count") = core {
-            self = .count
-        } else {
-            self = .sum(try reader.string(reader.object(core, path)["sum"], "\(path).sum"))
-        }
     }
 }
 
@@ -351,44 +251,41 @@ extension Items {
         try await holder.run { core in try core.view(id: id).map(SavedView.init) }
     }
 
-    /// The items a view lists, in the order of one of its layouts, read from the copy alone.
+    /// The items a view lists, in the order of its ``ViewSettings/sort``, read from the copy alone.
     ///
-    /// `layout` is a layout's id, and `nil` is the view's first layout. Items that tie on every sort key follow in
-    /// ascending id order.
+    /// Items that tie on every sort key follow in ascending id order.
     ///
     /// Throws `MarfaError.invalid`, naming the reason, where the copy cannot answer the whole view: a type or tier
     /// the query lists that the slice does not hold, `beneath` without `parent-of` held whole, a `backref` in the
-    /// filter, a revoked view, an item that is not a `system.view`, or a `layout` the view does not have. While a
+    /// filter of an edge type the slice does not hold whole, a revoked view, or an item that is not a `system.view`. While a
     /// hydration is still filling the copy the list holds the items that have arrived, and `completeness` says
     /// `.partial`. Throws `MarfaError.notFound` with the code `not_held` for a view the copy does not hold; hydrate
     /// with `system.view` in the slice, or pin it.
-    public func list(inView id: String, layout: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil)
-        async throws -> Rows<Item>
-    {
+    public func list(inView id: String, limit: UInt32? = nil, offset: UInt32? = nil) async throws -> Rows<Item> {
         try await holder.run { core in
-            try core.listInView(id: id, layout: layout, limit: limit, offset: offset).answer
+            try core.listInView(id: id, limit: limit, offset: offset).answer
         }
     }
 
-    /// The groups of one of a view's layouts, with each group's count, in the order the layout gives.
+    /// The groups of a view, with each group's count, in the order the view gives.
     ///
     /// The groups its ``ViewGrouping/order`` names come first, in that order, then the others by ascending key with
-    /// the `null` group last, and the groups in ``ViewGrouping/hidden`` are left out. A layout that groups nothing
-    /// answers one `null` group of every item. When the layout charts a sum, each group carries it.
+    /// the `null` group last, and the groups in ``ViewGrouping/hidden`` are left out. A view that groups nothing
+    /// answers one `null` group of every item.
     ///
     /// Date groups follow the calendar of `timeZone`, or of the device's when it is `nil`. Throws as
-    /// ``list(inView:layout:limit:offset:)`` does, and `MarfaError.invalid` for a group by `edge[<type>]` or
+    /// ``list(inView:limit:offset:)`` does, and `MarfaError.invalid` for a group by `edge[<type>]` or
     /// `backref[<type>]` of an edge type the slice does not hold whole: pass it as an `edgeTypes` of `hydrate`.
-    public func groups(inView id: String, layout: String, timeZone: TimeZone? = nil) async throws -> Rows<ViewGroup> {
+    public func groups(inView id: String, timeZone: TimeZone? = nil) async throws -> Rows<ViewGroup> {
         try await holder.run { core in
-            let groups = try core.viewGroups(id: id, layout: layout, timeZone: timeZone?.identifier)
+            let groups = try core.viewGroups(id: id, timeZone: timeZone?.identifier)
             return Rows(groups.groups, completeness: groups.completeness)
         }
     }
 }
 
 extension WorkingCopy {
-    /// A full-text search narrowed to what the view lists; it throws as ``Items/list(inView:layout:limit:offset:)``
+    /// A full-text search narrowed to what the view lists; it throws as ``Items/list(inView:limit:offset:)``
     /// throws.
     public func search(_ query: String, inView id: String, limit: Int = 20) async throws -> Rows<SearchHit> {
         try await holder.run { core in
@@ -412,25 +309,23 @@ extension Reading where Value == SavedView? {
 }
 
 extension Reading where Value == Rows<Item> {
-    /// The items a view lists in one layout's order, as `items.list(inView:layout:limit:offset:)` answers them.
+    /// The items a view lists in its order, as `items.list(inView:limit:offset:)` answers them.
     ///
     /// The query reads again when an item enters or leaves the view, or changes in a way that moves it.
-    public static func list(inView id: String, layout: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil)
-        -> Reading
-    {
+    public static func list(inView id: String, limit: UInt32? = nil, offset: UInt32? = nil) -> Reading {
         Reading(placeholder: .unread) { copy in
-            try await copy.items.list(inView: id, layout: layout, limit: limit, offset: offset)
+            try await copy.items.list(inView: id, limit: limit, offset: offset)
         }
     }
 }
 
 extension Reading where Value == Rows<ViewGroup> {
-    /// The groups of a view's layout with their counts, as `items.groups(inView:layout:timeZone:)` answers them.
+    /// The groups of a view with their counts, as `items.groups(inView:timeZone:)` answers them.
     ///
     /// The query reads again when an item enters or leaves the view, or changes group.
-    public static func groups(inView id: String, layout: String, timeZone: TimeZone? = nil) -> Reading {
+    public static func groups(inView id: String, timeZone: TimeZone? = nil) -> Reading {
         Reading(placeholder: .unread) { copy in
-            try await copy.items.groups(inView: id, layout: layout, timeZone: timeZone)
+            try await copy.items.groups(inView: id, timeZone: timeZone)
         }
     }
 }

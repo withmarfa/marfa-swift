@@ -33,10 +33,11 @@ public func checkImports() {
     let edgeEdit = EdgeEdit(baseVersion: edge.version, move: .source("third"))
     precondition(queued.id == "write" && report.unsent == 0 && error.code() == "invalid")
     precondition(slice == .all && edgeEdit.move == .source("third"))
-    let group = ViewGroup(key: .string("todo"), count: 2, sum: nil)
-    let layout = ViewLayout(id: "board", kind: .board, group: ViewGrouping(by: "properties.status", bucket: .day))
-    let settings = ViewSettings(title: "Tasks", query: ViewQuery(types: ["core.task"], tier: .all), layouts: [layout])
-    precondition(group.count == 2 && settings.layouts.first?.kind == .board)
+    let group = ViewGroup(key: .string("todo"), count: 2)
+    let settings = ViewSettings(
+        title: "Tasks", query: ViewQuery(types: ["core.task"], tier: .all),
+        sort: [ViewSort(by: "title", direction: .ascending)], group: ViewGrouping(by: "properties.status"))
+    precondition(group.count == 2 && settings.group?.by == "properties.status")
     let notHeld = NotHeldAttachments(reason: NotHeldReason.rateLimited, attachments: 2, bytes: 9, unstated: 1)
     let kept = KeptAttachments(
         held: 1, heldBytes: 4, partialBytes: 0, notHeld: 2, notHeldBytes: 9, notHeldByReason: [notHeld])
