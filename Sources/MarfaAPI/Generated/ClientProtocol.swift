@@ -33,6 +33,20 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /occurrences`.
     /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)`.
     func listOccurrences(_ input: Operations.ListOccurrences.Input) async throws -> Operations.ListOccurrences.Output
+    /// Get a bulk-action job
+    ///
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of `instance.read`, can read it.
+    ///
+    /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
+    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
+    func getBulkActionJob(_ input: Operations.GetBulkActionJob.Input) async throws -> Operations.GetBulkActionJob.Output
+    /// Cancel a bulk-action job
+    ///
+    /// Cancels a bulk-action job and returns it. Items the job already processed stay processed. A job that has already finished is left as it is.
+    ///
+    /// - Remark: HTTP `POST /items/bulk-actions/jobs/{id}/cancel`.
+    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)`.
+    func cancelBulkActionJob(_ input: Operations.CancelBulkActionJob.Input) async throws -> Operations.CancelBulkActionJob.Output
     /// Get item metadata
     ///
     /// Returns an item's metadata: its tags and the extension namespaces you can read. To read metadata for many items, use `include=metadata` on `GET /items`.
@@ -91,11 +105,18 @@ public protocol ClientProtocol: Sendable {
     func replaceType(_ input: Operations.ReplaceType.Input) async throws -> Operations.ReplaceType.Output
     /// Delete a type
     ///
-    /// Deletes an unused type. A key can use `force=true` to keep existing items without their type; new writes then fail until it is registered again. A recent owner session or local command can remove only unused types.
+    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
     func deleteType(_ input: Operations.DeleteType.Input) async throws -> Operations.DeleteType.Output
+    /// Move items to another type
+    ///
+    /// Moves every item of the type you can see, in any state, to another type as a bulk-action job. Once none remains, it rewrites the folders, views and webhooks that name the type. `dry_run: true` returns what it would do.
+    ///
+    /// - Remark: HTTP `POST /types/{id}/move`.
+    /// - Remark: Generated from `#/paths//types/{id}/move/post(moveType)`.
+    func moveType(_ input: Operations.MoveType.Input) async throws -> Operations.MoveType.Output
     /// Normalize a type definition
     ///
     /// Normalizes a candidate definition and returns its declared form, the registered declared definition and the registered resolved definition. It does not register or replace a type.
@@ -112,7 +133,7 @@ public protocol ClientProtocol: Sendable {
     func listEdgeTypes(_ input: Operations.ListEdgeTypes.Input) async throws -> Operations.ListEdgeTypes.Output
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints and may rename its labels, without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
@@ -406,6 +427,36 @@ extension ClientProtocol {
             headers: headers
         ))
     }
+    /// Get a bulk-action job
+    ///
+    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of `instance.read`, can read it.
+    ///
+    /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
+    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
+    public func getBulkActionJob(
+        path: Operations.GetBulkActionJob.Input.Path,
+        headers: Operations.GetBulkActionJob.Input.Headers = .init()
+    ) async throws -> Operations.GetBulkActionJob.Output {
+        try await getBulkActionJob(Operations.GetBulkActionJob.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Cancel a bulk-action job
+    ///
+    /// Cancels a bulk-action job and returns it. Items the job already processed stay processed. A job that has already finished is left as it is.
+    ///
+    /// - Remark: HTTP `POST /items/bulk-actions/jobs/{id}/cancel`.
+    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)`.
+    public func cancelBulkActionJob(
+        path: Operations.CancelBulkActionJob.Input.Path,
+        headers: Operations.CancelBulkActionJob.Input.Headers = .init()
+    ) async throws -> Operations.CancelBulkActionJob.Output {
+        try await cancelBulkActionJob(Operations.CancelBulkActionJob.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Get item metadata
     ///
     /// Returns an item's metadata: its tags and the extension namespaces you can read. To read metadata for many items, use `include=metadata` on `GET /items`.
@@ -518,7 +569,7 @@ extension ClientProtocol {
     }
     /// Delete a type
     ///
-    /// Deletes an unused type. A key can use `force=true` to keep existing items without their type; new writes then fail until it is registered again. A recent owner session or local command can remove only unused types.
+    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -531,6 +582,23 @@ extension ClientProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// Move items to another type
+    ///
+    /// Moves every item of the type you can see, in any state, to another type as a bulk-action job. Once none remains, it rewrites the folders, views and webhooks that name the type. `dry_run: true` returns what it would do.
+    ///
+    /// - Remark: HTTP `POST /types/{id}/move`.
+    /// - Remark: Generated from `#/paths//types/{id}/move/post(moveType)`.
+    public func moveType(
+        path: Operations.MoveType.Input.Path,
+        headers: Operations.MoveType.Input.Headers = .init(),
+        body: Operations.MoveType.Input.Body
+    ) async throws -> Operations.MoveType.Output {
+        try await moveType(Operations.MoveType.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Normalize a type definition
@@ -559,7 +627,7 @@ extension ClientProtocol {
     }
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints and may rename its labels, without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
