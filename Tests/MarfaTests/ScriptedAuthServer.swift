@@ -10,6 +10,8 @@ import Synchronization
 final class ScriptedAuthServer: Sendable {
     indirect enum Reply: Sendable {
         case json(Int, [String: any Sendable], headers: [String: String] = [:])
+        /// Answers `body` as it is, with only the headers named.
+        case raw(Int, Data, headers: [String: String] = [:])
         /// Never answers, as a server that has gone quiet.
         case silence
         case failure(URLError.Code)
@@ -197,10 +199,11 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(code))
         case .json(let status, let object, let extra):
             let data = (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
+            deliver(.raw(status, data, headers: ["Content-Type": "application/json"].merging(extra) { $1 }), for: url)
+        case .raw(let status, let data, let headers):
             guard
                 let response = HTTPURLResponse(
-                    url: url, statusCode: status, httpVersion: "HTTP/1.1",
-                    headerFields: ["Content-Type": "application/json"].merging(extra) { $1 })
+                    url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)
             else {
                 client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
                 return

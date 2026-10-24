@@ -116,6 +116,21 @@ When the instance ends the sign-in, for example because the owner revoked the ap
 
 To share the sign-in with your app's extensions, pass `keychain: Keychain(accessGroup:)` with an access group that every target's entitlements name.
 
+## Call the server directly
+
+Some calls only the instance can answer, such as registering an item type, managing keys and webhooks, or reading the audit log. The `MarfaAPI` product provides `Client`, which sends these calls straight to the instance with the server's key or sign-in. Add it to your app's target next to `Marfa`:
+
+```swift
+import MarfaAPI
+
+let api = Client(server)
+let title = Components.Schemas.FieldDefinition(_type: .string, required: true)
+_ = try await api.register(
+    itemType: .init(fields: .init(additionalProperties: ["title": title]), id: "app.example.entry"))
+```
+
+`Client` makes only the calls that the working copy does not make itself, so it has no methods for reading or writing items. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect.
+
 ## Test and preview
 
 The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. Its module compiles empty in a release build, so nothing from it ships; wrap its uses in `#if DEBUG`. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:

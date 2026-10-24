@@ -1,4 +1,5 @@
 import Foundation
+import MarfaCore
 
 /// A working copy holds the key in memory and never writes it to its store.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
@@ -24,7 +25,7 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// Throws ``SignInError/otherServer`` when `url` is not on the server the credential is for, and
     /// ``SignInError/notSignedIn`` when the keychain no longer holds the sign-in.
     public init(url: URL, credential: Credential) throws {
-        guard origin(of: url) == credential.place.account else { throw SignInError.otherServer }
+        guard Marfa.origin(of: url) == credential.place.account else { throw SignInError.otherServer }
         guard let token = try credential.accessToken() else { throw SignInError.notSignedIn }
         self.url = url
         key = token
@@ -82,4 +83,40 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     public var description: String { "Server(\(url.absoluteString))" }
     public var debugDescription: String { description }
     public var customMirror: Mirror { Mirror(self, children: ["url": url]) }
+}
+
+extension Server {
+    /// The origin a refusal or a redirect names: the server's scheme, host and port.
+    package var origin: String { Marfa.origin(of: url) ?? url.absoluteString }
+
+    /// The session a server made from a credential signs in through, which its requests share.
+    package var signInSession: URLSession? { credential?.transport.session }
+
+    /// The token a request sends now, as ``openingToken()`` reads it, refused as the working copy refuses it.
+    package func currentToken() throws(MarfaError) -> String {
+        do {
+            return try openingToken()
+        } catch SignInError.notSignedIn {
+            throw .signedOut(origin: origin, message: "the app is not signed in to \(origin)")
+        } catch {
+            throw .noKeychain(message: "the keychain could not be read: \(error)")
+        }
+    }
+
+    /// A token to send in place of `refused`, which the server refused, or `nil` for a server made from a key.
+    package func renewedToken(refused: String) async throws(MarfaError) -> String? {
+        guard let credential else { return nil }
+        let renewer = TokenRenewer(credential)
+        do {
+            return try await background { try renewer.renew(refused: refused) }
+        } catch RenewalError.Ended(let message) {
+            throw .signedOut(origin: origin, message: message)
+        } catch RenewalError.Unavailable(let message) {
+            throw .network(message: message)
+        } catch RenewalError.Failed(let message) {
+            throw .invalid(message: message)
+        } catch {
+            throw .invalid(message: "the sign-in to \(origin) was not renewed: \(error)")
+        }
+    }
 }
