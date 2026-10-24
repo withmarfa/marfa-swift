@@ -398,7 +398,7 @@ final class Feed: Sendable {
             }
         } catch let error as KeyChanged {
             throw error
-        } catch where !admitted() {
+        } catch  where !admitted() {
             // A key change reopening the store refuses the lease before `admitted` is asked.
             throw KeyChanged()
         } catch {
