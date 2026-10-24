@@ -100,6 +100,10 @@ struct Errors {
         (.WrongServer(expected: "a", got: "b", message: "m"), .wrongServer(expected: "a", got: "b", message: "m")),
         (.BytesAbsent(hash: "h", reason: "r", message: "m"), .bytesAbsent(hash: "h", reason: "r", message: "m")),
         (
+            .NoRoom(hash: "h", size: 5, free: 3, message: "m"),
+            .noRoom(hash: "h", size: 5, free: 3, message: "m")
+        ),
+        (
             .ContractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m"),
             .contractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m")
         ),
@@ -205,15 +209,20 @@ struct OwnValueTypes {
             stopped: "s", unclaimedSources: ["u"], retryAfterSeconds: 4)
         #expect(Marfa.DrainReport(report.core) == report)
         let hydrated = Marfa.HydrateReport(
-            types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, cursor: "c",
-            registeredTypes: ["app.new"],
+            types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, pagesTotal: 5,
+            resumed: true, restarted: "slice_changed", cursor: "c", registeredTypes: ["app.new"],
             unregisteredTypes: [Marfa.UnregisteredType(id: "app.no", code: "forbidden", message: "m")])
         #expect(Marfa.HydrateReport(hydrated.core) == hydrated)
         let caught = Marfa.CatchUpReport(applied: 1, skipped: 2, cursor: "c", catalogChanged: true)
         #expect(Marfa.CatchUpReport(caught.core) == caught)
         let status = Marfa.Status(
             serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],
-            eventCursor: "c", hydration: .inProgress, items: 1, edges: 2, catalogVersion: 5, instanceId: "instance")
+            eventCursor: "c", hydration: .inProgress, items: 1, itemsExpected: 10, itemsListed: 4, edges: 2,
+            catalogVersion: 5,
+            instanceId: "instance",
+            fileCache: FileCache(
+                setting: .bytes(bytes: 5), budget: 5, held: 3, heldUnreadable: nil, volumeUnreadable: true,
+                backupMarkFailure: "no"))
         #expect(Marfa.Status(status.core) == status)
         let unheld = Marfa.Status(hydration: .never)
         #expect(Marfa.Status(unheld.core).catalogVersion == nil)

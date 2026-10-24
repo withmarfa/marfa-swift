@@ -7,8 +7,8 @@ import Testing
     @Test func settingsCrossTheBindingAndBackUnchanged() throws {
         let settings = FolderSettings(
             title: "Recipes",
-            search: FolderSearch(
-                types: ["core.note"], tier: .feed, states: [.archived], filter: "tags contains \"recipe\"",
+            query: FolderQuery(
+                types: ["core.note"], tier: .all, states: [.archived], filter: "tags contains \"recipe\"",
                 beneath: "parent"),
             defaults: FolderDefaults(
                 type: "core.note", tier: .feed, properties: ["rating": 3, "cuisine": "any"], tags: ["new"],
@@ -17,6 +17,8 @@ import Testing
             removalThreshold: RemovalThreshold(files: 4, fraction: 0.5))
         let crossed = FolderSettings(settings.core)
         #expect(crossed == settings)
+        #expect(crossed.query.tier == .all, "a query of both tiers")
+        #expect(FolderSettings(FolderSettings().core).query.tier == nil, "no tier is the library tier, not a tier")
         #expect(crossed.defaults.properties.keys == ["rating", "cuisine"], "the defaults' key order")
     }
 
@@ -30,14 +32,9 @@ import Testing
         #expect(try await copy.queue.all().isEmpty)
     }
 
-    @Test func aFolderTheCopyDoesNotHoldIsNotHeldAndReadsAsNone() async throws {
+    @Test func aFolderTheCopyDoesNotHoldReadsAsNone() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         #expect(try await copy.items.folder("01a00000-0000-7000-8000-000000000001") == nil)
-        await #expect {
-            _ = try await copy.items.list(inFolder: "01a00000-0000-7000-8000-000000000001")
-        } throws: { error in
-            if case .notFound(let code, _) = error as? MarfaError { code == "not_held" } else { false }
-        }
     }
 }
 
@@ -54,29 +51,19 @@ extension LiveWorkingCopies {
             return copy
         }
 
-        @Test func aFolderIsMadeReadListedSearchedChangedAndRevokedThroughACopy() async throws {
+        @Test func aFolderIsMadeReadChangedAndRevokedThroughACopy() async throws {
             let copy = try await Self.copy()
-            let tag = "shelf\(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: ""))"
-            let note = try #require(
-                try await copy.items.create(
-                    Draft(
-                        type: "core.note", properties: ["title": "Marmalade", "body": "oranges"], tags: [tag],
-                        tier: .library)
-                ).itemId)
-            _ = try await copy.queue.drain()
             let heard = Heard(copy.changes())
 
             let made = try await copy.createFolder(
                 FolderSettings(
-                    title: "Shelf", search: FolderSearch(types: ["core.note"], filter: "tags contains \"\(tag)\"")))
+                    title: "Shelf", query: FolderQuery(types: ["core.note"], filter: "tags contains \"shelf\"")))
             #expect(made.version == 1 && made.state == .active)
             #expect(try await copy.items.folder(made.id)?.settings.title == "Shelf", "held at once")
-            #expect(try await copy.items.list(inFolder: made.id).map(\.id) == [note])
-            #expect(try await copy.search("marmalade", inFolder: made.id).map(\.item.id) == [note])
             let renamed = try await copy.changeFolder(
                 made.id, FolderSettingsChange(title: "Pantry"), baseVersion: made.version)
             #expect(renamed.version == 2 && renamed.settings.title == "Pantry")
-            #expect(renamed.settings.search.types == ["core.note"], "a setting the change did not name stays")
+            #expect(renamed.settings.query.types == ["core.note"], "a setting the change did not name stays")
 
             let revoked = try await copy.revokeFolder(made.id)
             #expect(revoked.state == .revoked)
@@ -85,11 +72,6 @@ extension LiveWorkingCopies {
                 _ = try await copy.changeFolder(made.id, FolderSettingsChange(title: "Again"), baseVersion: 2)
             } throws: { error in
                 if case .validation(let code, _) = error as? MarfaError { code == "invalid_transition" } else { false }
-            }
-            await #expect {
-                _ = try await copy.items.list(inFolder: made.id)
-            } throws: { error in
-                if case .invalid = error as? MarfaError { true } else { false }
             }
             #expect(try await copy.queue.all().allSatisfy { $0.itemId != made.id }, "nothing was queued")
             try await Task.sleep(for: .milliseconds(300))
@@ -101,14 +83,14 @@ extension LiveWorkingCopies {
             let copy = try await Self.copy()
             let key = "folder-\(UUID().uuidString.lowercased())"
             let made = try await copy.createFolder(
-                FolderSettings(title: "Once", search: FolderSearch(types: ["core.note"])), idempotencyKey: key)
+                FolderSettings(title: "Once", query: FolderQuery(types: ["core.note"])), idempotencyKey: key)
             let again = try await copy.createFolder(
-                FolderSettings(title: "Once", search: FolderSearch(types: ["core.note"])), idempotencyKey: key)
+                FolderSettings(title: "Once", query: FolderQuery(types: ["core.note"])), idempotencyKey: key)
             #expect(again.id == made.id)
             let renamed = try await copy.changeFolder(made.id, FolderSettingsChange(title: "Twice"), baseVersion: 1)
             #expect(renamed.version == 2)
             let merged = try await copy.changeFolder(
-                made.id, FolderSettingsChange(search: FolderSearch(types: ["core.task"])), baseVersion: 1)
+                made.id, FolderSettingsChange(query: FolderQuery(types: ["core.task"])), baseVersion: 1)
             #expect(merged.version == 3 && merged.settings.title == "Twice", "a setting the other change did not touch")
             await #expect {
                 _ = try await copy.changeFolder(made.id, FolderSettingsChange(title: "Thrice"), baseVersion: 1)
@@ -124,32 +106,29 @@ extension LiveWorkingCopies {
             _ = try await copy.revokeFolder(made.id)
         }
 
-        @Test func aSearchTheCopyCannotAnswerWholeIsRefusedNeverListedInPart() async throws {
+        @Test func aQueryOfBothTiersIsMadeAndReadBackAtBoth() async throws {
             let copy = try await Self.copy()
-            let every = try await copy.createFolder(FolderSettings(title: "Everything"))
-            await #expect {
-                _ = try await copy.items.list(inFolder: every.id)
-            } throws: { error in
-                if case .invalid(let message) = error as? MarfaError {
-                    message.contains("does not take")
-                } else {
-                    false
-                }
-            }
-            _ = try await copy.revokeFolder(every.id)
+            let made = try await copy.createFolder(
+                FolderSettings(title: "Both", query: FolderQuery(types: ["core.note"], tier: .all)))
+            #expect(made.settings.query.tier == .all)
+            #expect(try await copy.items.folder(made.id)?.settings.query.tier == .all)
+            let narrowed = try await copy.changeFolder(
+                made.id, FolderSettingsChange(query: FolderQuery(types: ["core.note"], tier: .library)), baseVersion: 1)
+            #expect(narrowed.settings.query.tier == .library)
+            _ = try await copy.revokeFolder(made.id)
         }
 
         @Test func settingsNoFolderFollowsAreRefusedBeforeTheyAreSent() async throws {
             let copy = try await Self.copy()
             await #expect {
                 _ = try await copy.createFolder(
-                    FolderSettings(title: "Typo", search: FolderSearch(types: ["core.note"], filter: "title eq 1")))
+                    FolderSettings(title: "Typo", query: FolderQuery(types: ["core.note"], filter: "title eq 1")))
             } throws: { error in
                 if case .validation = error as? MarfaError { true } else { false }
             }
             await #expect {
                 _ = try await copy.createFolder(
-                    FolderSettings(title: "Back", search: FolderSearch(filter: "backref[parent-of] exists")))
+                    FolderSettings(title: "Back", query: FolderQuery(filter: "backref[parent-of] exists")))
             } throws: { error in
                 if case .invalid(let message) = error as? MarfaError { message.contains("backref") } else { false }
             }

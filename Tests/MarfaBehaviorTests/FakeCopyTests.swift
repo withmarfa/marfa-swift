@@ -113,8 +113,6 @@ struct FakeCopyBehavior {
                 { _ = try await copy.items.list(ListFilters(occurredAfter: "2026-01-01T00:00:00.000Z")) }
             ),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
-            ("search(inFolder:)", { _ = try await copy.search("x", inFolder: id) }),
-            ("items.list(inFolder:)", { _ = try await copy.items.list(inFolder: id) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
         ]
         for (call, make) in calls {

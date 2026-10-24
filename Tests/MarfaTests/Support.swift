@@ -230,8 +230,9 @@ final class FakeCore: Core, @unchecked Sendable {
     {
         state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
         return MarfaCore.HydrateReport(
-            types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, cursor: "1",
-            registeredTypes: [], unregisteredTypes: state.withLock { $0.registrationRefusals })
+            types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1, resumed: false,
+            restarted: nil, cursor: "1", registeredTypes: [],
+            unregisteredTypes: state.withLock { $0.registrationRefusals })
     }
 
     override func declareTypes(types: [JSONObject]) {
@@ -267,7 +268,10 @@ final class FakeCore: Core, @unchecked Sendable {
         MarfaCore.Status(
             serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
             eventCursor: nil,
-            hydration: .complete, items: 0, edges: 0, catalogVersion: 1)
+            hydration: .complete, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0, catalogVersion: 1,
+            fileCache: MarfaCore.FileCache(
+                setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
+                backupMarkFailure: nil))
     }
 
     override func withdraw(id: String) throws -> Bool {

@@ -172,7 +172,7 @@ public final class WorkingCopy: Sendable {
         -> [SearchHit]
     {
         try await holder.run { core in
-            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit))
+            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit)).whole()
         }
     }
 
@@ -366,7 +366,7 @@ public struct Items: Sendable {
     )
         async throws -> [Item]
     {
-        try await holder.run { core in try core.list(filters: filters, sort: sort.core) }
+        try await holder.run { core in try core.list(filters: filters, sort: sort.core).whole() }
     }
 
     /// `nil` for an item in the bin or not held.
@@ -691,7 +691,7 @@ public struct Blobs: Sendable {
     /// A reader, or a copy without a server, throws `bytesAbsent` instead of
     /// fetching.
     public func get(_ hash: String) async throws -> URL {
-        URL(fileURLWithPath: try await holder.run { core in try core.blob(hash: hash) })
+        URL(fileURLWithPath: try await holder.run { core in try core.blob(hash: hash).path() })
     }
 
     public func isHeld(_ hash: String) async throws -> Bool {

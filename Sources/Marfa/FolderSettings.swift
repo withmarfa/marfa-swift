@@ -1,8 +1,7 @@
 import Foundation
 import MarfaCore
 
-/// A `system.folder`: the saved search and defaults that folders on disk and
-/// an app's sidebar follow.
+/// A `system.folder`: the query and defaults that folders on disk follow.
 public struct Folder: Sendable, Hashable, Identifiable {
     public let id: String
     public let version: Int64
@@ -22,7 +21,7 @@ public struct Folder: Sendable, Hashable, Identifiable {
 public struct FolderSettings: Sendable, Hashable {
     /// Required to create a folder.
     public var title: String?
-    public var search: FolderSearch
+    public var query: FolderQuery
     public var defaults: FolderDefaults
     /// Gitignore patterns for the paths a folder on disk takes; empty takes every path.
     public var include: [String]
@@ -33,12 +32,12 @@ public struct FolderSettings: Sendable, Hashable {
     public var removalThreshold: RemovalThreshold
 
     public init(
-        title: String? = nil, search: FolderSearch = FolderSearch(), defaults: FolderDefaults = FolderDefaults(),
+        title: String? = nil, query: FolderQuery = FolderQuery(), defaults: FolderDefaults = FolderDefaults(),
         include: [String] = [], ignore: [String] = [], firstPlacement: [String: String] = [:],
         removalThreshold: RemovalThreshold = RemovalThreshold()
     ) {
         self.title = title
-        self.search = search
+        self.query = query
         self.defaults = defaults
         self.include = include
         self.ignore = ignore
@@ -48,24 +47,25 @@ public struct FolderSettings: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderSettings) {
         self.init(
-            title: core.title, search: FolderSearch(core.search), defaults: FolderDefaults(core.defaults),
+            title: core.title, query: FolderQuery(core.query), defaults: FolderDefaults(core.defaults),
             include: core.include, ignore: core.ignore, firstPlacement: core.firstPlacement,
             removalThreshold: RemovalThreshold(core.removalThreshold))
     }
 
     var core: MarfaCore.FolderSettings {
         MarfaCore.FolderSettings(
-            title: title, search: search.core, defaults: defaults.core, include: include, ignore: ignore,
+            title: title, query: query.core, defaults: defaults.core, include: include, ignore: ignore,
             firstPlacement: firstPlacement, removalThreshold: removalThreshold.core)
     }
 }
 
-/// The search that decides which items a folder holds.
-public struct FolderSearch: Sendable, Hashable {
+/// The query that decides which items a folder holds.
+public struct FolderQuery: Sendable, Hashable {
     /// Each with its subtypes; empty holds every type but `system.*`.
     public var types: [String]
-    /// `nil` holds the library tier.
-    public var tier: Tier?
+    /// `nil` holds the library tier. `.all` holds both tiers, and a new file takes ``FolderDefaults/tier``, or
+    /// `library` where that is `nil`.
+    public var tier: SliceTier?
     /// `nil` holds active and archived items.
     public var states: [ItemState]?
     /// An expression in the server's listing grammar.
@@ -74,7 +74,7 @@ public struct FolderSearch: Sendable, Hashable {
     public var beneath: String?
 
     public init(
-        types: [String] = [], tier: Tier? = nil, states: [ItemState]? = nil, filter: String? = nil,
+        types: [String] = [], tier: SliceTier? = nil, states: [ItemState]? = nil, filter: String? = nil,
         beneath: String? = nil
     ) {
         self.types = types
@@ -84,15 +84,15 @@ public struct FolderSearch: Sendable, Hashable {
         self.beneath = beneath
     }
 
-    init(_ core: MarfaCore.FolderSearch) {
+    init(_ core: MarfaCore.FolderQuery) {
         self.init(
-            types: core.types, tier: core.tier, states: core.states,
+            types: core.types, tier: core.tier.map(SliceTier.init), states: core.states,
             filter: core.filter, beneath: core.beneath)
     }
 
-    var core: MarfaCore.FolderSearch {
-        MarfaCore.FolderSearch(
-            types: types, tier: tier, states: states, filter: filter, beneath: beneath)
+    var core: MarfaCore.FolderQuery {
+        MarfaCore.FolderQuery(
+            types: types, tier: tier?.core, states: states, filter: filter, beneath: beneath)
     }
 }
 
@@ -149,7 +149,7 @@ public struct RemovalThreshold: Sendable, Hashable {
 /// The settings to replace, each whole; a `nil` one is left as it is.
 public struct FolderSettingsChange: Sendable, Hashable {
     public var title: String?
-    public var search: FolderSearch?
+    public var query: FolderQuery?
     public var defaults: FolderDefaults?
     public var include: [String]?
     public var ignore: [String]?
@@ -157,11 +157,11 @@ public struct FolderSettingsChange: Sendable, Hashable {
     public var removalThreshold: RemovalThreshold?
 
     public init(
-        title: String? = nil, search: FolderSearch? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil,
+        title: String? = nil, query: FolderQuery? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil,
         ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil
     ) {
         self.title = title
-        self.search = search
+        self.query = query
         self.defaults = defaults
         self.include = include
         self.ignore = ignore
@@ -171,29 +171,12 @@ public struct FolderSettingsChange: Sendable, Hashable {
 
     var core: MarfaCore.FolderSettingsChange {
         MarfaCore.FolderSettingsChange(
-            title: title, search: search?.core, defaults: defaults?.core, include: include, ignore: ignore,
+            title: title, query: query?.core, defaults: defaults?.core, include: include, ignore: ignore,
             firstPlacement: firstPlacement, removalThreshold: removalThreshold?.core)
     }
 }
 
 extension Items {
-    /// What the folder's search holds, as a folder on disk holds it, read from the copy alone.
-    ///
-    /// Throws `MarfaError.invalid` where the copy cannot answer the search whole, never answering part of it: a copy
-    /// with no slice yet, a type or the tier the search holds that the slice does not, `beneath` without `parent-of`
-    /// held whole, a revoked folder, an item that is not a `system.folder`, and settings naming a condition no
-    /// folder follows, such as a `backref`. Throws `MarfaError.notFound`
-    /// with the code `not_held` for a folder the copy does not hold; hydrate with `system.folder` in the slice, or
-    /// pin it.
-    public func list(
-        inFolder id: String, sort: Sort = Sort(field: .createdAt, direction: .descending), limit: UInt32? = nil,
-        offset: UInt32? = nil
-    ) async throws -> [Item] {
-        try await holder.run { core in
-            try core.listInFolder(id: id, sort: sort.core, limit: limit, offset: offset)
-        }
-    }
-
     /// `nil` where the copy does not hold the folder.
     ///
     /// Throws `MarfaError.invalid` for a held item that is not a `system.folder`, or one whose settings name a
@@ -204,13 +187,6 @@ extension Items {
 }
 
 extension WorkingCopy {
-    /// A full-text search narrowed to what the folder holds; it throws as `items.list(inFolder:)` throws.
-    public func search(_ query: String, inFolder id: String, limit: Int = 20) async throws -> [SearchHit] {
-        try await holder.run { core in
-            try core.searchInFolder(query: query, id: id, limit: UInt32(clamping: limit))
-        }
-    }
-
     /// Creates a folder through the server's folder door, at once.
     ///
     /// Folder writes are never queued, because only the folder door writes a `system.folder`: with no server, or

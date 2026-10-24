@@ -515,6 +515,27 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/put(reportFolderStatus)`.
     func reportFolderStatus(_ input: Operations.ReportFolderStatus.Input) async throws -> Operations.ReportFolderStatus.Output
+    /// Create a view
+    ///
+    /// Creates a view: a `system.view` item whose properties say which items it lists and how its layouts show them. The item endpoints can't write one.
+    ///
+    /// - Remark: HTTP `POST /views`.
+    /// - Remark: Generated from `#/paths//views/post(createView)`.
+    func createView(_ input: Operations.CreateView.Input) async throws -> Operations.CreateView.Output
+    /// Update a view
+    ///
+    /// Updates a view's title, query or layouts. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
+    ///
+    /// - Remark: HTTP `PATCH /views/{id}`.
+    /// - Remark: Generated from `#/paths//views/{id}/patch(updateView)`.
+    func updateView(_ input: Operations.UpdateView.Input) async throws -> Operations.UpdateView.Output
+    /// Delete a view
+    ///
+    /// Deletes an active or revoked view permanently, with no trash. Marfa announces it as `item.purged`, so every app drops it. The items it listed don't change.
+    ///
+    /// - Remark: HTTP `DELETE /views/{id}`.
+    /// - Remark: Generated from `#/paths//views/{id}/delete(deleteView)`.
+    func deleteView(_ input: Operations.DeleteView.Input) async throws -> Operations.DeleteView.Output
     /// List connectors
     ///
     /// Returns your registration, or every registration if you hold `connectors.manage`, newest first.
@@ -2007,6 +2028,53 @@ extension APIProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// Create a view
+    ///
+    /// Creates a view: a `system.view` item whose properties say which items it lists and how its layouts show them. The item endpoints can't write one.
+    ///
+    /// - Remark: HTTP `POST /views`.
+    /// - Remark: Generated from `#/paths//views/post(createView)`.
+    public func createView(
+        headers: Operations.CreateView.Input.Headers = .init(),
+        body: Operations.CreateView.Input.Body
+    ) async throws -> Operations.CreateView.Output {
+        try await createView(Operations.CreateView.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Update a view
+    ///
+    /// Updates a view's title, query or layouts. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
+    ///
+    /// - Remark: HTTP `PATCH /views/{id}`.
+    /// - Remark: Generated from `#/paths//views/{id}/patch(updateView)`.
+    public func updateView(
+        path: Operations.UpdateView.Input.Path,
+        headers: Operations.UpdateView.Input.Headers = .init(),
+        body: Operations.UpdateView.Input.Body
+    ) async throws -> Operations.UpdateView.Output {
+        try await updateView(Operations.UpdateView.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Delete a view
+    ///
+    /// Deletes an active or revoked view permanently, with no trash. Marfa announces it as `item.purged`, so every app drops it. The items it listed don't change.
+    ///
+    /// - Remark: HTTP `DELETE /views/{id}`.
+    /// - Remark: Generated from `#/paths//views/{id}/delete(deleteView)`.
+    public func deleteView(
+        path: Operations.DeleteView.Input.Path,
+        headers: Operations.DeleteView.Input.Headers = .init()
+    ) async throws -> Operations.DeleteView.Output {
+        try await deleteView(Operations.DeleteView.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// List connectors

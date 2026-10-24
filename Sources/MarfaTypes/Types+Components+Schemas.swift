@@ -1970,6 +1970,161 @@ extension Components {
                 case details
             }
         }
+        /// A field: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier`, `tags`) or `properties.<name>`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewField`.
+        public typealias ViewField = Swift.String
+        /// A tier: `library`, `feed`, or `all` for both.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewTier`.
+        @frozen public enum ViewTier: String, Codable, Hashable, Sendable, CaseIterable {
+            case library = "library"
+            case feed = "feed"
+            case all = "all"
+        }
+        /// How a layout shows items. `list`: rows. `table`: rows with columns. `board`: columns by `group`. `gallery`: cards. `calendar`: on dates. `timeline`: as spans. `chart`: as a chart. `map`: on a map.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewLayoutKind`.
+        @frozen public enum ViewLayoutKind: String, Codable, Hashable, Sendable, CaseIterable {
+            case list = "list"
+            case table = "table"
+            case board = "board"
+            case gallery = "gallery"
+            case calendar = "calendar"
+            case timeline = "timeline"
+            case chart = "chart"
+            case map = "map"
+        }
+        /// One key a layout sorts by.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewSort`.
+        public struct ViewSort: Codable, Hashable, Sendable {
+            /// The field to sort by.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewSort/by`.
+            public var by: Components.Schemas.ViewField
+            /// `asc` sorts smallest first, `desc` largest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewSort/direction`.
+            @frozen public enum DirectionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case asc = "asc"
+                case desc = "desc"
+            }
+            /// `asc` sorts smallest first, `desc` largest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewSort/direction`.
+            public var direction: Components.Schemas.ViewSort.DirectionPayload
+            /// Creates a new `ViewSort`.
+            ///
+            /// - Parameters:
+            ///   - by: The field to sort by.
+            ///   - direction: `asc` sorts smallest first, `desc` largest first.
+            public init(
+                by: Components.Schemas.ViewField,
+                direction: Components.Schemas.ViewSort.DirectionPayload
+            ) {
+                self.by = by
+                self.direction = direction
+            }
+            public enum CodingKeys: String, CodingKey {
+                case by
+                case direction
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.by = try container.decode(
+                    Components.Schemas.ViewField.self,
+                    forKey: .by
+                )
+                self.direction = try container.decode(
+                    Components.Schemas.ViewSort.DirectionPayload.self,
+                    forKey: .direction
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "by",
+                    "direction"
+                ])
+            }
+        }
+        /// How a layout groups its items.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewGroup`.
+        public struct ViewGroup: Codable, Hashable, Sendable {
+            /// The field to group by: a field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewGroup/by`.
+            public var by: Swift.String
+            /// For a date field, the span each group covers. Absent groups by the value.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewGroup/bucket`.
+            @frozen public enum BucketPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case day = "day"
+                case week = "week"
+                case month = "month"
+                case year = "year"
+            }
+            /// For a date field, the span each group covers. Absent groups by the value.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewGroup/bucket`.
+            public var bucket: Components.Schemas.ViewGroup.BucketPayload?
+            /// The values whose groups come first, in this order. Other groups follow.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewGroup/order`.
+            public var order: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]?
+            /// The values whose groups the layout leaves out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewGroup/hidden`.
+            public var hidden: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]?
+            /// Creates a new `ViewGroup`.
+            ///
+            /// - Parameters:
+            ///   - by: The field to group by: a field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            ///   - bucket: For a date field, the span each group covers. Absent groups by the value.
+            ///   - order: The values whose groups come first, in this order. Other groups follow.
+            ///   - hidden: The values whose groups the layout leaves out.
+            public init(
+                by: Swift.String,
+                bucket: Components.Schemas.ViewGroup.BucketPayload? = nil,
+                order: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]? = nil,
+                hidden: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]? = nil
+            ) {
+                self.by = by
+                self.bucket = bucket
+                self.order = order
+                self.hidden = hidden
+            }
+            public enum CodingKeys: String, CodingKey {
+                case by
+                case bucket
+                case order
+                case hidden
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.by = try container.decode(
+                    Swift.String.self,
+                    forKey: .by
+                )
+                self.bucket = try container.decodeIfPresent(
+                    Components.Schemas.ViewGroup.BucketPayload.self,
+                    forKey: .bucket
+                )
+                self.order = try container.decodeIfPresent(
+                    [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f].self,
+                    forKey: .order
+                )
+                self.hidden = try container.decodeIfPresent(
+                    [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f].self,
+                    forKey: .hidden
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "by",
+                    "bucket",
+                    "order",
+                    "hidden"
+                ])
+            }
+        }
         /// An instance: its identity, build, contract version and features.
         ///
         /// - Remark: Generated from `#/components/schemas/InstanceDescription`.
@@ -11526,49 +11681,57 @@ extension Components {
         }
         /// Which items the folder holds.
         ///
-        /// - Remark: Generated from `#/components/schemas/FolderSearch`.
-        public struct FolderSearch: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/FolderQuery`.
+        public struct FolderQuery: Codable, Hashable, Sendable {
             /// The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*`.
             ///
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/types`.
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/types`.
             public var types: [Swift.String]?
-            /// The tier the folder holds. Absent means `library`.
+            /// The tiers the folder holds: `library`, `feed`, or `all` for both. Absent means `library`.
             ///
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/tier`.
-            public var tier: Components.Schemas.Tier?
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/StatePayload`.
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/tier`.
+            @frozen public enum TierPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case library = "library"
+                case feed = "feed"
+                case all = "all"
+            }
+            /// The tiers the folder holds: `library`, `feed`, or `all` for both. Absent means `library`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/tier`.
+            public var tier: Components.Schemas.FolderQuery.TierPayload?
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/StatePayload`.
             @frozen public enum StatePayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case active = "active"
                 case archived = "archived"
             }
             /// The states the folder holds. Absent means both.
             ///
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/state`.
-            public typealias StatePayload = [Components.Schemas.FolderSearch.StatePayloadPayload]
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/state`.
+            public typealias StatePayload = [Components.Schemas.FolderQuery.StatePayloadPayload]
             /// The states the folder holds. Absent means both.
             ///
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/state`.
-            public var state: Components.Schemas.FolderSearch.StatePayload?
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/state`.
+            public var state: Components.Schemas.FolderQuery.StatePayload?
             /// A filter expression, as on `GET /items`, that narrows what the folder holds.
             ///
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/filter`.
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/filter`.
             public var filter: Swift.String?
             /// An item ID. The folder holds that item and everything under it by `parent-of`, at any depth.
             ///
-            /// - Remark: Generated from `#/components/schemas/FolderSearch/beneath`.
+            /// - Remark: Generated from `#/components/schemas/FolderQuery/beneath`.
             public var beneath: Swift.String?
-            /// Creates a new `FolderSearch`.
+            /// Creates a new `FolderQuery`.
             ///
             /// - Parameters:
             ///   - types: The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*`.
-            ///   - tier: The tier the folder holds. Absent means `library`.
+            ///   - tier: The tiers the folder holds: `library`, `feed`, or `all` for both. Absent means `library`.
             ///   - state: The states the folder holds. Absent means both.
             ///   - filter: A filter expression, as on `GET /items`, that narrows what the folder holds.
             ///   - beneath: An item ID. The folder holds that item and everything under it by `parent-of`, at any depth.
             public init(
                 types: [Swift.String]? = nil,
-                tier: Components.Schemas.Tier? = nil,
-                state: Components.Schemas.FolderSearch.StatePayload? = nil,
+                tier: Components.Schemas.FolderQuery.TierPayload? = nil,
+                state: Components.Schemas.FolderQuery.StatePayload? = nil,
                 filter: Swift.String? = nil,
                 beneath: Swift.String? = nil
             ) {
@@ -11592,11 +11755,11 @@ extension Components {
                     forKey: .types
                 )
                 self.tier = try container.decodeIfPresent(
-                    Components.Schemas.Tier.self,
+                    Components.Schemas.FolderQuery.TierPayload.self,
                     forKey: .tier
                 )
                 self.state = try container.decodeIfPresent(
-                    Components.Schemas.FolderSearch.StatePayload.self,
+                    Components.Schemas.FolderQuery.StatePayload.self,
                     forKey: .state
                 )
                 self.filter = try container.decodeIfPresent(
@@ -12357,6 +12520,451 @@ extension Components {
                 case problems
                 case receivedAt = "received_at"
                 case ageSeconds = "age_seconds"
+            }
+        }
+        /// Which items the view lists. Absent lists every item the reading key can read, except `system.*`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewQuery`.
+        public struct ViewQuery: Codable, Hashable, Sendable {
+            /// The types the view lists, each with its subtypes. Empty or absent lists every type the reading key can read, except `system.*`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/types`.
+            public var types: [Swift.String]?
+            /// The tier the view lists. Absent means `all`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/tier`.
+            public var tier: Components.Schemas.ViewTier?
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/StatePayload`.
+            @frozen public enum StatePayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case active = "active"
+                case archived = "archived"
+            }
+            /// The states the view lists. Absent means both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/state`.
+            public typealias StatePayload = [Components.Schemas.ViewQuery.StatePayloadPayload]
+            /// The states the view lists. Absent means both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/state`.
+            public var state: Components.Schemas.ViewQuery.StatePayload?
+            /// A filter expression, as on `GET /items`, that narrows what the view lists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/filter`.
+            public var filter: Swift.String?
+            /// An item ID. The view lists that item and everything under it by `parent-of`, at any depth.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewQuery/beneath`.
+            public var beneath: Swift.String?
+            /// Creates a new `ViewQuery`.
+            ///
+            /// - Parameters:
+            ///   - types: The types the view lists, each with its subtypes. Empty or absent lists every type the reading key can read, except `system.*`.
+            ///   - tier: The tier the view lists. Absent means `all`.
+            ///   - state: The states the view lists. Absent means both.
+            ///   - filter: A filter expression, as on `GET /items`, that narrows what the view lists.
+            ///   - beneath: An item ID. The view lists that item and everything under it by `parent-of`, at any depth.
+            public init(
+                types: [Swift.String]? = nil,
+                tier: Components.Schemas.ViewTier? = nil,
+                state: Components.Schemas.ViewQuery.StatePayload? = nil,
+                filter: Swift.String? = nil,
+                beneath: Swift.String? = nil
+            ) {
+                self.types = types
+                self.tier = tier
+                self.state = state
+                self.filter = filter
+                self.beneath = beneath
+            }
+            public enum CodingKeys: String, CodingKey {
+                case types
+                case tier
+                case state
+                case filter
+                case beneath
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.types = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .types
+                )
+                self.tier = try container.decodeIfPresent(
+                    Components.Schemas.ViewTier.self,
+                    forKey: .tier
+                )
+                self.state = try container.decodeIfPresent(
+                    Components.Schemas.ViewQuery.StatePayload.self,
+                    forKey: .state
+                )
+                self.filter = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .filter
+                )
+                self.beneath = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .beneath
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "types",
+                    "tier",
+                    "state",
+                    "filter",
+                    "beneath"
+                ])
+            }
+        }
+        /// One way a view shows its items. A layout takes only the options its `kind` takes, and never narrows which items the view lists.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewLayout`.
+        public struct ViewLayout: Codable, Hashable, Sendable {
+            /// The layout's ID, unique in the view, which an app keeps to reopen it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/id`.
+            public var id: Swift.String
+            /// How the layout shows items.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/kind`.
+            public var kind: Components.Schemas.ViewLayoutKind
+            /// The layout's name. Absent, an app names it by its kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/title`.
+            public var title: Swift.String?
+            /// The keys the layout sorts by, first key first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/sort`.
+            public var sort: [Components.Schemas.ViewSort]?
+            /// How the layout groups its items. A `board` requires it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/group`.
+            public var group: Components.Schemas.ViewGroup?
+            /// The fields the layout shows, in order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/shown`.
+            public var shown: [Components.Schemas.ViewField]?
+            /// For a `gallery`, the property that holds each card's image.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/image`.
+            public var image: Swift.String?
+            /// For a `calendar`, the date field that places each item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/date`.
+            public var date: Swift.String?
+            /// For a `timeline`, the date field each span starts at. Required for a `timeline`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/start`.
+            public var start: Swift.String?
+            /// For a `calendar` or `timeline`, the date field each span ends at. Required for a `timeline`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/end`.
+            public var end: Swift.String?
+            /// For a `chart`, the field along its horizontal axis.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/x`.
+            public var x: Components.Schemas.ViewField?
+            /// What a chart measures: `count` of items, or `{ "sum": "properties.<name>" }`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/y`.
+            public struct YPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value1`.
+                @frozen public enum Value1Payload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case count = "count"
+                }
+                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value1`.
+                public var value1: Components.Schemas.ViewLayout.YPayload.Value1Payload?
+                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value2`.
+                public struct Value2Payload: Codable, Hashable, Sendable {
+                    /// The number property whose values are added up.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value2/sum`.
+                    public var sum: Swift.String
+                    /// Creates a new `Value2Payload`.
+                    ///
+                    /// - Parameters:
+                    ///   - sum: The number property whose values are added up.
+                    public init(sum: Swift.String) {
+                        self.sum = sum
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case sum
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.sum = try container.decode(
+                            Swift.String.self,
+                            forKey: .sum
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "sum"
+                        ])
+                    }
+                }
+                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value2`.
+                public var value2: Components.Schemas.ViewLayout.YPayload.Value2Payload?
+                /// Creates a new `YPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                ///   - value2:
+                public init(
+                    value1: Components.Schemas.ViewLayout.YPayload.Value1Payload? = nil,
+                    value2: Components.Schemas.ViewLayout.YPayload.Value2Payload? = nil
+                ) {
+                    self.value1 = value1
+                    self.value2 = value2
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    var errors: [any Swift.Error] = []
+                    do {
+                        self.value1 = try decoder.decodeFromSingleValueContainer()
+                    } catch {
+                        errors.append(error)
+                    }
+                    do {
+                        self.value2 = try .init(from: decoder)
+                    } catch {
+                        errors.append(error)
+                    }
+                    try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                        [
+                            self.value1,
+                            self.value2
+                        ],
+                        type: Self.self,
+                        codingPath: decoder.codingPath,
+                        errors: errors
+                    )
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeFirstNonNilValueToSingleValueContainer([
+                        self.value1
+                    ])
+                    try self.value2?.encode(to: encoder)
+                }
+            }
+            /// What a chart measures: `count` of items, or `{ "sum": "properties.<name>" }`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/y`.
+            public var y: Components.Schemas.ViewLayout.YPayload?
+            /// For a `map`, the property that holds each item's place.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewLayout/location`.
+            public var location: Swift.String?
+            /// Creates a new `ViewLayout`.
+            ///
+            /// - Parameters:
+            ///   - id: The layout's ID, unique in the view, which an app keeps to reopen it.
+            ///   - kind: How the layout shows items.
+            ///   - title: The layout's name. Absent, an app names it by its kind.
+            ///   - sort: The keys the layout sorts by, first key first.
+            ///   - group: How the layout groups its items. A `board` requires it.
+            ///   - shown: The fields the layout shows, in order.
+            ///   - image: For a `gallery`, the property that holds each card's image.
+            ///   - date: For a `calendar`, the date field that places each item.
+            ///   - start: For a `timeline`, the date field each span starts at. Required for a `timeline`.
+            ///   - end: For a `calendar` or `timeline`, the date field each span ends at. Required for a `timeline`.
+            ///   - x: For a `chart`, the field along its horizontal axis.
+            ///   - y: What a chart measures: `count` of items, or `{ "sum": "properties.<name>" }`.
+            ///   - location: For a `map`, the property that holds each item's place.
+            public init(
+                id: Swift.String,
+                kind: Components.Schemas.ViewLayoutKind,
+                title: Swift.String? = nil,
+                sort: [Components.Schemas.ViewSort]? = nil,
+                group: Components.Schemas.ViewGroup? = nil,
+                shown: [Components.Schemas.ViewField]? = nil,
+                image: Swift.String? = nil,
+                date: Swift.String? = nil,
+                start: Swift.String? = nil,
+                end: Swift.String? = nil,
+                x: Components.Schemas.ViewField? = nil,
+                y: Components.Schemas.ViewLayout.YPayload? = nil,
+                location: Swift.String? = nil
+            ) {
+                self.id = id
+                self.kind = kind
+                self.title = title
+                self.sort = sort
+                self.group = group
+                self.shown = shown
+                self.image = image
+                self.date = date
+                self.start = start
+                self.end = end
+                self.x = x
+                self.y = y
+                self.location = location
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case kind
+                case title
+                case sort
+                case group
+                case shown
+                case image
+                case date
+                case start
+                case end
+                case x
+                case y
+                case location
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.kind = try container.decode(
+                    Components.Schemas.ViewLayoutKind.self,
+                    forKey: .kind
+                )
+                self.title = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .title
+                )
+                self.sort = try container.decodeIfPresent(
+                    [Components.Schemas.ViewSort].self,
+                    forKey: .sort
+                )
+                self.group = try container.decodeIfPresent(
+                    Components.Schemas.ViewGroup.self,
+                    forKey: .group
+                )
+                self.shown = try container.decodeIfPresent(
+                    [Components.Schemas.ViewField].self,
+                    forKey: .shown
+                )
+                self.image = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .image
+                )
+                self.date = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .date
+                )
+                self.start = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .start
+                )
+                self.end = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .end
+                )
+                self.x = try container.decodeIfPresent(
+                    Components.Schemas.ViewField.self,
+                    forKey: .x
+                )
+                self.y = try container.decodeIfPresent(
+                    Components.Schemas.ViewLayout.YPayload.self,
+                    forKey: .y
+                )
+                self.location = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .location
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "kind",
+                    "title",
+                    "sort",
+                    "group",
+                    "shown",
+                    "image",
+                    "date",
+                    "start",
+                    "end",
+                    "x",
+                    "y",
+                    "location"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+        public struct InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
+                    case invalidTransition = "invalid_transition"
+                    case missingRequiredField = "missing_required_field"
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
             }
         }
         /// A new API key, with its plaintext `key`.
@@ -16848,6 +17456,65 @@ extension Components {
         public typealias MarfaInline9983a886c97e38f1 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInlinecddf8275afa15408`.
         public typealias MarfaInlinecddf8275afa15408 = Swift.Double
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinefdf0831745ef621f`.
+        public struct MarfaInlinefdf0831745ef621f: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinefdf0831745ef621f/value1`.
+            public var value1: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinefdf0831745ef621f/value2`.
+            public var value2: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinefdf0831745ef621f/value3`.
+            public var value3: Swift.Bool?
+            /// Creates a new `MarfaInlinefdf0831745ef621f`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            ///   - value3:
+            public init(
+                value1: Swift.String? = nil,
+                value2: Swift.Double? = nil,
+                value3: Swift.Bool? = nil
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+                self.value3 = value3
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                var errors: [any Swift.Error] = []
+                do {
+                    self.value1 = try decoder.decodeFromSingleValueContainer()
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self.value2 = try decoder.decodeFromSingleValueContainer()
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self.value3 = try decoder.decodeFromSingleValueContainer()
+                } catch {
+                    errors.append(error)
+                }
+                try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                    [
+                        self.value1,
+                        self.value2,
+                        self.value3
+                    ],
+                    type: Self.self,
+                    codingPath: decoder.codingPath,
+                    errors: errors
+                )
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try encoder.encodeFirstNonNilValueToSingleValueContainer([
+                    self.value1,
+                    self.value2,
+                    self.value3
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df`.
         public struct MarfaInlined4567187ff0a66df: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1`.
@@ -17008,6 +17675,8 @@ extension Components {
         public typealias MarfaNullableMarfaInline9983a886c97e38f1 = MarfaNullable<Components.Schemas.MarfaInline9983a886c97e38f1>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinecddf8275afa15408`.
         public typealias MarfaNullableMarfaInlinecddf8275afa15408 = MarfaNullable<Components.Schemas.MarfaInlinecddf8275afa15408>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinefdf0831745ef621f`.
+        public typealias MarfaNullableMarfaInlinefdf0831745ef621f = MarfaNullable<Components.Schemas.MarfaInlinefdf0831745ef621f>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableTypeDefinition`.
         public typealias MarfaNullableTypeDefinition = MarfaNullable<Components.Schemas.TypeDefinition>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.

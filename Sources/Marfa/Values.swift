@@ -46,6 +46,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case wrongServer(expected: String, got: String, message: String)
     /// The item is whole and its bytes are not here, nor can they be fetched.
     case bytesAbsent(hash: String, reason: String, message: String)
+    /// The volume holding the file cache has less room than a fetch still has to receive.
+    case noRoom(hash: String, size: UInt64, free: UInt64, message: String)
     /// The server speaks a contract this build was not made for, and its
     /// answer was not read. `served` is the contract the answer named, or nil
     /// where a success named none. Where `writeSent`, the answer was to a
@@ -74,6 +76,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .copyExpired(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
+            .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
             .invalid(let message),
             .closed(let message):
@@ -118,6 +121,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             core = .WrongServer(expected: expected, got: got, message: message)
         case .bytesAbsent(let hash, let reason, let message):
             core = .BytesAbsent(hash: hash, reason: reason, message: message)
+        case .noRoom(let hash, let size, let free, let message):
+            core = .NoRoom(hash: hash, size: size, free: free, message: message)
         case .contractMismatch(let served, let expected, let status, let writeSent, let message):
             core = .ContractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message)
@@ -165,6 +170,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .wrongServer(expected: expected, got: got, message: message)
         case .BytesAbsent(let hash, let reason, let message):
             self = .bytesAbsent(hash: hash, reason: reason, message: message)
+        case .NoRoom(let hash, let size, let free, let message):
+            self = .noRoom(hash: hash, size: size, free: free, message: message)
         case .ContractMismatch(let served, let expected, let status, let writeSent, let message):
             self = .contractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message)
@@ -182,6 +189,32 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
 /// server answers them, and is empty where `unreadableProperties` says the
 /// stored properties could not be read.
 public typealias Item = MarfaCore.Item
+
+extension MarfaCore.Listing {
+    /// The items, where the copy was whole.
+    ///
+    /// Throws `MarfaError.hydrationIncomplete` while a hydration is still filling the copy, which would answer only
+    /// the rows that have arrived.
+    func whole() throws -> [Item] {
+        try refuseUnlessWhole(completeness)
+        return items
+    }
+}
+
+extension MarfaCore.Found {
+    /// The hits, where the copy was whole, as `Listing.whole()` answers the items.
+    func whole() throws -> [SearchHit] {
+        try refuseUnlessWhole(completeness)
+        return hits
+    }
+}
+
+func refuseUnlessWhole(_ completeness: MarfaCore.Completeness) throws {
+    guard completeness == .complete else {
+        throw MarfaError.hydrationIncomplete(
+            message: "a hydration is still filling this working copy, so the answer would hold only some rows")
+    }
+}
 
 /// One page of the server's bin.
 public typealias BinPage = MarfaCore.BinPage
