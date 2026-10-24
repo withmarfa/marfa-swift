@@ -28,8 +28,15 @@ final class Feed: Sendable {
         var running = false
         /// Streams whose `.stopped` waits on the refill, told only where it cannot be made.
         var waiting: Set<UUID> = []
-        /// What stopped the follow, told where the copy turns out not to be one a refill can mend.
+        /// What last stopped the follow, told where the copy turns out not to be one a refill can mend.
         var reason: MarfaError?
+        /// The server answered the copy's follow under the reach it was built under, and said its cursor aged out.
+        ///
+        /// Only then does a refill start by itself: the reach is not exposed, and a hydration under another reach
+        /// replaces the copy instead of filling it in place.
+        var vouched = false
+        /// A refill's own fill was cut off by a failure that mends itself, so a copy left `.inProgress` is its own.
+        var unfinished = false
         var attempts = 0
         /// The wait a rate limit named for the next attempt.
         var retryAfter: Duration = .zero
@@ -63,18 +70,42 @@ final class Feed: Sendable {
         /// Told once the lock is let go; `nil` ends the stream.
         var told: [(AsyncStream<Change>.Continuation, Change?)] = []
         var refill = Refill()
+        /// A hydration runs; the core holds one at a time and refuses the next `invalid`.
+        var filling = false
+        var fillWaiters: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)] = []
+        /// The most recent hydration, where it completed.
+        var lastFill: Fill?
+    }
+
+    private struct Fill {
+        let types: [String]
+        let tier: MarfaCore.SliceTier
+        let edgeTypes: [String]
+        let report: MarfaCore.HydrateReport
     }
 
     let holder: CoreHolder
     /// Whether the core has a watch to give: a writer with a server, or a reader.
     private let watched: Bool
     private let refillPace: RefillPace
+    private let instanceAt: InstanceAt
     private let state = Mutex(State())
 
-    init(holder: CoreHolder, watched: Bool, refillPace: RefillPace = .standard) {
+    /// The instance that answers at a server's address, as its public description names it.
+    typealias InstanceAt = @Sendable (_ origin: String) async throws -> String
+
+    static let instanceAt: InstanceAt = { origin in
+        try await background { try Marfa.translated { try MarfaCore.instanceDescription(url: origin).instanceId } }
+    }
+
+    init(
+        holder: CoreHolder, watched: Bool, refillPace: RefillPace = .standard,
+        instanceAt: @escaping InstanceAt = instanceAt
+    ) {
         self.holder = holder
         self.watched = watched
         self.refillPace = refillPace
+        self.instanceAt = instanceAt
     }
 
     /// Runs `body` under the lock, then tells what it queued to stream
@@ -129,12 +160,16 @@ final class Feed: Sendable {
     /// Ends every stream, takes each out of the watch, and returns once the core
     /// has let go of all of them, and so of the store.
     func close() async {
-        let streams = locked { state -> [Stream] in
+        let (streams, waiters) = locked { state -> ([Stream], [CheckedContinuation<Void, any Error>]) in
             state.closed = true
             state.refill.task?.cancel()
-            defer { state.streams = [:] }
-            return Array(state.streams.values)
+            defer {
+                state.streams = [:]
+                state.fillWaiters = []
+            }
+            return (Array(state.streams.values), state.fillWaiters.map(\.continuation))
         }
+        for waiter in waiters { waiter.resume(throwing: MarfaError.closed(message: CoreHolder.closedMessage)) }
         // Finishing a stream runs its termination handler, which takes the lock.
         for stream in streams { stream.continuation.finish() }
         for stream in streams { stream.subscription?.stop() }
@@ -149,6 +184,8 @@ final class Feed: Sendable {
         let leaving = try locked { state -> [MarfaCore.Subscription] in
             guard !state.closed else { throw MarfaError.closed(message: CoreHolder.closedMessage) }
             state.suspends += 1
+            // A new key may read under another reach than the one the server last answered for.
+            state.refill.vouched = false
             var leaving: [MarfaCore.Subscription] = []
             for token in state.streams.keys {
                 if let subscription = state.streams[token]?.subscription { leaving.append(subscription) }
@@ -236,9 +273,11 @@ final class Feed: Sendable {
             case .serverReachable: stream.unreachable = false
             case .watchFailed(let reason, _):
                 // An aged-out cursor expires the copy as well, so which it was is read from the store.
-                if case .copyExpired = MarfaError(reason) {
+                if case .copyExpired(let why, _) = MarfaError(reason) {
                     state.refill.waiting.insert(token)
-                    if state.refill.reason == nil { state.refill.reason = MarfaError(reason) }
+                    state.refill.reason = MarfaError(reason)
+                    // The core refuses a copy that was stale already with this reason, asking the server nothing.
+                    if why != "catchup_too_old" { state.refill.vouched = true }
                     guard !state.refill.running else { return false }
                     state.refill.running = true
                     if let filledAt = state.refill.filledAt, filledAt.duration(to: .now) >= refillPace.settle {
@@ -259,10 +298,71 @@ final class Feed: Sendable {
         }
     }
 
-    /// Runs a hydration and tells every stream how it ended, as the app's own does.
+    /// Runs the app's hydration, after any other one this copy is running, and tells every stream how it ended.
+    ///
+    /// One that waited, for the same slice as a hydration that just completed, returns that one's report while the
+    /// copy is still whole.
     func hydrate(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String]) async throws
         -> MarfaCore.HydrateReport
     {
+        let waited = try await takeFill()
+        defer { releaseFill() }
+        if waited, let filled = locked({ $0.lastFill }), filled.types == types, filled.tier == tier,
+            filled.edgeTypes == edgeTypes, (try? await holder.run({ try $0.status() }).hydration) == .complete
+        {
+            return filled.report
+        }
+        return try await fill(types: types, tier: tier, edgeTypes: edgeTypes, byRefill: false)
+    }
+
+    /// Waits until no other hydration of this copy runs, and says whether it had to.
+    private func takeFill() async throws -> Bool {
+        let id = UUID()
+        var waited = false
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let now = locked { state -> Result<Void, any Error>? in
+                    if state.closed { return .failure(MarfaError.closed(message: CoreHolder.closedMessage)) }
+                    if Task.isCancelled { return .failure(MarfaError.canceled(message: "the call was canceled")) }
+                    guard state.filling else {
+                        state.filling = true
+                        return .success(())
+                    }
+                    state.fillWaiters.append((id, continuation))
+                    return nil
+                }
+                if let now { continuation.resume(with: now) } else { waited = true }
+            }
+        } onCancel: {
+            let waiter = locked { state -> CheckedContinuation<Void, any Error>? in
+                guard let index = state.fillWaiters.firstIndex(where: { $0.id == id }) else { return nil }
+                return state.fillWaiters.remove(at: index).continuation
+            }
+            waiter?.resume(throwing: MarfaError.canceled(message: "the call was canceled"))
+        }
+        return waited
+    }
+
+    /// Hands the turn to the next waiting hydration.
+    private func releaseFill() {
+        let next = locked { state -> CheckedContinuation<Void, any Error>? in
+            guard !state.fillWaiters.isEmpty else {
+                state.filling = false
+                return nil
+            }
+            return state.fillWaiters.removeFirst().continuation
+        }
+        next?.resume()
+    }
+
+    /// Runs a hydration, holding the turn `takeFill` gave, and tells every stream how it ended.
+    private func fill(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], byRefill: Bool)
+        async throws -> MarfaCore.HydrateReport
+    {
+        locked { state in
+            state.lastFill = nil
+            if !byRefill { state.refill.unfinished = false }
+        }
         let report: MarfaCore.HydrateReport
         do {
             report = try await holder.runUntilCanceled { core, stop in
@@ -272,6 +372,7 @@ final class Feed: Sendable {
             announce(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
             throw error
         }
+        locked { $0.lastFill = Fill(types: types, tier: tier, edgeTypes: edgeTypes, report: report) }
         announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }
@@ -302,26 +403,9 @@ final class Feed: Sendable {
             if next.delay > .zero { try? await Task.sleep(for: next.delay) }
             let failure: MarfaError?
             do {
-                let status = try await holder.run { try $0.status() }
-                switch status.hydration {
-                case .stale:
-                    guard let tier = status.sliceTier else {
-                        failure = locked { $0.refill.reason }
-                        break
-                    }
-                    _ = try await hydrate(types: status.sliceTypes, tier: tier, edgeTypes: status.sliceEdgeTypes)
-                    failure = nil
-                    locked { $0.refill.filledAt = .now }
-                // A stream that joined while the refill ran heard the failure the refill mended.
-                case .complete:
-                    failure = locked { state in
-                        guard let filledAt = state.refill.filledAt, filledAt.duration(to: .now) < refillPace.settle
-                        else { return state.refill.reason }
-                        return nil
-                    }
-                default:
-                    failure = locked { $0.refill.reason }
-                }
+                _ = try await takeFill()
+                defer { releaseFill() }
+                failure = try await refillOnce()
             } catch let error as MarfaError where Self.mendsItself(error) {
                 locked { state in
                     state.refill.waiting.formUnion(next.owed)
@@ -338,9 +422,48 @@ final class Feed: Sendable {
                         state.told.append((stream.continuation, Self.stopped(failure)))
                     }
                 }
-                state.refill = Refill(attempts: state.refill.attempts, filledAt: state.refill.filledAt)
+                state.refill = Refill(filledAt: state.refill.filledAt)
             }
             return
+        }
+    }
+
+    /// One attempt, holding the hydration turn: `nil` where the copy is whole or filling, or was filled, and
+    /// otherwise the stop to tell.
+    private func refillOnce() async throws -> MarfaError? {
+        let status = try await holder.run { try $0.status() }
+        let reason = locked { $0.refill.reason } ?? .copyExpired(reason: "catchup_too_old", message: "")
+        switch status.hydration {
+        // The app's hydration, or an earlier refill, mended it; a later aged-out cursor halts the follow again.
+        case .complete:
+            return nil
+        // A fill the app began and did not finish is its own to carry on, and the core's follow waits for it.
+        case .inProgress where !locked({ $0.refill.unfinished }):
+            return nil
+        case .stale, .inProgress:
+            guard let tier = status.sliceTier, locked({ $0.refill.vouched }) else { return reason }
+            guard let origin = status.serverOrigin, let built = status.instanceId else { return reason }
+            // The core fills a copy built under another instance from scratch instead of in place, and a queued
+            // write would then be sent to that instance.
+            guard try await instanceAt(origin) == built else {
+                return .copyExpired(
+                    reason: "instance_changed",
+                    message: "another instance answers at the copy's server; hydrate to replace the copy")
+            }
+            do {
+                _ = try await fill(
+                    types: status.sliceTypes, tier: tier, edgeTypes: status.sliceEdgeTypes, byRefill: true)
+            } catch let error as MarfaError where Self.mendsItself(error) {
+                locked { $0.refill.unfinished = true }
+                throw error
+            }
+            locked { state in
+                state.refill.filledAt = .now
+                state.refill.unfinished = false
+            }
+            return nil
+        default:
+            return reason
         }
     }
 

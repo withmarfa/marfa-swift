@@ -160,6 +160,14 @@ final class FakeCore: Core, @unchecked Sendable {
         var hydrations: [ContinuousClock.Instant] = []
         /// Fails this many hydrations with `hydrateFails` before the rest succeed; `nil` fails them all.
         var hydrateFailsFirst: Int?
+        /// Held by the next hydration until signaled, as `gate` holds a drain.
+        var hydrateGate: DispatchSemaphore?
+        var hydrateGated = false
+        var hydrating = false
+        /// A completed hydration leaves the copy `.complete`, as the core's does.
+        var hydrationCompletes = false
+        var instanceId: String?
+        var serverOrigin: String?
         var pins: Set<String> = []
         var probe: DropProbe?
         var budgets: [MarfaCore.FileBudget] = []
@@ -243,6 +251,18 @@ final class FakeCore: Core, @unchecked Sendable {
     ) throws
         -> MarfaCore.HydrateReport
     {
+        // The core holds one hydration at a time (`claim_stream(Mover::Hydration)`).
+        let held = try state.withLock { state -> DispatchSemaphore? in
+            guard !state.hydrating else {
+                throw MarfaCore.MarfaError.Invalid(
+                    message: "this working copy is already hydrating, catching up or following")
+            }
+            state.hydrating = true
+            defer { state.hydrateGate = nil }
+            state.hydrateGated = state.hydrateGate != nil
+            return state.hydrateGate
+        }
+        defer { state.withLock { $0.hydrating = false } }
         let failure = state.withLock { state -> MarfaCore.MarfaError? in
             state.hydrationOptions = (types, tier, edgeTypes)
             state.hydrations.append(.now)
@@ -251,7 +271,14 @@ final class FakeCore: Core, @unchecked Sendable {
             state.hydrateFailsFirst = first - 1
             return first > 0 ? failure : nil
         }
+        held?.wait()
         if let failure { throw failure }
+        state.withLock { state in
+            if state.hydrationCompletes {
+                state.hydration = .complete
+                state.slice = (types, tier, edgeTypes)
+            }
+        }
         return MarfaCore.HydrateReport(
             types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1, resumed: false,
             restarted: nil, inPlace: state.withLock { $0.hydrateInPlace }, cursor: "1", registeredTypes: [],
@@ -311,9 +338,9 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func status() throws -> MarfaCore.Status {
-        let slice = state.withLock { $0.slice }
+        let (slice, origin, instance) = state.withLock { ($0.slice, $0.serverOrigin, $0.instanceId) }
         return MarfaCore.Status(
-            serverOrigin: nil, instanceId: nil, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
+            serverOrigin: origin, instanceId: instance, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
             sliceEdgeTypes: slice?.edgeTypes ?? [], pinned: [],
             eventCursor: nil,
             hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0,

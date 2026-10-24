@@ -47,7 +47,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
     /// The catch-up that first detects an aged-out cursor gives a descriptive reason; read `status().hydration`
     /// to distinguish `.stale` from other expired copies. A held `changes()` stream fills a stale copy again by
-    /// itself.
+    /// itself when its follow finds the cursor aged out, and is told this error where it does not.
     case copyExpired(reason: String, message: String)
     case streamIncomplete(reason: String, message: String)
     case wrongServer(expected: String, got: String, message: String)

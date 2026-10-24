@@ -24,9 +24,14 @@ public final class WorkingCopy: Sendable {
     public let queue: Queue
     public let catalog: Catalog
 
-    init(holder: CoreHolder, hasServer: Bool, refillPace: Feed.RefillPace = .standard) {
+    init(
+        holder: CoreHolder, hasServer: Bool, refillPace: Feed.RefillPace = .standard,
+        instanceAt: @escaping Feed.InstanceAt = Feed.instanceAt
+    ) {
         self.holder = holder
-        feed = Feed(holder: holder, watched: hasServer || holder.handle == .reader, refillPace: refillPace)
+        feed = Feed(
+            holder: holder, watched: hasServer || holder.handle == .reader, refillPace: refillPace,
+            instanceAt: instanceAt)
         items = Items(holder: holder, feed: feed)
         edges = Edges(holder: holder, feed: feed)
         tags = Tags(holder: holder, feed: feed)
@@ -164,6 +169,10 @@ public final class WorkingCopy: Sendable {
     /// completes, writes to items (file items and attaches included) are queued, to a row the copy holds or a new
     /// one, and edge writes throw `hydrationIncomplete`.
     ///
+    /// The copy runs one hydration at a time. A call made while another runs, such as the refill a held `changes()`
+    /// stream starts, waits for it and then runs. When the one it waited for completed over the same slice and the
+    /// copy is still whole, the call returns that hydration's report instead of filling the copy again.
+    ///
     /// The call announces `.refreshed(.hydrated)` when it completes, and `.refreshed(.unfinished)` when it fails or
     /// is canceled, because the rows it wrote stay.
     public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = []) async throws -> HydrateReport {
@@ -270,16 +279,25 @@ public final class WorkingCopy: Sendable {
     /// duration and gives it back, and no stream is told of the gap. A reader
     /// is told each save the writer makes.
     ///
-    /// When the server's event log has let the copy's cursor go, as it can
-    /// while a Mac sleeps, `status().hydration` is `.stale` and the copy fills
-    /// itself again over the slice it holds, as `hydrate` does, telling the
-    /// streams `.refreshed(.hydrated)`, and the follow carries on. An attempt
-    /// the network or the server fails is told `.refreshed(.unfinished)` and
-    /// tried again after one second, then further apart, up to five minutes
-    /// apart. When the follow stops with any other error, or the server
-    /// refuses the refill, every stream is told `.stopped` and it stays stopped
-    /// until the app's next hydration or catch-up, or until a stream is asked
-    /// for while none is held. On a
+    /// When the follow finds that the server's event log has let the copy's
+    /// cursor go, as it can while a Mac sleeps, `status().hydration` is
+    /// `.stale` and the copy fills itself again over the slice it holds, as
+    /// `hydrate` does, telling the streams `.refreshed(.hydrated)`, and the
+    /// follow carries on. It does so only while the instance answering at the
+    /// server is the one the copy was built from, and the key is the one the
+    /// follow used. An attempt the network or the server fails is told
+    /// `.refreshed(.unfinished)` and tried again after one second, then
+    /// further apart, up to five minutes apart. A copy the app is hydrating,
+    /// or has made whole, is left to that hydration.
+    ///
+    /// Otherwise every stream is told `.stopped`: when the follow stops with
+    /// any other error, when the server refuses the refill, when another
+    /// instance answers (`copyExpired` with the reason `instance_changed`),
+    /// and when the copy was already stale as the follow began, such as after
+    /// `useKey` or on a store opened stale (`copyExpired` with the reason
+    /// `catchup_too_old`). For a `.stale` copy, hydrate the same slice to fill
+    /// it again. A stopped stream stays stopped until the app's next hydration
+    /// or catch-up, or until a stream is asked for while none is held. On a
     /// store that holds no completed hydration the follow waits, asking the
     /// server nothing, until one completes. Local writes and declarations
     /// still notify the writer's streams. `status().hydration` says which.

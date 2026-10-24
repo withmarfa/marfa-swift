@@ -330,7 +330,7 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
     case expired
     /// The server's event log let the copy's cursor go. The copy answers reads with what it held, marked
     /// `.stale`, and takes writes but edge writes, until a hydration has filled it again in place. A held
-    /// `changes()` stream starts that hydration by itself.
+    /// `changes()` stream starts that hydration by itself when its follow finds the cursor aged out.
     case stale
 
     init(_ core: MarfaCore.Hydration) {
