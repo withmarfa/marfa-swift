@@ -129,11 +129,14 @@ extension LiveWorkingCopies {
             let started = try await api.startMove(ofType: from, to: to)
             let stopped = try await api.cancel(moveJob: started.id)
             let ended = try await api.follow(moveJob: stopped.id)
-            #expect(ended.status == .canceled, "\(ended)")
-            #expect(ended.succeeded < 600, "it stopped before the end")
+            // The server may finish the job before the cancel reaches it; that answer is a completed job.
+            #expect(ended.status == .canceled || ended.status == .completed, "\(ended)")
             let afterwards = try await api.previewMove(ofType: from, to: to)
             #expect(afterwards.matched == 600 - ended.succeeded, "what it moved stays moved")
-            #expect(afterwards.settings.contains { $0.id == view }, "no setting was rewritten")
+            if ended.status == .canceled {
+                #expect(ended.succeeded < 600, "it stopped before the end")
+                #expect(afterwards.settings.contains { $0.id == view }, "no setting was rewritten")
+            }
 
             let finished = try await api.follow(moveJob: try await api.startMove(ofType: from, to: to).id)
             #expect(finished.status == .completed && finished.result?.remaining == 0)
