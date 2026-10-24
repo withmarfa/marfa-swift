@@ -7,9 +7,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { generate, prepare } from "./generate.mjs";
+import { clientOperations, generate, prepare } from "./generate.mjs";
 
 const nullable = {
   anyOf: [
@@ -379,5 +380,63 @@ test("optional nullable type arrays keep presence, constraints, and annotations"
     const collision = structuredClone(input);
     collision.components.schemas[reserved] = { type: "string" };
     assert.throws(() => prepare(collision), /already defines/);
+  }
+});
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+test("the client keeps what an app's credential calls on the server and a working copy does not do", () => {
+  const operation = (operationId, tags, security = [{ bearerAuth: [] }]) => ({
+    operationId, tags, security, responses: {},
+  });
+  const input = {
+    openapi: "3.1.0",
+    info: { title: "Fixture", version: "1" },
+    paths: {
+      "/types": { post: operation("registerType", ["Types"]) },
+      "/items": { post: operation("createItem", ["Items"]) },
+      "/items/{id}/versions": { get: operation("listItemVersions", ["Items"]) },
+      "/items/new": { get: operation("aNewItemsOperation", ["Items"]) },
+      "/connectors": { post: operation("registerConnector", ["Connectors"]) },
+      "/owner": { get: operation("getOwner", ["Owner"], [{ ownerSession: [] }]) },
+      "/": { get: operation("getInstance", ["Instance"], []) },
+      "/blobs": { post: operation("uploadBlob", ["Blobs"]) },
+      "/blobs/stores": { get: operation("listBlobStores", ["Blobs"]) },
+      "/new": { get: operation("aNewServerOperation", ["Something new"]) },
+    },
+  };
+  assert.deepEqual(clientOperations(input), [
+    "aNewServerOperation", "listBlobStores", "listItemVersions", "registerType",
+  ]);
+});
+
+// A pin that adds or removes an operation fails here until the list says whether the client makes it.
+const pinned = [
+  "applyBulkAction", "cancelBulkActionJob", "createKey", "createWebhook", "deleteBlobCopy", "deleteEdgeType",
+  "deleteRetiredPlatformType", "deleteType", "deleteWebhook", "exportArchive", "getBlobUrl", "getBulkActionJob",
+  "getConfig", "getCurrentKey", "getFolderStatus", "getInstanceMetrics", "getItemExtension", "getItemMetadata",
+  "getItemStats", "getOwnerPicture", "getType", "getWebhook", "listAppGrants", "listAuditLog", "listBlobCopies",
+  "listBlobOrphans", "listBlobStores", "listEdgeTypes", "listHousekeeping", "listItemExtensions",
+  "listItemVersions", "listKeys", "listOccurrences", "listRetiredPlatformTypes", "listTags", "listTypes",
+  "listWebhookDeliveries", "listWebhooks", "normalizeType", "redeliverWebhookDelivery", "registerEdgeType",
+  "registerType", "replaceConfig", "replaceProfilePicture", "replaceType", "revokeAppGrant", "revokeKey",
+  "runHousekeeping", "updateConfig", "updateKey", "updateProfile", "updateWebhook",
+];
+
+test("the committed client makes exactly the pinned operations", () => {
+  const generated = (file) => [
+    ...readFileSync(join(root, file), "utf8").matchAll(/- Remark: Generated from `#\/paths\/[^`]*\((\w+)\)`/g),
+  ].map((match) => match[1]);
+  const client = [...new Set(generated("Sources/MarfaAPI/Generated/Client.swift"))].sort();
+  assert.deepEqual(client, pinned);
+  // The wire types still describe every operation, so the client's absence of one is its own.
+  const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
+  assert.ok(wire.has("createItem"));
+  assert.ok(!client.includes("createItem"));
+  const openapi = join(root, ".build/marfa/openapi.json");
+  try {
+    assert.deepEqual(clientOperations(JSON.parse(readFileSync(openapi, "utf8"))), pinned);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
   }
 });

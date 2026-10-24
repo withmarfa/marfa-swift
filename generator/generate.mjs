@@ -239,56 +239,148 @@ export function prepare(document) {
   return { document: result, nullable, usesNull };
 }
 
-export function generate(binary, source, destination) {
+// A connector calls these with a key of its own, through the TypeScript SDK or HTTP.
+const connectorTags = new Set(["Connectors", "Connector state", "Inbound webhooks"]);
+// A working copy reads and writes these itself, offline, so the client leaves them out.
+const copyTags = new Set([
+  "Items",
+  "Metadata",
+  "Extensions",
+  "Edges",
+  "Search",
+  "Event stream",
+  "Folders",
+  "Views",
+]);
+// What the server answers from those areas and a copy does not hold.
+const serverOnly = new Set([
+  "listItemVersions",
+  "getItemStats",
+  "listOccurrences",
+  "getItemMetadata",
+  "listTags",
+  "getItemExtension",
+  "listItemExtensions",
+  "getFolderStatus",
+]);
+// A copy uploads a blob's bytes and fetches them itself.
+const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
+const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+
+function* operations(document) {
+  for (const [path, item] of Object.entries(document.paths ?? {}))
+    for (const method of methods)
+      if (item[method]?.operationId) yield { path, method, operation: item[method] };
+}
+
+// The operations the client makes: those an app's key or access token may call, less a connector's and what
+// a working copy does.
+export function clientOperations(document) {
+  const kept = [];
+  for (const { operation } of operations(document)) {
+    const security = operation.security ?? document.security ?? [];
+    if (!security.some((requirement) => "bearerAuth" in requirement)) continue;
+    const tags = operation.tags ?? [];
+    if (tags.some((tag) => connectorTags.has(tag))) continue;
+    if (tags.some((tag) => copyTags.has(tag)) && !serverOnly.has(operation.operationId)) continue;
+    if (copyBlobs.has(operation.operationId)) continue;
+    kept.push(operation.operationId);
+  }
+  return kept.sort();
+}
+
+// The document with only `kept` operations, each answering only its successes: the client throws a refusal
+// before it would read one.
+function clientDocument(document, kept) {
+  const result = structuredClone(document);
+  for (const [path, item] of Object.entries(result.paths ?? {})) {
+    for (const method of methods) {
+      const operation = item[method];
+      if (!operation?.operationId) continue;
+      if (!kept.has(operation.operationId)) {
+        delete item[method];
+        continue;
+      }
+      for (const status of Object.keys(operation.responses ?? {}))
+        if (!/^[123]/.test(status)) delete operation.responses[status];
+    }
+    if (!methods.some((method) => item[method])) delete result.paths[path];
+  }
+  return result;
+}
+
+function replaceOnce(text, pattern, replacement, file) {
+  const matches = text.match(new RegExp(pattern.source, `${pattern.flags.replace("g", "")}g`)) ?? [];
+  if (matches.length !== 1)
+    throw new Error(`${file}: expected one match of ${pattern}, found ${matches.length}`);
+  return text.replace(pattern, replacement);
+}
+
+function run(binary, scratch, name, document, config) {
+  const prepared = join(scratch, `${name}.json`);
+  const diagnostics = join(scratch, `${name}-diagnostics.yaml`);
+  const configFile = join(scratch, `${name}-config.yaml`);
+  const output = join(scratch, name);
+  writeFileSync(prepared, JSON.stringify(document, null, 2));
+  writeFileSync(configFile, config);
+  mkdirSync(output);
+  const result = spawnSync(
+    binary,
+    [
+      "generate",
+      "--config",
+      configFile,
+      "--diagnostics-output-path",
+      diagnostics,
+      "--output-directory",
+      output,
+      prepared,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0)
+    throw new Error(`${name} generation failed: ${result.stderr || result.stdout}`);
+  const report = readFileSync(diagnostics, "utf8").trim();
+  if (report !== "diagnostics: []\nuniqueMessages: []")
+    throw new Error(`${name} generation reported diagnostics:\n${report}`);
+  return output;
+}
+
+// Publish only a complete generation, so a skipped schema leaves the last good output available for
+// inspection.
+function publish(output, destination) {
+  rmSync(destination, { recursive: true, force: true });
+  mkdirSync(destination, { recursive: true });
+  for (const name of readdirSync(output))
+    copyFileSync(join(output, name), join(destination, name));
+}
+
+const clientSummary = `/// The server's own operations, for what only the server can do.
+///
+/// Make one with \`Client(_:)\` from a \`Server\`. A working copy answers items, edges, search, folders and
+/// views, offline; this client calls the server for the rest, such as registering a type, reading an item's
+/// versions or managing keys, and needs a connection for each call. Every call throws \`MarfaError\`.
+`;
+
+export function generate(binary, source, destination, clientDestination) {
   const document = JSON.parse(readFileSync(source, "utf8"));
   const contract = String(document.info?.version);
   if (!/^(0|[1-9][0-9]*)$/.test(contract))
     throw new Error("the API document must name a whole-number contract");
   const scratch = mkdtempSync(join(tmpdir(), "marfa-types-"));
   try {
-    const prepared = join(scratch, "openapi.json");
-    const diagnostics = join(scratch, "diagnostics.yaml");
-    const output = join(scratch, "types");
     const preparedDocument = prepare(document);
-    writeFileSync(prepared, JSON.stringify(preparedDocument.document, null, 2));
-    const config = join(scratch, "config.yaml");
-    const overrides = [...preparedDocument.nullable]
-      .map(
-        ([name, { target }]) =>
-          `    ${name}: MarfaNullable<Components.Schemas.${target}>\n`,
-      )
-      .join("");
-    writeFileSync(
-      config,
-      readFileSync(join(here, "openapi-generator-config.yaml"), "utf8") +
-        (preparedDocument.usesNull
-          ? "    MarfaNull: MarfaNullValue\n"
-          : "") +
-        overrides,
-    );
-    mkdirSync(output);
-    const result = spawnSync(
-      binary,
-      [
-        "generate",
-        "--config",
-        config,
-        "--diagnostics-output-path",
-        diagnostics,
-        "--output-directory",
-        output,
-        prepared,
-      ],
-      { encoding: "utf8" },
-    );
-    if (result.error) throw result.error;
-    if (result.status !== 0)
-      throw new Error(
-        `wire generation failed: ${result.stderr || result.stdout}`,
-      );
-    const report = readFileSync(diagnostics, "utf8").trim();
-    if (report !== "diagnostics: []\nuniqueMessages: []")
-      throw new Error(`wire generation reported diagnostics:\n${report}`);
+    const overrides =
+      (preparedDocument.usesNull ? "    MarfaNull: MarfaNullValue\n" : "") +
+      [...preparedDocument.nullable]
+        .map(
+          ([name, { target }]) =>
+            `    ${name}: MarfaNullable<Components.Schemas.${target}>\n`,
+        )
+        .join("");
+    const base = readFileSync(join(here, "openapi-generator-config.yaml"), "utf8") + overrides;
+    const output = run(binary, scratch, "types", preparedDocument.document, base);
     copyFileSync(
       join(here, "MarfaNullValue.swift"),
       join(output, "MarfaNullValue.swift"),
@@ -301,12 +393,39 @@ export function generate(binary, source, destination) {
       join(output, "Contract.swift"),
       `// Generated from the pinned openapi.json by scripts/core.sh; do not edit.\n\n/// The contract version these types describe: the document's \`info.version\`,\n/// which an instance's root answers as \`contract\`.\npublic let marfaContractVersion = ${contract}\n`,
     );
-    // Publish only a complete generation, so a skipped schema leaves the
-    // last good output available for inspection.
-    rmSync(destination, { recursive: true, force: true });
-    mkdirSync(destination, { recursive: true });
-    for (const name of readdirSync(output))
-      copyFileSync(join(output, name), join(destination, name));
+    let client;
+    if (clientDestination) {
+      const filtered = clientDocument(
+        preparedDocument.document,
+        new Set(clientOperations(document)),
+      );
+      // The wire types are MarfaTypes'; of each run only the client and its protocol are kept.
+      const imports = "additionalImports:\n  - MarfaTypes\n";
+      const made = run(
+        binary, scratch, "client", filtered,
+        base.replace("  - types\n", "  - client\n") + imports,
+      );
+      const surface = run(binary, scratch, "surface", filtered, base + imports);
+      client = join(scratch, "published-client");
+      mkdirSync(client);
+      let code = readFileSync(join(made, "Client.swift"), "utf8");
+      code = replaceOnce(
+        code,
+        /(public import MarfaTypes\n)(?:\/\/\/.*\n)+public struct Client: APIProtocol \{\n/,
+        `$1${clientSummary}public struct Client: ClientProtocol {\n`,
+        "Client.swift",
+      );
+      code = replaceOnce(code, /private let client: UniversalClient\n/, "private let client: Sender\n", "Client.swift");
+      code = replaceOnce(code, /\n    public init\(\n        serverURL:/, "\n    init(\n        serverURL:", "Client.swift");
+      writeFileSync(join(client, "Client.swift"), code);
+      let protocol = readFileSync(join(surface, "Types.swift"), "utf8");
+      protocol = replaceOnce(protocol, /public protocol APIProtocol: Sendable \{/, "public protocol ClientProtocol: Sendable {", "Types.swift");
+      protocol = replaceOnce(protocol, /\nextension APIProtocol \{/, "\nextension ClientProtocol {", "Types.swift");
+      protocol = replaceOnce(protocol, /\n\/\/\/ Server URLs defined in the OpenAPI document\.\npublic enum Servers \{[\s\S]*$/, "\n", "Types.swift");
+      writeFileSync(join(client, "ClientProtocol.swift"), protocol);
+    }
+    publish(output, destination);
+    if (client) publish(client, clientDestination);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -316,10 +435,10 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 ) {
-  const [, , binary, source, destination] = process.argv;
-  if (!binary || !source || !destination)
+  const [, , binary, source, destination, clientDestination] = process.argv;
+  if (!binary || !source || !destination || !clientDestination)
     throw new Error(
-      "usage: node generator/generate.mjs <generator> <openapi.json> <output-directory>",
+      "usage: node generator/generate.mjs <generator> <openapi.json> <types-directory> <client-directory>",
     );
-  generate(binary, source, destination);
+  generate(binary, source, destination, clientDestination);
 }
