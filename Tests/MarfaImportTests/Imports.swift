@@ -33,4 +33,12 @@ public func checkImports() {
     let edgeEdit = EdgeEdit(baseVersion: edge.version, move: .source("third"))
     precondition(queued.id == "write" && report.unsent == 0 && error.code() == "invalid")
     precondition(slice == .all && edgeEdit.move == .source("third"))
+    let group = ViewGroup(key: .string("todo"), count: 2, sum: nil)
+    let layout = ViewLayout(id: "board", kind: .board, group: ViewGrouping(by: "properties.status", bucket: .day))
+    let settings = ViewSettings(title: "Tasks", query: ViewQuery(types: ["core.task"], tier: .all), layouts: [layout])
+    precondition(group.count == 2 && settings.layouts.first?.kind == .board)
+    let cache = FileCache(
+        setting: FileBudget.keepAll, budget: nil, held: 0, heldUnreadable: nil, volumeUnreadable: false,
+        backupMarkFailure: nil)
+    precondition(Status(fileCache: cache).fileCache.setting == .keepAll)
 }

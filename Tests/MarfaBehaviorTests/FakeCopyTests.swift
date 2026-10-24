@@ -114,6 +114,11 @@ struct FakeCopyBehavior {
             ),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
+            ("items.views", { _ = try await copy.items.views() }),
+            ("items.view", { _ = try await copy.items.view(id) }),
+            ("items.list(inView:)", { _ = try await copy.items.list(inView: id) }),
+            ("items.groups(inView:)", { _ = try await copy.items.groups(inView: id, layout: "main") }),
+            ("search(inView:)", { _ = try await copy.search("x", inView: id) }),
         ]
         for (call, make) in calls {
             await #expect(performing: { try await make() }, throws: refusedAsUnsupported(call))
