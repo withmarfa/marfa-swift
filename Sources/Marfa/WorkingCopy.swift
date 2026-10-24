@@ -275,8 +275,8 @@ public final class WorkingCopy: Sendable {
     /// itself again over the slice it holds, as `hydrate` does, telling the
     /// streams `.refreshed(.hydrated)`, and the follow carries on. An attempt
     /// the network or the server fails is told `.refreshed(.unfinished)` and
-    /// tried again, at once the first time and then further apart, up to five
-    /// minutes. When the follow stops with any other error, or the server
+    /// tried again after one second, then further apart, up to five minutes
+    /// apart. When the follow stops with any other error, or the server
     /// refuses the refill, every stream is told `.stopped` and it stays stopped
     /// until the app's next hydration or catch-up, or until a stream is asked
     /// for while none is held. On a
