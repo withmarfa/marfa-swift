@@ -14,7 +14,9 @@ public typealias ViewGroup = MarfaCore.ViewGroup
 ///
 /// A view says which items to list in its ``ViewSettings/query`` and how each layout shows them, so every app shows
 /// the same list the same way. Read one with ``Items/view(_:)``, its items with ``Items/list(inView:layout:limit:offset:)``
-/// and its groups with ``Items/groups(inView:layout:timeZone:)``.
+/// and its groups with ``Items/groups(inView:layout:timeZone:)``. ``WorkingCopy/createView(_:idempotencyKey:)``,
+/// ``WorkingCopy/changeView(_:_:baseVersion:idempotencyKey:)`` and ``WorkingCopy/deleteView(_:idempotencyKey:)``
+/// write one.
 public struct SavedView: Sendable, Hashable, Identifiable {
     public let id: String
     public let version: Int64
@@ -310,12 +312,20 @@ private struct ViewReader {
 }
 
 extension SliceTier {
-    fileprivate init?(wire: String) {
+    init?(wire: String) {
         switch wire {
         case "library": self = .library
         case "feed": self = .feed
         case "all": self = .all
         default: return nil
+        }
+    }
+
+    var wire: String {
+        switch self {
+        case .library: "library"
+        case .feed: "feed"
+        case .all: "all"
         }
     }
 }

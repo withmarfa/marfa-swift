@@ -271,7 +271,7 @@ final class FakeCore: Core, @unchecked Sendable {
             hydration: .complete, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0, catalogVersion: 1,
             fileCache: MarfaCore.FileCache(
                 setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
-                backupMarkFailure: nil))
+                backupMarkFailure: nil, attachments: nil))
     }
 
     override func withdraw(id: String) throws -> Bool {

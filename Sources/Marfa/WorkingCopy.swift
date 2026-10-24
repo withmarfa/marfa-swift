@@ -341,6 +341,9 @@ public struct Change: Sendable, Hashable {
         /// revoked; the copy holds the answer where its slice or a pin takes it,
         /// and otherwise at its next catch-up.
         case folderWritten
+        /// A view, named by `itemId`, was created or changed; the copy holds the answer where its slice or a pin
+        /// takes it, and otherwise at its next catch-up. A deleted view is told as `.purged`.
+        case viewWritten
         /// The app replaced its declarations, or a refresh read a changed
         /// item type or edge type catalog; read `catalog` again.
         case catalog

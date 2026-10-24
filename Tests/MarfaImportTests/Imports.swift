@@ -39,6 +39,6 @@ public func checkImports() {
     precondition(group.count == 2 && settings.layouts.first?.kind == .board)
     let cache = FileCache(
         setting: FileBudget.keepAll, budget: nil, held: 0, heldUnreadable: nil, volumeUnreadable: false,
-        backupMarkFailure: nil)
+        backupMarkFailure: nil, attachments: nil)
     precondition(Status(fileCache: cache).fileCache.setting == .keepAll)
 }
