@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 public import Marfa
 @_exported public import MarfaTypes
 import OpenAPIRuntime
