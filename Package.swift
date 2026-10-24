@@ -13,7 +13,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0")
     ],
     targets: [
-        .binaryTarget(name: "MarfaCoreFFI", path: "Frameworks/MarfaCoreFFI.xcframework"),
+        .binaryTarget(name: "MarfaCoreFFI", url: "https://github.com/withmarfa/marfa-swift/releases/download/v0.0.31/MarfaCoreFFI.xcframework.zip", checksum: "67a263e97f2403bc7ee96660fc2caba180a160a9c48f471a14a3020a97939125"),
         // Swift 5, because the generated glue is not Swift 6 clean.
         .target(
             name: "MarfaCore",
