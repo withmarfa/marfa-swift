@@ -52,6 +52,24 @@ for note in try await copy.items.list(ListFilters(type: "core.note")) {
 
 `storeURL` is where the working copy keeps its SQLite file, and `serverURL` is your instance's address. Keep `key` in the keychain between launches with `Keychain.system`; the copy holds it in memory and never writes it to its store.
 
+## Identify the connected instance
+
+Read the server's public description to display its configured name:
+
+```swift
+let instance = try await server.instanceDescription()
+print(instance.name)
+print(instance.instanceId)
+print(instance.version)
+if let release = instance.release {
+    print(release)
+}
+```
+
+The result also includes `contract` and `features`. The server supplies `Marfa` when no display name is configured, and omits `release` for a build that is not a numbered release.
+
+This call sends an anonymous JSON request through the core, preserves the server URL's path prefix, and needs no working copy or `config.manage` permission. It does not send `server.key` or read the keychain. Connection failures, HTTP refusals, redirects, and malformed descriptions throw `MarfaError`; a failed read does not produce a default description. Reading the description does not establish access to the instance's data or contract compatibility.
+
 ## Sign in
 
 An app that people install signs in to their instance instead of asking them for a key. The owner approves the app in the browser, and the package keeps the sign-in in the keychain and renews it when the instance stops accepting its access token.
