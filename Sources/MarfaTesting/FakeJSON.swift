@@ -210,6 +210,8 @@ enum Refuse {
         notFound("edge_not_found", "\(id) is not an edge this copy holds")
     }
 
+    static let noServer = MarfaCore.MarfaError.NoServer(message: "no server configured for this call")
+
     static func write(_ id: String) -> MarfaCore.MarfaError {
         notFound("queued_write_not_found", "\(id) is not a write this queue holds")
     }

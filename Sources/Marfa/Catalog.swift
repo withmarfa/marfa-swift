@@ -34,6 +34,36 @@ public struct Catalog: Sendable {
     public func edgeType(_ id: String) async throws -> EdgeType {
         try await holder.run { core in EdgeType(try core.edgeType(id: id)) }
     }
+
+    /// The server's item types and edge types, read from it now.
+    ///
+    /// An app can offer a choice of types before a first hydration. Nothing in the copy changes, and the other reads here keep answering from the store.
+    ///
+    /// Throws `noServer` for a copy opened without a server, and `network` when the server cannot be reached.
+    /// Canceling the task ends the request with `canceled`.
+    public func fromServer() async throws -> ServerCatalog {
+        try await holder.runUntilCanceled { core, stop in
+            ServerCatalog(try core.serverCatalog(stop: stop))
+        }
+    }
+}
+
+/// What the server holds, as ``Catalog/fromServer()`` reads it.
+public struct ServerCatalog: Sendable, Hashable {
+    /// By id.
+    public let itemTypes: [ItemType]
+    /// By id.
+    public let edgeTypes: [EdgeType]
+
+    /// For an app's previews and tests.
+    public init(itemTypes: [ItemType] = [], edgeTypes: [EdgeType] = []) {
+        self.itemTypes = itemTypes
+        self.edgeTypes = edgeTypes
+    }
+
+    init(_ core: MarfaCore.ServerCatalog) {
+        self.init(itemTypes: core.itemTypes.map(ItemType.init), edgeTypes: core.edgeTypes.map(EdgeType.init))
+    }
 }
 
 /// An item type, read as the server's `GET /types/{id}` answers it.

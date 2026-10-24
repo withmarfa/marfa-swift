@@ -78,3 +78,33 @@ extension LiveWorkingCopies {
         }
     }
 }
+
+extension LiveWorkingCopies {
+    @Suite(
+        .enabled(if: Live.server != nil, "set MARFA_API_URL and MARFA_API_KEY to run against a server"),
+        .timeLimit(.minutes(2)))
+    struct LiveCopyGaps {
+        @Test func theCatalogIsReadBeforeTheFirstFillAndTheCopyIsLeftAlone() async throws {
+            let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            let before = try await copy.status()
+            let catalog = try await copy.catalog.fromServer()
+            #expect(catalog.itemTypes.contains { $0.id == "core.note" })
+            #expect(!catalog.edgeTypes.isEmpty)
+            #expect(try await copy.status() == before)
+            await copy.close()
+        }
+
+        @Test func aFileAddedOnItsOwnReachesTheServerWithItsNonASCIIName() async throws {
+            let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            _ = try await copy.hydrate(types: ["core.file"], tier: .all)
+            let name = "Résumé 写真 \(UUID())"
+            let added = try await copy.items.addFile(try Live.file("bytes", named: name), tags: ["added-file"])
+            let id = try #require(added.item.itemId)
+            let drained = try await copy.queue.drain()
+            #expect(drained.undelivered == 0 && drained.verdicts.allSatisfy { $0.verdict == .accepted })
+            let served = try await Live.read("items/\(id)")
+            #expect(served["item"]?.object?["properties"]?.object?["title"]?.string == name)
+            await copy.close()
+        }
+    }
+}

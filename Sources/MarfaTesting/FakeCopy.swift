@@ -21,7 +21,8 @@ import Synchronization
 ///
 /// - Reads: `items.list(_:sort:)` without `filter`, `occurredAfter` or
 ///   `occurredBefore`, `items.get(_:)`, `edges.from(_:)`, `edges.to(_:)`,
-///   `edges.ofType(_:)`, the four reads of `catalog`, `declaredTypes()` and
+///   `edges.ofType(_:)`, the four reads of `catalog`, `catalog.fromServer()`, which throws `noServer` as
+///   a copy without a server does, `declaredTypes()` and
 ///   `status()`.
 /// - Writes: `items.create(_:)` without `sourceId`, `items.update(_:_:)`,
 ///   `items.updateAsRead(_:_:)`, `items.delete(_:)`, `items.restore(_:)`,

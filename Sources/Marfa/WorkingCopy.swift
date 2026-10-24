@@ -71,14 +71,40 @@ public final class WorkingCopy: Sendable {
     public static func open(store: URL, server: Server? = nil, fileBudget: FileBudget? = nil) async throws
         -> WorkingCopy
     {
+        try await opened(store: store, server: server, fileBudget: fileBudget, replacing: false)
+    }
+
+    /// Replaces a store that ``open(store:server:fileBudget:)`` refuses with `wrongSchema` by an empty one of this
+    /// build's shape, and opens it, taking its arguments as `open` does.
+    ///
+    /// The files the copy downloaded stay, because they are kept by content and not by the store. What only the
+    /// old store held does not: pins, the position in the server's events, the declared types and the choice of
+    /// file budget, which is the default again unless `fileBudget` sets it. Read what matters before replacing,
+    /// and hydrate the new copy as you would a new one.
+    ///
+    /// Leaves the store as it is and throws `wrongSchema`, with its `unsent` count, while it holds a write the
+    /// server has not taken, and `readingHandle` while another process writes it. Throws `invalid` for a store
+    /// that opens as it is, or a path that holds none.
+    public static func replaceRefused(store: URL, server: Server? = nil, fileBudget: FileBudget? = nil) async throws
+        -> WorkingCopy
+    {
+        try await opened(store: store, server: server, fileBudget: fileBudget, replacing: true)
+    }
+
+    private static func opened(store: URL, server: Server?, fileBudget: FileBudget?, replacing: Bool) async throws
+        -> WorkingCopy
+    {
         let path = store.path
         let copy: WorkingCopy
         if let server {
             let url = server.url.absoluteString
             let credential = server.credential
             let core = try await background {
-                try Core.open(
-                    path: path, url: url, key: try server.openingToken(), renewer: credential.map(TokenRenewer.init))
+                let renewer = credential.map(TokenRenewer.init)
+                let key = try server.openingToken()
+                return replacing
+                    ? try Core.replaceRefused(path: path, url: url, key: key, renewer: renewer)
+                    : try Core.open(path: path, url: url, key: key, renewer: renewer)
             }
             // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
             let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
@@ -86,7 +112,11 @@ public final class WorkingCopy: Sendable {
             }
             copy = WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
         } else {
-            let core = try await background { try Core.open(path: path, url: nil, key: nil) }
+            let core = try await background {
+                replacing
+                    ? try Core.replaceRefused(path: path, url: nil, key: nil)
+                    : try Core.open(path: path, url: nil, key: nil)
+            }
             copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         }
         if let fileBudget {
@@ -611,6 +641,25 @@ public struct Items: Sendable {
     /// or has a title that cannot name it alone.
     public func embedText(of file: String, in id: String) async throws -> String {
         try await holder.run { core in try core.embedText(id: id, file: file) }
+    }
+
+    /// Adds `file` as an item of its own, attached to nothing, with a tag write for each of `tags`.
+    ///
+    /// Queues the upload of the bytes and a file item that names them, then one write per tag; `Added` holds the
+    /// first two. `attachment` fills in what the file does not say, as for ``attach(to:file:_:)``.
+    public func addFile(_ file: URL, _ attachment: Attachment = Attachment(), tags: [String] = []) async throws
+        -> Added
+    {
+        let added = try await holder.run { core in
+            Added(try core.addFile(path: file.path, attachment: attachment.core, tags: tags))
+        }
+        for write in [added.upload, added.item] {
+            feed.announce(write)
+        }
+        for _ in tags {
+            feed.announce(Change(origin: .local(.addTag), itemId: added.item.itemId, edgeId: nil))
+        }
+        return added
     }
 
     private func write(_ work: @escaping @Sendable (any CoreProtocol) throws -> MarfaCore.QueuedWrite) async throws

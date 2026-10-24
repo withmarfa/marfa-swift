@@ -33,6 +33,11 @@ extension InMemoryCore {
         }
     }
 
+    /// The fake has no server, as a real copy opened without one has none.
+    func serverCatalog(stop: Stop?) throws -> ServerCatalog {
+        throw Refuse.noServer
+    }
+
     func declareTypes(types: [JsonObject]) throws {
         let ids = Set(types.compactMap { Properties.string($0, "id") })
         try state.withLock { state in
