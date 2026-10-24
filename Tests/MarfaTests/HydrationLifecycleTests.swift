@@ -130,6 +130,25 @@ struct HydrationLifecycle {
         await copy.close()
     }
 
+    @Test func aHeldStreamRefillsAStaleCopyInPlaceWhenTheServerSaysItsCursorAgedOut() async throws {
+        let script = HydrationScript()
+        let server = try await script.start()
+        defer { server.stop() }
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        script.set("/items", [.page(["held", "gone"])])
+        _ = try await copy.hydrate(types: ["*"], tier: .library)
+        script.set("/events", [.agedOut, .stream(cursor: "60")])
+        script.set("/items", [.page(["held"])])
+        let heard = Heard(copy.changes())
+        try await eventually("the refill was told", within: 10) {
+            heard.all.contains { if case .refreshed(.hydrated) = $0.origin { true } else { false } }
+        }
+        #expect(heard.stops.isEmpty)
+        #expect(try await copy.status().hydration == .complete)
+        #expect(try await copy.items.get("gone") == nil)
+        await copy.close()
+    }
+
     private static func queueEdits(_ copy: WorkingCopy) async throws -> [String] {
         let held = try #require(try await copy.items.get("held"))
         let edit = try await copy.items.update(
@@ -180,7 +199,10 @@ private final class HydrationScript: Sendable {
                 return response.answer
             }
             switch path {
-            case "/": return Response.json(#"{"instance_id":"test-instance"}"#).answer
+            case "/":
+                return Response.json(
+                    #"{"name":"t","version":"1","release":null,"instance_id":"test-instance","contract":\#(marfaContractVersion),"features":[]}"#
+                ).answer
             case "/types":
                 return Response.json(
                     #"{"data":[{"id":"core.note","display_hints":{"title_field":"title"},"fields":{"title":{"type":"string"}}}],"next_cursor":null}"#

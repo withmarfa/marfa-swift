@@ -148,6 +148,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var refused: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
+        var catchUps = 0
         var hydrateFails: MarfaCore.MarfaError?
         var hydrateInPlace = false
         var hydration = MarfaCore.Hydration.complete
@@ -155,6 +156,19 @@ final class FakeCore: Core, @unchecked Sendable {
         var declarations: [JSONObject] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
         var hydrationOptions: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
+        var slice: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
+        /// When each hydration began.
+        var hydrations: [ContinuousClock.Instant] = []
+        /// Fails this many hydrations with `hydrateFails` before the rest succeed; `nil` fails them all.
+        var hydrateFailsFirst: Int?
+        /// Held by the next hydration until signaled, as `gate` holds a drain.
+        var hydrateGate: DispatchSemaphore?
+        var hydrateGated = false
+        var hydrating = false
+        /// A completed hydration leaves the copy `.complete`, as the core's does.
+        var hydrationCompletes = false
+        var instanceId: String?
+        var serverOrigin: String?
         var pins: Set<String> = []
         var probe: DropProbe?
         var budgets: [MarfaCore.FileBudget] = []
@@ -238,8 +252,34 @@ final class FakeCore: Core, @unchecked Sendable {
     ) throws
         -> MarfaCore.HydrateReport
     {
-        state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
-        if let failure = state.withLock({ $0.hydrateFails }) { throw failure }
+        // The core holds one hydration at a time (`claim_stream(Mover::Hydration)`).
+        let held = try state.withLock { state -> DispatchSemaphore? in
+            guard !state.hydrating else {
+                throw MarfaCore.MarfaError.Invalid(
+                    message: "this working copy is already hydrating, catching up or following")
+            }
+            state.hydrating = true
+            defer { state.hydrateGate = nil }
+            state.hydrateGated = state.hydrateGate != nil
+            return state.hydrateGate
+        }
+        defer { state.withLock { $0.hydrating = false } }
+        let failure = state.withLock { state -> MarfaCore.MarfaError? in
+            state.hydrationOptions = (types, tier, edgeTypes)
+            state.hydrations.append(.now)
+            guard let failure = state.hydrateFails else { return nil }
+            guard let first = state.hydrateFailsFirst else { return failure }
+            state.hydrateFailsFirst = first - 1
+            return first > 0 ? failure : nil
+        }
+        held?.wait()
+        if let failure { throw failure }
+        state.withLock { state in
+            if state.hydrationCompletes {
+                state.hydration = .complete
+                state.slice = (types, tier, edgeTypes)
+            }
+        }
         return MarfaCore.HydrateReport(
             types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1, resumed: false,
             restarted: nil, inPlace: state.withLock { $0.hydrateInPlace }, cursor: "1", registeredTypes: [],
@@ -289,6 +329,13 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
         try state.withLock { state in
+            // The core's catch-up claims the stream a hydration holds (`claim_stream(Mover::CatchUp)`).
+            guard !state.hydrating else {
+                throw MarfaCore.CatchUpError.Failed(
+                    error: .Invalid(message: "this working copy is already hydrating, catching up or following"),
+                    catalogChanged: false)
+            }
+            state.catchUps += 1
             if let failure = state.catchUpFails {
                 throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: state.catchUpChangesCatalog)
             }
@@ -299,8 +346,10 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func status() throws -> MarfaCore.Status {
-        MarfaCore.Status(
-            serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
+        let (slice, origin, instance) = state.withLock { ($0.slice, $0.serverOrigin, $0.instanceId) }
+        return MarfaCore.Status(
+            serverOrigin: origin, instanceId: instance, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
+            sliceEdgeTypes: slice?.edgeTypes ?? [], pinned: [],
             eventCursor: nil,
             hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0,
             catalogVersion: 1,
@@ -497,6 +546,91 @@ struct LocalServer: Sendable {
     }
 }
 
+/// A TCP relay on a local port in front of a server, which a test cuts and mends as a Mac that sleeps or loses
+/// its network does, while the server itself stays up for others.
+final class Relay: Sendable {
+    let url: URL
+    private let listener: NWListener
+    private let state = Mutex<(cut: Bool, open: [NWConnection])>((false, []))
+
+    private init(url: URL, listener: NWListener) {
+        self.url = url
+        self.listener = listener
+    }
+
+    static func start(to target: URL) async throws -> Relay {
+        let host = NWEndpoint.Host(try #require(target.host()))
+        let number = try #require(target.port.flatMap { UInt16(exactly: $0) })
+        let port = try #require(NWEndpoint.Port(rawValue: number))
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        let listener = try NWListener(using: parameters)
+        let ready = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(returning: listener.port?.rawValue ?? 0)
+                case .failed(let error):
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(throwing: error)
+                default: break
+                }
+            }
+            listener.newConnectionHandler = { _ in }
+            listener.start(queue: .global())
+        }
+        let relay = Relay(url: try #require(URL(string: "http://127.0.0.1:\(ready)")), listener: listener)
+        listener.newConnectionHandler = { [weak relay] inbound in
+            guard let relay else { return inbound.forceCancel() }
+            let outbound = NWConnection(host: host, port: port, using: .tcp)
+            let admitted = relay.state.withLock { state -> Bool in
+                guard !state.cut else { return false }
+                state.open += [inbound, outbound]
+                return true
+            }
+            guard admitted else { return inbound.forceCancel() }
+            inbound.start(queue: .global())
+            outbound.start(queue: .global())
+            Self.pump(from: inbound, to: outbound)
+            Self.pump(from: outbound, to: inbound)
+        }
+        return relay
+    }
+
+    private static func pump(from source: NWConnection, to sink: NWConnection) {
+        source.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, complete, error in
+            if let data, !data.isEmpty {
+                sink.send(content: data, completion: .contentProcessed { _ in })
+            }
+            if complete || error != nil {
+                sink.send(content: nil, contentContext: .finalMessage, isComplete: true, completion: .idempotent)
+                return
+            }
+            pump(from: source, to: sink)
+        }
+    }
+
+    /// Resets every connection through the relay and refuses new ones until ``mend()``.
+    func cut() {
+        let open = state.withLock { state in
+            state.cut = true
+            defer { state.open = [] }
+            return state.open
+        }
+        for connection in open { connection.forceCancel() }
+    }
+
+    func mend() {
+        state.withLock { $0.cut = false }
+    }
+
+    func stop() {
+        cut()
+        listener.cancel()
+    }
+}
+
 /// A server of a test's own, booted with marfa's `core/scripts/server-up.sh`
 /// from the checkout `MARFA_MONOREPO` names, so a test can stop it and start
 /// it again under a copy.
@@ -546,6 +680,16 @@ final class OwnServer: Sendable {
                 "Content-Type: application/json", "--data", body, "http://localhost/_control/test/clock",
             ], environment: [:])
         try #require(printed.contains("offset_ms"), "the clock hook answered \(printed)")
+    }
+
+    /// Retires every event but the newest, as the server's retention does once the rest are older than it keeps.
+    func pruneEventLog() async throws {
+        _ = try await Self.run(
+            "/usr/bin/sqlite3",
+            [
+                state.appending(path: "marfa.db").path,
+                "PRAGMA busy_timeout = 5000; DELETE FROM event_log WHERE id < (SELECT MAX(id) FROM event_log);",
+            ], environment: [:])
     }
 
     func stop() async throws {
