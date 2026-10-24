@@ -113,6 +113,25 @@ struct ClientTests {
         #expect(error == .network(message: "\(scripted.origin) did not answer in time"))
     }
 
+    @Test func aSlowAnswerWithinTheTimeoutSucceeds() async throws {
+        let scripted = ScriptedAuthServer { _ in .delayed(.milliseconds(300), tags) }
+        let answer = try await client(scripted, timeout: .seconds(5)).listTags()
+        _ = try answer.ok
+    }
+
+    @Test func aRedirectIsNotFollowedAndTheTokenGoesNowhereElse() async {
+        let target = ScriptedAuthServer { _ in tags }
+        let scripted = ScriptedAuthServer { _ in .raw(302, Data(), headers: ["Location": target.url.absoluteString]) }
+        let error = await failure { try await client(scripted).listTags() }
+        guard case .redirected(let origin, let status, let location, _)? = error else {
+            Issue.record("\(String(describing: error))")
+            return
+        }
+        #expect((origin, status, location) == (scripted.origin, 302, target.url.absoluteString))
+        #expect(scripted.requests.count == 1)
+        #expect(target.requests.isEmpty)
+    }
+
     @Test func untidyRefusalsAreReadAsTheWorkingCopyReadsThem() async {
         let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
             (

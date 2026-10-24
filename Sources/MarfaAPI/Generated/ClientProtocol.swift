@@ -33,27 +33,6 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /occurrences`.
     /// - Remark: Generated from `#/paths//occurrences/get(listOccurrences)`.
     func listOccurrences(_ input: Operations.ListOccurrences.Input) async throws -> Operations.ListOccurrences.Output
-    /// Apply a bulk action
-    ///
-    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
-    ///
-    /// - Remark: HTTP `POST /items/bulk-actions`.
-    /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
-    func applyBulkAction(_ input: Operations.ApplyBulkAction.Input) async throws -> Operations.ApplyBulkAction.Output
-    /// Get a bulk-action job
-    ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of `instance.read`, can read it.
-    ///
-    /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
-    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
-    func getBulkActionJob(_ input: Operations.GetBulkActionJob.Input) async throws -> Operations.GetBulkActionJob.Output
-    /// Cancel a bulk-action job
-    ///
-    /// Cancels a bulk-action job and returns it. Items the job already processed stay processed. A job that has already finished is left as it is.
-    ///
-    /// - Remark: HTTP `POST /items/bulk-actions/jobs/{id}/cancel`.
-    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)`.
-    func cancelBulkActionJob(_ input: Operations.CancelBulkActionJob.Input) async throws -> Operations.CancelBulkActionJob.Output
     /// Get item metadata
     ///
     /// Returns an item's metadata: its tags and the extension namespaces you can read. To read metadata for many items, use `include=metadata` on `GET /items`.
@@ -424,51 +403,6 @@ extension ClientProtocol {
     ) async throws -> Operations.ListOccurrences.Output {
         try await listOccurrences(Operations.ListOccurrences.Input(
             query: query,
-            headers: headers
-        ))
-    }
-    /// Apply a bulk action
-    ///
-    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
-    ///
-    /// - Remark: HTTP `POST /items/bulk-actions`.
-    /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
-    public func applyBulkAction(
-        headers: Operations.ApplyBulkAction.Input.Headers = .init(),
-        body: Operations.ApplyBulkAction.Input.Body
-    ) async throws -> Operations.ApplyBulkAction.Output {
-        try await applyBulkAction(Operations.ApplyBulkAction.Input(
-            headers: headers,
-            body: body
-        ))
-    }
-    /// Get a bulk-action job
-    ///
-    /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of `instance.read`, can read it.
-    ///
-    /// - Remark: HTTP `GET /items/bulk-actions/jobs/{id}`.
-    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/get(getBulkActionJob)`.
-    public func getBulkActionJob(
-        path: Operations.GetBulkActionJob.Input.Path,
-        headers: Operations.GetBulkActionJob.Input.Headers = .init()
-    ) async throws -> Operations.GetBulkActionJob.Output {
-        try await getBulkActionJob(Operations.GetBulkActionJob.Input(
-            path: path,
-            headers: headers
-        ))
-    }
-    /// Cancel a bulk-action job
-    ///
-    /// Cancels a bulk-action job and returns it. Items the job already processed stay processed. A job that has already finished is left as it is.
-    ///
-    /// - Remark: HTTP `POST /items/bulk-actions/jobs/{id}/cancel`.
-    /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)`.
-    public func cancelBulkActionJob(
-        path: Operations.CancelBulkActionJob.Input.Path,
-        headers: Operations.CancelBulkActionJob.Input.Headers = .init()
-    ) async throws -> Operations.CancelBulkActionJob.Output {
-        try await cancelBulkActionJob(Operations.CancelBulkActionJob.Input(
-            path: path,
             headers: headers
         ))
     }

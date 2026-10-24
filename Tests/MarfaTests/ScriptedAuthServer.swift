@@ -208,6 +208,10 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
                 client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
                 return
             }
+            if (300..<400).contains(status), let location = headers["Location"], let target = URL(string: location) {
+                // A real server's redirect is offered to the session, which follows it unless its delegate refuses.
+                client?.urlProtocol(self, wasRedirectedTo: URLRequest(url: target), redirectResponse: response)
+            }
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
             client?.urlProtocolDidFinishLoading(self)

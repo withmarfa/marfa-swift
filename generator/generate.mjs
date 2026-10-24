@@ -263,6 +263,8 @@ const serverOnly = new Set([
   "listItemExtensions",
   "getFolderStatus",
 ]);
+// A bulk action writes items on the server, a second path for item writes.
+const bulkTags = new Set(["Bulk actions"]);
 // A copy uploads a blob's bytes and fetches them itself.
 const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
@@ -283,6 +285,7 @@ export function clientOperations(document) {
     const tags = operation.tags ?? [];
     if (tags.some((tag) => connectorTags.has(tag))) continue;
     if (tags.some((tag) => copyTags.has(tag)) && !serverOnly.has(operation.operationId)) continue;
+    if (tags.some((tag) => bulkTags.has(tag))) continue;
     if (copyBlobs.has(operation.operationId)) continue;
     kept.push(operation.operationId);
   }

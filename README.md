@@ -136,7 +136,7 @@ _ = try await api.register(
     itemType: .init(fields: .init(additionalProperties: ["title": title]), id: "app.example.entry"))
 ```
 
-`Client` makes only the calls that the working copy does not make itself, so it has no methods for reading or writing items. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect.
+`Client` has no call that creates, gets, changes or deletes one item or edge, and none for search or events: those go through the working copy, so each item has one path. It offers no bulk changes either. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect, and it waits 30 seconds for the instance to send more; pass `Client(_:timeout:)` a longer time for a call such as `runHousekeeping(_:)` that answers only when its work is done.
 
 ## Test and preview
 
