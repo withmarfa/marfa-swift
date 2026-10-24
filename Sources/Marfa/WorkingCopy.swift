@@ -63,23 +63,41 @@ public final class WorkingCopy: Sendable {
     /// `MarfaError.wrongSchema` for a store another build of the core made,
     /// and leaves the store as it is: its `unsent` counts the writes the
     /// server has not taken, which only that build can send.
-    public static func open(store: URL, server: Server? = nil) async throws -> WorkingCopy {
+    ///
+    /// `fileBudget` chooses the budget of the cache of fetched files, as ``Blobs/setBudget(_:)`` does, trimming to
+    /// it before this returns; left `nil`, the copy keeps the choice its store holds, which is the default
+    /// budget for a new store. A second opener of a store is a reader and cannot set it: opening with a
+    /// `fileBudget` then throws `readingHandle`, and the store is released.
+    public static func open(store: URL, server: Server? = nil, fileBudget: FileBudget? = nil) async throws
+        -> WorkingCopy
+    {
         let path = store.path
-        guard let server else {
+        let copy: WorkingCopy
+        if let server {
+            let url = server.url.absoluteString
+            let credential = server.credential
+            let core = try await background {
+                try Core.open(
+                    path: path, url: url, key: try server.openingToken(), renewer: credential.map(TokenRenewer.init))
+            }
+            // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
+            let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
+                try Core.open(path: path, url: url, key: key)
+            }
+            copy = WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
+        } else {
             let core = try await background { try Core.open(path: path, url: nil, key: nil) }
-            return WorkingCopy(holder: CoreHolder(core), hasServer: false)
+            copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         }
-        let url = server.url.absoluteString
-        let credential = server.credential
-        let core = try await background {
-            try Core.open(
-                path: path, url: url, key: try server.openingToken(), renewer: credential.map(TokenRenewer.init))
+        if let fileBudget {
+            do {
+                _ = try await copy.blobs.setBudget(fileBudget)
+            } catch {
+                await copy.close()
+                throw error
+            }
         }
-        // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
-        let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
-            try Core.open(path: path, url: url, key: key)
-        }
-        return WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
+        return copy
     }
 
     /// Opens a store another process writes, to read it only.
@@ -102,13 +120,34 @@ public final class WorkingCopy: Sendable {
     /// `.all` for both, with their tags and the edges going out from them.
     /// `edgeTypes` also holds each named edge type whole, whichever of its
     /// endpoints the item slice holds.
+    ///
+    /// `["*"]` alone is every type but `system.*`, hydrated in one pass with no need to read the catalog and name
+    /// its types first. Beside `system.*` types it adds them, and beside any other type it throws `invalid`.
+    ///
+    /// While the call runs, `status()` says how far it has got in `itemsListed` against `itemsExpected`, and a
+    /// list or search answers the rows that have arrived, marked `.partial`. A hydration that was interrupted
+    /// carries on from the page it reached when its slice is unchanged; the report says whether it did
+    /// (`resumed`) or why it started again (`restarted`).
+    ///
+    /// A copy whose cursor the server's event log let go (`status().hydration` is `.stale`) is filled again over the
+    /// rows it holds, which reads answer meanwhile marked `.stale`, and the report says `inPlace`. Until a fill
+    /// completes, writes to items (file items and attaches included) are queued, to a row the copy holds or a new
+    /// one, and edge writes throw `hydrationIncomplete`.
+    ///
+    /// The call announces `.refreshed(.hydrated)` when it completes, and `.refreshed(.unfinished)` when it fails or
+    /// is canceled, because the rows it wrote stay.
     public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = []) async throws -> HydrateReport {
-        let report = HydrateReport(
-            try await holder.runUntilCanceled { core, stop in
+        let report: MarfaCore.HydrateReport
+        do {
+            report = try await holder.runUntilCanceled { core, stop in
                 try core.hydrateWith(types: types, tier: tier.core, edgeTypes: edgeTypes, stop: stop)
-            })
+            }
+        } catch {
+            feed.announce(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
+            throw error
+        }
         feed.announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
-        return report
+        return HydrateReport(report)
     }
 
     /// Replaces the app's declared types, each a type definition.
@@ -168,11 +207,14 @@ public final class WorkingCopy: Sendable {
     }
 
     /// Full-text search over indexed fields and tags, best match first.
+    ///
+    /// While a hydration fills the copy the hits are those of the rows that have arrived, and `completeness` says
+    /// `.partial`.
     public func search(_ query: String, filters: SearchFilters = SearchFilters(), limit: Int = 20) async throws
-        -> [SearchHit]
+        -> Rows<SearchHit>
     {
         try await holder.run { core in
-            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit)).whole()
+            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit)).answer
         }
     }
 
@@ -327,6 +369,9 @@ public struct Change: Sendable, Hashable {
     public enum Refresh: Sendable, Hashable {
         /// Everything may have changed, the type catalog included.
         case hydrated
+        /// A hydration failed or was canceled part way. The rows it wrote stay, so a reader should read again, and
+        /// nothing about the copy's follow is learned from it.
+        case unfinished
         case caughtUp
         case drained
         case withdrawn
@@ -364,15 +409,22 @@ public struct Items: Sendable {
     let holder: CoreHolder
     let feed: Feed
 
+    /// The items `filters` select.
+    ///
+    /// While a hydration fills the copy the list holds the rows that have arrived, and `completeness` says
+    /// `.partial`.
     public func list(
         _ filters: ListFilters = ListFilters(), sort: Sort = Sort(field: .createdAt, direction: .descending)
     )
-        async throws -> [Item]
+        async throws -> Rows<Item>
     {
-        try await holder.run { core in try core.list(filters: filters, sort: sort.core).whole() }
+        try await holder.run { core in try core.list(filters: filters, sort: sort.core).answer }
     }
 
     /// `nil` for an item in the bin or not held.
+    ///
+    /// While a hydration fills the copy, an item not held yet may still arrive, so asking for it throws
+    /// `hydrationIncomplete` rather than answering `nil`.
     public func get(_ id: String) async throws -> Item? {
         try await holder.run { core in try core.get(id: id) }
     }
@@ -591,6 +643,10 @@ public struct Edges: Sendable {
         try await holder.run { core in try core.edgesOfType(edgeType: type) }
     }
 
+    /// Queues an edge.
+    ///
+    /// Throws `hydrationIncomplete` until the copy is whole, as ``update(_:_:)`` and ``delete(_:)`` do: a fill under
+    /// way, or a stale copy's refill, leaves the edges it has not yet read unknown.
     public func create(
         from source: String, to target: String, type: String, properties: JSONObject = [:],
         id: String? = nil
@@ -710,6 +766,45 @@ public struct Blobs: Sendable {
 
     public func isHeld(_ hash: String) async throws -> Bool {
         try await holder.run { core in try core.blobHeld(hash: hash) }
+    }
+
+    /// The cache of fetched files: its setting, the budget in force, the bytes held, and the attachments kept
+    /// outside the budget.
+    ///
+    /// Read from the copy with no request, as `status().fileCache` is. `attachments` is `nil` from the start of a
+    /// hydration until one completes, and where the cache could not be read.
+    public func cache() async throws -> FileCache {
+        try await holder.run { core in try core.fileCache() }
+    }
+
+    /// Chooses how the cache's budget is set, trims the cache to it at once, and returns the bytes the trim took.
+    ///
+    /// The choice is kept in the store, so a copy opened again uses it. Files attached to items the copy holds
+    /// stay outside the budget, and a file being read inside ``withFile(_:isolation:_:)`` is never trimmed. Throws
+    /// `readingHandle` for a reader.
+    public func setBudget(_ budget: FileBudget) async throws -> UInt64 {
+        try await holder.run { core in try core.setFileBudget(budget: budget) }
+    }
+
+    /// Trims the cache to its budget now.
+    ///
+    /// Returns the bytes it took. Throws `readingHandle` for a reader.
+    public func trim() async throws -> UInt64 {
+        try await holder.run { core in try core.trimFiles() }
+    }
+
+    /// Fetches the bytes of every file attached to an item the copy holds that the cache does not hold whole,
+    /// smallest first, so they are there offline.
+    ///
+    /// Run it after a hydration and after a catch-up. It resumes the part of a file an earlier fetch left. It waits
+    /// out a server that asks for a wait of a minute or less. It stops at the first file the disk has no room for,
+    /// once the server cannot be reached, or once the server asks for a longer wait; a file that fails otherwise is
+    /// passed over. The report, and `status().fileCache.attachments`, say what is still not held and why.
+    ///
+    /// Canceling the task stops it and throws `canceled`; the files it had fetched stay. Throws `readingHandle`
+    /// for a reader and for a folder's copy, and `noServer` for a copy without a server.
+    public func fetchKept() async throws -> KeptFetch {
+        try await holder.runUntilCanceled { core, stop in try core.fetchKept(stop: stop) }
     }
 }
 

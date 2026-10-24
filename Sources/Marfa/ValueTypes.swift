@@ -3,10 +3,23 @@ import MarfaCore
 
 @_exported import enum MarfaCore.FileBudget
 @_exported import enum MarfaCore.ItemState
+@_exported import struct MarfaCore.KeptFetch
+@_exported import enum MarfaCore.NotHeldReason
 @_exported import enum MarfaCore.Tier
 
-/// The cache of fetched files: its setting, the budget in force and the bytes held.
+/// The cache of fetched files: its setting, the budget in force and the bytes held, and the attachments kept
+/// outside the budget.
+///
+/// `heldUnreadable` and `volumeUnreadable` say why `held` or `budget` could not be worked out, and
+/// `backupMarkFailure` why the files fetched last could not be kept out of backups.
 public typealias FileCache = MarfaCore.FileCache
+
+/// The files attached to items the copy holds, which stay on the device outside the file budget: how many are held
+/// whole, and how many are not, by reason.
+public typealias KeptAttachments = MarfaCore.Attachments
+
+/// The attachments whose bytes are not held for one reason, with the bytes they state.
+public typealias NotHeldAttachments = MarfaCore.NotHeld
 
 /// The tier an item is in: `library` for lasting material, `feed` for an
 /// incoming stream.
@@ -315,6 +328,9 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
     case inProgress
     case complete
     case expired
+    /// The server's event log let the copy's cursor go. The copy answers reads with what it held, marked
+    /// `.stale`, and takes writes but edge writes, until a hydration has filled it again in place.
+    case stale
 
     init(_ core: MarfaCore.Hydration) {
         switch core {
@@ -322,6 +338,7 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
         case .inProgress: self = .inProgress
         case .complete: self = .complete
         case .expired: self = .expired
+        case .stale: self = .stale
         }
     }
 
@@ -331,6 +348,7 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
         case .inProgress: .inProgress
         case .complete: .complete
         case .expired: .expired
+        case .stale: .stale
         }
     }
 }
@@ -645,14 +663,19 @@ public struct HydrateReport: Sendable, Hashable {
     /// Why an interrupted hydration was filled again from the first page rather than resumed, such as
     /// `slice_changed` or `head_aged_out`.
     public var restarted: String?
+    /// Whether the copy was filled again over the rows it held.
+    ///
+    /// It answered those rows marked stale meanwhile, rather than clearing them first. That happens when the event
+    /// log let the cursor go and the instance, the reach and the slice are those the copy was built under.
+    public var inPlace: Bool
     public var cursor: String
     public var registeredTypes: [String]
     public var unregisteredTypes: [UnregisteredType]
 
     public init(
         types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64,
-        pagesTotal: UInt64? = nil, resumed: Bool = false, restarted: String? = nil, cursor: String,
-        registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
+        pagesTotal: UInt64? = nil, resumed: Bool = false, restarted: String? = nil, inPlace: Bool = false,
+        cursor: String, registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
     ) {
         self.types = types
         self.tier = tier
@@ -663,6 +686,7 @@ public struct HydrateReport: Sendable, Hashable {
         self.pagesTotal = pagesTotal ?? pages
         self.resumed = resumed
         self.restarted = restarted
+        self.inPlace = inPlace
         self.cursor = cursor
         self.registeredTypes = registeredTypes
         self.unregisteredTypes = unregisteredTypes
@@ -672,14 +696,15 @@ public struct HydrateReport: Sendable, Hashable {
         self.init(
             types: core.types, tier: SliceTier(core.tier), edgeTypes: core.edgeTypes, items: core.items,
             edges: core.edges, pages: core.pages, pagesTotal: core.pagesTotal, resumed: core.resumed,
-            restarted: core.restarted, cursor: core.cursor, registeredTypes: core.registeredTypes,
+            restarted: core.restarted, inPlace: core.inPlace, cursor: core.cursor,
+            registeredTypes: core.registeredTypes,
             unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
     }
 
     var core: MarfaCore.HydrateReport {
         MarfaCore.HydrateReport(
             types: types, tier: tier.core, edgeTypes: edgeTypes, items: items, edges: edges, pages: pages,
-            pagesTotal: pagesTotal, resumed: resumed, restarted: restarted, cursor: cursor,
+            pagesTotal: pagesTotal, resumed: resumed, restarted: restarted, inPlace: inPlace, cursor: cursor,
             registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core))
     }
 }

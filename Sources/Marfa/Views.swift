@@ -333,14 +333,13 @@ extension SliceTier {
 extension Items {
     /// Every view the copy holds.
     ///
-    /// Hydrate with `system.view` in the slice, or pin a view, to hold it. Throws `MarfaError.hydrationIncomplete`
-    /// while a hydration is still filling the copy, and `MarfaError.invalid` for a view whose settings this build
-    /// cannot read.
-    public func views() async throws -> [SavedView] {
+    /// Hydrate with `system.view` in the slice, or pin a view, to hold it. While a hydration is still filling the
+    /// copy the answer holds the views that have arrived, and `completeness` says `.partial`. Throws
+    /// `MarfaError.invalid` for a view whose settings this build cannot read.
+    public func views() async throws -> Rows<SavedView> {
         try await holder.run { core in
             let views = try core.listViews()
-            try refuseUnlessWhole(views.completeness)
-            return try views.views.map(SavedView.init)
+            return Rows(try views.views.map(SavedView.init), completeness: views.completeness)
         }
     }
 
@@ -359,14 +358,15 @@ extension Items {
     ///
     /// Throws `MarfaError.invalid`, naming the reason, where the copy cannot answer the whole view: a type or tier
     /// the query lists that the slice does not hold, `beneath` without `parent-of` held whole, a `backref` in the
-    /// filter, a revoked view, an item that is not a `system.view`, or a `layout` the view does not have. Throws
-    /// `MarfaError.hydrationIncomplete` while a hydration is still filling the copy, and `MarfaError.notFound` with
-    /// the code `not_held` for a view the copy does not hold; hydrate with `system.view` in the slice, or pin it.
+    /// filter, a revoked view, an item that is not a `system.view`, or a `layout` the view does not have. While a
+    /// hydration is still filling the copy the list holds the items that have arrived, and `completeness` says
+    /// `.partial`. Throws `MarfaError.notFound` with the code `not_held` for a view the copy does not hold; hydrate
+    /// with `system.view` in the slice, or pin it.
     public func list(inView id: String, layout: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil)
-        async throws -> [Item]
+        async throws -> Rows<Item>
     {
         try await holder.run { core in
-            try core.listInView(id: id, layout: layout, limit: limit, offset: offset).whole()
+            try core.listInView(id: id, layout: layout, limit: limit, offset: offset).answer
         }
     }
 
@@ -379,11 +379,10 @@ extension Items {
     /// Date groups follow the calendar of `timeZone`, or of the device's when it is `nil`. Throws as
     /// ``list(inView:layout:limit:offset:)`` does, and `MarfaError.invalid` for a group by `edge[<type>]` or
     /// `backref[<type>]` of an edge type the slice does not hold whole: pass it as an `edgeTypes` of `hydrate`.
-    public func groups(inView id: String, layout: String, timeZone: TimeZone? = nil) async throws -> [ViewGroup] {
+    public func groups(inView id: String, layout: String, timeZone: TimeZone? = nil) async throws -> Rows<ViewGroup> {
         try await holder.run { core in
             let groups = try core.viewGroups(id: id, layout: layout, timeZone: timeZone?.identifier)
-            try refuseUnlessWhole(groups.completeness)
-            return groups.groups
+            return Rows(groups.groups, completeness: groups.completeness)
         }
     }
 }
@@ -391,17 +390,17 @@ extension Items {
 extension WorkingCopy {
     /// A full-text search narrowed to what the view lists; it throws as ``Items/list(inView:layout:limit:offset:)``
     /// throws.
-    public func search(_ query: String, inView id: String, limit: Int = 20) async throws -> [SearchHit] {
+    public func search(_ query: String, inView id: String, limit: Int = 20) async throws -> Rows<SearchHit> {
         try await holder.run { core in
-            try core.searchInView(query: query, id: id, limit: UInt32(clamping: limit)).whole()
+            try core.searchInView(query: query, id: id, limit: UInt32(clamping: limit)).answer
         }
     }
 }
 
-extension Reading where Value == [SavedView] {
+extension Reading where Value == Rows<SavedView> {
     /// Every view the copy holds, as `items.views()` answers.
     public static var views: Reading {
-        Reading(placeholder: []) { copy in try await copy.items.views() }
+        Reading(placeholder: .unread) { copy in try await copy.items.views() }
     }
 }
 
@@ -412,25 +411,25 @@ extension Reading where Value == SavedView? {
     }
 }
 
-extension Reading where Value == [Item] {
+extension Reading where Value == Rows<Item> {
     /// The items a view lists in one layout's order, as `items.list(inView:layout:limit:offset:)` answers them.
     ///
     /// The query reads again when an item enters or leaves the view, or changes in a way that moves it.
     public static func list(inView id: String, layout: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil)
         -> Reading
     {
-        Reading(placeholder: []) { copy in
+        Reading(placeholder: .unread) { copy in
             try await copy.items.list(inView: id, layout: layout, limit: limit, offset: offset)
         }
     }
 }
 
-extension Reading where Value == [ViewGroup] {
+extension Reading where Value == Rows<ViewGroup> {
     /// The groups of a view's layout with their counts, as `items.groups(inView:layout:timeZone:)` answers them.
     ///
     /// The query reads again when an item enters or leaves the view, or changes group.
     public static func groups(inView id: String, layout: String, timeZone: TimeZone? = nil) -> Reading {
-        Reading(placeholder: []) { copy in
+        Reading(placeholder: .unread) { copy in
             try await copy.items.groups(inView: id, layout: layout, timeZone: timeZone)
         }
     }

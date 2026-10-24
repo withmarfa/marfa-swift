@@ -148,11 +148,21 @@ final class FakeCore: Core, @unchecked Sendable {
         var refused: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
+        var hydrateFails: MarfaCore.MarfaError?
+        var hydrateInPlace = false
+        var hydration = MarfaCore.Hydration.complete
+        var edgeWriteFails: MarfaCore.MarfaError?
         var declarations: [JSONObject] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
         var hydrationOptions: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         var pins: Set<String> = []
         var probe: DropProbe?
+        var budgets: [MarfaCore.FileBudget] = []
+        var trimmed: UInt64 = 0
+        var keptFetches = 0
+        var cache = MarfaCore.FileCache(
+            setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
+            backupMarkFailure: nil, attachments: nil)
     }
 
     let state = Mutex(State())
@@ -229,10 +239,34 @@ final class FakeCore: Core, @unchecked Sendable {
         -> MarfaCore.HydrateReport
     {
         state.withLock { $0.hydrationOptions = (types, tier, edgeTypes) }
+        if let failure = state.withLock({ $0.hydrateFails }) { throw failure }
         return MarfaCore.HydrateReport(
             types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1, resumed: false,
-            restarted: nil, cursor: "1", registeredTypes: [],
+            restarted: nil, inPlace: state.withLock { $0.hydrateInPlace }, cursor: "1", registeredTypes: [],
             unregisteredTypes: state.withLock { $0.registrationRefusals })
+    }
+
+    override func setFileBudget(budget: MarfaCore.FileBudget) throws -> UInt64 {
+        state.withLock { state in
+            state.budgets.append(budget)
+            state.cache.setting = budget
+            return state.trimmed
+        }
+    }
+
+    override func trimFiles() throws -> UInt64 {
+        state.withLock { $0.trimmed }
+    }
+
+    override func fileCache() throws -> MarfaCore.FileCache {
+        state.withLock { $0.cache }
+    }
+
+    override func fetchKept(stop: MarfaCore.Stop?) throws -> MarfaCore.KeptFetch {
+        state.withLock { state in
+            state.keptFetches += 1
+            return MarfaCore.KeptFetch(fetched: 2, fetchedBytes: 30, attachments: state.cache.attachments)
+        }
     }
 
     override func declareTypes(types: [JSONObject]) {
@@ -268,10 +302,16 @@ final class FakeCore: Core, @unchecked Sendable {
         MarfaCore.Status(
             serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
             eventCursor: nil,
-            hydration: .complete, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0, catalogVersion: 1,
+            hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0,
+            catalogVersion: 1,
             fileCache: MarfaCore.FileCache(
                 setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
                 backupMarkFailure: nil, attachments: nil))
+    }
+
+    override func createEdge(draft: MarfaCore.EdgeDraft) throws -> MarfaCore.QueuedWrite {
+        if let failure = state.withLock({ $0.edgeWriteFails }) { throw failure }
+        return try super.createEdge(draft: draft)
     }
 
     override func withdraw(id: String) throws -> Bool {

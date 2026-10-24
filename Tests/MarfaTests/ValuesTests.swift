@@ -210,9 +210,13 @@ struct OwnValueTypes {
         #expect(Marfa.DrainReport(report.core) == report)
         let hydrated = Marfa.HydrateReport(
             types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, pagesTotal: 5,
-            resumed: true, restarted: "slice_changed", cursor: "c", registeredTypes: ["app.new"],
+            resumed: true, restarted: "slice_changed", inPlace: true, cursor: "c", registeredTypes: ["app.new"],
             unregisteredTypes: [Marfa.UnregisteredType(id: "app.no", code: "forbidden", message: "m")])
         #expect(Marfa.HydrateReport(hydrated.core) == hydrated)
+        #expect(Marfa.HydrateReport(hydrated.core).inPlace && hydrated.core.inPlace)
+        #expect(
+            !Marfa.HydrateReport(types: [], tier: .all, edgeTypes: [], items: 0, edges: 0, pages: 0, cursor: "").inPlace
+        )
         let caught = Marfa.CatchUpReport(applied: 1, skipped: 2, cursor: "c", catalogChanged: true)
         #expect(Marfa.CatchUpReport(caught.core) == caught)
         let status = Marfa.Status(
@@ -222,7 +226,10 @@ struct OwnValueTypes {
             instanceId: "instance",
             fileCache: FileCache(
                 setting: .bytes(bytes: 5), budget: 5, held: 3, heldUnreadable: nil, volumeUnreadable: true,
-                backupMarkFailure: "no", attachments: nil))
+                backupMarkFailure: "no",
+                attachments: Attachments(
+                    held: 1, heldBytes: 2, partialBytes: 3, notHeld: 4, notHeldBytes: 5,
+                    notHeldByReason: [NotHeld(reason: .rateLimited, attachments: 4, bytes: 5, unstated: 1)])))
         #expect(Marfa.Status(status.core) == status)
         let unheld = Marfa.Status(hydration: .never)
         #expect(Marfa.Status(unheld.core).catalogVersion == nil)

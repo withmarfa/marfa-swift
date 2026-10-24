@@ -37,8 +37,14 @@ public func checkImports() {
     let layout = ViewLayout(id: "board", kind: .board, group: ViewGrouping(by: "properties.status", bucket: .day))
     let settings = ViewSettings(title: "Tasks", query: ViewQuery(types: ["core.task"], tier: .all), layouts: [layout])
     precondition(group.count == 2 && settings.layouts.first?.kind == .board)
+    let notHeld = NotHeldAttachments(reason: NotHeldReason.rateLimited, attachments: 2, bytes: 9, unstated: 1)
+    let kept = KeptAttachments(
+        held: 1, heldBytes: 4, partialBytes: 0, notHeld: 2, notHeldBytes: 9, notHeldByReason: [notHeld])
     let cache = FileCache(
         setting: FileBudget.keepAll, budget: nil, held: 0, heldUnreadable: nil, volumeUnreadable: false,
-        backupMarkFailure: nil, attachments: nil)
+        backupMarkFailure: nil, attachments: kept)
     precondition(Status(fileCache: cache).fileCache.setting == .keepAll)
+    precondition(KeptFetch(fetched: 1, fetchedBytes: 4, attachments: kept).attachments?.notHeld == 2)
+    let rows = Rows([group], completeness: Completeness.partial)
+    precondition(rows.count == 1 && rows.completeness == .partial)
 }
