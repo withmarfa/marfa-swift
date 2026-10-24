@@ -103,7 +103,7 @@ struct FakeCopyBehavior {
             ("items.original", { _ = try await copy.items.original(ofConflictedCopy: id) }),
             ("items.conflictedCopies", { _ = try await copy.items.conflictedCopies(of: id) }),
             ("blobs.put", { _ = try await copy.blobs.put(file: file) }),
-            ("blobs.get", { _ = try await copy.blobs.get("hash") }),
+            ("blobs.withFile", { try await copy.blobs.withFile("hash") { _ in } }),
             ("blobs.isHeld", { _ = try await copy.blobs.isHeld("hash") }),
             ("queue.release", { _ = try await copy.queue.release(id) }),
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),
@@ -113,9 +113,12 @@ struct FakeCopyBehavior {
                 { _ = try await copy.items.list(ListFilters(occurredAfter: "2026-01-01T00:00:00.000Z")) }
             ),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
-            ("search(inFolder:)", { _ = try await copy.search("x", inFolder: id) }),
-            ("items.list(inFolder:)", { _ = try await copy.items.list(inFolder: id) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
+            ("items.views", { _ = try await copy.items.views() }),
+            ("items.view", { _ = try await copy.items.view(id) }),
+            ("items.list(inView:)", { _ = try await copy.items.list(inView: id) }),
+            ("items.groups(inView:)", { _ = try await copy.items.groups(inView: id, layout: "main") }),
+            ("search(inView:)", { _ = try await copy.search("x", inView: id) }),
         ]
         for (call, make) in calls {
             await #expect(performing: { try await make() }, throws: refusedAsUnsupported(call))

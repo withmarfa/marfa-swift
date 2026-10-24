@@ -206,7 +206,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
             .unnamed, .decoding, .store, .storageFull, .signedOut, .noKeychain, .redirected, .noServer, .noCursor,
             .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle,
-            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .contractMismatch, .canceled,
+            .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,
             .firstSyncWaiting, .invalid,
             .closed:
             true

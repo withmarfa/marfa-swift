@@ -1,8 +1,12 @@
 import Foundation
 import MarfaCore
 
+@_exported import enum MarfaCore.FileBudget
 @_exported import enum MarfaCore.ItemState
 @_exported import enum MarfaCore.Tier
+
+/// The cache of fetched files: its setting, the budget in force and the bytes held.
+public typealias FileCache = MarfaCore.FileCache
 
 /// The tier an item is in: `library` for lasting material, `feed` for an
 /// incoming stream.
@@ -632,14 +636,23 @@ public struct HydrateReport: Sendable, Hashable {
     public var edgeTypes: [String]
     public var items: UInt64
     public var edges: UInt64
+    /// The listing pages this call read, those of a walk it then started again from the first page included.
     public var pages: UInt64
+    /// The listing pages the hydration read in all, those of the interrupted calls it resumed included.
+    public var pagesTotal: UInt64
+    /// Whether this call carried on from the page an interrupted hydration of the same slice had reached.
+    public var resumed: Bool
+    /// Why an interrupted hydration was filled again from the first page rather than resumed, such as
+    /// `slice_changed` or `head_aged_out`.
+    public var restarted: String?
     public var cursor: String
     public var registeredTypes: [String]
     public var unregisteredTypes: [UnregisteredType]
 
     public init(
         types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64,
-        cursor: String, registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
+        pagesTotal: UInt64? = nil, resumed: Bool = false, restarted: String? = nil, cursor: String,
+        registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
     ) {
         self.types = types
         self.tier = tier
@@ -647,6 +660,9 @@ public struct HydrateReport: Sendable, Hashable {
         self.items = items
         self.edges = edges
         self.pages = pages
+        self.pagesTotal = pagesTotal ?? pages
+        self.resumed = resumed
+        self.restarted = restarted
         self.cursor = cursor
         self.registeredTypes = registeredTypes
         self.unregisteredTypes = unregisteredTypes
@@ -655,14 +671,16 @@ public struct HydrateReport: Sendable, Hashable {
     init(_ core: MarfaCore.HydrateReport) {
         self.init(
             types: core.types, tier: SliceTier(core.tier), edgeTypes: core.edgeTypes, items: core.items,
-            edges: core.edges, pages: core.pages, cursor: core.cursor,
-            registeredTypes: core.registeredTypes, unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
+            edges: core.edges, pages: core.pages, pagesTotal: core.pagesTotal, resumed: core.resumed,
+            restarted: core.restarted, cursor: core.cursor, registeredTypes: core.registeredTypes,
+            unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
     }
 
     var core: MarfaCore.HydrateReport {
         MarfaCore.HydrateReport(
             types: types, tier: tier.core, edgeTypes: edgeTypes, items: items, edges: edges, pages: pages,
-            cursor: cursor, registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core))
+            pagesTotal: pagesTotal, resumed: resumed, restarted: restarted, cursor: cursor,
+            registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core))
     }
 }
 
@@ -714,18 +732,29 @@ public struct Status: Sendable, Hashable {
     public var eventCursor: String?
     public var hydration: Hydration
     public var items: UInt64
+    /// While a hydration fills the copy, how many items its slice held on the server when it started; `nil` where
+    /// the server did not count them.
+    public var itemsExpected: UInt64?
+    /// While a hydration fills the copy, how many rows its listings have brought, the figure to set against
+    /// ``itemsExpected``.
+    public var itemsListed: UInt64?
     public var edges: UInt64
     /// Moves each time a refresh changes the server's item type or edge type
     /// catalog; `nil` until the copy first holds the server's catalog.
     ///
     /// Local built-in and declared types do not assign a version.
     public var catalogVersion: UInt64?
+    /// The cache of fetched files: its setting, the budget in force and the bytes held.
+    public var fileCache: FileCache
 
     public init(
         serverOrigin: String? = nil, sliceTypes: [String] = [], sliceTier: SliceTier? = nil,
         sliceEdgeTypes: [String] = [], pinned: [String] = [], eventCursor: String? = nil,
-        hydration: Hydration = .never, items: UInt64 = 0, edges: UInt64 = 0, catalogVersion: UInt64? = nil,
-        instanceId: String? = nil
+        hydration: Hydration = .never, items: UInt64 = 0, itemsExpected: UInt64? = nil, itemsListed: UInt64? = nil,
+        edges: UInt64 = 0, catalogVersion: UInt64? = nil, instanceId: String? = nil,
+        fileCache: FileCache = FileCache(
+            setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
+            backupMarkFailure: nil)
     ) {
         self.serverOrigin = serverOrigin
         self.instanceId = instanceId
@@ -736,23 +765,28 @@ public struct Status: Sendable, Hashable {
         self.eventCursor = eventCursor
         self.hydration = hydration
         self.items = items
+        self.itemsExpected = itemsExpected
+        self.itemsListed = itemsListed
         self.edges = edges
         self.catalogVersion = catalogVersion
+        self.fileCache = fileCache
     }
 
     init(_ core: MarfaCore.Status) {
         self.init(
             serverOrigin: core.serverOrigin, sliceTypes: core.sliceTypes, sliceTier: core.sliceTier.map(SliceTier.init),
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
-            hydration: Hydration(core.hydration), items: core.items, edges: core.edges,
-            catalogVersion: core.catalogVersion, instanceId: core.instanceId)
+            hydration: Hydration(core.hydration), items: core.items, itemsExpected: core.itemsExpected,
+            itemsListed: core.itemsListed, edges: core.edges, catalogVersion: core.catalogVersion,
+            instanceId: core.instanceId, fileCache: core.fileCache)
     }
 
     var core: MarfaCore.Status {
         MarfaCore.Status(
             serverOrigin: serverOrigin, instanceId: instanceId, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
             sliceEdgeTypes: sliceEdgeTypes, pinned: pinned, eventCursor: eventCursor, hydration: hydration.core,
-            items: items, edges: edges, catalogVersion: catalogVersion)
+            items: items, itemsExpected: itemsExpected, itemsListed: itemsListed, edges: edges,
+            catalogVersion: catalogVersion, fileCache: fileCache)
     }
 }
 

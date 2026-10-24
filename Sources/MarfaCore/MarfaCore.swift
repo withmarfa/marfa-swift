@@ -589,6 +589,132 @@ fileprivate struct FfiConverterData: FfiConverterRustBuffer {
 
 
 /**
+ * Where a blob's bytes are held. No trim in this process takes them while
+ * this is held, so a caller that waits for it on another thread holds it
+ * until it has opened the path.
+ */
+public protocol BlobPathProtocol: AnyObject, Sendable {
+    
+    func path()  -> String
+    
+}
+/**
+ * Where a blob's bytes are held. No trim in this process takes them while
+ * this is held, so a caller that waits for it on another thread holds it
+ * until it has opened the path.
+ */
+open class BlobPath: BlobPathProtocol, @unchecked Sendable {
+    fileprivate let handle: UInt64
+
+    /// Used to instantiate a [FFIObject] without an actual handle, for fakes in tests, mostly.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public struct NoHandle {
+        public init() {}
+    }
+
+    // TODO: We'd like this to be `private` but for Swifty reasons,
+    // we can't implement `FfiConverter` without making this `required` and we can't
+    // make it `required` without making it `public`.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    required public init(unsafeFromHandle handle: UInt64) {
+        self.handle = handle
+    }
+
+    // This constructor can be used to instantiate a fake object.
+    // - Parameter noHandle: Placeholder value so we can have a constructor separate from the default empty one that may be implemented for classes extending [FFIObject].
+    //
+    // - Warning:
+    //     Any object instantiated with this constructor cannot be passed to an actual Rust-backed object. Since there isn't a backing handle the FFI lower functions will crash.
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public init(noHandle: NoHandle) {
+        self.handle = 0
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public func uniffiCloneHandle() -> UInt64 {
+        return try! rustCall { uniffi_marfa_core_ffi_fn_clone_blobpath(self.handle, $0) }
+    }
+    // No primary constructor declared for this class.
+
+    deinit {
+        if handle == 0 {
+            // Mock objects have handle=0 don't try to free them
+            return
+        }
+
+        try! rustCall { uniffi_marfa_core_ffi_fn_free_blobpath(handle, $0) }
+    }
+
+    
+
+    
+open func path() -> String  {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_marfa_core_ffi_fn_method_blobpath_path(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+
+    
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeBlobPath: FfiConverter {
+    typealias FfiType = UInt64
+    typealias SwiftType = BlobPath
+
+    public static func lift(_ handle: UInt64) throws -> BlobPath {
+        return BlobPath(unsafeFromHandle: handle)
+    }
+
+    public static func lower(_ value: BlobPath) -> UInt64 {
+        return value.uniffiCloneHandle()
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BlobPath {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+    public static func write(_ value: BlobPath, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(value))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBlobPath_lift(_ handle: UInt64) throws -> BlobPath {
+    return try FfiConverterTypeBlobPath.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeBlobPath_lower(_ value: BlobPath) -> UInt64 {
+    return FfiConverterTypeBlobPath.lower(value)
+}
+
+
+
+
+
+
+/**
  * What an app hands `follow` or `watch`: told of each change as it lands, on a
  * thread of the core's, and once when the stream ends, with the error that
  * ended it or none where it was stopped.
@@ -859,9 +985,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
     /**
      * Where a blob's bytes are held, fetching them first where this store
      * does not hold them yet. Refused `BytesAbsent` where they can be
-     * neither read nor fetched.
+     * neither read nor fetched. No trim in this process takes the bytes
+     * until the answer is released; after that a trim may, so open the path
+     * before releasing it.
      */
-    func blob(hash: String) throws  -> String
+    func blob(hash: String) throws  -> BlobPath
     
     /**
      * Whether a blob's bytes are held beside the store, with no request.
@@ -961,6 +1089,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func embedText(id: String, file: String) throws  -> String
     
     /**
+     * The cache of fetched files: its setting, the budget in force and the
+     * bytes held.
+     */
+    func fileCache() throws  -> FileCache
+    
+    /**
      * Holds the event stream open on a thread of its own and applies each
      * event as it arrives, telling `listener` of each change. On a copy
      * never hydrated, or whose hydration was interrupted, it waits, asking
@@ -997,11 +1131,19 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func heldHandle()  -> Handle
     
+    /**
+     * Replaces the local copy with the declared types at `tier`, one tier or
+     * `all` for both. `["*"]` alone is every type but `system.*`, hydrated in
+     * one pass with no need to read the catalog and name its types first;
+     * beside `system.*` types it adds them, and beside any other type it is
+     * refused `invalid`.
+     */
     func hydrate(types: [String], tier: SliceTier, stop: Stop?) throws  -> HydrateReport
     
     /**
      * A hydration that also holds every edge of `edge_types` the key reads,
-     * whichever ends the copy holds.
+     * whichever ends the copy holds. `types` reads as in `hydrate`, so
+     * `["*"]` alone is every type but `system.*`.
      */
     func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?) throws  -> HydrateReport
     
@@ -1015,7 +1157,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func itemTypes() throws  -> [ItemType]
     
-    func list(filters: ListFilters, sort: Sort) throws  -> [Item]
+    func list(filters: ListFilters, sort: Sort) throws  -> Listing
     
     /**
      * The ID of the item a conflicted copy was made from, or `nil` where
@@ -1084,7 +1226,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func restoreItem(id: String) throws  -> QueuedWrite
     
-    func search(query: String, filters: SearchFilters, limit: UInt32) throws  -> [SearchHit]
+    func search(query: String, filters: SearchFilters, limit: UInt32) throws  -> Found
     
     /**
      * The server's item types and edge types, read from it now, so an app
@@ -1092,6 +1234,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * changes. `NoServer` for a copy with no server.
      */
     func serverCatalog(stop: Stop?) throws  -> ServerCatalog
+    
+    /**
+     * Chooses the cache's budget, trims to it at once and answers the bytes
+     * the trim took. Refused to a reading handle.
+     */
+    func setFileBudget(budget: FileBudget) throws  -> UInt64
     
     func status() throws  -> Status
     
@@ -1107,6 +1255,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * Moves an item to another lifecycle state.
      */
     func transitionItem(id: String, state: ItemState) throws  -> QueuedWrite
+    
+    /**
+     * Trims the cache to its budget now and answers the bytes it took.
+     * Refused to a reading handle.
+     */
+    func trimFiles() throws  -> UInt64
     
     /**
      * Stops holding a row by id; one the slice does not take goes, unless
@@ -1189,18 +1343,21 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func createFolder(settings: FolderSettings, idempotencyKey: String?) throws  -> FolderRow
     
     /**
-     * `None` where the copy does not hold it. A row that is not a folder,
-     * or one naming a setting no folder follows, is `MarfaError.Invalid`.
+     * `None` where a whole copy does not hold it; part way through a
+     * hydration, one that has not arrived is `MarfaError.HydrationIncomplete`.
+     * A row that is not a folder, or one naming a setting no folder follows,
+     * is `MarfaError.Invalid`.
      */
     func folder(id: String) throws  -> FolderRow?
     
     /**
-     * What the folder's search holds, as a folder on disk holds it. A
-     * search the copy cannot answer whole is `MarfaError.Invalid`, never
+     * What the folder's query holds, as a folder on disk holds it. A
+     * query the slice cannot answer whole is `MarfaError.Invalid`, never
      * answered in part; a folder the copy does not hold is
-     * `MarfaError.NotFound` with the code `not_held`.
+     * `MarfaError.NotFound` with the code `not_held`. While a hydration
+     * fills the copy, the answer is marked partial.
      */
-    func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?) throws  -> [Item]
+    func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?) throws  -> Listing
     
     /**
      * Final: a revoked folder changes no more, and a second revoke is
@@ -1211,7 +1368,17 @@ public protocol CoreProtocol: AnyObject, Sendable {
     /**
      * Refused as `list_in_folder` refuses.
      */
-    func searchInFolder(query: String, id: String, limit: UInt32) throws  -> [SearchHit]
+    func searchInFolder(query: String, id: String, limit: UInt32) throws  -> Found
+    
+    func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?) throws  -> Listing
+    
+    func listViews() throws  -> Views
+    
+    func searchInView(query: String, id: String, limit: UInt32) throws  -> Found
+    
+    func view(id: String) throws  -> ViewRow?
+    
+    func viewGroups(id: String, layout: String, timeZone: String?) throws  -> ViewGroups
     
 }
 /**
@@ -1384,10 +1551,12 @@ open func bin(type: String?, cursor: String?, limit: UInt32)throws  -> BinPage  
     /**
      * Where a blob's bytes are held, fetching them first where this store
      * does not hold them yet. Refused `BytesAbsent` where they can be
-     * neither read nor fetched.
+     * neither read nor fetched. No trim in this process takes the bytes
+     * until the answer is released; after that a trim may, so open the path
+     * before releasing it.
      */
-open func blob(hash: String)throws  -> String  {
-    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func blob(hash: String)throws  -> BlobPath  {
+    return try  FfiConverterTypeBlobPath_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_blob(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(hash),$0
@@ -1631,6 +1800,18 @@ open func embedText(id: String, file: String)throws  -> String  {
 }
     
     /**
+     * The cache of fetched files: its setting, the budget in force and the
+     * bytes held.
+     */
+open func fileCache()throws  -> FileCache  {
+    return try  FfiConverterTypeFileCache_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_file_cache(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
      * Holds the event stream open on a thread of its own and applies each
      * event as it arrives, telling `listener` of each change. On a copy
      * never hydrated, or whose hydration was interrupted, it waits, asking
@@ -1701,6 +1882,13 @@ open func heldHandle() -> Handle  {
 })
 }
     
+    /**
+     * Replaces the local copy with the declared types at `tier`, one tier or
+     * `all` for both. `["*"]` alone is every type but `system.*`, hydrated in
+     * one pass with no need to read the catalog and name its types first;
+     * beside `system.*` types it adds them, and beside any other type it is
+     * refused `invalid`.
+     */
 open func hydrate(types: [String], tier: SliceTier, stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_hydrate(
@@ -1714,7 +1902,8 @@ open func hydrate(types: [String], tier: SliceTier, stop: Stop?)throws  -> Hydra
     
     /**
      * A hydration that also holds every edge of `edge_types` the key reads,
-     * whichever ends the copy holds.
+     * whichever ends the copy holds. `types` reads as in `hydrate`, so
+     * `["*"]` alone is every type but `system.*`.
      */
 open func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -1751,8 +1940,8 @@ open func itemTypes()throws  -> [ItemType]  {
 })
 }
     
-open func list(filters: ListFilters, sort: Sort)throws  -> [Item]  {
-    return try  FfiConverterSequenceTypeItem.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func list(filters: ListFilters, sort: Sort)throws  -> Listing  {
+    return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_list(
             self.uniffiCloneHandle(),
         FfiConverterTypeListFilters_lower(filters),
@@ -1900,8 +2089,8 @@ open func restoreItem(id: String)throws  -> QueuedWrite  {
 })
 }
     
-open func search(query: String, filters: SearchFilters, limit: UInt32)throws  -> [SearchHit]  {
-    return try  FfiConverterSequenceTypeSearchHit.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func search(query: String, filters: SearchFilters, limit: UInt32)throws  -> Found  {
+    return try  FfiConverterTypeFound_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_search(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(query),
@@ -1921,6 +2110,19 @@ open func serverCatalog(stop: Stop?)throws  -> ServerCatalog  {
     uniffi_marfa_core_ffi_fn_method_core_server_catalog(
             self.uniffiCloneHandle(),
         FfiConverterOptionTypeStop.lower(stop),$0
+    )
+})
+}
+    
+    /**
+     * Chooses the cache's budget, trims to it at once and answers the bytes
+     * the trim took. Refused to a reading handle.
+     */
+open func setFileBudget(budget: FileBudget)throws  -> UInt64  {
+    return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_set_file_budget(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeFileBudget_lower(budget),$0
     )
 })
 }
@@ -1957,6 +2159,18 @@ open func transitionItem(id: String, state: ItemState)throws  -> QueuedWrite  {
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterTypeItemState_lower(state),$0
+    )
+})
+}
+    
+    /**
+     * Trims the cache to its budget now and answers the bytes it took.
+     * Refused to a reading handle.
+     */
+open func trimFiles()throws  -> UInt64  {
+    return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_trim_files(
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -2115,8 +2329,10 @@ open func createFolder(settings: FolderSettings, idempotencyKey: String?)throws 
 }
     
     /**
-     * `None` where the copy does not hold it. A row that is not a folder,
-     * or one naming a setting no folder follows, is `MarfaError.Invalid`.
+     * `None` where a whole copy does not hold it; part way through a
+     * hydration, one that has not arrived is `MarfaError.HydrationIncomplete`.
+     * A row that is not a folder, or one naming a setting no folder follows,
+     * is `MarfaError.Invalid`.
      */
 open func folder(id: String)throws  -> FolderRow?  {
     return try  FfiConverterOptionTypeFolderRow.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2128,13 +2344,14 @@ open func folder(id: String)throws  -> FolderRow?  {
 }
     
     /**
-     * What the folder's search holds, as a folder on disk holds it. A
-     * search the copy cannot answer whole is `MarfaError.Invalid`, never
+     * What the folder's query holds, as a folder on disk holds it. A
+     * query the slice cannot answer whole is `MarfaError.Invalid`, never
      * answered in part; a folder the copy does not hold is
-     * `MarfaError.NotFound` with the code `not_held`.
+     * `MarfaError.NotFound` with the code `not_held`. While a hydration
+     * fills the copy, the answer is marked partial.
      */
-open func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?)throws  -> [Item]  {
-    return try  FfiConverterSequenceTypeItem.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?)throws  -> Listing  {
+    return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_list_in_folder(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
@@ -2162,13 +2379,64 @@ open func revokeFolder(id: String, idempotencyKey: String?)throws  -> FolderRow 
     /**
      * Refused as `list_in_folder` refuses.
      */
-open func searchInFolder(query: String, id: String, limit: UInt32)throws  -> [SearchHit]  {
-    return try  FfiConverterSequenceTypeSearchHit.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func searchInFolder(query: String, id: String, limit: UInt32)throws  -> Found  {
+    return try  FfiConverterTypeFound_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_search_in_folder(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(query),
         FfiConverterString.lower(id),
         FfiConverterUInt32.lower(limit),$0
+    )
+})
+}
+    
+open func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?)throws  -> Listing  {
+    return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_list_in_view(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterOptionString.lower(layout),
+        FfiConverterOptionUInt32.lower(limit),
+        FfiConverterOptionUInt32.lower(offset),$0
+    )
+})
+}
+    
+open func listViews()throws  -> Views  {
+    return try  FfiConverterTypeViews_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_list_views(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+open func searchInView(query: String, id: String, limit: UInt32)throws  -> Found  {
+    return try  FfiConverterTypeFound_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_search_in_view(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(query),
+        FfiConverterString.lower(id),
+        FfiConverterUInt32.lower(limit),$0
+    )
+})
+}
+    
+open func view(id: String)throws  -> ViewRow?  {
+    return try  FfiConverterOptionTypeViewRow.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_view(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+open func viewGroups(id: String, layout: String, timeZone: String?)throws  -> ViewGroups  {
+    return try  FfiConverterTypeViewGroups_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_view_groups(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterString.lower(layout),
+        FfiConverterOptionString.lower(timeZone),$0
     )
 })
 }
@@ -2789,7 +3057,7 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     
     /**
      * Everything a folder does, once: sends what changed on disk, catches
-     * up with the server and writes out what its search matches. A folder
+     * up with the server and writes out what its query matches. A folder
      * whose first sync waits to be confirmed is only read, and `Waiting`
      * says what the sync will do. Asks a watch that holds the folder to let
      * it go, as `add` does.
@@ -2997,7 +3265,7 @@ open func status(dir: String)throws  -> FolderStatus  {
     
     /**
      * Everything a folder does, once: sends what changed on disk, catches
-     * up with the server and writes out what its search matches. A folder
+     * up with the server and writes out what its query matches. A folder
      * whose first sync waits to be confirmed is only read, and `Waiting`
      * says what the sync will do. Asks a watch that holds the folder to let
      * it go, as `add` does.
@@ -3088,8 +3356,8 @@ public func FfiConverterTypeFolders_lower(_ value: Folders) -> UInt64 {
 /**
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
- * a hydration left unfinished refuses reads, a catch-up keeps the cursor it
- * reached, and a drain leaves what it had not sent queued, and an upload or
+ * a hydration left unfinished answers lists and searches marked partial and
+ * refuses writes until a hydration completes (the next one of the same slice carries on from the page it reached where it can), a catch-up keeps the cursor it reached, and a drain leaves what it had not sent queued, and an upload or
  * item or edge write it had in flight queued as sent, for the next drain to
  * send again under the same key. A raised `Stop` stays raised, so a call given one afterwards
  * ends at once.
@@ -3102,8 +3370,8 @@ public protocol StopProtocol: AnyObject, Sendable {
 /**
  * Raised to end a `hydrate`, `catchUp` or `drain` it was given to, soon
  * after, with `MarfaError.Canceled`. What the call had taken is consistent:
- * a hydration left unfinished refuses reads, a catch-up keeps the cursor it
- * reached, and a drain leaves what it had not sent queued, and an upload or
+ * a hydration left unfinished answers lists and searches marked partial and
+ * refuses writes until a hydration completes (the next one of the same slice carries on from the page it reached where it can), a catch-up keeps the cursor it reached, and a drain leaves what it had not sent queued, and an upload or
  * item or edge write it had in flight queued as sent, for the next drain to
  * send again under the same key. A raised `Stop` stays raised, so a call given one afterwards
  * ends at once.
@@ -4900,6 +5168,119 @@ public func FfiConverterTypeFieldRefusal_lower(_ value: FieldRefusal) -> RustBuf
 }
 
 
+/**
+ * The cache of fetched files as the state report gives it.
+ */
+public struct FileCache: Equatable, Hashable {
+    /**
+     * What was chosen.
+     */
+    public var setting: FileBudget
+    /**
+     * The budget in force, in bytes; none while every file fetched is kept.
+     */
+    public var budget: UInt64?
+    /**
+     * The bytes of the files kept now; none where the cache could not be
+     * read.
+     */
+    public var held: UInt64?
+    /**
+     * Why `held` is unknown; none when it is known.
+     */
+    public var heldUnreadable: String?
+    /**
+     * The default budget is 2 GiB because the disk could not be read.
+     */
+    public var volumeUnreadable: Bool
+    /**
+     * Why the files fetched last could not be kept out of backups; none
+     * once a fetched file is marked.
+     */
+    public var backupMarkFailure: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * What was chosen.
+         */setting: FileBudget, 
+        /**
+         * The budget in force, in bytes; none while every file fetched is kept.
+         */budget: UInt64?, 
+        /**
+         * The bytes of the files kept now; none where the cache could not be
+         * read.
+         */held: UInt64?, 
+        /**
+         * Why `held` is unknown; none when it is known.
+         */heldUnreadable: String?, 
+        /**
+         * The default budget is 2 GiB because the disk could not be read.
+         */volumeUnreadable: Bool, 
+        /**
+         * Why the files fetched last could not be kept out of backups; none
+         * once a fetched file is marked.
+         */backupMarkFailure: String?) {
+        self.setting = setting
+        self.budget = budget
+        self.held = held
+        self.heldUnreadable = heldUnreadable
+        self.volumeUnreadable = volumeUnreadable
+        self.backupMarkFailure = backupMarkFailure
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FileCache: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFileCache: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileCache {
+        return
+            try FileCache(
+                setting: FfiConverterTypeFileBudget.read(from: &buf), 
+                budget: FfiConverterOptionUInt64.read(from: &buf), 
+                held: FfiConverterOptionUInt64.read(from: &buf), 
+                heldUnreadable: FfiConverterOptionString.read(from: &buf), 
+                volumeUnreadable: FfiConverterBool.read(from: &buf), 
+                backupMarkFailure: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FileCache, into buf: inout [UInt8]) {
+        FfiConverterTypeFileBudget.write(value.setting, into: &buf)
+        FfiConverterOptionUInt64.write(value.budget, into: &buf)
+        FfiConverterOptionUInt64.write(value.held, into: &buf)
+        FfiConverterOptionString.write(value.heldUnreadable, into: &buf)
+        FfiConverterBool.write(value.volumeUnreadable, into: &buf)
+        FfiConverterOptionString.write(value.backupMarkFailure, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileCache_lift(_ buf: RustBuffer) throws -> FileCache {
+    return try FfiConverterTypeFileCache.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileCache_lower(_ value: FileCache) -> RustBuffer {
+    return FfiConverterTypeFileCache.lower(value)
+}
+
+
 public struct FileStatus: Equatable, Hashable {
     public var path: String
     public var itemId: String?
@@ -5331,7 +5712,7 @@ public struct FolderPull: Equatable, Hashable {
     public var unchanged: UInt64
     public var skipped: UInt64
     /**
-     * Files of items trashed, purged or gone from the search's states, removed.
+     * Files of items trashed, purged or gone from the query's states, removed.
      */
     public var removed: UInt64
     /**
@@ -5339,7 +5720,7 @@ public struct FolderPull: Equatable, Hashable {
      */
     public var purged: UInt64
     /**
-     * Files of items gone from the search, kept with the person's changes.
+     * Files of items gone from the query, kept with the person's changes.
      */
     public var kept: UInt64
     /**
@@ -5355,7 +5736,7 @@ public struct FolderPull: Equatable, Hashable {
      */
     public var unplaced: UInt64
     /**
-     * Files left in place whose items the search no longer matches.
+     * Files left in place whose items the query no longer matches.
      */
     public var unmatched: UInt64
     /**
@@ -5371,13 +5752,13 @@ public struct FolderPull: Equatable, Hashable {
     // declare one manually.
     public init(written: UInt64, rewritten: UInt64, moved: UInt64, unchanged: UInt64, skipped: UInt64, 
         /**
-         * Files of items trashed, purged or gone from the search's states, removed.
+         * Files of items trashed, purged or gone from the query's states, removed.
          */removed: UInt64, 
         /**
          * Of `removed`, the files of items purged, which no restore brings back.
          */purged: UInt64, 
         /**
-         * Files of items gone from the search, kept with the person's changes.
+         * Files of items gone from the query, kept with the person's changes.
          */kept: UInt64, 
         /**
          * Files the folder did not write, and would not write over.
@@ -5389,7 +5770,7 @@ public struct FolderPull: Equatable, Hashable {
          * Placements the server refused.
          */unplaced: UInt64, 
         /**
-         * Files left in place whose items the search no longer matches.
+         * Files left in place whose items the query no longer matches.
          */unmatched: UInt64, 
         /**
          * Files a large removal holds back.
@@ -5477,6 +5858,105 @@ public func FfiConverterTypeFolderPull_lift(_ buf: RustBuffer) throws -> FolderP
 #endif
 public func FfiConverterTypeFolderPull_lower(_ value: FolderPull) -> RustBuffer {
     return FfiConverterTypeFolderPull.lower(value)
+}
+
+
+/**
+ * The query that decides which items a folder holds.
+ */
+public struct FolderQuery: Equatable, Hashable {
+    /**
+     * Each with its subtypes; empty holds every type but `system.*`.
+     */
+    public var types: [String]
+    /**
+     * `None` holds the library tier.
+     */
+    public var tier: SliceTier?
+    /**
+     * `None` holds active and archived items.
+     */
+    public var states: [ItemState]?
+    /**
+     * An expression in the server's listing grammar.
+     */
+    public var filter: String?
+    /**
+     * An item id: that item and everything it reaches along `parent-of`.
+     */
+    public var beneath: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Each with its subtypes; empty holds every type but `system.*`.
+         */types: [String] = [], 
+        /**
+         * `None` holds the library tier.
+         */tier: SliceTier? = nil, 
+        /**
+         * `None` holds active and archived items.
+         */states: [ItemState]? = nil, 
+        /**
+         * An expression in the server's listing grammar.
+         */filter: String? = nil, 
+        /**
+         * An item id: that item and everything it reaches along `parent-of`.
+         */beneath: String? = nil) {
+        self.types = types
+        self.tier = tier
+        self.states = states
+        self.filter = filter
+        self.beneath = beneath
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderQuery: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderQuery: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderQuery {
+        return
+            try FolderQuery(
+                types: FfiConverterSequenceString.read(from: &buf), 
+                tier: FfiConverterOptionTypeSliceTier.read(from: &buf), 
+                states: FfiConverterOptionSequenceTypeItemState.read(from: &buf), 
+                filter: FfiConverterOptionString.read(from: &buf), 
+                beneath: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderQuery, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.types, into: &buf)
+        FfiConverterOptionTypeSliceTier.write(value.tier, into: &buf)
+        FfiConverterOptionSequenceTypeItemState.write(value.states, into: &buf)
+        FfiConverterOptionString.write(value.filter, into: &buf)
+        FfiConverterOptionString.write(value.beneath, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderQuery_lift(_ buf: RustBuffer) throws -> FolderQuery {
+    return try FfiConverterTypeFolderQuery.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderQuery_lower(_ value: FolderQuery) -> RustBuffer {
+    return FfiConverterTypeFolderQuery.lower(value)
 }
 
 
@@ -5692,111 +6172,12 @@ public func FfiConverterTypeFolderScan_lower(_ value: FolderScan) -> RustBuffer 
 
 
 /**
- * The search that decides which items a folder holds.
- */
-public struct FolderSearch: Equatable, Hashable {
-    /**
-     * Each with its subtypes; empty holds every type but `system.*`.
-     */
-    public var types: [String]
-    /**
-     * `None` holds the library tier.
-     */
-    public var tier: Tier?
-    /**
-     * `None` holds active and archived items.
-     */
-    public var states: [ItemState]?
-    /**
-     * An expression in the server's listing grammar.
-     */
-    public var filter: String?
-    /**
-     * An item id: that item and everything it reaches along `parent-of`.
-     */
-    public var beneath: String?
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Each with its subtypes; empty holds every type but `system.*`.
-         */types: [String] = [], 
-        /**
-         * `None` holds the library tier.
-         */tier: Tier? = nil, 
-        /**
-         * `None` holds active and archived items.
-         */states: [ItemState]? = nil, 
-        /**
-         * An expression in the server's listing grammar.
-         */filter: String? = nil, 
-        /**
-         * An item id: that item and everything it reaches along `parent-of`.
-         */beneath: String? = nil) {
-        self.types = types
-        self.tier = tier
-        self.states = states
-        self.filter = filter
-        self.beneath = beneath
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension FolderSearch: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeFolderSearch: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderSearch {
-        return
-            try FolderSearch(
-                types: FfiConverterSequenceString.read(from: &buf), 
-                tier: FfiConverterOptionTypeTier.read(from: &buf), 
-                states: FfiConverterOptionSequenceTypeItemState.read(from: &buf), 
-                filter: FfiConverterOptionString.read(from: &buf), 
-                beneath: FfiConverterOptionString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: FolderSearch, into buf: inout [UInt8]) {
-        FfiConverterSequenceString.write(value.types, into: &buf)
-        FfiConverterOptionTypeTier.write(value.tier, into: &buf)
-        FfiConverterOptionSequenceTypeItemState.write(value.states, into: &buf)
-        FfiConverterOptionString.write(value.filter, into: &buf)
-        FfiConverterOptionString.write(value.beneath, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFolderSearch_lift(_ buf: RustBuffer) throws -> FolderSearch {
-    return try FfiConverterTypeFolderSearch.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFolderSearch_lower(_ value: FolderSearch) -> RustBuffer {
-    return FfiConverterTypeFolderSearch.lower(value)
-}
-
-
-/**
  * What a folder holds and what a new file in it takes: the settings a
  * `system.folder` carries.
  */
 public struct FolderSettings: Equatable, Hashable {
     public var title: String?
-    public var search: FolderSearch
+    public var query: FolderQuery
     public var defaults: FolderDefaults
     /**
      * Gitignore patterns for the paths a folder on disk takes; empty takes
@@ -5817,7 +6198,7 @@ public struct FolderSettings: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(title: String? = nil, search: FolderSearch, defaults: FolderDefaults, 
+    public init(title: String? = nil, query: FolderQuery, defaults: FolderDefaults, 
         /**
          * Gitignore patterns for the paths a folder on disk takes; empty takes
          * every path.
@@ -5831,7 +6212,7 @@ public struct FolderSettings: Equatable, Hashable {
          * directory.
          */firstPlacement: [String: String], removalThreshold: RemovalThreshold) {
         self.title = title
-        self.search = search
+        self.query = query
         self.defaults = defaults
         self.include = include
         self.ignore = ignore
@@ -5856,7 +6237,7 @@ public struct FfiConverterTypeFolderSettings: FfiConverterRustBuffer {
         return
             try FolderSettings(
                 title: FfiConverterOptionString.read(from: &buf), 
-                search: FfiConverterTypeFolderSearch.read(from: &buf), 
+                query: FfiConverterTypeFolderQuery.read(from: &buf), 
                 defaults: FfiConverterTypeFolderDefaults.read(from: &buf), 
                 include: FfiConverterSequenceString.read(from: &buf), 
                 ignore: FfiConverterSequenceString.read(from: &buf), 
@@ -5867,7 +6248,7 @@ public struct FfiConverterTypeFolderSettings: FfiConverterRustBuffer {
 
     public static func write(_ value: FolderSettings, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.title, into: &buf)
-        FfiConverterTypeFolderSearch.write(value.search, into: &buf)
+        FfiConverterTypeFolderQuery.write(value.query, into: &buf)
         FfiConverterTypeFolderDefaults.write(value.defaults, into: &buf)
         FfiConverterSequenceString.write(value.include, into: &buf)
         FfiConverterSequenceString.write(value.ignore, into: &buf)
@@ -5897,7 +6278,7 @@ public func FfiConverterTypeFolderSettings_lower(_ value: FolderSettings) -> Rus
  */
 public struct FolderSettingsChange: Equatable, Hashable {
     public var title: String?
-    public var search: FolderSearch?
+    public var query: FolderQuery?
     public var defaults: FolderDefaults?
     public var include: [String]?
     public var ignore: [String]?
@@ -5906,9 +6287,9 @@ public struct FolderSettingsChange: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(title: String? = nil, search: FolderSearch? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil, ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil) {
+    public init(title: String? = nil, query: FolderQuery? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil, ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil) {
         self.title = title
-        self.search = search
+        self.query = query
         self.defaults = defaults
         self.include = include
         self.ignore = ignore
@@ -5933,7 +6314,7 @@ public struct FfiConverterTypeFolderSettingsChange: FfiConverterRustBuffer {
         return
             try FolderSettingsChange(
                 title: FfiConverterOptionString.read(from: &buf), 
-                search: FfiConverterOptionTypeFolderSearch.read(from: &buf), 
+                query: FfiConverterOptionTypeFolderQuery.read(from: &buf), 
                 defaults: FfiConverterOptionTypeFolderDefaults.read(from: &buf), 
                 include: FfiConverterOptionSequenceString.read(from: &buf), 
                 ignore: FfiConverterOptionSequenceString.read(from: &buf), 
@@ -5944,7 +6325,7 @@ public struct FfiConverterTypeFolderSettingsChange: FfiConverterRustBuffer {
 
     public static func write(_ value: FolderSettingsChange, into buf: inout [UInt8]) {
         FfiConverterOptionString.write(value.title, into: &buf)
-        FfiConverterOptionTypeFolderSearch.write(value.search, into: &buf)
+        FfiConverterOptionTypeFolderQuery.write(value.query, into: &buf)
         FfiConverterOptionTypeFolderDefaults.write(value.defaults, into: &buf)
         FfiConverterOptionSequenceString.write(value.include, into: &buf)
         FfiConverterOptionSequenceString.write(value.ignore, into: &buf)
@@ -6112,13 +6493,90 @@ public func FfiConverterTypeFolderSync_lower(_ value: FolderSync) -> RustBuffer 
 }
 
 
+/**
+ * The hits a local search answers, best match first, and whether the copy
+ * was whole.
+ */
+public struct Found: Equatable, Hashable {
+    public var hits: [SearchHit]
+    public var completeness: Completeness
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(hits: [SearchHit], completeness: Completeness) {
+        self.hits = hits
+        self.completeness = completeness
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Found: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFound: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Found {
+        return
+            try Found(
+                hits: FfiConverterSequenceTypeSearchHit.read(from: &buf), 
+                completeness: FfiConverterTypeCompleteness.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Found, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeSearchHit.write(value.hits, into: &buf)
+        FfiConverterTypeCompleteness.write(value.completeness, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFound_lift(_ buf: RustBuffer) throws -> Found {
+    return try FfiConverterTypeFound.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFound_lower(_ value: Found) -> RustBuffer {
+    return FfiConverterTypeFound.lower(value)
+}
+
+
 public struct HydrateReport: Equatable, Hashable {
     public var types: [String]
     public var tier: SliceTier
     public var edgeTypes: [String]
     public var items: UInt64
     public var edges: UInt64
+    /**
+     * The listing pages this call read, those of a walk it then started
+     * again from the first page included.
+     */
     public var pages: UInt64
+    /**
+     * The listing pages the hydration read in all, those of the interrupted
+     * calls it resumed included.
+     */
+    public var pagesTotal: UInt64
+    /**
+     * Whether this call carried on from the page an interrupted hydration
+     * of the same slice had reached.
+     */
+    public var resumed: Bool
+    /**
+     * Why an interrupted hydration was filled again from the first page
+     * rather than resumed, such as `slice_changed` or `head_aged_out`.
+     */
+    public var restarted: String?
     public var cursor: String
     /**
      * Types the app declared that the instance did not hold and now does.
@@ -6131,7 +6589,23 @@ public struct HydrateReport: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64, cursor: String, 
+    public init(types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, 
+        /**
+         * The listing pages this call read, those of a walk it then started
+         * again from the first page included.
+         */pages: UInt64, 
+        /**
+         * The listing pages the hydration read in all, those of the interrupted
+         * calls it resumed included.
+         */pagesTotal: UInt64, 
+        /**
+         * Whether this call carried on from the page an interrupted hydration
+         * of the same slice had reached.
+         */resumed: Bool, 
+        /**
+         * Why an interrupted hydration was filled again from the first page
+         * rather than resumed, such as `slice_changed` or `head_aged_out`.
+         */restarted: String?, cursor: String, 
         /**
          * Types the app declared that the instance did not hold and now does.
          */registeredTypes: [String], 
@@ -6144,6 +6618,9 @@ public struct HydrateReport: Equatable, Hashable {
         self.items = items
         self.edges = edges
         self.pages = pages
+        self.pagesTotal = pagesTotal
+        self.resumed = resumed
+        self.restarted = restarted
         self.cursor = cursor
         self.registeredTypes = registeredTypes
         self.unregisteredTypes = unregisteredTypes
@@ -6171,6 +6648,9 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
                 items: FfiConverterUInt64.read(from: &buf), 
                 edges: FfiConverterUInt64.read(from: &buf), 
                 pages: FfiConverterUInt64.read(from: &buf), 
+                pagesTotal: FfiConverterUInt64.read(from: &buf), 
+                resumed: FfiConverterBool.read(from: &buf), 
+                restarted: FfiConverterOptionString.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
                 registeredTypes: FfiConverterSequenceString.read(from: &buf), 
                 unregisteredTypes: FfiConverterSequenceTypeUnregisteredType.read(from: &buf)
@@ -6184,6 +6664,9 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.items, into: &buf)
         FfiConverterUInt64.write(value.edges, into: &buf)
         FfiConverterUInt64.write(value.pages, into: &buf)
+        FfiConverterUInt64.write(value.pagesTotal, into: &buf)
+        FfiConverterBool.write(value.resumed, into: &buf)
+        FfiConverterOptionString.write(value.restarted, into: &buf)
         FfiConverterString.write(value.cursor, into: &buf)
         FfiConverterSequenceString.write(value.registeredTypes, into: &buf)
         FfiConverterSequenceTypeUnregisteredType.write(value.unregisteredTypes, into: &buf)
@@ -6203,6 +6686,76 @@ public func FfiConverterTypeHydrateReport_lift(_ buf: RustBuffer) throws -> Hydr
 #endif
 public func FfiConverterTypeHydrateReport_lower(_ value: HydrateReport) -> RustBuffer {
     return FfiConverterTypeHydrateReport.lower(value)
+}
+
+
+public struct InstanceDescription: Equatable, Hashable {
+    public var name: String
+    public var version: String
+    public var release: String?
+    public var instanceId: String
+    public var contract: UInt64
+    public var features: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(name: String, version: String, release: String?, instanceId: String, contract: UInt64, features: [String]) {
+        self.name = name
+        self.version = version
+        self.release = release
+        self.instanceId = instanceId
+        self.contract = contract
+        self.features = features
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension InstanceDescription: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeInstanceDescription: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InstanceDescription {
+        return
+            try InstanceDescription(
+                name: FfiConverterString.read(from: &buf), 
+                version: FfiConverterString.read(from: &buf), 
+                release: FfiConverterOptionString.read(from: &buf), 
+                instanceId: FfiConverterString.read(from: &buf), 
+                contract: FfiConverterUInt64.read(from: &buf), 
+                features: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: InstanceDescription, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.version, into: &buf)
+        FfiConverterOptionString.write(value.release, into: &buf)
+        FfiConverterString.write(value.instanceId, into: &buf)
+        FfiConverterUInt64.write(value.contract, into: &buf)
+        FfiConverterSequenceString.write(value.features, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInstanceDescription_lift(_ buf: RustBuffer) throws -> InstanceDescription {
+    return try FfiConverterTypeInstanceDescription.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeInstanceDescription_lower(_ value: InstanceDescription) -> RustBuffer {
+    return FfiConverterTypeInstanceDescription.lower(value)
 }
 
 
@@ -6804,6 +7357,63 @@ public func FfiConverterTypeListedFolder_lower(_ value: ListedFolder) -> RustBuf
 }
 
 
+/**
+ * The items a local list answers, and whether the copy was whole.
+ */
+public struct Listing: Equatable, Hashable {
+    public var items: [Item]
+    public var completeness: Completeness
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(items: [Item], completeness: Completeness) {
+        self.items = items
+        self.completeness = completeness
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Listing: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeListing: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Listing {
+        return
+            try Listing(
+                items: FfiConverterSequenceTypeItem.read(from: &buf), 
+                completeness: FfiConverterTypeCompleteness.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Listing, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeItem.write(value.items, into: &buf)
+        FfiConverterTypeCompleteness.write(value.completeness, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeListing_lift(_ buf: RustBuffer) throws -> Listing {
+    return try FfiConverterTypeListing.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeListing_lower(_ value: Listing) -> RustBuffer {
+    return FfiConverterTypeListing.lower(value)
+}
+
+
 public struct MissingGrant: Equatable, Hashable {
     public var kind: GrantKind
     /**
@@ -6877,7 +7487,7 @@ public struct PausedRemoval: Equatable, Hashable {
      */
     public var disk: UInt64
     /**
-     * Files left in place whose items left the search elsewhere.
+     * Files left in place whose items left the query elsewhere.
      */
     public var pull: UInt64
 
@@ -6888,7 +7498,7 @@ public struct PausedRemoval: Equatable, Hashable {
          * Files gone from the disk whose deletes are not sent.
          */disk: UInt64, 
         /**
-         * Files left in place whose items left the search elsewhere.
+         * Files left in place whose items left the query elsewhere.
          */pull: UInt64) {
         self.disk = disk
         self.pull = pull
@@ -7853,23 +8463,42 @@ public struct Status: Equatable, Hashable {
     public var eventCursor: String?
     public var hydration: Hydration
     public var items: UInt64
+    /**
+     * While a hydration fills the copy, how many items its slice held on the
+     * server when it started; none where the server did not count them.
+     */
+    public var itemsExpected: UInt64?
+    /**
+     * While a hydration fills the copy, how many rows its listings have
+     * brought, the figure to set against `items_expected`.
+     */
+    public var itemsListed: UInt64?
     public var edges: UInt64
     /**
      * Moves each time a refresh changes the catalog; none where the copy has
      * never held one.
      */
     public var catalogVersion: UInt64?
+    public var fileCache: FileCache
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(serverOrigin: String?, 
         /**
          * The instance the copy was hydrated from.
-         */instanceId: String?, sliceTypes: [String], sliceTier: SliceTier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, edges: UInt64, 
+         */instanceId: String?, sliceTypes: [String], sliceTier: SliceTier?, sliceEdgeTypes: [String], pinned: [String], eventCursor: String?, hydration: Hydration, items: UInt64, 
+        /**
+         * While a hydration fills the copy, how many items its slice held on the
+         * server when it started; none where the server did not count them.
+         */itemsExpected: UInt64?, 
+        /**
+         * While a hydration fills the copy, how many rows its listings have
+         * brought, the figure to set against `items_expected`.
+         */itemsListed: UInt64?, edges: UInt64, 
         /**
          * Moves each time a refresh changes the catalog; none where the copy has
          * never held one.
-         */catalogVersion: UInt64?) {
+         */catalogVersion: UInt64?, fileCache: FileCache) {
         self.serverOrigin = serverOrigin
         self.instanceId = instanceId
         self.sliceTypes = sliceTypes
@@ -7879,8 +8508,11 @@ public struct Status: Equatable, Hashable {
         self.eventCursor = eventCursor
         self.hydration = hydration
         self.items = items
+        self.itemsExpected = itemsExpected
+        self.itemsListed = itemsListed
         self.edges = edges
         self.catalogVersion = catalogVersion
+        self.fileCache = fileCache
     }
 
     
@@ -7908,8 +8540,11 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
                 eventCursor: FfiConverterOptionString.read(from: &buf), 
                 hydration: FfiConverterTypeHydration.read(from: &buf), 
                 items: FfiConverterUInt64.read(from: &buf), 
+                itemsExpected: FfiConverterOptionUInt64.read(from: &buf), 
+                itemsListed: FfiConverterOptionUInt64.read(from: &buf), 
                 edges: FfiConverterUInt64.read(from: &buf), 
-                catalogVersion: FfiConverterOptionUInt64.read(from: &buf)
+                catalogVersion: FfiConverterOptionUInt64.read(from: &buf), 
+                fileCache: FfiConverterTypeFileCache.read(from: &buf)
         )
     }
 
@@ -7923,8 +8558,11 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.eventCursor, into: &buf)
         FfiConverterTypeHydration.write(value.hydration, into: &buf)
         FfiConverterUInt64.write(value.items, into: &buf)
+        FfiConverterOptionUInt64.write(value.itemsExpected, into: &buf)
+        FfiConverterOptionUInt64.write(value.itemsListed, into: &buf)
         FfiConverterUInt64.write(value.edges, into: &buf)
         FfiConverterOptionUInt64.write(value.catalogVersion, into: &buf)
+        FfiConverterTypeFileCache.write(value.fileCache, into: &buf)
     }
 }
 
@@ -8212,6 +8850,234 @@ public func FfiConverterTypeUnsureFile_lift(_ buf: RustBuffer) throws -> UnsureF
 #endif
 public func FfiConverterTypeUnsureFile_lower(_ value: UnsureFile) -> RustBuffer {
     return FfiConverterTypeUnsureFile.lower(value)
+}
+
+
+public struct ViewGroup: Equatable, Hashable {
+    public var key: JsonValue
+    public var count: UInt64
+    public var sum: Double?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(key: JsonValue, count: UInt64, sum: Double?) {
+        self.key = key
+        self.count = count
+        self.sum = sum
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ViewGroup: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeViewGroup: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ViewGroup {
+        return
+            try ViewGroup(
+                key: FfiConverterTypeJsonValue.read(from: &buf), 
+                count: FfiConverterUInt64.read(from: &buf), 
+                sum: FfiConverterOptionDouble.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ViewGroup, into buf: inout [UInt8]) {
+        FfiConverterTypeJsonValue.write(value.key, into: &buf)
+        FfiConverterUInt64.write(value.count, into: &buf)
+        FfiConverterOptionDouble.write(value.sum, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViewGroup_lift(_ buf: RustBuffer) throws -> ViewGroup {
+    return try FfiConverterTypeViewGroup.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViewGroup_lower(_ value: ViewGroup) -> RustBuffer {
+    return FfiConverterTypeViewGroup.lower(value)
+}
+
+
+public struct ViewGroups: Equatable, Hashable {
+    public var groups: [ViewGroup]
+    public var completeness: Completeness
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(groups: [ViewGroup], completeness: Completeness) {
+        self.groups = groups
+        self.completeness = completeness
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ViewGroups: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeViewGroups: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ViewGroups {
+        return
+            try ViewGroups(
+                groups: FfiConverterSequenceTypeViewGroup.read(from: &buf), 
+                completeness: FfiConverterTypeCompleteness.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ViewGroups, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeViewGroup.write(value.groups, into: &buf)
+        FfiConverterTypeCompleteness.write(value.completeness, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViewGroups_lift(_ buf: RustBuffer) throws -> ViewGroups {
+    return try FfiConverterTypeViewGroups.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViewGroups_lower(_ value: ViewGroups) -> RustBuffer {
+    return FfiConverterTypeViewGroups.lower(value)
+}
+
+
+public struct ViewRow: Equatable, Hashable {
+    public var id: String
+    public var version: Int64
+    public var state: ItemState
+    public var settings: JsonObject
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, version: Int64, state: ItemState, settings: JsonObject) {
+        self.id = id
+        self.version = version
+        self.state = state
+        self.settings = settings
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ViewRow: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeViewRow: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ViewRow {
+        return
+            try ViewRow(
+                id: FfiConverterString.read(from: &buf), 
+                version: FfiConverterInt64.read(from: &buf), 
+                state: FfiConverterTypeItemState.read(from: &buf), 
+                settings: FfiConverterTypeJsonObject.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ViewRow, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterInt64.write(value.version, into: &buf)
+        FfiConverterTypeItemState.write(value.state, into: &buf)
+        FfiConverterTypeJsonObject.write(value.settings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViewRow_lift(_ buf: RustBuffer) throws -> ViewRow {
+    return try FfiConverterTypeViewRow.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViewRow_lower(_ value: ViewRow) -> RustBuffer {
+    return FfiConverterTypeViewRow.lower(value)
+}
+
+
+public struct Views: Equatable, Hashable {
+    public var views: [ViewRow]
+    public var completeness: Completeness
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(views: [ViewRow], completeness: Completeness) {
+        self.views = views
+        self.completeness = completeness
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Views: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeViews: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Views {
+        return
+            try Views(
+                views: FfiConverterSequenceTypeViewRow.read(from: &buf), 
+                completeness: FfiConverterTypeCompleteness.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Views, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeViewRow.write(value.views, into: &buf)
+        FfiConverterTypeCompleteness.write(value.completeness, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViews_lift(_ buf: RustBuffer) throws -> Views {
+    return try FfiConverterTypeViews.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeViews_lower(_ value: Views) -> RustBuffer {
+    return FfiConverterTypeViews.lower(value)
 }
 
 
@@ -8744,6 +9610,77 @@ public func FfiConverterTypeChange_lower(_ value: Change) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Whether a local list or search was read from a whole copy, or from one a
+ * hydration is still filling, which holds only the rows that have arrived.
+ */
+
+public enum Completeness: Equatable, Hashable, CaseIterable {
+    
+    case complete
+    case partial
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension Completeness: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCompleteness: FfiConverterRustBuffer {
+    typealias SwiftType = Completeness
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Completeness {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .complete
+        
+        case 2: return .partial
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Completeness, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .complete:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .partial:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCompleteness_lift(_ buf: RustBuffer) throws -> Completeness {
+    return try FfiConverterTypeCompleteness.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCompleteness_lower(_ value: Completeness) -> RustBuffer {
+    return FfiConverterTypeCompleteness.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * One end of an edge.
  */
 
@@ -8891,6 +9828,96 @@ public func FfiConverterTypeEdgeWrittenAt_lower(_ value: EdgeWrittenAt) -> RustB
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * How the cache of fetched files chooses its budget.
+ */
+
+public enum FileBudget: Equatable, Hashable {
+    
+    /**
+     * The larger of 2 GiB and a tenth of the volume, held to what leaves a
+     * twentieth of the volume free.
+     */
+    case `default`
+    /**
+     * This many bytes.
+     */
+    case bytes(bytes: UInt64
+    )
+    /**
+     * No budget: every file fetched stays.
+     */
+    case keepAll
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FileBudget: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFileBudget: FfiConverterRustBuffer {
+    typealias SwiftType = FileBudget
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FileBudget {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .`default`
+        
+        case 2: return .bytes(bytes: try FfiConverterUInt64.read(from: &buf)
+        )
+        
+        case 3: return .keepAll
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FileBudget, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .`default`:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .bytes(bytes):
+            writeInt(&buf, Int32(2))
+            FfiConverterUInt64.write(bytes, into: &buf)
+            
+        
+        case .keepAll:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileBudget_lift(_ buf: RustBuffer) throws -> FileBudget {
+    return try FfiConverterTypeFileBudget.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFileBudget_lower(_ value: FileBudget) -> RustBuffer {
+    return FfiConverterTypeFileBudget.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Where one file stands, from the folder's own store.
  */
 
@@ -8909,7 +9936,7 @@ public enum FileState: Equatable, Hashable, CaseIterable {
      */
     case held
     /**
-     * Its item no longer matches the folder's search.
+     * Its item no longer matches the folder's query.
      */
     case unmatched
     /**
@@ -9889,6 +10916,12 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case BytesAbsent(hash: String, reason: String, message: String
     )
     /**
+     * The volume holding the file cache has less room than a fetch still has
+     * to receive.
+     */
+    case NoRoom(hash: String, size: UInt64, free: UInt64, message: String
+    )
+    /**
      * The server speaks a contract this build was not made for, and its
      * answer was not read.
      */
@@ -10054,20 +11087,26 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 27: return .ContractMismatch(
+        case 27: return .NoRoom(
+            hash: try FfiConverterString.read(from: &buf), 
+            size: try FfiConverterUInt64.read(from: &buf), 
+            free: try FfiConverterUInt64.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 28: return .ContractMismatch(
             served: try FfiConverterOptionString.read(from: &buf), 
             expected: try FfiConverterUInt64.read(from: &buf), 
             status: try FfiConverterOptionUInt16.read(from: &buf), 
             writeSent: try FfiConverterBool.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 28: return .Canceled(
+        case 29: return .Canceled(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 29: return .FirstSyncWaiting(
+        case 30: return .FirstSyncWaiting(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 30: return .Invalid(
+        case 31: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -10234,8 +11273,16 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .ContractMismatch(served,expected,status,writeSent,message):
+        case let .NoRoom(hash,size,free,message):
             writeInt(&buf, Int32(27))
+            FfiConverterString.write(hash, into: &buf)
+            FfiConverterUInt64.write(size, into: &buf)
+            FfiConverterUInt64.write(free, into: &buf)
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .ContractMismatch(served,expected,status,writeSent,message):
+            writeInt(&buf, Int32(28))
             FfiConverterOptionString.write(served, into: &buf)
             FfiConverterUInt64.write(expected, into: &buf)
             FfiConverterOptionUInt16.write(status, into: &buf)
@@ -10244,17 +11291,17 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .Canceled(message):
-            writeInt(&buf, Int32(28))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(29))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Invalid(message):
+        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(30))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Invalid(message):
+            writeInt(&buf, Int32(31))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -11364,6 +12411,30 @@ fileprivate struct FfiConverterOptionTypeFolderPull: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeFolderQuery: FfiConverterRustBuffer {
+    typealias SwiftType = FolderQuery?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFolderQuery.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFolderQuery.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeFolderRow: FfiConverterRustBuffer {
     typealias SwiftType = FolderRow?
 
@@ -11380,30 +12451,6 @@ fileprivate struct FfiConverterOptionTypeFolderRow: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeFolderRow.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-fileprivate struct FfiConverterOptionTypeFolderSearch: FfiConverterRustBuffer {
-    typealias SwiftType = FolderSearch?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeFolderSearch.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeFolderSearch.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -11596,6 +12643,30 @@ fileprivate struct FfiConverterOptionTypeThumbnail: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeThumbnail.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeViewRow: FfiConverterRustBuffer {
+    typealias SwiftType = ViewRow?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeViewRow.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeViewRow.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -12318,6 +13389,56 @@ fileprivate struct FfiConverterSequenceTypeUnsureFile: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeViewGroup: FfiConverterRustBuffer {
+    typealias SwiftType = [ViewGroup]
+
+    public static func write(_ value: [ViewGroup], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeViewGroup.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ViewGroup] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ViewGroup]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeViewGroup.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeViewRow: FfiConverterRustBuffer {
+    typealias SwiftType = [ViewRow]
+
+    public static func write(_ value: [ViewRow], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeViewRow.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ViewRow] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ViewRow]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeViewRow.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeItemState: FfiConverterRustBuffer {
     typealias SwiftType = [ItemState]
 
@@ -12416,6 +13537,13 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
         return dict
     }
 }
+public func instanceDescription(url: String)throws  -> InstanceDescription  {
+    return try  FfiConverterTypeInstanceDescription_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_instance_description(
+        FfiConverterString.lower(url),$0
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -12431,6 +13559,12 @@ private let initializationResult: InitializationResult = {
     let scaffolding_contract_version = ffi_marfa_core_ffi_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_instance_description() != 5508) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_blobpath_path() != 32251) {
+        return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_changelistener_changed() != 39938) {
         return InitializationResult.apiChecksumMismatch
@@ -12450,7 +13584,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_bin() != 51174) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_blob() != 18413) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_blob() != 13524) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_blob_held() != 47878) {
@@ -12513,6 +13647,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_embed_text() != 54663) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_core_file_cache() != 11121) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 58708) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -12528,10 +13665,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_held_handle() != 31292) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 51604) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 41773) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 22476) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 18467) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_item_type() != 51576) {
@@ -12540,7 +13677,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_item_types() != 15133) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 38444) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 5666) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_original_of_conflicted_copy() != 44658) {
@@ -12573,10 +13710,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_restore_item() != 12216) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_search() != 11561) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_search() != 9508) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_server_catalog() != 47388) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_set_file_budget() != 9616) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_status() != 27928) {
@@ -12586,6 +13726,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_transition_item() != 52263) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_trim_files() != 62056) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_unpin() != 56069) {
@@ -12615,16 +13758,31 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_create_folder() != 36712) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_folder() != 40230) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_folder() != 48388) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_folder() != 23132) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_folder() != 30479) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_revoke_folder() != 58152) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_search_in_folder() != 53431) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_search_in_folder() != 25178) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_view() != 48867) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_list_views() != 21095) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_search_in_view() != 16726) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_view() != 43776) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_view_groups() != 21367) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_stop_raise() != 50331) {
@@ -12660,7 +13818,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_status() != 56073) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 49305) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 24267) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 17682) {

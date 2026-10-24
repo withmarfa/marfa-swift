@@ -75,7 +75,7 @@ struct Closing {
         await refused("metadata.replaceTags") { _ = try await copy.metadata.replaceTags(of: "a", with: ["t"]) }
         await refused("extensions.write") { _ = try await copy.extensions.write("n", [:], on: "a") }
         await refused("extensions.delete") { _ = try await copy.extensions.delete("n", from: "a") }
-        await refused("blobs.get") { _ = try await copy.blobs.get("h") }
+        await refused("blobs.withFile") { try await copy.blobs.withFile("h") { _ in } }
         await refused("blobs.isHeld") { _ = try await copy.blobs.isHeld("h") }
         await refused("queue.all") { _ = try await copy.queue.all() }
         await refused("queue.drain") { _ = try await copy.queue.drain() }

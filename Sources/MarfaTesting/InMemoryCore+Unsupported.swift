@@ -21,8 +21,8 @@ extension InMemoryCore {
         try unsupported("items.bin")
     }
 
-    func blob(hash: String) throws -> String {
-        try unsupported("blobs.get")
+    func blob(hash: String) throws -> BlobPath {
+        try unsupported("blobs.withFile")
     }
 
     func blobHeld(hash: String) throws -> Bool {
@@ -85,7 +85,7 @@ extension InMemoryCore {
         try unsupported("queue.release(reason:)")
     }
 
-    func search(query: String, filters: SearchFilters, limit: UInt32) throws -> [SearchHit] {
+    func search(query: String, filters: SearchFilters, limit: UInt32) throws -> Found {
         try unsupported("search")
     }
 
@@ -119,16 +119,48 @@ extension InMemoryCore {
         try unsupported("folder")
     }
 
-    func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?) throws -> [Item] {
-        try unsupported("items.list(inFolder:)")
+    func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?) throws -> Listing {
+        try unsupported("listInFolder")
     }
 
     func revokeFolder(id: String, idempotencyKey: String?) throws -> FolderRow {
         try unsupported("revokeFolder")
     }
 
-    func searchInFolder(query: String, id: String, limit: UInt32) throws -> [SearchHit] {
-        try unsupported("search(inFolder:)")
+    func searchInFolder(query: String, id: String, limit: UInt32) throws -> Found {
+        try unsupported("searchInFolder")
+    }
+
+    func fileCache() throws -> FileCache {
+        try unsupported("fileCache")
+    }
+
+    func setFileBudget(budget: FileBudget) throws -> UInt64 {
+        try unsupported("setFileBudget")
+    }
+
+    func trimFiles() throws -> UInt64 {
+        try unsupported("trimFiles")
+    }
+
+    func listViews() throws -> Views {
+        try unsupported("items.views")
+    }
+
+    func view(id: String) throws -> ViewRow? {
+        try unsupported("items.view")
+    }
+
+    func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?) throws -> Listing {
+        try unsupported("items.list(inView:)")
+    }
+
+    func searchInView(query: String, id: String, limit: UInt32) throws -> Found {
+        try unsupported("search(inView:)")
+    }
+
+    func viewGroups(id: String, layout: String, timeZone: String?) throws -> ViewGroups {
+        try unsupported("items.groups(inView:)")
     }
 }
 #endif

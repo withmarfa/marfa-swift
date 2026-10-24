@@ -167,7 +167,7 @@ enum Scenario {
         let attachedTo = try await copy.edges.from(file.id).filter { $0.edgeType == "attached-to" }.map(\.targetId)
         print("the file is attached to: \(attachedTo)")
         expect(attachedTo == [note.id], "the file is not attached to the first note")
-        let bytes = try Data(contentsOf: try await copy.blobs.get(hash))
+        let bytes = try await copy.blobs.withFile(hash) { try Data(contentsOf: $0) }
         expect(bytes == Data("attached offline\n".utf8), "the file's bytes are not the ones attached")
     }
 

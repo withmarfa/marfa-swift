@@ -206,13 +206,14 @@ struct LiveRestart {
 
             let note = try #require(try await copy.items.create(Self.note("answered by the app's drain")).itemId)
             let upload = try await copy.blobs.put(file: try Live.file("kept for the next stream \(UUID())"))
-            let cached = try await copy.blobs.get(try #require(upload.blob))
 
             // The core cannot read the cached bytes, so it sends the note and
             // leaves the upload.
-            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: cached.path)
-            let partial = try await copy.queue.drain()
-            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: cached.path)
+            let partial = try await copy.blobs.withFile(try #require(upload.blob)) { cached in
+                try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: cached.path)
+                defer { try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: cached.path) }
+                return try await copy.queue.drain()
+            }
             #expect(partial.answered >= 1, "the app's drain answered nothing: \(partial)")
             #expect(partial.undelivered == 1, "the app's drain left \(partial.undelivered) undelivered")
             #expect(try await Self.read(own, note).status == 200)

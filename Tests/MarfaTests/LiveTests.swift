@@ -267,9 +267,36 @@ extension LiveWorkingCopies {
 
             let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
             #expect(try await !fresh.blobs.isHeld(hash))
-            let fetched = try await fresh.blobs.get(hash)
-            #expect(try Data(contentsOf: fetched) == Data(text.utf8))
+            let fetched = try await fresh.blobs.withFile(hash) { try Data(contentsOf: $0) }
+            #expect(fetched == Data(text.utf8))
             #expect(try await fresh.blobs.isHeld(hash))
+        }
+
+        /// Another fetch trims the cache to a budget the first file alone exceeds.
+        @Test func aFileInUseStaysWhileAnotherFetchTrimsTheCache() async throws {
+            let copy = try await Live.hydrated()
+            let firstText = String(repeating: "first \(UUID())\n", count: 64)
+            let secondText = String(repeating: "second \(UUID())\n", count: 64)
+            let first = try await copy.blobs.put(file: try Live.file(firstText))
+            let second = try await copy.blobs.put(file: try Live.file(secondText))
+            let report = try await copy.queue.drain()
+            #expect(report.undelivered == 0)
+            let firstHash = try #require(first.blob)
+            let secondHash = try #require(second.blob)
+
+            let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            _ = try await fresh.holder.run { try $0.setFileBudget(budget: .bytes(bytes: 1)) }
+
+            let inUse = try await fresh.blobs.withFile(firstHash) { held in
+                try await fresh.blobs.withFile(secondHash) { _ in }
+                _ = try await fresh.holder.run { try $0.trimFiles() }
+                return (url: held, bytes: try? Data(contentsOf: held))
+            }
+            #expect(inUse.bytes == Data(firstText.utf8), "the file was trimmed while its call was still running")
+
+            // The witness: the same trim takes the file once nothing holds it.
+            _ = try await fresh.holder.run { try $0.trimFiles() }
+            #expect(!FileManager.default.fileExists(atPath: inUse.url.path))
         }
 
         /// The server answers `404 blob_not_found` for bytes it holds none of,
@@ -288,7 +315,7 @@ extension LiveWorkingCopies {
             #expect(report.verdicts.first { $0.id == file.id }?.verdict == .accepted)
             let id = try #require(file.itemId)
             await #expect {
-                _ = try await copy.blobs.get(hash)
+                try await copy.blobs.withFile(hash) { _ in }
             } throws: { error in
                 guard case Marfa.MarfaError.bytesAbsent(let absent, _, _) = error else { return false }
                 return absent == hash

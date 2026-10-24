@@ -57,7 +57,7 @@ public struct Folders: Sendable {
     }
 
     /// Syncs the folder once: sends what changed on disk, catches up with the server, writes out what the
-    /// folder's search matches, and sends the placements of the files it wrote.
+    /// folder's query matches, and sends the placements of the files it wrote.
     ///
     /// While the folder's first sync waits to be confirmed, it only reads the folder and returns
     /// ``FolderSyncResult/awaitingConfirmation(_:)``: nothing was written or sent.
@@ -430,7 +430,7 @@ public enum FileState: Sendable, Hashable {
     case waiting
     /// The file isn't sent; its status says why.
     case held
-    /// The file's item no longer matches the folder's search.
+    /// The file's item no longer matches the folder's query.
     case unmatched
     /// The scan didn't reach the file, so it's held rather than deleted.
     case unreached
@@ -453,7 +453,7 @@ public enum FileState: Sendable, Hashable {
 public struct PausedRemoval: Sendable, Hashable {
     /// Files gone from the disk whose deletes aren't sent.
     public var disk: UInt64
-    /// Files left in place whose items left the folder's search elsewhere.
+    /// Files left in place whose items left the folder's query elsewhere.
     public var pull: UInt64
 
     /// Whether a removal waits.
@@ -650,11 +650,11 @@ public struct FolderPull: Sendable, Hashable {
     public let moved: UInt64
     public let unchanged: UInt64
     public let skipped: UInt64
-    /// Files of items moved to the bin, purged, or moved out of the search's states, removed.
+    /// Files of items moved to the bin, purged, or moved out of the query's states, removed.
     public let removed: UInt64
     /// Of `removed`, the files of items purged, which no restore brings back.
     public let purged: UInt64
-    /// Files of items gone from the search, kept because the person changed them.
+    /// Files of items gone from the query, kept because the person changed them.
     public let kept: UInt64
     /// Files the folder didn't write, and won't write over.
     public let unwritten: UInt64
@@ -662,7 +662,7 @@ public struct FolderPull: Sendable, Hashable {
     public let absent: UInt64
     /// Placements the server refused.
     public let unplaced: UInt64
-    /// Files left in place whose items the search no longer matches.
+    /// Files left in place whose items the query no longer matches.
     public let unmatched: UInt64
     /// Files a large removal holds back.
     public let paused: UInt64

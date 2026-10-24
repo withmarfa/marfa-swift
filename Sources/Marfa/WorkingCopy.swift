@@ -172,7 +172,7 @@ public final class WorkingCopy: Sendable {
         -> [SearchHit]
     {
         try await holder.run { core in
-            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit))
+            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit)).whole()
         }
     }
 
@@ -366,7 +366,7 @@ public struct Items: Sendable {
     )
         async throws -> [Item]
     {
-        try await holder.run { core in try core.list(filters: filters, sort: sort.core) }
+        try await holder.run { core in try core.list(filters: filters, sort: sort.core).whole() }
     }
 
     /// `nil` for an item in the bin or not held.
@@ -686,12 +686,23 @@ public struct Blobs: Sendable {
         }
     }
 
-    /// Where a blob's bytes are held, fetching them first when they are not.
+    /// Calls `body` with where a blob's bytes are held, fetching them first
+    /// when they are not.
+    ///
+    /// The file stays in the cache until `body` returns or throws, however
+    /// many other blobs are fetched meanwhile and whatever the cache budget.
+    /// Once it returns, a later trim can take the file, so read it inside
+    /// `body` and copy it out if it must outlast the call.
     ///
     /// A reader, or a copy without a server, throws `bytesAbsent` instead of
     /// fetching.
-    public func get(_ hash: String) async throws -> URL {
-        URL(fileURLWithPath: try await holder.run { core in try core.blob(hash: hash) })
+    public func withFile<Result>(
+        _ hash: String, isolation: isolated (any Actor)? = #isolation,
+        _ body: (URL) async throws -> Result
+    ) async throws -> Result {
+        let lease = try await holder.run { core in try core.blob(hash: hash) }
+        defer { withExtendedLifetime(lease) {} }
+        return try await body(URL(fileURLWithPath: lease.path()))
     }
 
     public func isHeld(_ hash: String) async throws -> Bool {

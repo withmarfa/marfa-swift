@@ -79,7 +79,7 @@ enum FolderFixture {
         let tag = "folder\(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: ""))"
         var body: [String: Any] = [
             "title": tag,
-            "search": ["types": ["core.note"], "filter": "tags contains \"\(tag)\""],
+            "query": ["types": ["core.note"], "filter": "tags contains \"\(tag)\""],
             "defaults": ["tags": [tag]],
         ]
         if let removalThreshold { body["removal_threshold"] = removalThreshold }

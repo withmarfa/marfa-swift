@@ -82,8 +82,11 @@ final class InMemoryCore: CoreProtocol, Sendable {
                 pinned: state.made.filter { state.items[$0] != nil }.sorted {
                     $0.utf8.lexicographicallyPrecedes($1.utf8)
                 }, eventCursor: nil,
-                hydration: .never, items: UInt64(state.items.count), edges: UInt64(state.edges.count),
-                catalogVersion: nil)
+                hydration: .never, items: UInt64(state.items.count), itemsExpected: nil, itemsListed: nil,
+                edges: UInt64(state.edges.count), catalogVersion: nil,
+                fileCache: FileCache(
+                    setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
+                    backupMarkFailure: nil))
         }
     }
 
@@ -93,12 +96,12 @@ final class InMemoryCore: CoreProtocol, Sendable {
         state.withLock { state in state.items[id].flatMap { $0.state == .trashed ? nil : $0 } }
     }
 
-    func list(filters: ListFilters, sort: Sort) throws -> [Item] {
+    func list(filters: ListFilters, sort: Sort) throws -> Listing {
         if filters.filter != nil { throw FakeCopyError.unsupported(call: "items.list(filter:)") }
         if filters.occurredAfter != nil || filters.occurredBefore != nil {
             throw FakeCopyError.unsupported(call: "items.list(occurredAfter:occurredBefore:)")
         }
-        return try state.withLock { state in
+        let listed: [Item] = try state.withLock { state in
             let types = state.resolvedItemTypes()
             let root = try filters.type.flatMap { try Self.root(of: $0) }
             let beneath = filters.beneath.map { state.reached(from: $0) }
@@ -122,6 +125,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
             if let limit = filters.limit { found = Array(found.prefix(Int(limit))) }
             return found
         }
+        return Listing(items: listed, completeness: .complete)
     }
 
     func edgesFrom(id: String) throws -> [Edge] {
