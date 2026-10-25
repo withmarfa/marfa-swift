@@ -1494,8 +1494,8 @@ public static func openReader(path: String)throws  -> Core  {
      * writes the store, with `WrongSchema` and its `unsent` count while it
      * holds a write the server has not taken, and with `Invalid` where
      * `open` would not refuse it, leaving the store as it is. The new store
-     * is empty, so what only the old store held, such as pins, is lost: read
-     * it first.
+     * keeps only the old store's file budget, so what else only the old store
+     * held, such as pins, is lost: read it first.
      */
 public static func replaceRefused(path: String, url: String?, key: String?, renewer: CredentialRenewer? = nil)throws  -> Core  {
     return try  FfiConverterTypeCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -11455,6 +11455,17 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case ReadingHandle(message: String
     )
     /**
+     * A removal of a store was refused, leaving it as it was, because the
+     * writes it holds that the server has not taken are not the number the
+     * caller agreed to lose. Carried so an app can show the person the
+     * store's own count and ask again.
+     */
+    case UnsentDiffers(path: String, 
+        /**
+         * The store's own count; `None` where it cannot be read.
+         */unsent: UInt64?, agreed: UInt64, message: String
+    )
+    /**
      * The copy can no longer be kept current from its cursor: a hydration
      * is owed, and the queue survives it.
      */
@@ -11623,44 +11634,50 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 22: return .ReadingHandle(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 23: return .CopyExpired(
+        case 23: return .UnsentDiffers(
+            path: try FfiConverterString.read(from: &buf), 
+            unsent: try FfiConverterOptionUInt64.read(from: &buf), 
+            agreed: try FfiConverterUInt64.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 24: return .CopyExpired(
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 24: return .StreamIncomplete(
+        case 25: return .StreamIncomplete(
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 25: return .WrongServer(
+        case 26: return .WrongServer(
             expected: try FfiConverterString.read(from: &buf), 
             got: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 26: return .BytesAbsent(
+        case 27: return .BytesAbsent(
             hash: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 27: return .NoRoom(
+        case 28: return .NoRoom(
             hash: try FfiConverterString.read(from: &buf), 
             size: try FfiConverterUInt64.read(from: &buf), 
             free: try FfiConverterUInt64.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 28: return .ContractMismatch(
+        case 29: return .ContractMismatch(
             served: try FfiConverterOptionString.read(from: &buf), 
             expected: try FfiConverterUInt64.read(from: &buf), 
             status: try FfiConverterOptionUInt16.read(from: &buf), 
             writeSent: try FfiConverterBool.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 29: return .Canceled(
+        case 30: return .Canceled(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 30: return .FirstSyncWaiting(
+        case 31: return .FirstSyncWaiting(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 31: return .Invalid(
+        case 32: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -11801,34 +11818,42 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .CopyExpired(reason,message):
+        case let .UnsentDiffers(path,unsent,agreed,message):
             writeInt(&buf, Int32(23))
-            FfiConverterString.write(reason, into: &buf)
+            FfiConverterString.write(path, into: &buf)
+            FfiConverterOptionUInt64.write(unsent, into: &buf)
+            FfiConverterUInt64.write(agreed, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .StreamIncomplete(reason,message):
+        case let .CopyExpired(reason,message):
             writeInt(&buf, Int32(24))
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .WrongServer(expected,got,message):
+        case let .StreamIncomplete(reason,message):
             writeInt(&buf, Int32(25))
+            FfiConverterString.write(reason, into: &buf)
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .WrongServer(expected,got,message):
+            writeInt(&buf, Int32(26))
             FfiConverterString.write(expected, into: &buf)
             FfiConverterString.write(got, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .BytesAbsent(hash,reason,message):
-            writeInt(&buf, Int32(26))
+            writeInt(&buf, Int32(27))
             FfiConverterString.write(hash, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .NoRoom(hash,size,free,message):
-            writeInt(&buf, Int32(27))
+            writeInt(&buf, Int32(28))
             FfiConverterString.write(hash, into: &buf)
             FfiConverterUInt64.write(size, into: &buf)
             FfiConverterUInt64.write(free, into: &buf)
@@ -11836,7 +11861,7 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .ContractMismatch(served,expected,status,writeSent,message):
-            writeInt(&buf, Int32(28))
+            writeInt(&buf, Int32(29))
             FfiConverterOptionString.write(served, into: &buf)
             FfiConverterUInt64.write(expected, into: &buf)
             FfiConverterOptionUInt16.write(status, into: &buf)
@@ -11845,17 +11870,17 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .Canceled(message):
-            writeInt(&buf, Int32(29))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(30))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Invalid(message):
+        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(31))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Invalid(message):
+            writeInt(&buf, Int32(32))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -14357,6 +14382,30 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
         return dict
     }
 }
+/**
+ * Removes the store at `path`: the store, its log, the bytes it fetched and
+ * its writer lock, and nothing else beside it, unlinking a symbolic link at
+ * any of those names rather than what it leads to. A store of any schema is
+ * removed, including one `open` refuses with `WrongSchema`. Drop every `Core`
+ * on the store first.
+ *
+ * `unsent` is the number of writes the server has not taken that the person
+ * agreed to lose. Throws `UnsentDiffers` with the store's own count, leaving
+ * it as it was, unless that count equals `unsent`; the count is `nil` where
+ * it cannot be read, and such a store is never removed. Throws
+ * `ReadingHandle` while another process, or another `Core` in this one,
+ * writes the store, and `Invalid` for a folder's store. With nothing at
+ * `path`, removes what a removal stopped part way left there when `unsent`
+ * is 0. A process that only reads the store does not stop the removal and
+ * keeps showing the old copy until it reopens.
+ */
+public func removeStore(path: String, unsent: UInt64)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_remove_store(
+        FfiConverterString.lower(path),
+        FfiConverterUInt64.lower(unsent),$0
+    )
+}
+}
 public func instanceDescription(url: String)throws  -> InstanceDescription  {
     return try  FfiConverterTypeInstanceDescription_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_func_instance_description(
@@ -14379,6 +14428,9 @@ private let initializationResult: InitializationResult = {
     let scaffolding_contract_version = ffi_marfa_core_ffi_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_remove_store() != 23704) {
+        return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_func_instance_description() != 5508) {
         return InitializationResult.apiChecksumMismatch
@@ -14665,7 +14717,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_constructor_core_open_reader() != 60011) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_core_replace_refused() != 17577) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_core_replace_refused() != 27342) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {

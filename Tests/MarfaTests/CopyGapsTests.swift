@@ -104,6 +104,24 @@ struct ReplacedRefusedCopy {
         await reopened.close()
     }
 
+    @Test func aBudgetTheOldStoreHeldIsKeptWhenNoneIsGiven() async throws {
+        let store = temporaryStore()
+        let first = try await WorkingCopy.open(store: store, fileBudget: .bytes(bytes: 8_192))
+        await first.close()
+        try OlderStore.execute(
+            store,
+            """
+            DELETE FROM queue;
+            PRAGMA writable_schema = ON;
+            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
+              WHERE type = 'table' AND name = 'queue';
+            """)
+
+        let copy = try await WorkingCopy.replaceRefused(store: store)
+        #expect(try await copy.blobs.cache().setting == .bytes(bytes: 8_192))
+        await copy.close()
+    }
+
     @Test func aBudgetThatCannotBeSetAfterAReplacementSaysTheStoreWasReplaced() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         await copy.close()
@@ -162,5 +180,84 @@ struct ReplacedRefusedCopy {
             if case .wrongSchema(_, _, let unsent, _)? = error as? MarfaError { unsent == 1 } else { false }
         }
         #expect(try OlderStore.count(store, "SELECT COUNT(*) FROM queue") == 1)
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct RemovedCopy {
+    private static func storeWithUnsent(_ count: Int) async throws -> URL {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store)
+        for index in 0..<count {
+            _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string("unsent \(index)")]))
+        }
+        await copy.close()
+        return store
+    }
+
+    @Test func aStoreWhoseUnsentCountMatchesIsRemoved() async throws {
+        let store = try await Self.storeWithUnsent(2)
+        #expect(FileManager.default.fileExists(atPath: store.path))
+
+        try await WorkingCopy.remove(store: store, unsent: 2)
+
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+        let fresh = try await WorkingCopy.open(store: store)
+        #expect(try await fresh.items.list(ListFilters(type: "core.note")).isEmpty)
+        await fresh.close()
+    }
+
+    @Test func aRefusedStoreIsRemovedToo() async throws {
+        let (store, _) = try await ReplacedRefusedCopy.refusedStore()
+        try await WorkingCopy.remove(store: store, unsent: 0)
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test(arguments: [0, 1, 3] as [UInt64])
+    func aDifferentCountLeavesTheStoreAndSaysTheRealOne(agreed: UInt64) async throws {
+        let store = try await Self.storeWithUnsent(2)
+
+        await #expect {
+            try await WorkingCopy.remove(store: store, unsent: agreed)
+        } throws: { error in
+            guard case .unsentDiffers(let path, let unsent, let reported, let message)? = error as? MarfaError else {
+                return false
+            }
+            return path.hasSuffix(store.lastPathComponent) && unsent == 2 && reported == agreed && !message.isEmpty
+        }
+        let kept = try await WorkingCopy.open(store: store)
+        #expect(try await kept.queue.all().count == 2)
+        await kept.close()
+    }
+
+    @Test func aStoreAnotherCopyHasOpenIsLeftAlone() async throws {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store)
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+
+        await #expect {
+            try await WorkingCopy.remove(store: store, unsent: 1)
+        } throws: { error in
+            if case .readingHandle? = error as? MarfaError { true } else { false }
+        }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+        #expect(try await copy.queue.all().count == 1)
+        await copy.close()
+        try await WorkingCopy.remove(store: store, unsent: 1)
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func aReadingHelperKeepsShowingTheCopyUntilItReopens() async throws {
+        let store = temporaryStore()
+        let writer = try await WorkingCopy.open(store: store)
+        let id = try #require(
+            try await writer.items.create(Draft(type: "core.note", properties: ["body": "seen"])).itemId)
+        await writer.close()
+        let reader = try await WorkingCopy.openReader(store: store)
+
+        try await WorkingCopy.remove(store: store, unsent: 1)
+
+        #expect(try await reader.items.get(id) != nil)
+        await reader.close()
     }
 }

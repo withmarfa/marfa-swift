@@ -42,6 +42,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// names the writes another build can still send, where the queue is readable.
     case wrongSchema(path: String, reason: String, unsent: UInt64?, message: String)
     case readingHandle(message: String)
+    /// ``WorkingCopy/remove(store:unsent:)`` found a store whose unsent writes are not the number the caller
+    /// agreed to lose, and left it as it was. `unsent` is the store's own count, `nil` where it cannot be read,
+    /// and such a store is never removed; `agreed` is the number passed. Show the person `unsent` and ask again.
+    case unsentDiffers(path: String, unsent: UInt64?, agreed: UInt64, message: String)
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
     /// is an open string, such as `reach_changed`, `instance_changed` or `catchup_too_old`. A stale copy
     /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
@@ -83,7 +87,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .store(let message), .storageFull(let message), .signedOut(_, let message),
             .noKeychain(let message), .redirected(_, _, _, let message),
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
-            .wrongSchema(_, _, _, let message), .readingHandle(let message), .copyExpired(_, let message),
+            .wrongSchema(_, _, _, let message), .readingHandle(let message), .unsentDiffers(_, _, _, let message),
+            .copyExpired(_, let message),
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
@@ -124,6 +129,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .wrongSchema(let path, let reason, let unsent, let message):
             core = .WrongSchema(path: path, reason: reason, unsent: unsent, message: message)
         case .readingHandle(let message): core = .ReadingHandle(message: message)
+        case .unsentDiffers(let path, let unsent, let agreed, let message):
+            core = .UnsentDiffers(path: path, unsent: unsent, agreed: agreed, message: message)
         case .copyExpired(let reason, let message): core = .CopyExpired(reason: reason, message: message)
         case .streamIncomplete(let reason, let message): core = .StreamIncomplete(reason: reason, message: message)
         case .wrongServer(let expected, let got, let message):
@@ -173,6 +180,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .WrongSchema(let path, let reason, let unsent, let message):
             self = .wrongSchema(path: path, reason: reason, unsent: unsent, message: message)
         case .ReadingHandle(let message): self = .readingHandle(message: message)
+        case .UnsentDiffers(let path, let unsent, let agreed, let message):
+            self = .unsentDiffers(path: path, unsent: unsent, agreed: agreed, message: message)
         case .CopyExpired(let reason, let message):
             self = .copyExpired(reason: reason, message: message)
         case .StreamIncomplete(let reason, let message): self = .streamIncomplete(reason: reason, message: message)

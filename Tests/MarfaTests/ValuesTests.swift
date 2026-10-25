@@ -91,6 +91,14 @@ struct Errors {
             .wrongSchema(path: "p", reason: "shape", unsent: 2, message: "m")
         ),
         (.ReadingHandle(message: "m"), .readingHandle(message: "m")),
+        (
+            .UnsentDiffers(path: "p", unsent: 2, agreed: 1, message: "m"),
+            .unsentDiffers(path: "p", unsent: 2, agreed: 1, message: "m")
+        ),
+        (
+            .UnsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m"),
+            .unsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m")
+        ),
         (.CopyExpired(reason: "aged_out", message: "m"), .copyExpired(reason: "aged_out", message: "m")),
         (
             .CopyExpired(reason: "instance_changed", message: "m"),
