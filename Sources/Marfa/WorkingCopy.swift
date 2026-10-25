@@ -465,12 +465,8 @@ public struct Items: Sendable {
     ///
     /// While a hydration fills the copy the list holds the rows that have arrived, and `completeness` says
     /// `.partial`.
-    public func list(
-        _ filters: ListFilters = ListFilters(), sort: Sort = Sort(field: .createdAt, direction: .descending)
-    )
-        async throws -> Rows<Item>
-    {
-        try await holder.run { core in try core.list(filters: filters, sort: sort.core).answer }
+    public func list(_ filters: ListFilters = ListFilters(), sort: Sort? = nil) async throws -> Rows<Item> {
+        try await holder.run { core in try core.list(filters: filters, sort: sort?.core).answer }
     }
 
     /// `nil` for an item in the bin or not held.

@@ -354,16 +354,22 @@ public enum Hydration: Sendable, Hashable, CaseIterable {
     }
 }
 
-public enum SortField: Sendable, Hashable, CaseIterable {
+public enum SortField: Sendable, Hashable {
     case createdAt
     case updatedAt
     case occurredAt
+    /// An item property, by name: `a` to `z`, `0` to `9` and `_`, else the list is refused `validationError`.
+    ///
+    /// Numbers and booleans (`false` before `true`) come first, then text, and items without the property last in
+    /// either direction. Ties go by ID, oldest first.
+    case property(name: String)
 
     init(_ core: MarfaCore.SortField) {
         switch core {
         case .createdAt: self = .createdAt
         case .updatedAt: self = .updatedAt
         case .occurredAt: self = .occurredAt
+        case .property(let name): self = .property(name: name)
         }
     }
 
@@ -372,6 +378,7 @@ public enum SortField: Sendable, Hashable, CaseIterable {
         case .createdAt: .createdAt
         case .updatedAt: .updatedAt
         case .occurredAt: .occurredAt
+        case .property(let name): .property(name: name)
         }
     }
 }
@@ -395,20 +402,24 @@ public enum SortDirection: Sendable, Hashable, CaseIterable {
     }
 }
 
+/// How a list orders its rows.
+///
+/// A half left out is the list's own: `createdAt` descending, or `updatedAt` ascending beside
+/// `ListFilters.updatedAfter`, which refuses another order.
 public struct Sort: Sendable, Hashable {
-    public var field: SortField
-    public var direction: SortDirection
+    public var field: SortField?
+    public var direction: SortDirection?
 
-    public init(field: SortField, direction: SortDirection) {
+    public init(field: SortField? = nil, direction: SortDirection? = nil) {
         self.field = field
         self.direction = direction
     }
 
     init(_ core: MarfaCore.Sort) {
-        self.init(field: SortField(core.field), direction: SortDirection(core.direction))
+        self.init(field: core.field.map(SortField.init), direction: core.direction.map(SortDirection.init))
     }
 
-    var core: MarfaCore.Sort { MarfaCore.Sort(field: field.core, direction: direction.core) }
+    var core: MarfaCore.Sort { MarfaCore.Sort(field: field?.core, direction: direction?.core) }
 }
 
 public struct QueuedWrite: Sendable, Hashable {
@@ -672,11 +683,17 @@ public struct HydrateReport: Sendable, Hashable {
     public var cursor: String
     public var registeredTypes: [String]
     public var unregisteredTypes: [UnregisteredType]
+    /// Declared `app.*` types the instance held in another definition and now holds as declared.
+    public var replacedTypes: [String]
+    /// Declared `app.*` types the instance holds in another definition and would not replace; they stay as the
+    /// server holds them, with the reason.
+    public var unreplacedTypes: [UnregisteredType]
 
     public init(
         types: [String], tier: SliceTier, edgeTypes: [String], items: UInt64, edges: UInt64, pages: UInt64,
         pagesTotal: UInt64? = nil, resumed: Bool = false, restarted: String? = nil, inPlace: Bool = false,
-        cursor: String, registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = []
+        cursor: String, registeredTypes: [String] = [], unregisteredTypes: [UnregisteredType] = [],
+        replacedTypes: [String] = [], unreplacedTypes: [UnregisteredType] = []
     ) {
         self.types = types
         self.tier = tier
@@ -691,6 +708,8 @@ public struct HydrateReport: Sendable, Hashable {
         self.cursor = cursor
         self.registeredTypes = registeredTypes
         self.unregisteredTypes = unregisteredTypes
+        self.replacedTypes = replacedTypes
+        self.unreplacedTypes = unreplacedTypes
     }
 
     init(_ core: MarfaCore.HydrateReport) {
@@ -699,14 +718,16 @@ public struct HydrateReport: Sendable, Hashable {
             edges: core.edges, pages: core.pages, pagesTotal: core.pagesTotal, resumed: core.resumed,
             restarted: core.restarted, inPlace: core.inPlace, cursor: core.cursor,
             registeredTypes: core.registeredTypes,
-            unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init))
+            unregisteredTypes: core.unregisteredTypes.map(UnregisteredType.init),
+            replacedTypes: core.replacedTypes, unreplacedTypes: core.unreplacedTypes.map(UnregisteredType.init))
     }
 
     var core: MarfaCore.HydrateReport {
         MarfaCore.HydrateReport(
             types: types, tier: tier.core, edgeTypes: edgeTypes, items: items, edges: edges, pages: pages,
             pagesTotal: pagesTotal, resumed: resumed, restarted: restarted, inPlace: inPlace, cursor: cursor,
-            registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core))
+            registeredTypes: registeredTypes, unregisteredTypes: unregisteredTypes.map(\.core),
+            replacedTypes: replacedTypes, unreplacedTypes: unreplacedTypes.map(\.core))
     }
 }
 

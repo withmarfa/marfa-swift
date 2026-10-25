@@ -20,8 +20,9 @@ final class InMemoryCore: CoreProtocol, Sendable {
     enum Effect {
         case none
         /// A create, with the row as it was made and no tags: each tag is its own write.
-        case made(Item)
-        case edit(properties: JsonObject, replacing: Bool, type: String?, tier: Tier?, sourceId: String?)
+        case made(Item, edges: [Edge])
+        case edit(
+            properties: JsonObject, replacing: Bool, type: String?, tier: Tier?, sourceId: String?, occurredAt: String?)
         case state(ItemState)
         case tags(TagChange)
         case madeEdge(Edge)
@@ -96,11 +97,13 @@ final class InMemoryCore: CoreProtocol, Sendable {
         state.withLock { state in state.items[id].flatMap { $0.state == .trashed ? nil : $0 } }
     }
 
-    func list(filters: ListFilters, sort: Sort) throws -> Listing {
+    func list(filters: ListFilters, sort: Sort?) throws -> Listing {
         if filters.filter != nil { throw FakeCopyError.unsupported(call: "items.list(filter:)") }
-        if filters.occurredAfter != nil || filters.occurredBefore != nil {
-            throw FakeCopyError.unsupported(call: "items.list(occurredAfter:occurredBefore:)")
-        }
+        let order = try Self.order(filters, sort)
+        let occurredAfter = try filters.occurredAfter.map(Checks.occurred)
+        let occurredBefore = try filters.occurredBefore.map(Checks.occurred)
+        let updatedAfter = try filters.updatedAfter.map(Checks.occurred)
+        let updatedBefore = try filters.updatedBefore.map(Checks.occurred)
         let listed: [Item] = try state.withLock { state in
             let types = state.resolvedItemTypes()
             let root = try filters.type.flatMap { try Self.root(of: $0) }
@@ -115,10 +118,15 @@ final class InMemoryCore: CoreProtocol, Sendable {
                     guard item.state == .active else { return false }
                 }
                 if let tier = filters.tier, item.tier != tier { return false }
+                if let source = filters.source, !item.source.isBytes(source) { return false }
+                if let occurredAfter, item.occurredAt <= occurredAfter { return false }
+                if let occurredBefore, item.occurredAt >= occurredBefore { return false }
+                if let updatedAfter, item.updatedAt < updatedAfter { return false }
+                if let updatedBefore, item.updatedAt >= updatedBefore { return false }
                 if let beneath, !beneath.contains(item.id) { return false }
                 return filters.tags.allSatisfy(item.tags.contains)
             }
-            found.sort { Self.precedes($0, $1, by: sort) }
+            found.sort { Self.precedes($0, $1, by: order) }
             let offset = Int(filters.offset ?? 0)
             guard offset < found.count else { return [] }
             found.removeFirst(offset)
@@ -160,16 +168,78 @@ final class InMemoryCore: CoreProtocol, Sendable {
         return false
     }
 
-    private static func precedes(_ lhs: Item, _ rhs: Item, by sort: Sort) -> Bool {
+    /// A list's order as the core answers it: the halves a caller left out are the list's own, which beside
+    /// `updatedAfter` is the only order it takes.
+    private static func order(_ filters: ListFilters, _ sort: Sort?) throws -> (SortField, SortDirection) {
+        let resumed = filters.updatedAfter != nil
+        let chosen = (
+            sort?.field ?? (resumed ? .updatedAt : .createdAt), sort?.direction ?? (resumed ? .ascending : .descending)
+        )
+        if case .property(let name) = chosen.0,
+            name.isEmpty
+                || !name.utf8.allSatisfy({ ($0 >= 0x61 && $0 <= 0x7A) || ($0 >= 0x30 && $0 <= 0x39) || $0 == 0x5F })
+        {
+            throw Refuse.validation(
+                "validation_error", "Invalid sort property field \"\(name)\"; expected ^[a-z0-9_]+$")
+        }
+        if resumed && (chosen.0 != .updatedAt || chosen.1 != .ascending) && sort != nil {
+            throw Refuse.validation(
+                "validation_error", "updated_after orders by updated_at, ascending; leave out sort and direction")
+        }
+        return chosen
+    }
+
+    private static func precedes(_ lhs: Item, _ rhs: Item, by order: (field: SortField, direction: SortDirection))
+        -> Bool
+    {
+        let ascending = order.direction == .ascending
+        if case .property(let name) = order.field {
+            switch (propertyKey(lhs, name), propertyKey(rhs, name)) {
+            case (nil, nil): return lhs.id < rhs.id
+            case (nil, _): return false
+            case (_, nil): return true
+            case (let left?, let right?):
+                if left == right { return lhs.id < rhs.id }
+                return ascending ? left < right : right < left
+            }
+        }
         let (left, right): (String, String) =
-            switch sort.field {
+            switch order.field {
             case .createdAt: (lhs.createdAt, rhs.createdAt)
             case .updatedAt: (lhs.updatedAt, rhs.updatedAt)
             case .occurredAt: (lhs.occurredAt, rhs.occurredAt)
+            case .property: ("", "")
             }
         let ordered = left == right ? lhs.id < rhs.id : left < right
         let reversed = left == right ? lhs.id > rhs.id : left > right
-        return sort.direction == .ascending ? ordered : reversed
+        return ascending ? ordered : reversed
+    }
+
+    /// What a property sorts by in the core: numbers and booleans (`false` before `true`) as numbers, text by its
+    /// bytes after them, and nothing for a missing, null, object or array value.
+    private enum PropertyKey: Comparable {
+        case number(Double)
+        case text([UInt8])
+
+        static func < (lhs: PropertyKey, rhs: PropertyKey) -> Bool {
+            switch (lhs, rhs) {
+            case (.number(let left), .number(let right)): left < right
+            case (.number, .text): true
+            case (.text, .number): false
+            case (.text(let left), .text(let right)): left.lexicographicallyPrecedes(right)
+            }
+        }
+    }
+
+    private static func propertyKey(_ item: Item, _ name: String) -> PropertyKey? {
+        guard let value = Properties.value(item.properties, name) else { return nil }
+        switch value {
+        case .integer(let number): return .number(Double(number))
+        case .number(let number): return .number(number)
+        case .bool(let flag): return .number(flag ? 1 : 0)
+        case .string(let text): return .text(Array(text.utf8))
+        case .null, .array, .object: return nil
+        }
     }
 }
 

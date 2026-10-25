@@ -1,4 +1,5 @@
 #if DEBUG
+import CryptoKit
 import Foundation
 import MarfaCore
 
@@ -20,6 +21,7 @@ extension InMemoryCore {
             guard let type = types[draft.type] else {
                 throw Refuse.unknownType("\(draft.type) is not a type this copy holds")
             }
+            let edges = try Checks.createFields(draft)
             let kept = Self.droppingOptionalNulls(draft.properties, of: type)
             try Checks.properties(kept, of: type, call: "items.create")
             try Self.requireFields(of: type, in: kept)
@@ -30,6 +32,16 @@ extension InMemoryCore {
                 JsonMember(key: "properties", value: .object(properties)),
                 JsonMember(key: "tier", value: .string((draft.tier ?? .library).name)),
             ])
+            if let created = draft.state { body.members.append(.init(key: "state", value: .string(created.name))) }
+            for (key, value) in [
+                ("capture_latitude", draft.captureLatitude), ("capture_longitude", draft.captureLongitude),
+            ] {
+                if let value { body.members.append(.init(key: key, value: .number(value))) }
+            }
+            if !edges.isEmpty {
+                let named = edges.map { JsonMember(key: $0.type, value: .array($0.targets.map { .string($0) })) }
+                body.members.append(.init(key: "edges", value: .object(JsonObject(members: named))))
+            }
             for (key, value) in [("source", draft.source), ("occurred_at", draft.occurredAt)] {
                 if let value { body.members.append(JsonMember(key: key, value: .string(value))) }
             }
@@ -39,15 +51,26 @@ extension InMemoryCore {
             let at = try draft.occurredAt.map(Checks.occurred) ?? Minted.now()
             try Properties.refuseTooDeep(body)
             let made = Item(
-                id: id, type: draft.type, properties: Properties.served(properties), state: .active,
+                id: id, type: draft.type, properties: Properties.served(properties), state: draft.state ?? .active,
                 tier: draft.tier ?? .library, version: 0, schemaVersion: 1, source: draft.source ?? "device",
                 sourceId: nil, occurredAt: at, createdAt: at, updatedAt: at,
-                tags: Self.applying(.replace(draft.tags), to: []), title: nil, body: nil, unreadableProperties: nil)
+                tags: Self.applying(.replace(draft.tags), to: []), captureLatitude: draft.captureLatitude,
+                captureLongitude: draft.captureLongitude, title: nil, body: nil, unreadableProperties: nil)
             state.items[id] = Self.derived(made, types: types)
             state.made.insert(id)
+            let shown = edges.flatMap { named in
+                named.targets.map { target in
+                    Edge(
+                        id: Self.projectedEdgeID(id, named.type, target), sourceId: id, targetId: target,
+                        edgeType: named.type, properties: JsonObject(members: []), version: 0, createdAt: at,
+                        updatedAt: at, unreadableProperties: nil)
+                }
+            }
+            for edge in shown { state.add(edge) }
             let created = state.append(
-                .createItem, item: id, baseVersion: draft.baseVersion, body: body, dependsOn: [],
-                effect: .made(Self.derived(Self.withoutTags(made), types: types)))
+                .createItem, item: id, baseVersion: draft.baseVersion, body: body,
+                dependsOn: state.pendingCreates(of: edges.flatMap(\.targets)),
+                effect: .made(Self.derived(Self.withoutTags(made), types: types), edges: shown))
             for tag in draft.tags {
                 state.append(
                     .addTag, item: id, tag: tag, body: Self.tags([tag]), dependsOn: state.pendingCreates(of: id),
@@ -69,6 +92,10 @@ extension InMemoryCore {
         try Properties.cross(edit.properties)
         try Checks.links(edit.properties, call: "items.update")
         try Properties.keptAsWritten(edit.properties)
+        if edit.clearOccurredAt && edit.occurredAt != nil {
+            throw Refuse.invalid("an edit sets the item's time or clears it, not both")
+        }
+        let named = try edit.occurredAt.map(Checks.occurred)
         return try state.withLock { state in
             guard var held = state.items[id], held.state != .trashed else { throw Refuse.item(id) }
             try Checks.writable(held.type)
@@ -97,6 +124,22 @@ extension InMemoryCore {
                 body.members.append(.init(key: "retype", value: .bool(true)))
             }
             if let tier { body.members.append(.init(key: "tier", value: .string(tier.name))) }
+            // The server holds no empty time: an item with none of its own takes its creation time. While its
+            // create is unsent, none is sent at all, and the server places the create at its own creation time.
+            let waiting = state.entries.indices.filter {
+                let entry = state.entries[$0]
+                return entry.inQueue && entry.write.verdict == nil && entry.write.kind == .createItem
+                    && entry.write.itemId == id
+            }
+            var unsentCreate: Int?
+            if edit.clearOccurredAt {
+                if waiting.count == 1 { unsentCreate = waiting[0] }
+                if unsentCreate == nil {
+                    body.members.append(.init(key: "occurred_at", value: .string(held.createdAt)))
+                }
+            } else if let occurredAt = edit.occurredAt {
+                body.members.append(.init(key: "occurred_at", value: .string(occurredAt)))
+            }
             try Properties.refuseTooDeep(body)
             let target = types[retype ?? held.type]
             if let target {
@@ -109,6 +152,15 @@ extension InMemoryCore {
             if let key = edit.sourceId { held.sourceId = key }
             if let retype { held.type = retype }
             if let tier { held.tier = tier }
+            var shownTime = named
+            if edit.clearOccurredAt { shownTime = unsentCreate == nil ? held.createdAt : nil }
+            if let shownTime { held.occurredAt = shownTime }
+            if let unsentCreate {
+                let queued = state.entries[unsentCreate].write.queuedAt
+                held.occurredAt = queued
+                held.createdAt = queued
+                state.dropUnsentTime(of: id)
+            }
             if let type = types[held.type], base == held.version {
                 try Self.requireFields(of: type, in: held.properties)
             }
@@ -116,9 +168,26 @@ extension InMemoryCore {
             return state.append(
                 .updateItem, item: id, baseVersion: base, body: body, dependsOn: state.pendingCreates(of: id),
                 effect: .edit(
-                    properties: edit.properties, replacing: replacing, type: retype, tier: tier, sourceId: edit.sourceId
-                ))
+                    properties: edit.properties, replacing: replacing, type: retype, tier: tier,
+                    sourceId: edit.sourceId,
+                    occurredAt: shownTime))
         }
+    }
+
+    /// The id the core gives the edge it shows from a create that waits, which the same create always shows again.
+    static func projectedEdgeID(_ source: String, _ edgeType: String, _ target: String) -> String {
+        var hash = SHA256()
+        for part in [source, edgeType, target] {
+            var length = UInt64(part.utf8.count).bigEndian
+            withUnsafeBytes(of: &length) { hash.update(bufferPointer: $0) }
+            hash.update(data: Data(part.utf8))
+        }
+        var bytes = Array(hash.finalize().prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x40
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        let hex = bytes.map { String(format: "%02x", $0) }
+        return [hex[0..<4], hex[4..<6], hex[6..<8], hex[8..<10], hex[10..<16]].map { $0.joined() }.joined(
+            separator: "-")
     }
 
     func deleteItem(id: String) throws -> QueuedWrite {
@@ -459,13 +528,16 @@ extension InMemoryCore.State {
             let write = entry.write
             switch entry.effect {
             case .none: break
-            case .made(let row): items[row.id] = row
-            case .edit(let properties, let replacing, let type, let tier, let sourceId):
+            case .made(let row, let edges):
+                items[row.id] = row
+                for edge in edges { add(edge) }
+            case .edit(let properties, let replacing, let type, let tier, let sourceId, let occurredAt):
                 guard let id = write.itemId, var row = items[id] else { continue }
                 row.properties = Properties.merged(row.properties, with: properties, replacing: replacing)
                 if let type { row.type = type }
                 if let tier { row.tier = tier }
                 if let sourceId { row.sourceId = sourceId }
+                if let occurredAt { row.occurredAt = occurredAt }
                 items[id] = InMemoryCore.derived(row, types: types)
             case .state(let state):
                 guard let id = write.itemId, var row = items[id] else { continue }
@@ -490,6 +562,33 @@ extension InMemoryCore.State {
         }
         for (id, row) in items where declared[row.type] != nil {
             items[id] = InMemoryCore.derived(row, types: types)
+        }
+    }
+
+    /// Takes the own time out of the create of an item and of every edit waiting behind it, so the server places the
+    /// item at its creation time, and shows the create as queued.
+    mutating func dropUnsentTime(of id: String) {
+        for at in entries.indices {
+            guard entries[at].inQueue, entries[at].write.verdict == nil, entries[at].write.itemId == id else {
+                continue
+            }
+            switch entries[at].write.kind {
+            case .createItem:
+                entries[at].write.body.members.removeAll { $0.key == "occurred_at" }
+                if case .made(var row, let edges) = entries[at].effect {
+                    row.occurredAt = entries[at].write.queuedAt
+                    row.createdAt = entries[at].write.queuedAt
+                    entries[at].effect = .made(row, edges: edges)
+                }
+            case .updateItem:
+                entries[at].write.body.members.removeAll { $0.key == "occurred_at" }
+                if case .edit(let properties, let replacing, let type, let tier, let sourceId, _) = entries[at].effect {
+                    entries[at].effect = .edit(
+                        properties: properties, replacing: replacing, type: type, tier: tier, sourceId: sourceId,
+                        occurredAt: nil)
+                }
+            default: break
+            }
         }
     }
 

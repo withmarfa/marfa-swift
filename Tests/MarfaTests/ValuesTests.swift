@@ -154,7 +154,9 @@ struct OwnValueTypes {
         for reason in Marfa.BlockedReason.allCases { #expect(Marfa.BlockedReason(reason.core) == reason) }
         for handle in Marfa.Handle.allCases { #expect(Marfa.Handle(handle.core) == handle) }
         for hydration in Marfa.Hydration.allCases { #expect(Marfa.Hydration(hydration.core) == hydration) }
-        for field in Marfa.SortField.allCases { #expect(Marfa.SortField(field.core) == field) }
+        for field in [Marfa.SortField.createdAt, .updatedAt, .occurredAt, .property(name: "rank")] {
+            #expect(Marfa.SortField(field.core) == field)
+        }
         for direction in Marfa.SortDirection.allCases { #expect(Marfa.SortDirection(direction.core) == direction) }
         #expect(MarfaCore.EdgeWrittenAt.allCases.map { Marfa.EdgeWrittenAt($0) } == Marfa.EdgeWrittenAt.allCases)
         #expect(Marfa.EdgeWrittenAt(.none) == .none)
@@ -211,7 +213,9 @@ struct OwnValueTypes {
         let hydrated = Marfa.HydrateReport(
             types: ["t"], tier: .feed, edgeTypes: ["e"], items: 1, edges: 2, pages: 3, pagesTotal: 5,
             resumed: true, restarted: "slice_changed", inPlace: true, cursor: "c", registeredTypes: ["app.new"],
-            unregisteredTypes: [Marfa.UnregisteredType(id: "app.no", code: "forbidden", message: "m")])
+            unregisteredTypes: [Marfa.UnregisteredType(id: "app.no", code: "forbidden", message: "m")],
+            replacedTypes: ["app.changed"],
+            unreplacedTypes: [Marfa.UnregisteredType(id: "app.held", code: "conflict", message: "n")])
         #expect(Marfa.HydrateReport(hydrated.core) == hydrated)
         #expect(Marfa.HydrateReport(hydrated.core).inPlace && hydrated.core.inPlace)
         #expect(

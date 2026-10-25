@@ -1169,7 +1169,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func itemTypes() throws  -> [ItemType]
     
-    func list(filters: ListFilters, sort: Sort) throws  -> Listing
+    /**
+     * Without a `sort` the list is newest created first, or oldest changed
+     * first where `updated_after` is set.
+     */
+    func list(filters: ListFilters, sort: Sort?) throws  -> Listing
     
     /**
      * The ID of the item a conflicted copy was made from, or `nil` where
@@ -1977,12 +1981,16 @@ open func itemTypes()throws  -> [ItemType]  {
 })
 }
     
-open func list(filters: ListFilters, sort: Sort)throws  -> Listing  {
+    /**
+     * Without a `sort` the list is newest created first, or oldest changed
+     * first where `updated_after` is set.
+     */
+open func list(filters: ListFilters, sort: Sort?)throws  -> Listing  {
     return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_list(
             self.uniffiCloneHandle(),
         FfiConverterTypeListFilters_lower(filters),
-        FfiConverterTypeSort_lower(sort),$0
+        FfiConverterOptionTypeSort.lower(sort),$0
     )
 })
 }
@@ -4436,10 +4444,25 @@ public struct Draft: Equatable, Hashable {
      */
     public var tags: [String]
     public var tier: Tier?
+    /**
+     * The state to create it in; none is active. `revoked` is refused.
+     */
+    public var state: ItemState?
     public var id: String?
     public var source: String?
     public var sourceId: String?
     public var occurredAt: String?
+    /**
+     * Where it was captured, in degrees. Both or neither.
+     */
+    public var captureLatitude: Double?
+    public var captureLongitude: Double?
+    /**
+     * Edge type to the ids of the items it points at. They are queued and
+     * sent with the create as one write: if the server refuses any, it makes
+     * none and the create stays in the queue as refused.
+     */
+    public var edges: [String: [String]]
     /**
      * The version this create is conditional on, where its natural key
      * resolves a row the server holds.
@@ -4451,7 +4474,18 @@ public struct Draft: Equatable, Hashable {
     public init(type: String, properties: JsonObject = JsonObject(), 
         /**
          * Each queued as a write of its own, waiting on the create.
-         */tags: [String] = [], tier: Tier? = nil, id: String? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil, 
+         */tags: [String] = [], tier: Tier? = nil, 
+        /**
+         * The state to create it in; none is active. `revoked` is refused.
+         */state: ItemState? = nil, id: String? = nil, source: String? = nil, sourceId: String? = nil, occurredAt: String? = nil, 
+        /**
+         * Where it was captured, in degrees. Both or neither.
+         */captureLatitude: Double? = nil, captureLongitude: Double? = nil, 
+        /**
+         * Edge type to the ids of the items it points at. They are queued and
+         * sent with the create as one write: if the server refuses any, it makes
+         * none and the create stays in the queue as refused.
+         */edges: [String: [String]] = [:], 
         /**
          * The version this create is conditional on, where its natural key
          * resolves a row the server holds.
@@ -4460,10 +4494,14 @@ public struct Draft: Equatable, Hashable {
         self.properties = properties
         self.tags = tags
         self.tier = tier
+        self.state = state
         self.id = id
         self.source = source
         self.sourceId = sourceId
         self.occurredAt = occurredAt
+        self.captureLatitude = captureLatitude
+        self.captureLongitude = captureLongitude
+        self.edges = edges
         self.baseVersion = baseVersion
     }
 
@@ -4487,10 +4525,14 @@ public struct FfiConverterTypeDraft: FfiConverterRustBuffer {
                 properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
+                state: FfiConverterOptionTypeItemState.read(from: &buf), 
                 id: FfiConverterOptionString.read(from: &buf), 
                 source: FfiConverterOptionString.read(from: &buf), 
                 sourceId: FfiConverterOptionString.read(from: &buf), 
                 occurredAt: FfiConverterOptionString.read(from: &buf), 
+                captureLatitude: FfiConverterOptionDouble.read(from: &buf), 
+                captureLongitude: FfiConverterOptionDouble.read(from: &buf), 
+                edges: FfiConverterDictionaryStringSequenceString.read(from: &buf), 
                 baseVersion: FfiConverterOptionInt64.read(from: &buf)
         )
     }
@@ -4500,10 +4542,14 @@ public struct FfiConverterTypeDraft: FfiConverterRustBuffer {
         FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
+        FfiConverterOptionTypeItemState.write(value.state, into: &buf)
         FfiConverterOptionString.write(value.id, into: &buf)
         FfiConverterOptionString.write(value.source, into: &buf)
         FfiConverterOptionString.write(value.sourceId, into: &buf)
         FfiConverterOptionString.write(value.occurredAt, into: &buf)
+        FfiConverterOptionDouble.write(value.captureLatitude, into: &buf)
+        FfiConverterOptionDouble.write(value.captureLongitude, into: &buf)
+        FfiConverterDictionaryStringSequenceString.write(value.edges, into: &buf)
         FfiConverterOptionInt64.write(value.baseVersion, into: &buf)
     }
 }
@@ -5212,6 +5258,15 @@ public struct Edit: Equatable, Hashable {
      * The tier to move the row to.
      */
     public var tier: Tier?
+    /**
+     * When the item's content happened.
+     */
+    public var occurredAt: String?
+    /**
+     * Gives the item no time of its own again, so it is its creation time.
+     * Refused beside `occurred_at`.
+     */
+    public var clearOccurredAt: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5239,13 +5294,22 @@ public struct Edit: Equatable, Hashable {
          */type: String? = nil, 
         /**
          * The tier to move the row to.
-         */tier: Tier? = nil) {
+         */tier: Tier? = nil, 
+        /**
+         * When the item's content happened.
+         */occurredAt: String? = nil, 
+        /**
+         * Gives the item no time of its own again, so it is its creation time.
+         * Refused beside `occurred_at`.
+         */clearOccurredAt: Bool = false) {
         self.properties = properties
         self.replaceProperties = replaceProperties
         self.baseVersion = baseVersion
         self.sourceId = sourceId
         self.type = type
         self.tier = tier
+        self.occurredAt = occurredAt
+        self.clearOccurredAt = clearOccurredAt
     }
 
     
@@ -5269,7 +5333,9 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
                 baseVersion: FfiConverterInt64.read(from: &buf), 
                 sourceId: FfiConverterOptionString.read(from: &buf), 
                 type: FfiConverterOptionString.read(from: &buf), 
-                tier: FfiConverterOptionTypeTier.read(from: &buf)
+                tier: FfiConverterOptionTypeTier.read(from: &buf), 
+                occurredAt: FfiConverterOptionString.read(from: &buf), 
+                clearOccurredAt: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -5280,6 +5346,8 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.sourceId, into: &buf)
         FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
+        FfiConverterOptionString.write(value.occurredAt, into: &buf)
+        FfiConverterBool.write(value.clearOccurredAt, into: &buf)
     }
 }
 
@@ -6792,6 +6860,16 @@ public struct HydrateReport: Equatable, Hashable {
      * Declared types the instance did not hold and would not take.
      */
     public var unregisteredTypes: [UnregisteredType]
+    /**
+     * Declared `app.*` types the instance held in another definition and now
+     * holds as declared.
+     */
+    public var replacedTypes: [String]
+    /**
+     * Declared `app.*` types the instance holds in another definition and
+     * would not replace; they stay as the server holds them.
+     */
+    public var unreplacedTypes: [UnregisteredType]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -6823,7 +6901,15 @@ public struct HydrateReport: Equatable, Hashable {
          */registeredTypes: [String], 
         /**
          * Declared types the instance did not hold and would not take.
-         */unregisteredTypes: [UnregisteredType]) {
+         */unregisteredTypes: [UnregisteredType], 
+        /**
+         * Declared `app.*` types the instance held in another definition and now
+         * holds as declared.
+         */replacedTypes: [String], 
+        /**
+         * Declared `app.*` types the instance holds in another definition and
+         * would not replace; they stay as the server holds them.
+         */unreplacedTypes: [UnregisteredType]) {
         self.types = types
         self.tier = tier
         self.edgeTypes = edgeTypes
@@ -6837,6 +6923,8 @@ public struct HydrateReport: Equatable, Hashable {
         self.cursor = cursor
         self.registeredTypes = registeredTypes
         self.unregisteredTypes = unregisteredTypes
+        self.replacedTypes = replacedTypes
+        self.unreplacedTypes = unreplacedTypes
     }
 
     
@@ -6867,7 +6955,9 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
                 inPlace: FfiConverterBool.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
                 registeredTypes: FfiConverterSequenceString.read(from: &buf), 
-                unregisteredTypes: FfiConverterSequenceTypeUnregisteredType.read(from: &buf)
+                unregisteredTypes: FfiConverterSequenceTypeUnregisteredType.read(from: &buf), 
+                replacedTypes: FfiConverterSequenceString.read(from: &buf), 
+                unreplacedTypes: FfiConverterSequenceTypeUnregisteredType.read(from: &buf)
         )
     }
 
@@ -6885,6 +6975,8 @@ public struct FfiConverterTypeHydrateReport: FfiConverterRustBuffer {
         FfiConverterString.write(value.cursor, into: &buf)
         FfiConverterSequenceString.write(value.registeredTypes, into: &buf)
         FfiConverterSequenceTypeUnregisteredType.write(value.unregisteredTypes, into: &buf)
+        FfiConverterSequenceString.write(value.replacedTypes, into: &buf)
+        FfiConverterSequenceTypeUnregisteredType.write(value.unreplacedTypes, into: &buf)
     }
 }
 
@@ -6996,6 +7088,11 @@ public struct Item: Equatable, Hashable {
     public var updatedAt: String
     public var tags: [String]
     /**
+     * Where the item was captured, in degrees, as sent.
+     */
+    public var captureLatitude: Double?
+    public var captureLongitude: Double?
+    /**
      * The text under the property the type's display hints name as its
      * title, or `title` where they name none; none where that holds no
      * string.
@@ -7022,6 +7119,9 @@ public struct Item: Equatable, Hashable {
          * The item's properties, in the order the server answers them. Empty
          * where `unreadable_properties` is set.
          */properties: JsonObject, state: ItemState, tier: Tier?, version: Int64, schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String, updatedAt: String, tags: [String], 
+        /**
+         * Where the item was captured, in degrees, as sent.
+         */captureLatitude: Double? = nil, captureLongitude: Double? = nil, 
         /**
          * The text under the property the type's display hints name as its
          * title, or `title` where they name none; none where that holds no
@@ -7051,6 +7151,8 @@ public struct Item: Equatable, Hashable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.tags = tags
+        self.captureLatitude = captureLatitude
+        self.captureLongitude = captureLongitude
         self.title = title
         self.body = body
         self.unreadableProperties = unreadableProperties
@@ -7085,6 +7187,8 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
                 createdAt: FfiConverterString.read(from: &buf), 
                 updatedAt: FfiConverterString.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
+                captureLatitude: FfiConverterOptionDouble.read(from: &buf), 
+                captureLongitude: FfiConverterOptionDouble.read(from: &buf), 
                 title: FfiConverterOptionString.read(from: &buf), 
                 body: FfiConverterOptionString.read(from: &buf), 
                 unreadableProperties: FfiConverterOptionString.read(from: &buf)
@@ -7105,6 +7209,8 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
         FfiConverterString.write(value.createdAt, into: &buf)
         FfiConverterString.write(value.updatedAt, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
+        FfiConverterOptionDouble.write(value.captureLatitude, into: &buf)
+        FfiConverterOptionDouble.write(value.captureLongitude, into: &buf)
         FfiConverterOptionString.write(value.title, into: &buf)
         FfiConverterOptionString.write(value.body, into: &buf)
         FfiConverterOptionString.write(value.unreadableProperties, into: &buf)
@@ -7479,6 +7585,20 @@ public struct ListFilters: Equatable, Hashable {
     public var occurredAfter: String?
     public var occurredBefore: String?
     /**
+     * Only the items stamped with this source.
+     */
+    public var source: String?
+    /**
+     * Inclusive lower bound on the time the item was last changed. The list
+     * is then ordered by that time and id, oldest first; a `sort` whose
+     * field or direction names another order is refused `validation_error`.
+     */
+    public var updatedAfter: String?
+    /**
+     * Exclusive upper bound on the time the item was last changed.
+     */
+    public var updatedBefore: String?
+    /**
      * An expression in the server's listing grammar, answered as the server
      * answers `filter` and refused `validation_error` where it refuses it.
      * A `backref` condition is refused `invalid`.
@@ -7496,6 +7616,17 @@ public struct ListFilters: Equatable, Hashable {
     // declare one manually.
     public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil, 
         /**
+         * Only the items stamped with this source.
+         */source: String? = nil, 
+        /**
+         * Inclusive lower bound on the time the item was last changed. The list
+         * is then ordered by that time and id, oldest first; a `sort` whose
+         * field or direction names another order is refused `validation_error`.
+         */updatedAfter: String? = nil, 
+        /**
+         * Exclusive upper bound on the time the item was last changed.
+         */updatedBefore: String? = nil, 
+        /**
          * An expression in the server's listing grammar, answered as the server
          * answers `filter` and refused `validation_error` where it refuses it.
          * A `backref` condition is refused `invalid`.
@@ -7511,6 +7642,9 @@ public struct ListFilters: Equatable, Hashable {
         self.tags = tags
         self.occurredAfter = occurredAfter
         self.occurredBefore = occurredBefore
+        self.source = source
+        self.updatedAfter = updatedAfter
+        self.updatedBefore = updatedBefore
         self.filter = filter
         self.beneath = beneath
         self.limit = limit
@@ -7540,6 +7674,9 @@ public struct FfiConverterTypeListFilters: FfiConverterRustBuffer {
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 occurredAfter: FfiConverterOptionString.read(from: &buf), 
                 occurredBefore: FfiConverterOptionString.read(from: &buf), 
+                source: FfiConverterOptionString.read(from: &buf), 
+                updatedAfter: FfiConverterOptionString.read(from: &buf), 
+                updatedBefore: FfiConverterOptionString.read(from: &buf), 
                 filter: FfiConverterOptionString.read(from: &buf), 
                 beneath: FfiConverterOptionString.read(from: &buf), 
                 limit: FfiConverterOptionUInt32.read(from: &buf), 
@@ -7555,6 +7692,9 @@ public struct FfiConverterTypeListFilters: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionString.write(value.occurredAfter, into: &buf)
         FfiConverterOptionString.write(value.occurredBefore, into: &buf)
+        FfiConverterOptionString.write(value.source, into: &buf)
+        FfiConverterOptionString.write(value.updatedAfter, into: &buf)
+        FfiConverterOptionString.write(value.updatedBefore, into: &buf)
         FfiConverterOptionString.write(value.filter, into: &buf)
         FfiConverterOptionString.write(value.beneath, into: &buf)
         FfiConverterOptionUInt32.write(value.limit, into: &buf)
@@ -8448,7 +8588,19 @@ public struct SearchFilters: Equatable, Hashable {
     public var type: String?
     public var state: ItemState?
     public var allStates: Bool
+    /**
+     * One tier; none answers both.
+     */
+    public var tier: Tier?
     public var tags: [String]
+    /**
+     * Exclusive lower bound on the item's own time. Either end alone works.
+     */
+    public var occurredAfter: String?
+    /**
+     * Exclusive upper bound on the item's own time.
+     */
+    public var occurredBefore: String?
     /**
      * An expression in the server's listing grammar, answered as the server
      * answers `filter` and refused `validation_error` where it refuses it.
@@ -8463,7 +8615,16 @@ public struct SearchFilters: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tags: [String] = [], 
+    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, 
+        /**
+         * One tier; none answers both.
+         */tier: Tier? = nil, tags: [String] = [], 
+        /**
+         * Exclusive lower bound on the item's own time. Either end alone works.
+         */occurredAfter: String? = nil, 
+        /**
+         * Exclusive upper bound on the item's own time.
+         */occurredBefore: String? = nil, 
         /**
          * An expression in the server's listing grammar, answered as the server
          * answers `filter` and refused `validation_error` where it refuses it.
@@ -8476,7 +8637,10 @@ public struct SearchFilters: Equatable, Hashable {
         self.type = type
         self.state = state
         self.allStates = allStates
+        self.tier = tier
         self.tags = tags
+        self.occurredAfter = occurredAfter
+        self.occurredBefore = occurredBefore
         self.filter = filter
         self.beneath = beneath
     }
@@ -8500,7 +8664,10 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
                 type: FfiConverterOptionString.read(from: &buf), 
                 state: FfiConverterOptionTypeItemState.read(from: &buf), 
                 allStates: FfiConverterBool.read(from: &buf), 
+                tier: FfiConverterOptionTypeTier.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
+                occurredAfter: FfiConverterOptionString.read(from: &buf), 
+                occurredBefore: FfiConverterOptionString.read(from: &buf), 
                 filter: FfiConverterOptionString.read(from: &buf), 
                 beneath: FfiConverterOptionString.read(from: &buf)
         )
@@ -8510,7 +8677,10 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.type, into: &buf)
         FfiConverterOptionTypeItemState.write(value.state, into: &buf)
         FfiConverterBool.write(value.allStates, into: &buf)
+        FfiConverterOptionTypeTier.write(value.tier, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
+        FfiConverterOptionString.write(value.occurredAfter, into: &buf)
+        FfiConverterOptionString.write(value.occurredBefore, into: &buf)
         FfiConverterOptionString.write(value.filter, into: &buf)
         FfiConverterOptionString.write(value.beneath, into: &buf)
     }
@@ -8763,13 +8933,17 @@ public func FfiConverterTypeSettingsFileOutcome_lower(_ value: SettingsFileOutco
 }
 
 
+/**
+ * Either half left out is the list's own: `created_at` descending, or
+ * `updated_at` ascending beside `updated_after`, which refuses another.
+ */
 public struct Sort: Equatable, Hashable {
-    public var field: SortField
-    public var direction: SortDirection
+    public var field: SortField?
+    public var direction: SortDirection?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(field: SortField, direction: SortDirection) {
+    public init(field: SortField? = nil, direction: SortDirection? = nil) {
         self.field = field
         self.direction = direction
     }
@@ -8790,14 +8964,14 @@ public struct FfiConverterTypeSort: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Sort {
         return
             try Sort(
-                field: FfiConverterTypeSortField.read(from: &buf), 
-                direction: FfiConverterTypeSortDirection.read(from: &buf)
+                field: FfiConverterOptionTypeSortField.read(from: &buf), 
+                direction: FfiConverterOptionTypeSortDirection.read(from: &buf)
         )
     }
 
     public static func write(_ value: Sort, into buf: inout [UInt8]) {
-        FfiConverterTypeSortField.write(value.field, into: &buf)
-        FfiConverterTypeSortDirection.write(value.direction, into: &buf)
+        FfiConverterOptionTypeSortField.write(value.field, into: &buf)
+        FfiConverterOptionTypeSortDirection.write(value.direction, into: &buf)
     }
 }
 
@@ -9100,7 +9274,7 @@ public func FfiConverterTypeTypeField_lower(_ value: TypeField) -> RustBuffer {
 
 
 /**
- * A declared type the instance refused to register, and why.
+ * A declared type the instance refused to register or to replace, and why.
  */
 public struct UnregisteredType: Equatable, Hashable {
     public var id: String
@@ -12093,11 +12267,19 @@ public func FfiConverterTypeSortDirection_lower(_ value: SortDirection) -> RustB
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
-public enum SortField: Equatable, Hashable, CaseIterable {
+public enum SortField: Equatable, Hashable {
     
     case createdAt
     case updatedAt
     case occurredAt
+    /**
+     * An item property, by name: `a` to `z`, `0` to `9` and `_`, else the
+     * list is refused `validation_error`. Numbers and booleans (`false`
+     * before `true`) order first, then text, and items lacking the property
+     * last in either direction; ties go by id, oldest first.
+     */
+    case property(name: String
+    )
 
 
 
@@ -12125,6 +12307,9 @@ public struct FfiConverterTypeSortField: FfiConverterRustBuffer {
         
         case 3: return .occurredAt
         
+        case 4: return .property(name: try FfiConverterString.read(from: &buf)
+        )
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -12144,6 +12329,11 @@ public struct FfiConverterTypeSortField: FfiConverterRustBuffer {
         case .occurredAt:
             writeInt(&buf, Int32(3))
         
+        
+        case let .property(name):
+            writeInt(&buf, Int32(4))
+            FfiConverterString.write(name, into: &buf)
+            
         }
     }
 }
@@ -13160,6 +13350,30 @@ fileprivate struct FfiConverterOptionTypeRemovalThreshold: FfiConverterRustBuffe
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeSort: FfiConverterRustBuffer {
+    typealias SwiftType = Sort?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSort.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSort.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeThumbnail: FfiConverterRustBuffer {
     typealias SwiftType = Thumbnail?
 
@@ -13320,6 +13534,54 @@ fileprivate struct FfiConverterOptionTypeSliceTier: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeSliceTier.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeSortDirection: FfiConverterRustBuffer {
+    typealias SwiftType = SortDirection?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSortDirection.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSortDirection.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeSortField: FfiConverterRustBuffer {
+    typealias SwiftType = SortField?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeSortField.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeSortField.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -14238,7 +14500,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_item_types() != 15133) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 5666) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 401) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_original_of_conflicted_copy() != 44658) {

@@ -19,12 +19,14 @@ import Synchronization
 ///
 /// The fake serves these calls:
 ///
-/// - Reads: `items.list(_:sort:)` without `filter`, `occurredAfter` or
-///   `occurredBefore`, `items.get(_:)`, `edges.from(_:)`, `edges.to(_:)`,
+/// - Reads: `items.list(_:sort:)` without `filter`, with `source`, the
+///   updated and occurred ranges and a sort on a property, `items.get(_:)`, `edges.from(_:)`, `edges.to(_:)`,
 ///   `edges.ofType(_:)`, the four reads of `catalog`, `catalog.fromServer()`, which throws `noServer` as
 ///   a copy without a server does, `declaredTypes()` and
 ///   `status()`.
-/// - Writes: `items.create(_:)` without `sourceId`, `items.update(_:_:)`,
+/// - Writes: `items.create(_:)` without `sourceId`, with `state`, a capture
+///   location and `edges`, `items.update(_:_:)` including `occurredAt` and
+///   `clearOccurredAt`,
 ///   `items.updateAsRead(_:_:)`, `items.delete(_:)`, `items.restore(_:)`,
 ///   `items.transition(_:to:)`, `tags`, `metadata`, `extensions`, `edges.create`,
 ///   `edges.update(_:_:)`, `edges.delete(_:)` and `declareTypes(_:)`.

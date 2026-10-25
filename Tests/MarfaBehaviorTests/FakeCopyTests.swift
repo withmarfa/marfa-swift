@@ -114,10 +114,6 @@ struct FakeCopyBehavior {
             ("queue.release", { _ = try await copy.queue.release(id) }),
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),
             ("items.list(filter:)", { _ = try await copy.items.list(ListFilters(filter: "x")) }),
-            (
-                "items.list(occurredAfter:occurredBefore:)",
-                { _ = try await copy.items.list(ListFilters(occurredAfter: "2026-01-01T00:00:00.000Z")) }
-            ),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
             (

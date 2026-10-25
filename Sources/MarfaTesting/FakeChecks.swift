@@ -107,6 +107,45 @@ enum Checks {
         }
     }
 
+    /// What a create names beyond its properties, judged as the core judges it before it queues anything: the
+    /// edges it draws, as pairs of edge type and targets in the order the core sends them.
+    static func createFields(_ draft: Draft) throws -> [(type: String, targets: [String])] {
+        if draft.state == .revoked {
+            throw Refuse.validation(
+                "validation_error",
+                "\(draft.type) cannot start in the revoked state; use active, archived or trashed")
+        }
+        for (name, value) in [
+            ("capture_latitude", draft.captureLatitude), ("capture_longitude", draft.captureLongitude),
+        ] {
+            if let value, !value.isFinite {
+                throw Refuse.validation("validation_error", "\(name) must be a number")
+            }
+        }
+        if (draft.captureLatitude == nil) != (draft.captureLongitude == nil)
+            || draft.captureLatitude.map({ abs($0) > 90 }) == true
+            || draft.captureLongitude.map({ abs($0) > 180 }) == true
+        {
+            throw FakeCopyError.unsupported(call: "items.create with a capture location the server may refuse")
+        }
+        let named = draft.edges.sorted { $0.key.utf8.lexicographicallyPrecedes($1.key.utf8) }
+        for (type, targets) in named {
+            if type.isEmpty {
+                throw Refuse.notFound(
+                    "edge_type_not_found", "edges names an edge type with an empty id, which no edge type has")
+            }
+            for target in targets {
+                if !Minted.isID(target) {
+                    throw Refuse.validation("invalid_id", "Invalid edges: \"\(target)\" is not a UUIDv7 in lowercase")
+                }
+                if draft.id == target {
+                    throw Refuse.validation("edge_cycle", "an edge from \(target) to itself closes a cycle")
+                }
+            }
+        }
+        return named.filter { !$0.value.isEmpty }.map { (type: $0.key, targets: $0.value) }
+    }
+
     /// A time as the core holds it: UTC, to the millisecond, ending in `Z`.
     ///
     /// Only the forms checked against the core are accepted.

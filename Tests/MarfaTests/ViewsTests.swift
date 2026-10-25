@@ -121,7 +121,7 @@ final class FillingCore: Core, @unchecked Sendable {
         id: "i", type: "core.task", properties: [:], state: .active, tier: .library, version: 1, schemaVersion: 1,
         source: "test", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "", tags: [])
 
-    override func list(filters: ListFilters, sort: MarfaCore.Sort) throws -> MarfaCore.Listing {
+    override func list(filters: ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
         Listing(items: [Self.item], completeness: completeness)
     }
 

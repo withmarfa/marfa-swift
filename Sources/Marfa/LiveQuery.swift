@@ -30,11 +30,7 @@ extension Reading where Value == Rows<Item> {
     /// `filters.limit` and `filters.offset` bound the result.
     public static func list(_ filters: ListFilters = ListFilters(), sort: Sort? = nil) -> Reading {
         Reading(placeholder: .unread) { copy in
-            if let sort {
-                try await copy.items.list(filters, sort: sort)
-            } else {
-                try await copy.items.list(filters)
-            }
+            try await copy.items.list(filters, sort: sort)
         }
     }
 

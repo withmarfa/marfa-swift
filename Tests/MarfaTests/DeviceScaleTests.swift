@@ -129,7 +129,7 @@ final class FillingFailureCore: Core, @unchecked Sendable {
 
     override func heldHandle() -> MarfaCore.Handle { .writer }
 
-    override func list(filters: ListFilters, sort: MarfaCore.Sort) throws -> MarfaCore.Listing {
+    override func list(filters: ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
         Listing(items: [], completeness: finished.withLock { $0 } ? .stale : .partial)
     }
 
