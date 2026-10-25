@@ -155,6 +155,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var edgeWriteFails: MarfaCore.MarfaError?
         var declarations: [JSONObject] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
+        var replacedTypes: [String] = []
+        var replacementRefusals: [MarfaCore.UnregisteredType] = []
         var hydrationOptions: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         var slice: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         /// When each hydration began.
@@ -283,7 +285,9 @@ final class FakeCore: Core, @unchecked Sendable {
         return MarfaCore.HydrateReport(
             types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1, resumed: false,
             restarted: nil, inPlace: state.withLock { $0.hydrateInPlace }, cursor: "1", registeredTypes: [],
-            unregisteredTypes: state.withLock { $0.registrationRefusals })
+            unregisteredTypes: state.withLock { $0.registrationRefusals },
+            replacedTypes: state.withLock { $0.replacedTypes },
+            unreplacedTypes: state.withLock { $0.replacementRefusals })
     }
 
     override func setFileBudget(budget: MarfaCore.FileBudget) throws -> UInt64 {

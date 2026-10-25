@@ -114,10 +114,6 @@ struct FakeCopyBehavior {
             ("queue.release", { _ = try await copy.queue.release(id) }),
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),
             ("items.list(filter:)", { _ = try await copy.items.list(ListFilters(filter: "x")) }),
-            (
-                "items.list(occurredAfter:occurredBefore:)",
-                { _ = try await copy.items.list(ListFilters(occurredAfter: "2026-01-01T00:00:00.000Z")) }
-            ),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
             (
@@ -180,6 +176,24 @@ struct FakeCopyBehavior {
         #expect(try await copy.queue.all().isEmpty)
         #expect(fake.writes.count == 4)
         #expect(fake.writes.allSatisfy { $0.verdict == .accepted })
+        await copy.close()
+    }
+
+    @Test func clearingTheOwnTimeOfAnAnsweredCreateSendsTheCreationTime() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let created = try await copy.items.create(
+            Draft(type: "core.note", properties: ["body": "b"], occurredAt: "2026-01-02T03:04:05.000Z"))
+        let id = try #require(created.itemId)
+        _ = try await copy.queue.drain()
+        let held = try #require(try await copy.items.get(id))
+
+        let write = try #require(
+            try await copy.items.update(id, Edit(properties: [:], baseVersion: held.version, clearOccurredAt: true)))
+
+        #expect(write.body["occurred_at"] == .string(held.createdAt))
+        let cleared = try #require(try await copy.items.get(id))
+        #expect(cleared.occurredAt == held.createdAt)
         await copy.close()
     }
 
