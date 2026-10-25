@@ -335,11 +335,18 @@ public protocol APIProtocol: Sendable {
     func replaceType(_ input: Operations.ReplaceType.Input) async throws -> Operations.ReplaceType.Output
     /// Delete a type
     ///
-    /// Deletes an unused type. A key can use `force=true` to keep existing items without their type; new writes then fail until it is registered again. A recent owner session or local command can remove only unused types.
+    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
     func deleteType(_ input: Operations.DeleteType.Input) async throws -> Operations.DeleteType.Output
+    /// Move items to another type
+    ///
+    /// Moves every item of the type you can see, in any state, to another type as a bulk-action job. Once none remains, it rewrites the folders, views and webhooks that name the type. `dry_run: true` returns what it would do.
+    ///
+    /// - Remark: HTTP `POST /types/{id}/move`.
+    /// - Remark: Generated from `#/paths//types/{id}/move/post(moveType)`.
+    func moveType(_ input: Operations.MoveType.Input) async throws -> Operations.MoveType.Output
     /// Normalize a type definition
     ///
     /// Normalizes a candidate definition and returns its declared form, the registered declared definition and the registered resolved definition. It does not register or replace a type.
@@ -356,7 +363,7 @@ public protocol APIProtocol: Sendable {
     func listEdgeTypes(_ input: Operations.ListEdgeTypes.Input) async throws -> Operations.ListEdgeTypes.Output
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints and may rename its labels, without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
@@ -489,7 +496,7 @@ public protocol APIProtocol: Sendable {
     func createFolder(_ input: Operations.CreateFolder.Input) async throws -> Operations.CreateFolder.Output
     /// Update a folder
     ///
-    /// Updates a folder's title and settings. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
+    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay. Removes stored properties the folder type does not declare.
     ///
     /// - Remark: HTTP `PATCH /folders/{id}`.
     /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
@@ -517,14 +524,14 @@ public protocol APIProtocol: Sendable {
     func reportFolderStatus(_ input: Operations.ReportFolderStatus.Input) async throws -> Operations.ReportFolderStatus.Output
     /// Create a view
     ///
-    /// Creates a view: a `system.view` item whose properties say which items it lists and how its layouts show them. The item endpoints can't write one.
+    /// Creates a view: a `system.view` item whose properties say which items it lists, in what order and how they group. The item endpoints can't write one.
     ///
     /// - Remark: HTTP `POST /views`.
     /// - Remark: Generated from `#/paths//views/post(createView)`.
     func createView(_ input: Operations.CreateView.Input) async throws -> Operations.CreateView.Output
     /// Update a view
     ///
-    /// Updates a view's title, query or layouts. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
+    /// Updates a view's title, query, sort or group. Each one you send replaces the current value whole, and those you leave out stay as they are. Send `group: null` to remove the grouping. Send the `version` you read.
     ///
     /// - Remark: HTTP `PATCH /views/{id}`.
     /// - Remark: Generated from `#/paths//views/{id}/patch(updateView)`.
@@ -1652,7 +1659,7 @@ extension APIProtocol {
     }
     /// Delete a type
     ///
-    /// Deletes an unused type. A key can use `force=true` to keep existing items without their type; new writes then fail until it is registered again. A recent owner session or local command can remove only unused types.
+    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -1665,6 +1672,23 @@ extension APIProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// Move items to another type
+    ///
+    /// Moves every item of the type you can see, in any state, to another type as a bulk-action job. Once none remains, it rewrites the folders, views and webhooks that name the type. `dry_run: true` returns what it would do.
+    ///
+    /// - Remark: HTTP `POST /types/{id}/move`.
+    /// - Remark: Generated from `#/paths//types/{id}/move/post(moveType)`.
+    public func moveType(
+        path: Operations.MoveType.Input.Path,
+        headers: Operations.MoveType.Input.Headers = .init(),
+        body: Operations.MoveType.Input.Body
+    ) async throws -> Operations.MoveType.Output {
+        try await moveType(Operations.MoveType.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Normalize a type definition
@@ -1693,7 +1717,7 @@ extension APIProtocol {
     }
     /// Register an edge type
     ///
-    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints without changing its edges. An edge type can't extend another.
+    /// Registers an edge type and returns it. With `evolve_constraints: true`, widens a registered type's endpoint constraints and may rename its labels, without changing its edges. An edge type can't extend another.
     ///
     /// - Remark: HTTP `POST /edge-types`.
     /// - Remark: Generated from `#/paths//edge-types/post(registerEdgeType)`.
@@ -1968,7 +1992,7 @@ extension APIProtocol {
     }
     /// Update a folder
     ///
-    /// Updates a folder's title and settings. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
+    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay. Removes stored properties the folder type does not declare.
     ///
     /// - Remark: HTTP `PATCH /folders/{id}`.
     /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
@@ -2032,7 +2056,7 @@ extension APIProtocol {
     }
     /// Create a view
     ///
-    /// Creates a view: a `system.view` item whose properties say which items it lists and how its layouts show them. The item endpoints can't write one.
+    /// Creates a view: a `system.view` item whose properties say which items it lists, in what order and how they group. The item endpoints can't write one.
     ///
     /// - Remark: HTTP `POST /views`.
     /// - Remark: Generated from `#/paths//views/post(createView)`.
@@ -2047,7 +2071,7 @@ extension APIProtocol {
     }
     /// Update a view
     ///
-    /// Updates a view's title, query or layouts. Each one you send replaces the current value whole, and those you leave out stay as they are. Send the `version` you read.
+    /// Updates a view's title, query, sort or group. Each one you send replaces the current value whole, and those you leave out stay as they are. Send `group: null` to remove the grouping. Send the `version` you read.
     ///
     /// - Remark: HTTP `PATCH /views/{id}`.
     /// - Remark: Generated from `#/paths//views/{id}/patch(updateView)`.

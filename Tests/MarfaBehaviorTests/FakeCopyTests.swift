@@ -28,7 +28,8 @@ struct FakeCopyBehavior {
     static let noteType = ItemType(
         id: "core.note", fields: [TypeField(name: "body", type: "string", required: true, declaredBy: "core.note")],
         titleField: "title", bodyField: "body")
-    static let references = EdgeType(id: "references", cardinality: "many-to-many")
+    static let references = EdgeType(
+        id: "references", label: "References", reverseLabel: "Referenced by", cardinality: "many-to-many")
 
     static func seeded() -> FakeCopy {
         WorkingCopy.fake(
@@ -121,14 +122,14 @@ struct FakeCopyBehavior {
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
             (
                 "createView",
-                { _ = try await copy.createView(ViewSettings(title: "v", layouts: [ViewLayout(id: "a", kind: .list)])) }
+                { _ = try await copy.createView(ViewSettings(title: "v")) }
             ),
             ("changeView", { _ = try await copy.changeView(id, ViewSettingsChange(title: "w"), baseVersion: 1) }),
             ("deleteView", { try await copy.deleteView(id) }),
             ("items.views", { _ = try await copy.items.views() }),
             ("items.view", { _ = try await copy.items.view(id) }),
             ("items.list(inView:)", { _ = try await copy.items.list(inView: id) }),
-            ("items.groups(inView:)", { _ = try await copy.items.groups(inView: id, layout: "main") }),
+            ("items.groups(inView:)", { _ = try await copy.items.groups(inView: id) }),
             ("search(inView:)", { _ = try await copy.search("x", inView: id) }),
         ]
         for (call, make) in calls {

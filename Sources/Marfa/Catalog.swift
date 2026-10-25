@@ -170,7 +170,14 @@ public enum EdgeWrittenAt: Sendable, Hashable, CaseIterable {
 /// An edge type, read as the server's `GET /edge-types` lists it.
 public struct EdgeType: Sendable, Hashable, Identifiable {
     public let id: String
-    public let label: String?
+    /// The name shown on the source end.
+    ///
+    /// The server derives one from the id for a type registered with none.
+    public let label: String
+    /// The name shown on the target end.
+    ///
+    /// It is the ``label`` for a two-way relation, which has no reverse label of its own.
+    public let reverseLabel: String
     public let description: String?
     /// `one-to-one`, `one-to-many`, `many-to-one` or `many-to-many`, from
     /// source to target.
@@ -187,15 +194,16 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     /// Whether Marfa ships it, rather than the instance registering it.
     public let shipped: Bool
 
-    /// For an app's previews and tests.
+    /// For an app's previews and tests; `reverseLabel` is `label` where it is `nil`, as the server answers it.
     public init(
-        id: String, label: String? = nil, description: String? = nil, cardinality: String,
+        id: String, label: String, reverseLabel: String? = nil, description: String? = nil, cardinality: String,
         reverseName: String? = nil, writtenAt: EdgeWrittenAt = .source, sourceTypeConstraints: [String] = ["*"],
         targetTypeConstraints: [String] = ["*"], cascadeOnDelete: String = "orphan", properties: [TypeField] = [],
         shipped: Bool = false
     ) {
         self.id = id
         self.label = label
+        self.reverseLabel = reverseLabel ?? label
         self.description = description
         self.cardinality = cardinality
         self.reverseName = reverseName
@@ -209,8 +217,8 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
 
     init(_ core: MarfaCore.EdgeType) {
         self.init(
-            id: core.id, label: core.label, description: core.description, cardinality: core.cardinality,
-            reverseName: core.reverseName, writtenAt: EdgeWrittenAt(core.writtenAt),
+            id: core.id, label: core.label, reverseLabel: core.reverseLabel, description: core.description,
+            cardinality: core.cardinality, reverseName: core.reverseName, writtenAt: EdgeWrittenAt(core.writtenAt),
             sourceTypeConstraints: core.sourceTypeConstraints, targetTypeConstraints: core.targetTypeConstraints,
             cascadeOnDelete: core.cascadeOnDelete, properties: core.properties.map(TypeField.init),
             shipped: core.shipped)

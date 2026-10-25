@@ -1,31 +1,52 @@
 import Foundation
 import MarfaCore
 
+/// What a change does to a view's grouping.
+public enum ViewGroupingChange: Sendable, Hashable {
+    /// Replaces the grouping whole.
+    case set(ViewGrouping)
+    /// Removes the grouping, which is the one setting a change can remove.
+    case clear
+}
+
 /// The settings to replace, each whole; a `nil` one is left as it is.
 public struct ViewSettingsChange: Sendable, Hashable {
     public var title: String?
     public var query: ViewQuery?
-    /// In order, and at least one.
-    public var layouts: [ViewLayout]?
+    /// An empty list removes the view's sort.
+    public var sort: [ViewSort]?
+    public var group: ViewGroupingChange?
 
-    public init(title: String? = nil, query: ViewQuery? = nil, layouts: [ViewLayout]? = nil) {
+    public init(
+        title: String? = nil, query: ViewQuery? = nil, sort: [ViewSort]? = nil, group: ViewGroupingChange? = nil
+    ) {
         self.title = title
         self.query = query
-        self.layouts = layouts
+        self.sort = sort
+        self.group = group
     }
 
     var json: JSONObject {
         var object = JSONObject()
         if let title { object["title"] = .string(title) }
         if let query { object["query"] = .object(query.json) }
-        if let layouts { object["layouts"] = .array(layouts.map { .object($0.json) }) }
+        if let sort { object["sort"] = .array(sort.map { .object($0.json) }) }
+        switch group {
+        case .set(let grouping): object["group"] = .object(grouping.json)
+        case .clear: object["group"] = .null
+        case nil: break
+        }
         return object
     }
 }
 
 extension ViewSettings {
+    /// A create names only the settings the view holds: the server refuses `null` and has no use for an empty sort.
     var json: JSONObject {
-        ViewSettingsChange(title: title, query: query, layouts: layouts).json
+        var object = ViewSettingsChange(title: title, query: query).json
+        if !sort.isEmpty { object["sort"] = .array(sort.map { .object($0.json) }) }
+        if let group { object["group"] = .object(group.json) }
+        return object
     }
 }
 
@@ -51,40 +72,6 @@ extension ViewQuery {
     }
 }
 
-extension ViewLayout {
-    fileprivate var json: JSONObject {
-        var object: JSONObject = ["id": .string(id)]
-        switch kind {
-        case .list: object["kind"] = "list"
-        case .table: object["kind"] = "table"
-        case .board: object["kind"] = "board"
-        case .gallery(let image):
-            object["kind"] = "gallery"
-            if let image { object["image"] = .string(image) }
-        case .calendar(let date, let end):
-            object["kind"] = "calendar"
-            if let date { object["date"] = .string(date) }
-            if let end { object["end"] = .string(end) }
-        case .timeline(let start, let end):
-            object["kind"] = "timeline"
-            object["start"] = .string(start)
-            object["end"] = .string(end)
-        case .chart(let x, let y):
-            object["kind"] = "chart"
-            if let x { object["x"] = .string(x) }
-            if let y { object["y"] = y.json }
-        case .map(let location):
-            object["kind"] = "map"
-            if let location { object["location"] = .string(location) }
-        }
-        if let title { object["title"] = .string(title) }
-        if !sort.isEmpty { object["sort"] = .array(sort.map { .object($0.json) }) }
-        if let group { object["group"] = .object(group.json) }
-        if !shown.isEmpty { object["shown"] = .array(shown.map { .string($0) }) }
-        return object
-    }
-}
-
 extension ViewSort {
     fileprivate var json: JSONObject {
         ["by": .string(by), "direction": .string(direction == .ascending ? "asc" : "desc")]
@@ -104,15 +91,6 @@ extension ViewGrouping {
         if !order.isEmpty { object["order"] = .array(order) }
         if !hidden.isEmpty { object["hidden"] = .array(hidden) }
         return object
-    }
-}
-
-extension ViewMeasure {
-    fileprivate var json: JSONValue {
-        switch self {
-        case .count: "count"
-        case .sum(let property): ["sum": .string(property)]
-        }
     }
 }
 

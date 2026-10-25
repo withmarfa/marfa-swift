@@ -136,9 +136,12 @@ import Testing
         let field = TypeField(name: "title", type: "string", declaredBy: "core.note")
         #expect(ItemType(id: "core.note", fields: [field]).fields.map(\.id) == ["title"])
         let edgeType = EdgeType(
-            id: "parent-of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target)
+            id: "parent-of", label: "Children", reverseLabel: "Parent", cardinality: "one-to-many",
+            reverseName: "child-of", writtenAt: .target)
         #expect(edgeType.writtenAt == .target)
-        #expect(EdgeType(id: "in-folder", cardinality: "many-to-many", writtenAt: .none).writtenAt == .none)
+        #expect(
+            EdgeType(id: "in-folder", label: "In folder", cardinality: "many-to-many", writtenAt: .none).writtenAt
+                == .none)
         #expect(Status(catalogVersion: 2).catalogVersion == 2)
         #expect(Change.Refresh.catalog != .hydrated)
         #expect(Change.Origin.serverUnreachable(.network(message: "m")) != .serverReachable)

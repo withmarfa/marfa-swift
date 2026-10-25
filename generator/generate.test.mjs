@@ -398,6 +398,8 @@ test("the client keeps what an app's credential calls on the server and a workin
       "/items/{id}/versions": { get: operation("listItemVersions", ["Items"]) },
       "/items/new": { get: operation("aNewItemsOperation", ["Items"]) },
       "/items/bulk-actions": { post: operation("applyBulkAction", ["Bulk actions"]) },
+      "/items/bulk-actions/jobs/{id}": { get: operation("getBulkActionJob", ["Bulk actions"]) },
+      "/items/bulk-actions/jobs/{id}/cancel": { post: operation("cancelBulkActionJob", ["Bulk actions"]) },
       "/connectors": { post: operation("registerConnector", ["Connectors"]) },
       "/owner": { get: operation("getOwner", ["Owner"], [{ ownerSession: [] }]) },
       "/": { get: operation("getInstance", ["Instance"], []) },
@@ -407,7 +409,8 @@ test("the client keeps what an app's credential calls on the server and a workin
     },
   };
   assert.deepEqual(clientOperations(input), [
-    "aNewServerOperation", "listBlobStores", "listItemVersions", "registerType",
+    "aNewServerOperation", "cancelBulkActionJob", "getBulkActionJob", "listBlobStores", "listItemVersions",
+    "registerType",
   ]);
 });
 
@@ -418,7 +421,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
   const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
   // The wire types describe every operation, so each absence below is the client's own.
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
-  for (const kept of ["registerType", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
+  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
   for (const left of ["createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance"]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);

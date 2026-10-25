@@ -112,7 +112,7 @@ struct DeclaredTypesOffline {
         let plain = try await copy.catalog.itemType("app.notes.plain")
         #expect(plain.titleField == "heading")
         #expect(plain.fields.first { $0.name == "heading" }?.declaredBy == "app.notes.plain")
-        #expect(plain.fields.first { $0.name == "body" }?.required == true)
+        #expect(plain.fields.first { $0.name == "body" }?.required == false, "inherited as the note declares it")
         await copy.close()
     }
 

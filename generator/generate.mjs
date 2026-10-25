@@ -263,8 +263,9 @@ const serverOnly = new Set([
   "listItemExtensions",
   "getFolderStatus",
 ]);
-// A bulk action writes items on the server, a second path for item writes.
-const bulkTags = new Set(["Bulk actions"]);
+// A bulk action writes items on the server, a second path for item writes. An app follows and cancels the job
+// a type move starts, so reading and cancelling a job stay.
+const bulkWrites = new Set(["applyBulkAction"]);
 // A copy uploads a blob's bytes and fetches them itself.
 const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
@@ -285,7 +286,7 @@ export function clientOperations(document) {
     const tags = operation.tags ?? [];
     if (tags.some((tag) => connectorTags.has(tag))) continue;
     if (tags.some((tag) => copyTags.has(tag)) && !serverOnly.has(operation.operationId)) continue;
-    if (tags.some((tag) => bulkTags.has(tag))) continue;
+    if (bulkWrites.has(operation.operationId)) continue;
     if (copyBlobs.has(operation.operationId)) continue;
     kept.push(operation.operationId);
   }

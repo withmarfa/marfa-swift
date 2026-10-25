@@ -20,10 +20,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/id`.
             public var id: Swift.String
-            /// A name for people to read.
+            /// The name an app shows on the source end of an edge of this type, such as `Children` on a parent. Not the `reverse_name`, which is the code name a file writes.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/label`.
-            public var label: Swift.String?
+            public var label: Swift.String
+            /// The name an app shows on the target end, such as `Parent` on a child. It is the same text as `label` when the relation is two-way, and an app then shows both directions as one list.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_label`.
+            public var reverseLabel: Swift.String
             /// What the edge type is for.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/description`.
@@ -109,7 +113,8 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the edge type.
-            ///   - label: A name for people to read.
+            ///   - label: The name an app shows on the source end of an edge of this type, such as `Children` on a parent. Not the `reverse_name`, which is the code name a file writes.
+            ///   - reverseLabel: The name an app shows on the target end, such as `Parent` on a child. It is the same text as `label` when the relation is two-way, and an app then shows both directions as one list.
             ///   - description: What the edge type is for.
             ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
             ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
@@ -121,7 +126,8 @@ extension Components {
             ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
             public init(
                 id: Swift.String,
-                label: Swift.String? = nil,
+                label: Swift.String,
+                reverseLabel: Swift.String,
                 description: Swift.String? = nil,
                 cardinality: Components.Schemas.EdgeType.CardinalityPayload,
                 sourceTypeConstraints: [Swift.String],
@@ -134,6 +140,7 @@ extension Components {
             ) {
                 self.id = id
                 self.label = label
+                self.reverseLabel = reverseLabel
                 self.description = description
                 self.cardinality = cardinality
                 self.sourceTypeConstraints = sourceTypeConstraints
@@ -147,6 +154,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case id
                 case label
+                case reverseLabel = "reverse_label"
                 case description
                 case cardinality
                 case sourceTypeConstraints = "source_type_constraints"
@@ -1864,6 +1872,22 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BulkActionResult/blob_hashes_referenced`.
             public var blobHashesReferenced: Swift.Int?
+            /// On a type move, every folder, view and webhook setting that named the old type when the job finished. Absent otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings`.
+            public var settings: [Components.Schemas.TypeSetting]?
+            /// On a type move, how many items you can see are still of the old type when the job finished, in any state: those it left unchanged and any written since the move began. Absent otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkActionResult/remaining`.
+            public var remaining: Swift.Int?
+            /// On a type move, `true` if items your source filter hides are still of the old type. A move takes only items you can see. Absent otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkActionResult/remaining_hidden`.
+            public var remainingHidden: Swift.Bool?
+            /// On a type move, `true` if Marfa rewrote `settings` to name the new type. `false` if an item of the old type remains, counted in `remaining` or `remaining_hidden`, or a setting has a `reason`: Marfa then rewrote none of them. Absent otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_rewritten`.
+            public var settingsRewritten: Swift.Bool?
             /// Creates a new `BulkActionResult`.
             ///
             /// - Parameters:
@@ -1875,6 +1899,10 @@ extension Components {
             ///   - ids: On a dry run, the ID of every matched item. On a job, the IDs of the items it changed, if it changed from 1 to 100 of them; absent otherwise.
             ///   - errors: On a job, the first 100 items it left unchanged, each with its error. Absent otherwise.
             ///   - blobHashesReferenced: On a purge job, how many distinct blobs the purged items referenced, whether or not anything still references them. Absent otherwise.
+            ///   - settings: On a type move, every folder, view and webhook setting that named the old type when the job finished. Absent otherwise.
+            ///   - remaining: On a type move, how many items you can see are still of the old type when the job finished, in any state: those it left unchanged and any written since the move began. Absent otherwise.
+            ///   - remainingHidden: On a type move, `true` if items your source filter hides are still of the old type. A move takes only items you can see. Absent otherwise.
+            ///   - settingsRewritten: On a type move, `true` if Marfa rewrote `settings` to name the new type. `false` if an item of the old type remains, counted in `remaining` or `remaining_hidden`, or a setting has a `reason`: Marfa then rewrote none of them. Absent otherwise.
             public init(
                 action: Swift.String,
                 matched: Swift.Int,
@@ -1883,7 +1911,11 @@ extension Components {
                 dryRun: Swift.Bool,
                 ids: [Swift.String]? = nil,
                 errors: [Components.Schemas.BulkActionError]? = nil,
-                blobHashesReferenced: Swift.Int? = nil
+                blobHashesReferenced: Swift.Int? = nil,
+                settings: [Components.Schemas.TypeSetting]? = nil,
+                remaining: Swift.Int? = nil,
+                remainingHidden: Swift.Bool? = nil,
+                settingsRewritten: Swift.Bool? = nil
             ) {
                 self.action = action
                 self.matched = matched
@@ -1893,6 +1925,10 @@ extension Components {
                 self.ids = ids
                 self.errors = errors
                 self.blobHashesReferenced = blobHashesReferenced
+                self.settings = settings
+                self.remaining = remaining
+                self.remainingHidden = remainingHidden
+                self.settingsRewritten = settingsRewritten
             }
             public enum CodingKeys: String, CodingKey {
                 case action
@@ -1903,6 +1939,10 @@ extension Components {
                 case ids
                 case errors
                 case blobHashesReferenced = "blob_hashes_referenced"
+                case settings
+                case remaining
+                case remainingHidden = "remaining_hidden"
+                case settingsRewritten = "settings_rewritten"
             }
         }
         /// An item a bulk action left unchanged, and why.
@@ -1970,6 +2010,76 @@ extension Components {
                 case details
             }
         }
+        /// A folder, view or webhook setting that names a type.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeSetting`.
+        public struct TypeSetting: Codable, Hashable, Sendable {
+            /// What holds the setting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case folder = "folder"
+                case view = "view"
+                case webhook = "webhook"
+            }
+            /// What holds the setting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/kind`.
+            public var kind: Components.Schemas.TypeSetting.KindPayload
+            /// The ID of the folder, view or webhook. Absent when you can't read it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/id`.
+            public var id: Swift.String?
+            /// The setting that names the type: `query.types`, `query.filter`, `defaults.type`, `first_placement` or `type_filter`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/field`.
+            public var field: Swift.String
+            /// Why a move can't rewrite the setting: `not_permitted`, you can't change it; `filter_term`, its filter can't be rewritten safely; `placement_conflict`, it places the types apart; `subtypes`, a webhook can't name both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/reason`.
+            @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case notPermitted = "not_permitted"
+                case filterTerm = "filter_term"
+                case placementConflict = "placement_conflict"
+                case subtypes = "subtypes"
+            }
+            /// Why a move can't rewrite the setting: `not_permitted`, you can't change it; `filter_term`, its filter can't be rewritten safely; `placement_conflict`, it places the types apart; `subtypes`, a webhook can't name both.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/reason`.
+            public var reason: Components.Schemas.TypeSetting.ReasonPayload?
+            /// What to change before moving, for a person to read. Present with `reason`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeSetting/message`.
+            public var message: Swift.String?
+            /// Creates a new `TypeSetting`.
+            ///
+            /// - Parameters:
+            ///   - kind: What holds the setting.
+            ///   - id: The ID of the folder, view or webhook. Absent when you can't read it.
+            ///   - field: The setting that names the type: `query.types`, `query.filter`, `defaults.type`, `first_placement` or `type_filter`.
+            ///   - reason: Why a move can't rewrite the setting: `not_permitted`, you can't change it; `filter_term`, its filter can't be rewritten safely; `placement_conflict`, it places the types apart; `subtypes`, a webhook can't name both.
+            ///   - message: What to change before moving, for a person to read. Present with `reason`.
+            public init(
+                kind: Components.Schemas.TypeSetting.KindPayload,
+                id: Swift.String? = nil,
+                field: Swift.String,
+                reason: Components.Schemas.TypeSetting.ReasonPayload? = nil,
+                message: Swift.String? = nil
+            ) {
+                self.kind = kind
+                self.id = id
+                self.field = field
+                self.reason = reason
+                self.message = message
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case id
+                case field
+                case reason
+                case message
+            }
+        }
         /// A field: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier`, `tags`) or `properties.<name>`.
         ///
         /// - Remark: Generated from `#/components/schemas/ViewField`.
@@ -1982,20 +2092,7 @@ extension Components {
             case feed = "feed"
             case all = "all"
         }
-        /// How a layout shows items. `list`: rows. `table`: rows with columns. `board`: columns by `group`. `gallery`: cards. `calendar`: on dates. `timeline`: as spans. `chart`: as a chart. `map`: on a map.
-        ///
-        /// - Remark: Generated from `#/components/schemas/ViewLayoutKind`.
-        @frozen public enum ViewLayoutKind: String, Codable, Hashable, Sendable, CaseIterable {
-            case list = "list"
-            case table = "table"
-            case board = "board"
-            case gallery = "gallery"
-            case calendar = "calendar"
-            case timeline = "timeline"
-            case chart = "chart"
-            case map = "map"
-        }
-        /// One key a layout sorts by.
+        /// One key a view sorts by.
         ///
         /// - Remark: Generated from `#/components/schemas/ViewSort`.
         public struct ViewSort: Codable, Hashable, Sendable {
@@ -2046,7 +2143,7 @@ extension Components {
                 ])
             }
         }
-        /// How a layout groups its items.
+        /// How a view groups its items.
         ///
         /// - Remark: Generated from `#/components/schemas/ViewGroup`.
         public struct ViewGroup: Codable, Hashable, Sendable {
@@ -2071,7 +2168,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/order`.
             public var order: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]?
-            /// The values whose groups the layout leaves out.
+            /// The values whose groups the view leaves out.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/hidden`.
             public var hidden: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]?
@@ -2081,7 +2178,7 @@ extension Components {
             ///   - by: The field to group by: a field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
             ///   - bucket: For a date field, the span each group covers. Absent groups by the value.
             ///   - order: The values whose groups come first, in this order. Other groups follow.
-            ///   - hidden: The values whose groups the layout leaves out.
+            ///   - hidden: The values whose groups the view leaves out.
             public init(
                 by: Swift.String,
                 bucket: Components.Schemas.ViewGroup.BucketPayload? = nil,
@@ -6830,10 +6927,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/id`.
             public var id: Swift.String
-            /// A name for people to read.
+            /// The name an app shows on the source end, such as `Children` on a parent. Leave it out and the last segment of the `id` makes it, such as `List Member`. On a change, leaving it out keeps the stored one.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/label`.
             public var label: Swift.String?
+            /// The name an app shows on the target end, such as `Parent` on a child. Leave it out and `label` names both ends. On a change, leaving it out keeps the stored one; send the `label` to make a type two-way.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/reverse_label`.
+            public var reverseLabel: Swift.String?
             /// What the edge type is for.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/description`.
@@ -6911,7 +7012,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
             public var writtenAt: Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload?
-            /// `true` widens a registered type's endpoints in place. Retain every existing constraint token, or allow all types with `[]` or `*`; other members must stay unchanged. Omit or set `false` to register a new type. Not stored in the definition.
+            /// `true` updates a registered type in place: widen its endpoints (keep every constraint token, or allow all types with `[]` or `*`) and change its labels. Other members stay unchanged. Omit or `false` to register a new type. Not stored.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/evolve_constraints`.
             public var evolveConstraints: Swift.Bool?
@@ -6919,7 +7020,8 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: The identifier of the edge type, such as `acme.list-member`.
-            ///   - label: A name for people to read.
+            ///   - label: The name an app shows on the source end, such as `Children` on a parent. Leave it out and the last segment of the `id` makes it, such as `List Member`. On a change, leaving it out keeps the stored one.
+            ///   - reverseLabel: The name an app shows on the target end, such as `Parent` on a child. Leave it out and `label` names both ends. On a change, leaving it out keeps the stored one; send the `label` to make a type two-way.
             ///   - description: What the edge type is for.
             ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
             ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
@@ -6928,10 +7030,11 @@ extension Components {
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
-            ///   - evolveConstraints: `true` widens a registered type's endpoints in place. Retain every existing constraint token, or allow all types with `[]` or `*`; other members must stay unchanged. Omit or set `false` to register a new type. Not stored in the definition.
+            ///   - evolveConstraints: `true` updates a registered type in place: widen its endpoints (keep every constraint token, or allow all types with `[]` or `*`) and change its labels. Other members stay unchanged. Omit or `false` to register a new type. Not stored.
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
+                reverseLabel: Swift.String? = nil,
                 description: Swift.String? = nil,
                 cardinality: Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload,
                 sourceTypeConstraints: [Swift.String]? = nil,
@@ -6944,6 +7047,7 @@ extension Components {
             ) {
                 self.id = id
                 self.label = label
+                self.reverseLabel = reverseLabel
                 self.description = description
                 self.cardinality = cardinality
                 self.sourceTypeConstraints = sourceTypeConstraints
@@ -6957,6 +7061,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case id
                 case label
+                case reverseLabel = "reverse_label"
                 case description
                 case cardinality
                 case sourceTypeConstraints = "source_type_constraints"
@@ -6976,6 +7081,10 @@ extension Components {
                 self.label = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .label
+                )
+                self.reverseLabel = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .reverseLabel
                 )
                 self.description = try container.decodeIfPresent(
                     Swift.String.self,
@@ -7016,6 +7125,7 @@ extension Components {
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "id",
                     "label",
+                    "reverse_label",
                     "description",
                     "cardinality",
                     "source_type_constraints",
@@ -8831,6 +8941,369 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// What a type move would do, written nowhere.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun`.
+        public struct TypeMoveDryRun: Codable, Hashable, Sendable {
+            /// Always `true`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/dry_run`.
+            public var dryRun: Swift.Bool
+            /// The type the items are in now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/from`.
+            public var from: Swift.String
+            /// The type the items would move to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/to`.
+            public var to: Swift.String
+            /// How many items of `from` the move would take, in any state. Items your source filter hides aren't counted or moved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/matched`.
+            public var matched: Swift.Int
+            /// The IDs of those items.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/ids`.
+            public var ids: [Swift.String]
+            /// Every folder, view and webhook setting that names `from`, which the move rewrites to name `to` once no item of `from` remains.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/settings`.
+            public var settings: [Components.Schemas.TypeSetting]
+            /// The keys and apps whose type map names `from`, which the move doesn't change. Keys are listed if you have `keys.manage`, and apps if you have `grants.manage`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveDryRun/grants`.
+            public var grants: [Components.Schemas.TypeGrant]
+            /// Creates a new `TypeMoveDryRun`.
+            ///
+            /// - Parameters:
+            ///   - dryRun: Always `true`.
+            ///   - from: The type the items are in now.
+            ///   - to: The type the items would move to.
+            ///   - matched: How many items of `from` the move would take, in any state. Items your source filter hides aren't counted or moved.
+            ///   - ids: The IDs of those items.
+            ///   - settings: Every folder, view and webhook setting that names `from`, which the move rewrites to name `to` once no item of `from` remains.
+            ///   - grants: The keys and apps whose type map names `from`, which the move doesn't change. Keys are listed if you have `keys.manage`, and apps if you have `grants.manage`.
+            public init(
+                dryRun: Swift.Bool,
+                from: Swift.String,
+                to: Swift.String,
+                matched: Swift.Int,
+                ids: [Swift.String],
+                settings: [Components.Schemas.TypeSetting],
+                grants: [Components.Schemas.TypeGrant]
+            ) {
+                self.dryRun = dryRun
+                self.from = from
+                self.to = to
+                self.matched = matched
+                self.ids = ids
+                self.settings = settings
+                self.grants = grants
+            }
+            public enum CodingKeys: String, CodingKey {
+                case dryRun = "dry_run"
+                case from
+                case to
+                case matched
+                case ids
+                case settings
+                case grants
+            }
+        }
+        /// A key or app whose type map names a type outright.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeGrant`.
+        public struct TypeGrant: Codable, Hashable, Sendable {
+            /// `key` for an API key, `app` for an app someone signed in to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeGrant/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case key = "key"
+                case app = "app"
+            }
+            /// `key` for an API key, `app` for an app someone signed in to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeGrant/kind`.
+            public var kind: Components.Schemas.TypeGrant.KindPayload
+            /// The ID of the key, or the app's client ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeGrant/id`.
+            public var id: Swift.String
+            /// The key's label. Absent for an app.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeGrant/label`.
+            public var label: Swift.String?
+            /// Creates a new `TypeGrant`.
+            ///
+            /// - Parameters:
+            ///   - kind: `key` for an API key, `app` for an app someone signed in to.
+            ///   - id: The ID of the key, or the app's client ID.
+            ///   - label: The key's label. Absent for an app.
+            public init(
+                kind: Components.Schemas.TypeGrant.KindPayload,
+                id: Swift.String,
+                label: Swift.String? = nil
+            ) {
+                self.kind = kind
+                self.id = id
+                self.label = label
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case id
+                case label
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+        public struct BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case bulkCapExceeded = "bulk_cap_exceeded"
+                    case missingRequiredField = "missing_required_field"
+                    case unknownType = "unknown_type"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal`.
+        public struct CoreTypeImmutableOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case coreTypeImmutable = "core_type_immutable"
+                    case typeNotPermitted = "type_not_permitted"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error/code`.
+                public var code: Components.Schemas.CoreTypeImmutableOrTypeNotPermittedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error/details`.
+                public var details: Components.Schemas.CoreTypeImmutableOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.CoreTypeImmutableOrTypeNotPermittedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.CoreTypeImmutableOrTypeNotPermittedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal/error`.
+            public var error: Components.Schemas.CoreTypeImmutableOrTypeNotPermittedRefusal._ErrorPayload
+            /// Creates a new `CoreTypeImmutableOrTypeNotPermittedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.CoreTypeImmutableOrTypeNotPermittedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal`.
+        public struct TypeMoveBlockedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case typeMoveBlocked = "type_move_blocked"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error/code`.
+                public var code: Components.Schemas.TypeMoveBlockedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error/details`.
+                public var details: Components.Schemas.TypeMoveBlockedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.TypeMoveBlockedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.TypeMoveBlockedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeMoveBlockedRefusal/error`.
+            public var error: Components.Schemas.TypeMoveBlockedRefusal._ErrorPayload
+            /// Creates a new `TypeMoveBlockedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.TypeMoveBlockedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -12611,273 +13084,6 @@ extension Components {
                     "state",
                     "filter",
                     "beneath"
-                ])
-            }
-        }
-        /// One way a view shows its items. A layout takes only the options its `kind` takes, and never narrows which items the view lists.
-        ///
-        /// - Remark: Generated from `#/components/schemas/ViewLayout`.
-        public struct ViewLayout: Codable, Hashable, Sendable {
-            /// The layout's ID, unique in the view, which an app keeps to reopen it.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/id`.
-            public var id: Swift.String
-            /// How the layout shows items.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/kind`.
-            public var kind: Components.Schemas.ViewLayoutKind
-            /// The layout's name. Absent, an app names it by its kind.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/title`.
-            public var title: Swift.String?
-            /// The keys the layout sorts by, first key first.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/sort`.
-            public var sort: [Components.Schemas.ViewSort]?
-            /// How the layout groups its items. A `board` requires it.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/group`.
-            public var group: Components.Schemas.ViewGroup?
-            /// The fields the layout shows, in order.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/shown`.
-            public var shown: [Components.Schemas.ViewField]?
-            /// For a `gallery`, the property that holds each card's image.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/image`.
-            public var image: Swift.String?
-            /// For a `calendar`, the date field that places each item.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/date`.
-            public var date: Swift.String?
-            /// For a `timeline`, the date field each span starts at. Required for a `timeline`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/start`.
-            public var start: Swift.String?
-            /// For a `calendar` or `timeline`, the date field each span ends at. Required for a `timeline`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/end`.
-            public var end: Swift.String?
-            /// For a `chart`, the field along its horizontal axis.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/x`.
-            public var x: Components.Schemas.ViewField?
-            /// What a chart measures: `count` of items, or `{ "sum": "properties.<name>" }`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/y`.
-            public struct YPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value1`.
-                @frozen public enum Value1Payload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case count = "count"
-                }
-                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value1`.
-                public var value1: Components.Schemas.ViewLayout.YPayload.Value1Payload?
-                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value2`.
-                public struct Value2Payload: Codable, Hashable, Sendable {
-                    /// The number property whose values are added up.
-                    ///
-                    /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value2/sum`.
-                    public var sum: Swift.String
-                    /// Creates a new `Value2Payload`.
-                    ///
-                    /// - Parameters:
-                    ///   - sum: The number property whose values are added up.
-                    public init(sum: Swift.String) {
-                        self.sum = sum
-                    }
-                    public enum CodingKeys: String, CodingKey {
-                        case sum
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        let container = try decoder.container(keyedBy: CodingKeys.self)
-                        self.sum = try container.decode(
-                            Swift.String.self,
-                            forKey: .sum
-                        )
-                        try decoder.ensureNoAdditionalProperties(knownKeys: [
-                            "sum"
-                        ])
-                    }
-                }
-                /// - Remark: Generated from `#/components/schemas/ViewLayout/y/value2`.
-                public var value2: Components.Schemas.ViewLayout.YPayload.Value2Payload?
-                /// Creates a new `YPayload`.
-                ///
-                /// - Parameters:
-                ///   - value1:
-                ///   - value2:
-                public init(
-                    value1: Components.Schemas.ViewLayout.YPayload.Value1Payload? = nil,
-                    value2: Components.Schemas.ViewLayout.YPayload.Value2Payload? = nil
-                ) {
-                    self.value1 = value1
-                    self.value2 = value2
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    var errors: [any Swift.Error] = []
-                    do {
-                        self.value1 = try decoder.decodeFromSingleValueContainer()
-                    } catch {
-                        errors.append(error)
-                    }
-                    do {
-                        self.value2 = try .init(from: decoder)
-                    } catch {
-                        errors.append(error)
-                    }
-                    try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
-                        [
-                            self.value1,
-                            self.value2
-                        ],
-                        type: Self.self,
-                        codingPath: decoder.codingPath,
-                        errors: errors
-                    )
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeFirstNonNilValueToSingleValueContainer([
-                        self.value1
-                    ])
-                    try self.value2?.encode(to: encoder)
-                }
-            }
-            /// What a chart measures: `count` of items, or `{ "sum": "properties.<name>" }`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/y`.
-            public var y: Components.Schemas.ViewLayout.YPayload?
-            /// For a `map`, the property that holds each item's place.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ViewLayout/location`.
-            public var location: Swift.String?
-            /// Creates a new `ViewLayout`.
-            ///
-            /// - Parameters:
-            ///   - id: The layout's ID, unique in the view, which an app keeps to reopen it.
-            ///   - kind: How the layout shows items.
-            ///   - title: The layout's name. Absent, an app names it by its kind.
-            ///   - sort: The keys the layout sorts by, first key first.
-            ///   - group: How the layout groups its items. A `board` requires it.
-            ///   - shown: The fields the layout shows, in order.
-            ///   - image: For a `gallery`, the property that holds each card's image.
-            ///   - date: For a `calendar`, the date field that places each item.
-            ///   - start: For a `timeline`, the date field each span starts at. Required for a `timeline`.
-            ///   - end: For a `calendar` or `timeline`, the date field each span ends at. Required for a `timeline`.
-            ///   - x: For a `chart`, the field along its horizontal axis.
-            ///   - y: What a chart measures: `count` of items, or `{ "sum": "properties.<name>" }`.
-            ///   - location: For a `map`, the property that holds each item's place.
-            public init(
-                id: Swift.String,
-                kind: Components.Schemas.ViewLayoutKind,
-                title: Swift.String? = nil,
-                sort: [Components.Schemas.ViewSort]? = nil,
-                group: Components.Schemas.ViewGroup? = nil,
-                shown: [Components.Schemas.ViewField]? = nil,
-                image: Swift.String? = nil,
-                date: Swift.String? = nil,
-                start: Swift.String? = nil,
-                end: Swift.String? = nil,
-                x: Components.Schemas.ViewField? = nil,
-                y: Components.Schemas.ViewLayout.YPayload? = nil,
-                location: Swift.String? = nil
-            ) {
-                self.id = id
-                self.kind = kind
-                self.title = title
-                self.sort = sort
-                self.group = group
-                self.shown = shown
-                self.image = image
-                self.date = date
-                self.start = start
-                self.end = end
-                self.x = x
-                self.y = y
-                self.location = location
-            }
-            public enum CodingKeys: String, CodingKey {
-                case id
-                case kind
-                case title
-                case sort
-                case group
-                case shown
-                case image
-                case date
-                case start
-                case end
-                case x
-                case y
-                case location
-            }
-            public init(from decoder: any Swift.Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                self.id = try container.decode(
-                    Swift.String.self,
-                    forKey: .id
-                )
-                self.kind = try container.decode(
-                    Components.Schemas.ViewLayoutKind.self,
-                    forKey: .kind
-                )
-                self.title = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .title
-                )
-                self.sort = try container.decodeIfPresent(
-                    [Components.Schemas.ViewSort].self,
-                    forKey: .sort
-                )
-                self.group = try container.decodeIfPresent(
-                    Components.Schemas.ViewGroup.self,
-                    forKey: .group
-                )
-                self.shown = try container.decodeIfPresent(
-                    [Components.Schemas.ViewField].self,
-                    forKey: .shown
-                )
-                self.image = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .image
-                )
-                self.date = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .date
-                )
-                self.start = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .start
-                )
-                self.end = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .end
-                )
-                self.x = try container.decodeIfPresent(
-                    Components.Schemas.ViewField.self,
-                    forKey: .x
-                )
-                self.y = try container.decodeIfPresent(
-                    Components.Schemas.ViewLayout.YPayload.self,
-                    forKey: .y
-                )
-                self.location = try container.decodeIfPresent(
-                    Swift.String.self,
-                    forKey: .location
-                )
-                try decoder.ensureNoAdditionalProperties(knownKeys: [
-                    "id",
-                    "kind",
-                    "title",
-                    "sort",
-                    "group",
-                    "shown",
-                    "image",
-                    "date",
-                    "start",
-                    "end",
-                    "x",
-                    "y",
-                    "location"
                 ])
             }
         }
@@ -17659,6 +17865,8 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline00404e686415370f`.
         public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableViewGroup`.
+        public typealias MarfaNullableViewGroup = MarfaNullable<Components.Schemas.ViewGroup>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.

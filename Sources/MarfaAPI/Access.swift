@@ -120,11 +120,21 @@ func refusal(_ answer: (HTTPResponse, HTTPBody?), origin: String, write: Bool) a
 }
 
 /// The `code` and `message` of a refusal's `{"error": {...}}` body, where it has one.
+///
+/// A refusal's `details` follow the message as JSON, since they say what the message alone cannot, such as which
+/// settings still name a type.
 private func refusalBody(_ text: String) -> (code: String, message: String)? {
     guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
         let error = object["error"] as? [String: Any], let code = error["code"] as? String
     else { return nil }
-    return (code, error["message"] as? String ?? "")
+    var message = error["message"] as? String ?? ""
+    if let details = error["details"] as? [String: Any], !details.isEmpty,
+        let data = try? JSONSerialization.data(withJSONObject: details, options: [.sortedKeys]),
+        let json = String(data: data, encoding: .utf8)
+    {
+        message += (message.isEmpty ? "" : " ") + "Details: \(json)"
+    }
+    return (code, message)
 }
 
 /// Up to the first 64 KiB of a refusal's body as text; a body that fails part way is read as far as it got.

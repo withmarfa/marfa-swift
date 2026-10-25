@@ -7,8 +7,8 @@ import Synchronization
 /// the first read ends.
 ///
 /// ``list(_:sort:)``, ``search(_:filters:limit:)``, ``item(_:)``, ``queue`` and
-/// the view reads ``views``, ``view(_:)``, ``list(inView:layout:limit:offset:)``
-/// and ``groups(inView:layout:timeZone:)`` cover the common reads. `init(placeholder:_:)` makes any other, such as
+/// the view reads ``views``, ``view(_:)``, ``list(inView:limit:offset:)``
+/// and ``groups(inView:timeZone:)`` cover the common reads. `init(placeholder:_:)` makes any other, such as
 /// the edges to an item or a search that keeps each hit's score.
 public struct Reading<Value: Sendable & Equatable>: Sendable {
     let placeholder: Value

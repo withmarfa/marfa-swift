@@ -1388,7 +1388,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     func deleteView(id: String, idempotencyKey: String?) throws 
     
-    func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?) throws  -> Listing
+    func listInView(id: String, limit: UInt32?, offset: UInt32?) throws  -> Listing
     
     func listViews() throws  -> Views
     
@@ -1396,7 +1396,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     func view(id: String) throws  -> ViewRow?
     
-    func viewGroups(id: String, layout: String, timeZone: String?) throws  -> ViewGroups
+    func viewGroups(id: String, timeZone: String?) throws  -> ViewGroups
     
 }
 /**
@@ -2458,12 +2458,11 @@ open func deleteView(id: String, idempotencyKey: String?)throws   {try rustCallW
 }
 }
     
-open func listInView(id: String, layout: String?, limit: UInt32?, offset: UInt32?)throws  -> Listing  {
+open func listInView(id: String, limit: UInt32?, offset: UInt32?)throws  -> Listing  {
     return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_list_in_view(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
-        FfiConverterOptionString.lower(layout),
         FfiConverterOptionUInt32.lower(limit),
         FfiConverterOptionUInt32.lower(offset),$0
     )
@@ -2498,12 +2497,11 @@ open func view(id: String)throws  -> ViewRow?  {
 })
 }
     
-open func viewGroups(id: String, layout: String, timeZone: String?)throws  -> ViewGroups  {
+open func viewGroups(id: String, timeZone: String?)throws  -> ViewGroups  {
     return try  FfiConverterTypeViewGroups_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_view_groups(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
-        FfiConverterString.lower(layout),
         FfiConverterOptionString.lower(timeZone),$0
     )
 })
@@ -5066,7 +5064,14 @@ public func FfiConverterTypeEdgeMove_lower(_ value: EdgeMove) -> RustBuffer {
  */
 public struct EdgeType: Equatable, Hashable {
     public var id: String
-    public var label: String?
+    /**
+     * The name shown on the source end.
+     */
+    public var label: String
+    /**
+     * The name shown on the target end.
+     */
+    public var reverseLabel: String
     public var description: String?
     public var cardinality: String
     /**
@@ -5082,12 +5087,19 @@ public struct EdgeType: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, label: String?, description: String?, cardinality: String, 
+    public init(id: String, 
+        /**
+         * The name shown on the source end.
+         */label: String, 
+        /**
+         * The name shown on the target end.
+         */reverseLabel: String, description: String?, cardinality: String, 
         /**
          * The name the edge goes by read from its target.
          */reverseName: String?, writtenAt: EdgeWrittenAt, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool) {
         self.id = id
         self.label = label
+        self.reverseLabel = reverseLabel
         self.description = description
         self.cardinality = cardinality
         self.reverseName = reverseName
@@ -5116,7 +5128,8 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
         return
             try EdgeType(
                 id: FfiConverterString.read(from: &buf), 
-                label: FfiConverterOptionString.read(from: &buf), 
+                label: FfiConverterString.read(from: &buf), 
+                reverseLabel: FfiConverterString.read(from: &buf), 
                 description: FfiConverterOptionString.read(from: &buf), 
                 cardinality: FfiConverterString.read(from: &buf), 
                 reverseName: FfiConverterOptionString.read(from: &buf), 
@@ -5131,7 +5144,8 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
 
     public static func write(_ value: EdgeType, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
-        FfiConverterOptionString.write(value.label, into: &buf)
+        FfiConverterString.write(value.label, into: &buf)
+        FfiConverterString.write(value.reverseLabel, into: &buf)
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterString.write(value.cardinality, into: &buf)
         FfiConverterOptionString.write(value.reverseName, into: &buf)
@@ -9209,14 +9223,12 @@ public func FfiConverterTypeUnsureFile_lower(_ value: UnsureFile) -> RustBuffer 
 public struct ViewGroup: Equatable, Hashable {
     public var key: JsonValue
     public var count: UInt64
-    public var sum: Double?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(key: JsonValue, count: UInt64, sum: Double?) {
+    public init(key: JsonValue, count: UInt64) {
         self.key = key
         self.count = count
-        self.sum = sum
     }
 
     
@@ -9236,15 +9248,13 @@ public struct FfiConverterTypeViewGroup: FfiConverterRustBuffer {
         return
             try ViewGroup(
                 key: FfiConverterTypeJsonValue.read(from: &buf), 
-                count: FfiConverterUInt64.read(from: &buf), 
-                sum: FfiConverterOptionDouble.read(from: &buf)
+                count: FfiConverterUInt64.read(from: &buf)
         )
     }
 
     public static func write(_ value: ViewGroup, into buf: inout [UInt8]) {
         FfiConverterTypeJsonValue.write(value.key, into: &buf)
         FfiConverterUInt64.write(value.count, into: &buf)
-        FfiConverterOptionDouble.write(value.sum, into: &buf)
     }
 }
 
@@ -14330,7 +14340,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_delete_view() != 58151) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_view() != 48867) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_view() != 42555) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_list_views() != 21095) {
@@ -14342,7 +14352,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_view() != 43776) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_view_groups() != 21367) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_view_groups() != 52650) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_stop_raise() != 50331) {

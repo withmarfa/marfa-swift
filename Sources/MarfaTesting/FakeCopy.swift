@@ -158,7 +158,8 @@ extension Marfa.EdgeType {
             case .none: .none
             }
         return MarfaCore.EdgeType(
-            id: id, label: label, description: description, cardinality: cardinality, reverseName: reverseName,
+            id: id, label: label, reverseLabel: reverseLabel, description: description, cardinality: cardinality,
+            reverseName: reverseName,
             writtenAt: placed, sourceTypeConstraints: sourceTypeConstraints,
             targetTypeConstraints: targetTypeConstraints, cascadeOnDelete: cascadeOnDelete,
             properties: properties.map(\.held), shipped: shipped)
