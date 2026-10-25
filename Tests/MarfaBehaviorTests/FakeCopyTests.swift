@@ -233,6 +233,36 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
+    @Test func anAnswerMovesTheRowToTheVersionTheServerGaveIt() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let id = try #require(try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
+        _ = try await copy.edges.create(from: id, to: Self.other.id, type: "references")
+        _ = try await copy.items.update(id, Edit(properties: ["title": "A"], baseVersion: 0))
+        #expect(try await copy.items.get(id)?.version == 0, "a create the server has not answered")
+
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(id)?.version == 2, "the create made version 1 and the edit the next")
+        #expect(try await copy.edges.from(id).map(\.version) == [1])
+        _ = try await copy.edges.update(Self.edge.id, EdgeEdit(["note": "x"], baseVersion: Self.edge.version))
+        _ = try await copy.queue.drain()
+        #expect(
+            try await copy.edges.from(Self.note.id).first { $0.id == Self.edge.id }?.version == Self.edge.version + 1,
+            "an accepted edge edit steps it")
+        _ = try await copy.items.update(id, Edit(properties: ["title": "B"], baseVersion: 2))
+        _ = try await copy.items.update(Self.note.id, Edit(properties: ["title": "C"], baseVersion: 4))
+        _ = try await copy.tags.add("t", to: id)
+        #expect(try await copy.items.get(id)?.version == 2, "an edit that waits leaves the version")
+        fake.verdict = { $0.itemId == id ? .merged(fields: ["title"]) : .refused(Refusal(reason: "no")) }
+
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(id)?.version == 3, "a merged edit moves it on, and a tag leaves it")
+        #expect(try await copy.items.get(Self.note.id)?.version == 4, "a refused edit leaves it")
+        await copy.close()
+    }
+
     @Test func theChosenVerdictAnswersEachWriteAndARefusalPutsTheRowBack() async throws {
         let fake = Self.seeded()
         let copy = fake.copy
@@ -375,13 +405,29 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
-    @Test func aDeleteWithNoServerVersionIsRefusedUnsent() async throws {
+    @Test func aDeleteQueuedBehindItsOwnCreateIsRebasedAndSentWhenTheCreateIsTaken() async throws {
         let fake = Self.seeded()
         let copy = fake.copy
         let made = try #require(
             try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
-        _ = try await copy.queue.drain()
         let write = try await copy.items.delete(made)
+        #expect(write.baseVersion == 0)
+
+        let report = try await copy.queue.drain()
+
+        #expect(report.unsent == 0 && report.answered == 2)
+        let sent = try #require(try await copy.queue.all().first { $0.id == write.id })
+        #expect(
+            sent.verdict == .accepted && sent.baseVersion == 1, "the delete is based on the version the create made")
+        await copy.close()
+    }
+
+    @Test func aDeleteWithNoServerVersionIsRefusedUnsent() async throws {
+        var unconfirmed = Self.other
+        unconfirmed.version = 0
+        let fake = WorkingCopy.fake(items: [unconfirmed], itemTypes: [Self.noteType])
+        let copy = fake.copy
+        let write = try await copy.items.delete(unconfirmed.id)
 
         let report = try await copy.queue.drain()
 

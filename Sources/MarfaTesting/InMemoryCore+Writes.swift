@@ -517,6 +517,11 @@ extension InMemoryCore.State {
 
     /// Works the rows out again: the seed, then every write that was not refused
     /// or withdrawn, in queue order.
+    ///
+    /// A row or edge of a create stays at version 0 until the server takes the
+    /// create, which makes version 1, and an edit the server takes, of a row or
+    /// of an edge, moves it to the next version, while one that waits leaves it
+    /// where it was.
     mutating func replay() {
         items = seedItems
         edges = seedEdges
@@ -526,11 +531,20 @@ extension InMemoryCore.State {
             if entry.withdrawn { continue }
             if case .refused? = entry.write.verdict { continue }
             let write = entry.write
+            let taken: Bool =
+                switch write.verdict {
+                case .accepted?, .merged?: true
+                default: false
+                }
             switch entry.effect {
             case .none: break
-            case .made(let row, let edges):
+            case .made(var row, let edges):
+                if taken { row.version = 1 }
                 items[row.id] = row
-                for edge in edges { add(edge) }
+                for var edge in edges {
+                    if taken { edge.version = 1 }
+                    add(edge)
+                }
             case .edit(let properties, let replacing, let type, let tier, let sourceId, let occurredAt):
                 guard let id = write.itemId, var row = items[id] else { continue }
                 row.properties = Properties.merged(row.properties, with: properties, replacing: replacing)
@@ -538,6 +552,7 @@ extension InMemoryCore.State {
                 if let tier { row.tier = tier }
                 if let sourceId { row.sourceId = sourceId }
                 if let occurredAt { row.occurredAt = occurredAt }
+                if taken { row.version += 1 }
                 items[id] = InMemoryCore.derived(row, types: types)
             case .state(let state):
                 guard let id = write.itemId, var row = items[id] else { continue }
@@ -547,12 +562,15 @@ extension InMemoryCore.State {
                 guard let id = write.itemId, var row = items[id] else { continue }
                 row.tags = InMemoryCore.applying(change, to: row.tags)
                 items[id] = row
-            case .madeEdge(let edge): add(edge)
+            case .madeEdge(var edge):
+                if taken { edge.version = 1 }
+                add(edge)
             case .editEdge(let properties, let source, let target):
                 guard let id = write.edgeId, var row = edges[id] else { continue }
                 row.properties = Properties.merged(row.properties, with: properties, replacing: false, dropping: false)
                 if let source { row.sourceId = source }
                 if let target { row.targetId = target }
+                if taken { row.version += 1 }
                 edges[id] = row
             case .removedEdge:
                 guard let id = write.edgeId else { continue }
