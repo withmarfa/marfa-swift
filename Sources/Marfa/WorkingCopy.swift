@@ -142,8 +142,8 @@ public final class WorkingCopy: Sendable {
             await close()
             guard replaced else { throw error }
             throw MarfaError.store(
-                message: "The refused store was replaced, but its file budget could not be set: "
-                    + "\(error.localizedDescription) Open the store again and set the budget with Blobs.setBudget(_:)."
+                message: "The refused store was replaced, but its file budget could not be set "
+                    + "(\(error.localizedDescription)). Open the store again and set the budget with Blobs.setBudget(_:)."
             )
         }
     }
