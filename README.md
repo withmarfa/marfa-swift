@@ -160,10 +160,10 @@ Use `FakeCopy` to record writes, choose drain verdicts, and send changes on `cha
 The documentation is at [docs.marfa.so](https://docs.marfa.so).
 
 - [Swift SDK](https://docs.marfa.so/swift-sdk): the working copy, items, queued writes, change streams, live queries, conflicted copies and folders on a Mac.
-- [Build an app with Swift](https://docs.marfa.so/guides/swift-app): a tutorial that builds a SwiftUI app for iPhone and Mac.
+- [Build an app with Swift](https://docs.marfa.so/build/swift-app): a tutorial that builds a SwiftUI app for iPhone and Mac.
 - [Devices](https://docs.marfa.so/devices): how an app keeps a working copy and sends its changes.
-- [Write safely](https://docs.marfa.so/guides/write-safely): versions, conflicts and retries.
-- [Sync a folder](https://docs.marfa.so/guides/sync-a-folder): keep a directory on your Mac in step with your notes.
+- [Write safely](https://docs.marfa.so/build/write-safely): versions, conflicts and retries.
+- [Sync a folder](https://docs.marfa.so/run/sync-a-folder): keep a directory on your Mac in step with your notes.
 - [API reference](https://docs.marfa.so/api-reference): the HTTP API the SDK is built on.
 
 The server, the core and the contract are in [withmarfa/marfa](https://github.com/withmarfa/marfa).
