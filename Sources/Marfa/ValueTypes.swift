@@ -360,8 +360,8 @@ public enum SortField: Sendable, Hashable {
     case occurredAt
     /// An item property, by name: `a` to `z`, `0` to `9` and `_`, else the list is refused `validationError`.
     ///
-    /// Numbers and booleans (`false` before `true`) come first, then text, and items without the property last in
-    /// either direction. Ties go by ID, oldest first.
+    /// Ascending puts numbers and booleans (`false` before `true`) first, then text, and descending reverses that.
+    /// Items without the property come last in either direction. Ties go by ID, oldest first.
     case property(name: String)
 
     init(_ core: MarfaCore.SortField) {
