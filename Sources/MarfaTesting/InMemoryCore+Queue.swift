@@ -139,9 +139,32 @@ extension InMemoryCore.State {
         entries[index].write.waiting = false
         entries[index].write.answeredAt = Minted.now()
         let write = entries[index].write
+        if write.kind == .createItem {
+            switch verdict {
+            case .accepted, .merged: rebaseDeletes(behind: write)
+            default: break
+            }
+        }
         return DrainVerdict(
             id: id, kind: write.kind, itemId: write.itemId, edgeId: write.edgeId, verdict: verdict, refusals: 0,
             replayed: false)
+    }
+
+    /// The core moves a delete queued at version 0 behind its own create to
+    /// version 1 when that create is taken, so the delete goes on the version
+    /// the create made.
+    private mutating func rebaseDeletes(behind create: QueuedWrite) {
+        for at in entries.indices {
+            let entry = entries[at].write
+            guard entries[at].inQueue, entry.verdict == nil, entry.kind == .deleteItem,
+                entry.itemId == create.itemId, entry.baseVersion == 0
+            else { continue }
+            entries[at].write.baseVersion = 1
+            for member in entries[at].write.body.members.indices
+            where entries[at].write.body.members[member].key == "version" {
+                entries[at].write.body.members[member].value = .integer(1)
+            }
+        }
     }
 
     func isWaitedOn(_ id: String) -> Bool {

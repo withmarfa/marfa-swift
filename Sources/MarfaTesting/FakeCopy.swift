@@ -54,8 +54,12 @@ import Synchronization
 ///   which gives it version 1, and an edit a drain takes, accepted or merged,
 ///   moves the row to the next version, as the real copy shows the answers. A
 ///   write waiting behind another is answered on the version it was queued
-///   on, where the real copy sends it on the answer ahead of it, and an edge's
-///   edit and a transition leave the version where it was.
+///   on, where the real copy sends it on the answer ahead of it. A transition
+///   and a tag leave the version where it was. A delete queued
+///   behind its own item's create is rebased to version 1 when that create is
+///   taken, as the real copy does, and it is refused unsent only where the
+///   real copy refuses one: a delete of an item it holds at version 0 with no
+///   create unanswered.
 /// - It knows only the types it was given and the ones the app declares, not
 ///   Marfa's built-in catalog, and it does not check an edge type's
 ///   constraints.

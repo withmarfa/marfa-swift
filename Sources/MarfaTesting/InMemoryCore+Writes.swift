@@ -519,8 +519,9 @@ extension InMemoryCore.State {
     /// or withdrawn, in queue order.
     ///
     /// A row or edge of a create stays at version 0 until the server takes the
-    /// create, which makes version 1, and an edit the server takes moves the row
-    /// to the next version, while one that waits leaves it where it was.
+    /// create, which makes version 1, and an edit the server takes, of a row or
+    /// of an edge, moves it to the next version, while one that waits leaves it
+    /// where it was.
     mutating func replay() {
         items = seedItems
         edges = seedEdges
@@ -569,6 +570,7 @@ extension InMemoryCore.State {
                 row.properties = Properties.merged(row.properties, with: properties, replacing: false, dropping: false)
                 if let source { row.sourceId = source }
                 if let target { row.targetId = target }
+                if taken { row.version += 1 }
                 edges[id] = row
             case .removedEdge:
                 guard let id = write.edgeId else { continue }
