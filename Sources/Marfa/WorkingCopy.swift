@@ -89,7 +89,9 @@ public final class WorkingCopy: Sendable {
     ///
     /// Leaves the store as it is and throws `wrongSchema`, with its `unsent` count, while it holds a write the
     /// server has not taken, and `readingHandle` while another process writes it. Throws `invalid` for a store
-    /// that opens as it is, or a path that holds none.
+    /// that opens as it is, or a path that holds none. Throws `store` when `fileBudget` cannot be set once the store
+    /// is replaced; the error says so, the copy is closed, and the new store is in place, so open it again and
+    /// call ``Blobs/setBudget(_:)``.
     public static func replaceRefused(store: URL, server: Server? = nil, fileBudget: FileBudget? = nil) async throws
         -> WorkingCopy
     {
@@ -124,15 +126,26 @@ public final class WorkingCopy: Sendable {
             }
             copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         }
-        if let fileBudget {
-            do {
-                _ = try await copy.blobs.setBudget(fileBudget)
-            } catch {
-                await copy.close()
-                throw error
-            }
-        }
+        try await copy.applyingOpeningBudget(fileBudget, replaced: replacing)
         return copy
+    }
+
+    /// Sets the budget the app opened the copy with.
+    ///
+    /// Closes the copy and throws if that fails. A replacement is done by then, so its error says the store was
+    /// replaced, rather than leaving the caller to take the store for the refused one.
+    func applyingOpeningBudget(_ fileBudget: FileBudget?, replaced: Bool) async throws {
+        guard let fileBudget else { return }
+        do {
+            _ = try await blobs.setBudget(fileBudget)
+        } catch {
+            await close()
+            guard replaced else { throw error }
+            throw MarfaError.store(
+                message: "The refused store was replaced, but its file budget could not be set: "
+                    + "\(error.localizedDescription) Open the store again and set the budget with Blobs.setBudget(_:)."
+            )
+        }
     }
 
     /// Opens a store another process writes, to read it only.
