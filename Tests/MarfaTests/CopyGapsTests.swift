@@ -94,6 +94,31 @@ struct ReplacedRefusedCopy {
         await reopened.close()
     }
 
+    @Test func aBudgetGivenWhenReplacingIsInForceAndKept() async throws {
+        let (store, _) = try await Self.refusedStore()
+        let copy = try await WorkingCopy.replaceRefused(store: store, fileBudget: .bytes(bytes: 4_096))
+        #expect(try await copy.blobs.cache().setting == .bytes(bytes: 4_096))
+        await copy.close()
+        let reopened = try await WorkingCopy.open(store: store)
+        #expect(try await reopened.blobs.cache().setting == .bytes(bytes: 4_096))
+        await reopened.close()
+    }
+
+    @Test func aBudgetThatCannotBeSetAfterAReplacementSaysTheStoreWasReplaced() async throws {
+        let copy = try await WorkingCopy.open(store: temporaryStore())
+        await copy.close()
+        await #expect {
+            try await copy.applyingOpeningBudget(.keepAll, replaced: true)
+        } throws: { error in
+            if case .store(let message)? = error as? MarfaError { message.contains("was replaced") } else { false }
+        }
+        await #expect {
+            try await copy.applyingOpeningBudget(.keepAll, replaced: false)
+        } throws: { error in
+            if case .closed? = error as? MarfaError { true } else { false }
+        }
+    }
+
     @Test func aStoreAtAnotherPathDoesNotHoldTheFiles() async throws {
         let (_, hash) = try await Self.refusedStore()
         let copy = try await WorkingCopy.open(store: temporaryStore())
