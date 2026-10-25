@@ -83,9 +83,9 @@ public final class WorkingCopy: Sendable {
     /// build's shape, and opens it, taking its arguments as `open` does.
     ///
     /// The files the copy downloaded stay, because they are kept by content and not by the store. What only the
-    /// old store held does not: pins, the position in the server's events and the declared types. The choice of
-    /// file budget stays, as it does for any reopened store; `fileBudget` sets a new one. Read what matters before
-    /// replacing, and hydrate the new copy as you would a new one.
+    /// old store held does not: pins, the position in the server's events and the declared types. The file
+    /// budget the old store recorded stays, as it does for any reopened store; `fileBudget` sets a new one. Read
+    /// what matters before replacing, and hydrate the new copy as you would a new one.
     ///
     /// Leaves the store as it is and throws `wrongSchema`, with its `unsent` count, while it holds a write the
     /// server has not taken, and `readingHandle` while another process writes it. Throws `invalid` for a store
@@ -100,8 +100,9 @@ public final class WorkingCopy: Sendable {
 
     /// Removes the store at `store`.
     ///
-    /// It removes the store, its log, the files it fetched and its writer lock, and nothing else beside it. A store of any schema goes, including one ``open(store:server:fileBudget:)`` refuses with
-    /// `wrongSchema`. A symbolic link at one of those names is unlinked, never what it leads to.
+    /// It removes the store, its log, the files it fetched and its writer lock, and nothing else beside it. A store
+    /// of any schema goes, including one ``open(store:server:fileBudget:)`` refuses with `wrongSchema`. A symbolic
+    /// link at one of those names is unlinked, never what it leads to.
     ///
     /// `unsent` is the number of writes the server has not taken that the person agreed to lose: the count they
     /// were shown. The removal holds the store's writer lock throughout and checks the count under it, so no
@@ -115,7 +116,7 @@ public final class WorkingCopy: Sendable {
     ///
     /// A reading helper, such as one opened with ``openReader(store:)``, does not stop the removal and keeps
     /// showing the old copy until it reopens. With no store at `store`, removes what an interrupted removal left
-    /// there when `unsent` is 0.
+    /// there when `unsent` is 0, and throws `unsentDiffers` with a count of 0 otherwise.
     public static func remove(store: URL, unsent: UInt64) async throws {
         let path = store.path
         try await background { try removeStore(path: path, unsent: unsent) }
