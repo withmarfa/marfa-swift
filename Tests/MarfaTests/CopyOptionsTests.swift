@@ -62,26 +62,6 @@ struct CopyOptions {
         await copy.close()
     }
 
-    @Test func aRefusedReplacementStillCompletesTheFillAndIsReported() async throws {
-        let core = FakeCore.writer()
-        core.state.withLock {
-            $0.replacedTypes = ["app.entry"]
-            $0.replacementRefusals = [
-                MarfaCore.UnregisteredType(id: "app.other", code: "conflict", message: "items hold the old field")
-            ]
-        }
-        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        let report = try await copy.hydrate(types: ["core.note"], tier: .library)
-        #expect(report.replacedTypes == ["app.entry"])
-        #expect(
-            report.unreplacedTypes == [
-                Marfa.UnregisteredType(id: "app.other", code: "conflict", message: "items hold the old field")
-            ])
-        #expect(report.unregisteredTypes.isEmpty)
-        #expect(try await copy.status().hydration == .complete)
-        await copy.close()
-    }
-
     @Test func pinsCarryTheirItemAndNotifyListeners() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)

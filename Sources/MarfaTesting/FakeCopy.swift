@@ -19,17 +19,17 @@ import Synchronization
 ///
 /// The fake serves these calls:
 ///
-/// - Reads: `items.list(_:sort:)` without `filter`, with `source`, the
-///   updated and occurred ranges and a sort on a property, `items.get(_:)`, `edges.from(_:)`, `edges.to(_:)`,
-///   `edges.ofType(_:)`, the four reads of `catalog`, `catalog.fromServer()`, which throws `noServer` as
-///   a copy without a server does, `declaredTypes()` and
-///   `status()`.
-/// - Writes: `items.create(_:)` without `sourceId`, with `state`, a capture
-///   location and `edges`, `items.update(_:_:)` including `occurredAt` and
-///   `clearOccurredAt`,
-///   `items.updateAsRead(_:_:)`, `items.delete(_:)`, `items.restore(_:)`,
-///   `items.transition(_:to:)`, `tags`, `metadata`, `extensions`, `edges.create`,
-///   `edges.update(_:_:)`, `edges.delete(_:)` and `declareTypes(_:)`.
+/// - Reads: `items.list(_:sort:)` without `filter`, including `source`, the
+///   updated and occurred ranges and a sort on a property, `items.get(_:)`,
+///   `edges.from(_:)`, `edges.to(_:)`, `edges.ofType(_:)`, the four reads of
+///   `catalog`, `catalog.fromServer()`, which throws `noServer` as a copy
+///   without a server does, `declaredTypes()` and `status()`.
+/// - Writes: `items.create(_:)` without `sourceId`, including `state`, a
+///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`
+///   and `clearOccurredAt`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
+///   `items.restore(_:)`, `items.transition(_:to:)`, `tags`, `metadata`,
+///   `extensions`, `edges.create`, `edges.update(_:_:)`, `edges.delete(_:)` and
+///   `declareTypes(_:)`.
 /// - The queue: `queue.all()`, `queue.drain()`, `queue.withdraw(_:)`,
 ///   `queue.discard(_:)` and `queue.forgetAnswered()`, with or without `ids`.
 /// - `changes()`, which tells the app's own writes, and the changes ``send(_:)``
@@ -40,9 +40,10 @@ import Synchronization
 /// The fake is not a second engine. A call, or an input to a call, that it
 /// cannot match exactly and cheaply throws ``FakeCopyError/unsupported(call:)``
 /// instead of being answered differently. That includes a `filter`, an
-/// `occurredAt` outside the forms it checks, a body that links to another item,
-/// a tag with surrounding whitespace, and a value for any field but a string
-/// field it can judge. It also differs from a real copy in these ways:
+/// `occurredAt` outside the forms it checks, a capture coordinate that is out
+/// of range or has no partner, a body that links to another item, a tag with
+/// surrounding whitespace, and a value for any field but a string field it can
+/// judge. It also differs from a real copy in these ways:
 ///
 /// - A drain answers each write with the verdict ``verdict`` chooses, one drain
 ///   at a time. A refused write puts back the row it changed, as the real copy

@@ -149,6 +149,9 @@ extension InMemoryCore {
             // so it cannot know which properties it clears: it merges.
             let replacing = edit.replaceProperties && base == held.version
             held.properties = Properties.merged(held.properties, with: edit.properties, replacing: replacing)
+            if let type = types[retype ?? held.type], base == held.version {
+                try Self.requireFields(of: type, in: held.properties)
+            }
             if let key = edit.sourceId { held.sourceId = key }
             if let retype { held.type = retype }
             if let tier { held.tier = tier }
@@ -160,9 +163,6 @@ extension InMemoryCore {
                 held.occurredAt = queued
                 held.createdAt = queued
                 state.dropUnsentTime(of: id)
-            }
-            if let type = types[held.type], base == held.version {
-                try Self.requireFields(of: type, in: held.properties)
             }
             state.items[id] = Self.derived(held, types: types)
             return state.append(

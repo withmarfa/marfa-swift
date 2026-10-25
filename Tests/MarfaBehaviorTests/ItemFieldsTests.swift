@@ -89,6 +89,8 @@ struct ItemFieldsOffline {
         let copy = try await kind.open()
         let held = try await Self.note(copy, "timed") { $0.occurredAt = "2026-01-02T03:04:05.000Z" }
         #expect(held.occurredAt == "2026-01-02T03:04:05.000Z")
+        let sent = try #require(try await copy.queue.all().first { $0.kind == .createItem })
+        #expect(sent.body["occurred_at"] != nil)
         let write = try #require(
             try await copy.items.update(
                 held.id, Edit(properties: [:], baseVersion: held.version, clearOccurredAt: true)))
@@ -97,6 +99,30 @@ struct ItemFieldsOffline {
         #expect(create.body["occurred_at"] == nil)
         let cleared = try #require(try await copy.items.get(held.id))
         #expect(cleared.occurredAt == cleared.createdAt && cleared.occurredAt != held.occurredAt)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aRefusedEditLeavesTheTimeOfAnUnsentCreateAlone(kind: CopyKind) async throws {
+        let copy = try await kind.open(declaring: [
+            ["id": "app.test.needs", "fields": ["name": ["type": "string", "required": true]]]
+        ])
+        let id = try #require(
+            try await copy.items.create(
+                Draft(type: "app.test.needs", properties: ["name": "n"], occurredAt: "2026-01-02T03:04:05.000Z")
+            ).itemId)
+        let held = try #require(try await copy.items.get(id))
+        await #expect(
+            performing: {
+                _ = try await copy.items.update(
+                    id,
+                    Edit(
+                        properties: ["other": "x"], replaceProperties: true, baseVersion: held.version,
+                        clearOccurredAt: true))
+            }, throws: Self.refused("invalid_properties"))
+        let create = try #require(try await copy.queue.all().first { $0.kind == .createItem })
+        #expect(create.body["occurred_at"] == "2026-01-02T03:04:05.000Z")
+        #expect(try await copy.items.get(id)?.occurredAt == "2026-01-02T03:04:05.000Z")
         await copy.close()
     }
 

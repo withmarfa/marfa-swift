@@ -179,6 +179,24 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
+    @Test func clearingTheOwnTimeOfAnAnsweredCreateSendsTheCreationTime() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let created = try await copy.items.create(
+            Draft(type: "core.note", properties: ["body": "b"], occurredAt: "2026-01-02T03:04:05.000Z"))
+        let id = try #require(created.itemId)
+        _ = try await copy.queue.drain()
+        let held = try #require(try await copy.items.get(id))
+
+        let write = try #require(
+            try await copy.items.update(id, Edit(properties: [:], baseVersion: held.version, clearOccurredAt: true)))
+
+        #expect(write.body["occurred_at"] == .string(held.createdAt))
+        let cleared = try #require(try await copy.items.get(id))
+        #expect(cleared.occurredAt == held.createdAt)
+        await copy.close()
+    }
+
     @Test func theVerdictChooserAcceptsByDefaultAndReadsBackWhatWasSet() async throws {
         let fake = Self.seeded()
         let write = QueuedWrite(id: "w", kind: .addTag, idempotencyKey: "k", queuedAt: "")
