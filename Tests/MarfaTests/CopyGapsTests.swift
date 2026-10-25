@@ -213,6 +213,28 @@ struct RemovedCopy {
         #expect(!FileManager.default.fileExists(atPath: store.path))
     }
 
+    @Test func aMissingStoreIsRemovedWhenNoneAreUnsent() async throws {
+        let store = temporaryStore()
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+
+        try await WorkingCopy.remove(store: store, unsent: 0)
+
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func aMissingStoreHasNoUnsentChangesToAgreeTo() async throws {
+        let store = temporaryStore()
+
+        await #expect {
+            try await WorkingCopy.remove(store: store, unsent: 1)
+        } throws: { error in
+            guard case .unsentDiffers(_, let unsent, let reported, _)? = error as? MarfaError else {
+                return false
+            }
+            return unsent == 0 && reported == 1
+        }
+    }
+
     @Test(arguments: [0, 1, 3] as [UInt64])
     func aDifferentCountLeavesTheStoreAndSaysTheRealOne(agreed: UInt64) async throws {
         let store = try await Self.storeWithUnsent(2)
