@@ -209,7 +209,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .io, .network,
             .unnamed, .decoding, .store, .storageFull, .signedOut, .noKeychain, .redirected, .noServer, .noCursor,
             .hydrationIncomplete, .noCatalog, .wrongSchema,
-            .readingHandle,
+            .readingHandle, .unsentDiffers,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,
             .firstSyncWaiting, .invalid,
             .closed, .noConnection:
