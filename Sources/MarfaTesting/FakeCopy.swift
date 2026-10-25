@@ -50,6 +50,12 @@ import Synchronization
 ///   shows it after the server refused; a write that depends on a refused or
 ///   dead one is refused unsent, and one that depends on a blocked or
 ///   unanswered one waits.
+/// - A row or edge it makes is at version 0 until a drain takes the create,
+///   which gives it version 1, and an edit a drain takes, accepted or merged,
+///   moves the row to the next version, as the real copy shows the answers. A
+///   write waiting behind another is answered on the version it was queued
+///   on, where the real copy sends it on the answer ahead of it, and an edge's
+///   edit and a transition leave the version where it was.
 /// - It knows only the types it was given and the ones the app declares, not
 ///   Marfa's built-in catalog, and it does not check an edge type's
 ///   constraints.

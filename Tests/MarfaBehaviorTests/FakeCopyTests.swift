@@ -233,6 +233,31 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
+    @Test func anAnswerMovesTheRowToTheVersionTheServerGaveIt() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        let id = try #require(try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
+        _ = try await copy.edges.create(from: id, to: Self.other.id, type: "references")
+        _ = try await copy.items.update(id, Edit(properties: ["title": "A"], baseVersion: 0))
+        #expect(try await copy.items.get(id)?.version == 0, "a create the server has not answered")
+
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(id)?.version == 2, "the create made version 1 and the edit the next")
+        #expect(try await copy.edges.from(id).map(\.version) == [1])
+        _ = try await copy.items.update(id, Edit(properties: ["title": "B"], baseVersion: 2))
+        _ = try await copy.items.update(Self.note.id, Edit(properties: ["title": "C"], baseVersion: 4))
+        _ = try await copy.tags.add("t", to: id)
+        #expect(try await copy.items.get(id)?.version == 2, "an edit that waits leaves the version")
+        fake.verdict = { $0.itemId == id ? .merged(fields: ["title"]) : .refused(Refusal(reason: "no")) }
+
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.items.get(id)?.version == 3, "a merged edit moves it on, and a tag leaves it")
+        #expect(try await copy.items.get(Self.note.id)?.version == 4, "a refused edit leaves it")
+        await copy.close()
+    }
+
     @Test func theChosenVerdictAnswersEachWriteAndARefusalPutsTheRowBack() async throws {
         let fake = Self.seeded()
         let copy = fake.copy
@@ -380,12 +405,11 @@ struct FakeCopyBehavior {
         let copy = fake.copy
         let made = try #require(
             try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"])).itemId)
-        _ = try await copy.queue.drain()
         let write = try await copy.items.delete(made)
 
         let report = try await copy.queue.drain()
 
-        #expect(report.unsent == 1 && report.answered == 0)
+        #expect(report.unsent == 1 && report.answered == 1)
         guard case .refused(let refusal)? = try await copy.queue.all().first(where: { $0.id == write.id })?.verdict
         else {
             Issue.record("the delete was not refused")
