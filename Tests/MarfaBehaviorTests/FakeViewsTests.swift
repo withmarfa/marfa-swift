@@ -98,6 +98,53 @@ struct FakeViews {
         #expect(cleared.version == 4 && cleared.settings.group == nil && cleared.settings.title == "Renamed")
     }
 
+    @Test func aStaleChangeSettingsEqualToTheBaseAreEchoes() async throws {
+        let copy = Self.fake().copy
+        let made = try await copy.createView(ViewSettings(title: "A"))
+        _ = try await copy.changeView(made.id, ViewSettingsChange(title: "B"), baseVersion: 1)
+
+        let sort = [ViewSort(by: "title", direction: .ascending)]
+        let merged = try await copy.changeView(
+            made.id, ViewSettingsChange(title: "A", sort: sort), baseVersion: 1)
+        #expect(merged.version == 3 && merged.settings.title == "B" && merged.settings.sort == sort)
+    }
+
+    @Test func aViewWriteTheServerRefusesChangesNothing() async throws {
+        let copy = Self.fake().copy
+        let made = try await copy.createView(ViewSettings(title: "V"))
+        let settings: [ViewSettings] = [
+            ViewSettings(title: ""),
+            ViewSettings(title: String(repeating: "a", count: 501)),
+            ViewSettings(title: "V", query: ViewQuery(states: [])),
+            ViewSettings(title: "V", query: ViewQuery(types: ["*"])),
+            ViewSettings(title: "V", query: ViewQuery(beneath: "not-an-id")),
+            ViewSettings(title: "V", sort: [ViewSort(by: "properties.9a", direction: .ascending)]),
+            ViewSettings(title: "V", sort: [ViewSort(by: "properties.a-b", direction: .ascending)]),
+        ]
+        for refused in settings {
+            await #expect {
+                _ = try await copy.createView(refused)
+            } throws: { error in
+                guard case .validation(let code, _)? = error as? MarfaError else { return false }
+                return code == "validation_error"
+            }
+        }
+        await #expect(throws: MarfaError.self) {
+            _ = try await copy.changeView(made.id, ViewSettingsChange(title: ""), baseVersion: 1)
+        }
+        await #expect(throws: MarfaError.self) {
+            _ = try await copy.changeView(made.id, ViewSettingsChange(query: ViewQuery(states: [])), baseVersion: 1)
+        }
+        #expect(try await copy.items.views().map(\.id) == [made.id])
+        #expect(try await copy.items.view(made.id)?.version == 1)
+
+        let ok = try await copy.createView(
+            ViewSettings(
+                title: String(repeating: "a", count: 500),
+                sort: [ViewSort(by: "properties._Rank9", direction: .ascending)]))
+        #expect(ok.settings.title.count == 500)
+    }
+
     @Test func aChangeOrDeleteOfWhatIsNotAViewIsRefused() async throws {
         let copy = Self.fake().copy
         let made = try await copy.createView(ViewSettings(title: "V"))
@@ -141,7 +188,8 @@ struct FakeViews {
             try await titles(copy, ViewSettings(title: "t", query: ViewQuery(types: ["core.task"]), sort: ascending))
                 == ["t"])
         #expect(
-            try await titles(copy, ViewSettings(title: "core", query: ViewQuery(types: ["core.*"]), sort: ascending))
+            try await titles(
+                copy, ViewSettings(title: "core", query: ViewQuery(types: ["core.note", "core.task"]), sort: ascending))
                 == ["a", "b", "c", "d", "t"])
         #expect(
             try await titles(

@@ -45,13 +45,13 @@ extension InMemoryCore {
             if Properties.value(changes, "version") != nil {
                 throw Refuse.invalid("a view's version is the one the change is based on, not a setting")
             }
-            guard let held = state.items[id], held.type == Self.viewType else {
-                throw Refuse.notFound("item_not_found", "\(id) is not a view")
-            }
             guard !changes.members.isEmpty else {
                 throw Refuse.validation("validation_error", "a change names at least one setting")
             }
             try Self.check(changes)
+            guard let held = state.items[id], held.type == Self.viewType else {
+                throw Refuse.notFound("item_not_found", "\(id) is not a view")
+            }
             guard held.state == .active else {
                 throw Refuse.validation("invalid_transition", "the view \(id) is \(held.state.name) and cannot change")
             }
@@ -60,8 +60,13 @@ extension InMemoryCore {
                 guard let base = state.viewSettings[id]?[version], version < held.version else {
                     throw FakeCopyError.unsupported(call: "changeView based on a version the fake never held")
                 }
-                // A clear of a group the base version lacked changes nothing.
-                named.removeAll { $0.key == "group" && $0.value == .null && Properties.value(base, "group") == nil }
+                // A setting equal to the base version's is an echo, and a clear of a group the base lacked
+                // changes nothing: neither collides nor applies.
+                named.removeAll {
+                    $0.value == .null
+                        ? $0.key == "group" && Properties.value(base, "group") == nil
+                        : Properties.value(base, $0.key) == $0.value
+                }
                 let collided = named.map(\.key).filter {
                     Properties.value(base, $0) != Properties.value(held.properties, $0)
                 }
@@ -126,18 +131,39 @@ extension InMemoryCore {
     ///
     /// A `filter` is stored as given: only a read that must evaluate it can refuse it.
     private static func check(_ settings: JsonObject) throws {
+        if let title = Properties.value(settings, "title"), case .string(let text) = title {
+            if text.isEmpty {
+                throw Refuse.validation("validation_error", "title: Too small: expected string to have >=1 characters")
+            }
+            if text.utf16.count > 500 {
+                throw Refuse.validation("validation_error", "title: Must contain at most 500 UTF-16 code units")
+            }
+        }
         if case .object(let query)? = Properties.value(settings, "query") {
-            for name in Properties.strings(query, "types") {
-                let trimmed = name.trimmingCharacters(in: .whitespaces)
-                if trimmed != "*" && !Declaring.isTypePattern(trimmed) {
-                    throw Refuse.validation("validation_error", "query.types: Invalid type identifier: \(name)")
+            let types = Properties.strings(query, "types")
+            if types.count > 100 {
+                throw Refuse.validation("validation_error", "query.types: Too big: expected array to have <=100 items")
+            }
+            if Properties.value(query, "state") != nil && Properties.strings(query, "state").isEmpty {
+                throw Refuse.validation(
+                    "validation_error", "query.state: Too small: expected array to have >=1 items")
+            }
+            for (index, name) in types.enumerated() {
+                if !Declaring.isTypeIdentifier(name) {
+                    throw Refuse.validation(
+                        "validation_error", "query.types.\(index): Invalid type identifier: \(name)")
                 }
-                if trimmed.hasPrefix("system.") || trimmed == "system.*" {
-                    throw Refuse.validation("validation_error", "query.types: \(name) is a system type")
+                if name.hasPrefix("system.") {
+                    throw Refuse.validation(
+                        "validation_error",
+                        "query.types.\(index): \(name) is a system type, which no item door writes")
                 }
             }
             for state in Properties.strings(query, "state") where state != "active" && state != "archived" {
                 throw Refuse.validation("validation_error", "query.state: \(state) is not active or archived")
+            }
+            if let beneath = Properties.string(query, "beneath"), !isItemId(beneath) {
+                throw Refuse.validation("validation_error", "query.beneath: Invalid item id: \(beneath)")
             }
         }
         if case .array(let keys)? = Properties.value(settings, "sort") {
@@ -155,6 +181,10 @@ extension InMemoryCore {
             if !isField(by, edges: true) {
                 throw Refuse.validation("validation_error", "group.by: \(by) is not a field")
             }
+            for name in ["order", "hidden"] where values(group, name).count > 1000 {
+                throw Refuse.validation(
+                    "validation_error", "group.\(name): Too big: expected array to have <=1000 items")
+            }
             if Properties.value(group, "bucket") != nil && !isDate(by) {
                 throw Refuse.validation("validation_error", "group.bucket: \(by) is not a date field")
             }
@@ -168,10 +198,17 @@ extension InMemoryCore {
     private static func property(_ field: String) -> String? {
         guard field.hasPrefix("properties.") else { return nil }
         let name = String(field.dropFirst("properties.".count))
+        func letter(_ byte: UInt8) -> Bool {
+            (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A) || byte == 0x5F
+        }
+        let bytes = Array(name.utf8)
         let ok =
-            !name.isEmpty
-            && name.utf8.allSatisfy { ($0 >= 0x61 && $0 <= 0x7A) || ($0 >= 0x30 && $0 <= 0x39) || $0 == 0x5F }
+            bytes.first.map(letter) == true && bytes.allSatisfy { letter($0) || ($0 >= 0x30 && $0 <= 0x39) }
         return ok ? name : nil
+    }
+
+    private static func isItemId(_ text: String) -> Bool {
+        text.wholeMatch(of: /[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/) != nil
     }
 
     private static func edgeReference(_ field: String) -> (backref: Bool, type: String)? {
