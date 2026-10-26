@@ -142,37 +142,5 @@ extension InMemoryCore {
     func trimFiles() throws -> UInt64 {
         try unsupported("blobs.trim")
     }
-
-    func createView(settings: JsonObject, idempotencyKey: String?) throws -> ViewRow {
-        try unsupported("createView")
-    }
-
-    func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?) throws -> ViewRow {
-        try unsupported("changeView")
-    }
-
-    func deleteView(id: String, idempotencyKey: String?) throws {
-        throw FakeCopyError.unsupported(call: "deleteView")
-    }
-
-    func listViews() throws -> Views {
-        try unsupported("items.views")
-    }
-
-    func view(id: String) throws -> ViewRow? {
-        try unsupported("items.view")
-    }
-
-    func listInView(id: String, limit: UInt32?, offset: UInt32?) throws -> Listing {
-        try unsupported("items.list(inView:)")
-    }
-
-    func searchInView(query: String, id: String, limit: UInt32) throws -> Found {
-        try unsupported("search(inView:)")
-    }
-
-    func viewGroups(id: String, timeZone: String?) throws -> ViewGroups {
-        try unsupported("items.groups(inView:)")
-    }
 }
 #endif
