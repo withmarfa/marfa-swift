@@ -115,13 +115,18 @@ enum Declaring {
         }
     }
 
+    /// A concrete type identifier: no wildcard.
+    static func isTypeIdentifier(_ name: String) -> Bool {
+        !name.hasSuffix(".*") && isTypePattern(name)
+    }
+
     /// A declaration as the core keeps it: the empty `fields` and the
     /// `version` a registration needs filled in where the app left them out.
     static func declaration(_ definition: JsonObject, known: Set<String>) throws -> (String, JsonObject) {
         guard let id = Properties.string(definition, "id") else {
             throw Refuse.invalid("a type to declare names its id")
         }
-        guard !id.hasSuffix(".*"), isTypePattern(id) else {
+        guard isTypeIdentifier(id) else {
             throw Refuse.invalid("not a type to declare: \"\(id)\"; \(grammar)")
         }
         guard !shippedRoots.contains(String(id.split(separator: ".")[0])) else {

@@ -24,6 +24,13 @@ public struct SavedView: Sendable, Hashable, Identifiable {
     public let state: ItemState
     public let settings: ViewSettings
 
+    public init(id: String, version: Int64, state: ItemState = .active, settings: ViewSettings) {
+        self.id = id
+        self.version = version
+        self.state = state
+        self.settings = settings
+    }
+
     init(_ core: MarfaCore.ViewRow) throws {
         id = core.id
         version = core.version

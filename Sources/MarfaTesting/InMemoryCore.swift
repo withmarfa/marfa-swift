@@ -51,6 +51,10 @@ final class InMemoryCore: CoreProtocol, Sendable {
         var entries: [Entry] = []
         /// Items made through the copy, which the core holds as pinned.
         var made: Set<String> = []
+        /// A view's settings at each version the fake saw, which a stale change is judged against.
+        var viewSettings: [String: [Int64: JsonObject]] = [:]
+        /// What a view write answered under its idempotency key, so a retry gets the first answer.
+        var viewAnswers: [String: ViewAnswer?] = [:]
         var verdict: @Sendable (QueuedWrite) -> Verdict? = { _ in .accepted }
     }
 
@@ -60,7 +64,10 @@ final class InMemoryCore: CoreProtocol, Sendable {
 
     init(items: [Item], edges: [Edge], itemTypes: [ItemType], edgeTypes: [EdgeType]) {
         var state = State()
-        for item in items { state.items[item.id] = item }
+        for item in items {
+            state.items[item.id] = item
+            if item.type == Self.viewType { state.viewSettings[item.id] = [item.version: item.properties] }
+        }
         for edge in edges { state.add(edge) }
         (state.seedItems, state.seedEdges, state.seedEdgeOrder) = (state.items, state.edges, state.edgeOrder)
         for type in itemTypes { state.givenItemTypes[type.id] = type }
@@ -148,7 +155,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         state.withLock { $0.edgesInOrder.filter { $0.edgeType == edgeType } }
     }
 
-    private static func root(of name: String) throws -> String? {
+    static func root(of name: String) throws -> String? {
         guard name != "*" else { return nil }
         guard Declaring.isTypePattern(name) else {
             throw Refuse.validation("validation_error", "Invalid type identifier: \(name)")
@@ -157,7 +164,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
     }
 
     /// A type reaches `root` by its name or by a declared parent.
-    private static func reaches(_ type: String, _ root: String, in types: [String: ItemType]) -> Bool {
+    static func reaches(_ type: String, _ root: String, in types: [String: ItemType]) -> Bool {
         var current: String? = type
         var steps = 0
         while let name = current, steps < 64 {
@@ -189,7 +196,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         return chosen
     }
 
-    private static func precedes(_ lhs: Item, _ rhs: Item, by order: (field: SortField, direction: SortDirection))
+    static func precedes(_ lhs: Item, _ rhs: Item, by order: (field: SortField, direction: SortDirection))
         -> Bool
     {
         let ascending = order.direction == .ascending
@@ -217,7 +224,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
 
     /// What a property sorts by in the core: numbers and booleans (`false` before `true`) as numbers, text by its
     /// bytes after them, and nothing for a missing, null, object or array value.
-    private enum PropertyKey: Comparable {
+    enum PropertyKey: Comparable {
         case number(Double)
         case text([UInt8])
 
@@ -231,7 +238,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         }
     }
 
-    private static func propertyKey(_ item: Item, _ name: String) -> PropertyKey? {
+    static func propertyKey(_ item: Item, _ name: String) -> PropertyKey? {
         guard let value = Properties.value(item.properties, name) else { return nil }
         switch value {
         case .integer(let number): return .number(Double(number))

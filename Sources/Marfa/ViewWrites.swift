@@ -42,7 +42,7 @@ public struct ViewSettingsChange: Sendable, Hashable {
 
 extension ViewSettings {
     /// A create names only the settings the view holds: the server refuses `null` and has no use for an empty sort.
-    var json: JSONObject {
+    package var json: JSONObject {
         var object = ViewSettingsChange(title: title, query: query).json
         if !sort.isEmpty { object["sort"] = .array(sort.map { .object($0.json) }) }
         if let group { object["group"] = .object(group.json) }

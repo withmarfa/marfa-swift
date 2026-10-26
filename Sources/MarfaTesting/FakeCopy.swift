@@ -30,6 +30,12 @@ import Synchronization
 ///   `items.restore(_:)`, `items.transition(_:to:)`, `tags`, `metadata`,
 ///   `extensions`, `edges.create`, `edges.update(_:_:)`, `edges.delete(_:)` and
 ///   `declareTypes(_:)`.
+/// - Views: `createView`, `changeView`, `deleteView`, `items.views()`, `items.view(_:)`,
+///   `items.list(inView:limit:offset:)` and `items.groups(inView:timeZone:)`, over the views it is given
+///   or makes. A view write goes straight through, never into the queue, and a change based on an older version
+///   merges or throws `version_conflict` as the server does. A view's `filter` is stored but not judged: listing
+///   or grouping that view throws ``FakeCopyError/unsupported(call:)``, as does `search(_:inView:)`. A view's
+///   `query.types` is not checked against the types the fake holds.
 /// - The queue: `queue.all()`, `queue.drain()`, `queue.withdraw(_:)`,
 ///   `queue.discard(_:)` and `queue.forgetAnswered()`, with or without `ids`.
 /// - `changes()`, which tells the app's own writes, and the changes ``send(_:)``
@@ -136,12 +142,26 @@ extension WorkingCopy {
     ///   - itemTypes: The item types its catalog holds. A create of a type
     ///     outside them and the app's declarations throws `unknownType`.
     ///   - edgeTypes: The edge types its catalog holds.
+    ///   - views: The saved views it holds, each as an item of type `system.view` at the version given.
     public static func fake(
-        items: [Item] = [], edges: [Edge] = [], itemTypes: [Marfa.ItemType] = [], edgeTypes: [Marfa.EdgeType] = []
+        items: [Item] = [], edges: [Edge] = [], itemTypes: [Marfa.ItemType] = [], edgeTypes: [Marfa.EdgeType] = [],
+        views: [SavedView] = []
     ) -> FakeCopy {
         FakeCopy(
             core: InMemoryCore(
-                items: items, edges: edges, itemTypes: itemTypes.map(\.held), edgeTypes: edgeTypes.map(\.held)))
+                items: items + views.map(\.held), edges: edges, itemTypes: itemTypes.map(\.held),
+                edgeTypes: edgeTypes.map(\.held)))
+    }
+}
+
+extension SavedView {
+    fileprivate var held: Item {
+        let at = Minted.now()
+        let properties = Properties.served(settings.json)
+        return Item(
+            id: id, type: InMemoryCore.viewType, properties: properties, state: state, tier: .library, version: version,
+            schemaVersion: 1, source: "device", sourceId: nil, occurredAt: at, createdAt: at, updatedAt: at, tags: [],
+            title: Properties.string(properties, "title"), body: nil)
     }
 }
 
