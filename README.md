@@ -170,6 +170,8 @@ A working copy takes the change when its connection to the server reopens, so an
 
 `Sources/MarfaIcons/LucideSymbols.swift` maps each Lucide name to an SF Symbol. It was seeded from [rosetta-icons](https://github.com/arfct/rosetta-icons) and then checked by hand, with the two glyphs side by side; a pair that is close but says something else is left out. `scripts/icons.mjs` ships the SVG from the pinned `lucide-static` release for every pinned name the table leaves out, and writes the name list, so the table, the artwork and the list share one pin. A test fails when the table names a Lucide icon the pinned list lacks, when a symbol does not exist on the SDK, or when a pinned name has neither. Edit the table, then run `scripts/icons.mjs` after `scripts/core.sh`. Licenses for both are in [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md).
 
+To let a person choose an icon, offer `LucidePinned.names`, the names the server accepts at the pinned release, and draw each with `TypeIcon(name:)`. `Client.set(icon:forType:)` saves the choice.
+
 ## Test and preview
 
 The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. Its module compiles empty in a release build, so nothing from it ships; wrap its uses in `#if DEBUG`. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:
