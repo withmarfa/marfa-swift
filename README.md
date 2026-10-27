@@ -33,12 +33,13 @@ In a `Package.swift`, add the package and the product:
 
 Each release includes the core prebuilt, so your app needs no Rust toolchain.
 
-The package has four products:
+The package has five products:
 
 - `Marfa`: the working copy, sign-in and folders.
 - `MarfaAPI`: a client for the calls only the instance can answer. See [Call the server directly](#call-the-server-directly).
 - `MarfaTypes`: the instance's wire types, generated from its `openapi.json`. `MarfaAPI` includes them.
 - `MarfaTesting`: a working copy for tests and previews. See [Test and preview](#test-and-preview).
+- `MarfaIcons`: draws an item type's icon. See [Draw a type's icon](#draw-a-types-icon).
 
 ## Example
 
@@ -137,6 +138,37 @@ _ = try await api.register(
 ```
 
 `Client` has no call that creates, gets, changes or deletes one item or edge, and none for search or events: those go through the working copy, so each item has one path. It offers no bulk changes either. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect, and it waits 30 seconds for the instance to send more; pass `Client(_:timeout:)` a longer time for a call such as `runHousekeeping(_:)` that answers only when its work is done.
+
+## Draw a type's icon
+
+An item type carries one icon: the name of an icon in the [Lucide](https://lucide.dev) release Marfa pins, such as `book-open`. `ItemType.icon` holds the name the core resolved: the owner's own choice for the type or the nearest type that has one, else the nearest author's. It is `nil` when no type in the chain sets one.
+
+The `MarfaIcons` product draws it:
+
+```swift
+import MarfaIcons
+
+TypeIcon(type)                 // from an ItemType
+TypeIcon(name: type.icon)      // from a name
+Image(typeIcon: type.icon)     // where a view needs an Image
+```
+
+Apple apps draw SF Symbols, so `TypeIcon` uses the SF Symbol that stands for the Lucide name. For a name with no good match it draws Lucide's own artwork, shipped in the package as a template image. Both tint with `foregroundStyle`, follow light and dark appearance, and size with the surrounding font. A type with no icon, and a name this version of the package does not know, draw a fallback symbol and never fail; a server newer than the SDK can send such a name.
+
+`MarfaAPI` sets and clears the owner's icon, and answers the type as the server now reads it, so your app can draw the new icon at once:
+
+```swift
+let type = try await api.set(icon: "scale", forType: "app.example.decision")
+_ = try await api.clearIcon(ofType: "app.example.decision")
+```
+
+Either call needs the `schema.write` permission and write on the type, and works on a type Marfa ships as well as your own. The server refuses a name that is not in the pinned Lucide release with `MarfaError.validation` and the code `invalid_schema`. Clearing a type that has no owner icon succeeds and changes nothing.
+
+A working copy takes the change when its connection to the server reopens, so another device shows it within about two minutes.
+
+### Where the icons come from
+
+`Sources/MarfaIcons/LucideSymbols.swift` maps each Lucide name to an SF Symbol. It was seeded from [rosetta-icons](https://github.com/arfct/rosetta-icons) and then checked by hand, with the two glyphs side by side; a pair that is close but says something else is left out. `scripts/icons.mjs` ships the SVG from the pinned `lucide-static` release for every pinned name the table leaves out, and writes the name list, so the table, the artwork and the list share one pin. A test fails when the table names a Lucide icon the pinned list lacks, when a symbol does not exist on the SDK, or when a pinned name has neither. Edit the table, then run `scripts/icons.mjs` after `scripts/core.sh`. Licenses for both are in [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md).
 
 ## Test and preview
 

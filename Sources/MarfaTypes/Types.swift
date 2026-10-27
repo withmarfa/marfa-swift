@@ -354,6 +354,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /types/normalize`.
     /// - Remark: Generated from `#/paths//types/normalize/post(normalizeType)`.
     func normalizeType(_ input: Operations.NormalizeType.Input) async throws -> Operations.NormalizeType.Output
+    /// Set a type's icon
+    ///
+    /// Sets the owner's icon for a type. Reads answer it in place of the author's, and a subtype with no icon inherits it. Replacing the type keeps it. Needs `schema.write` and write on the type, as replacing it does.
+    ///
+    /// - Remark: HTTP `PUT /types/{id}/icon`.
+    /// - Remark: Generated from `#/paths//types/{id}/icon/put(setTypeIcon)`.
+    func setTypeIcon(_ input: Operations.SetTypeIcon.Input) async throws -> Operations.SetTypeIcon.Output
+    /// Clear a type's icon
+    ///
+    /// Removes the icon the owner set for a type, so reads show the author's again. Clearing a type with no owner icon succeeds and changes nothing.
+    ///
+    /// - Remark: HTTP `DELETE /types/{id}/icon`.
+    /// - Remark: Generated from `#/paths//types/{id}/icon/delete(clearTypeIcon)`.
+    func clearTypeIcon(_ input: Operations.ClearTypeIcon.Input) async throws -> Operations.ClearTypeIcon.Output
     /// List edge types
     ///
     /// Returns every edge type on this instance: those Marfa ships and those registered through `POST /edge-types`. Every credential reads the whole list, whatever its edge map reaches.
@@ -1704,6 +1718,38 @@ extension APIProtocol {
         try await normalizeType(Operations.NormalizeType.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// Set a type's icon
+    ///
+    /// Sets the owner's icon for a type. Reads answer it in place of the author's, and a subtype with no icon inherits it. Replacing the type keeps it. Needs `schema.write` and write on the type, as replacing it does.
+    ///
+    /// - Remark: HTTP `PUT /types/{id}/icon`.
+    /// - Remark: Generated from `#/paths//types/{id}/icon/put(setTypeIcon)`.
+    public func setTypeIcon(
+        path: Operations.SetTypeIcon.Input.Path,
+        headers: Operations.SetTypeIcon.Input.Headers = .init(),
+        body: Operations.SetTypeIcon.Input.Body
+    ) async throws -> Operations.SetTypeIcon.Output {
+        try await setTypeIcon(Operations.SetTypeIcon.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Clear a type's icon
+    ///
+    /// Removes the icon the owner set for a type, so reads show the author's again. Clearing a type with no owner icon succeeds and changes nothing.
+    ///
+    /// - Remark: HTTP `DELETE /types/{id}/icon`.
+    /// - Remark: Generated from `#/paths//types/{id}/icon/delete(clearTypeIcon)`.
+    public func clearTypeIcon(
+        path: Operations.ClearTypeIcon.Input.Path,
+        headers: Operations.ClearTypeIcon.Input.Headers = .init()
+    ) async throws -> Operations.ClearTypeIcon.Output {
+        try await clearTypeIcon(Operations.ClearTypeIcon.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// List edge types

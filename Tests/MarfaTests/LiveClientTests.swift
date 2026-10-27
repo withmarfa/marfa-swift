@@ -70,6 +70,41 @@ extension LiveWorkingCopies {
             await copy.close()
         }
 
+        @Test func anOwnerIconIsSetClearedAndReadBackFromTheType() async throws {
+            let api = Client(try #require(Live.server))
+            let id = "app.swift\(Self.suffix()).icon"
+            let title = Components.Schemas.FieldDefinition(_type: .string)
+            _ = try await api.register(
+                itemType: .init(
+                    fields: .init(additionalProperties: ["title": title]), displayHints: .init(icon: "folder"),
+                    id: id))
+            func stored() async throws -> String? {
+                try await api.getType(path: .init(id: id)).ok.body.json.value1.displayHints?.icon
+            }
+            #expect(try await stored() == "folder", "the author's icon shows before the owner chooses")
+
+            let set = try await api.set(icon: "book-open", forType: id)
+            #expect(set.value1.displayHints?.icon == "book-open")
+            #expect(try await stored() == "book-open", "a read of the type shows the owner's icon")
+
+            let refused = await #expect(throws: MarfaError.self) {
+                try await api.set(icon: "no-such-icon", forType: id)
+            }
+            guard case .validation(let code, _)? = refused else {
+                Issue.record("expected a validation refusal, got \(String(describing: refused))")
+                return
+            }
+            #expect(code == "invalid_schema")
+            #expect(try await stored() == "book-open", "a refused name changes nothing")
+
+            let cleared = try await api.clearIcon(ofType: id)
+            #expect(cleared.value1.displayHints?.icon == "folder")
+            #expect(try await stored() == "folder", "clearing brings the author's icon back")
+            #expect(try await api.clearIcon(ofType: id).value1.displayHints?.icon == "folder", "clearing twice is fine")
+
+            try await api.delete(itemType: id)
+        }
+
         /// A type holding `count` items, and a second to move them to.
         private static func movable(_ api: Client, count: Int) async throws -> (from: String, to: String) {
             let name = Self.suffix()

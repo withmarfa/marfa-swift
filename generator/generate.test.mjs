@@ -421,7 +421,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
   const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
   // The wire types describe every operation, so each absence below is the client's own.
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
-  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
+  for (const kept of ["registerType", "setTypeIcon", "clearTypeIcon", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
   for (const left of ["createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance"]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);

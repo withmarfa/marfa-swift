@@ -117,6 +117,28 @@ struct DeclaredTypesOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func eachDisplayHintComesFromTheNearestTypeThatSetsIt(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        try await copy.declareTypes([
+            [
+                "id": "app.notes.base", "parent": "core.note",
+                "display_hints": ["title_field": "heading", "icon": "notebook-pen"],
+            ],
+            ["id": "app.notes.memo", "parent": "app.notes.base", "display_hints": ["body_field": "text"]],
+            ["id": "app.notes.starred", "parent": "app.notes.memo", "display_hints": ["icon": "star"]],
+            ["id": "app.notes.bare", "parent": "app.notes.starred"],
+            ["id": "app.notes.orphan"],
+        ])
+        let memo = try await copy.catalog.itemType("app.notes.memo")
+        #expect(memo.titleField == "heading" && memo.bodyField == "text" && memo.icon == "notebook-pen")
+        let starred = try await copy.catalog.itemType("app.notes.starred")
+        #expect(starred.titleField == "heading" && starred.bodyField == "text" && starred.icon == "star")
+        #expect(try await copy.catalog.itemType("app.notes.bare").icon == "star")
+        #expect(try await copy.catalog.itemType("app.notes.orphan").icon == nil, "no type in its chain sets one")
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func aDeclarationNamingAnUnknownParentOrABadFieldIsRefused(kind: CopyKind) async throws {
         let copy = try await kind.open()
         let refused: [JSONObject] = [

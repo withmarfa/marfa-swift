@@ -76,10 +76,18 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// By name, with the fields it inherits; a field declared again nearer
     /// this type takes the place of the one above it.
     public let fields: [TypeField]
-    /// The title and body hints are those of the nearest type that declares
-    /// any, taken whole: a subtype naming only its body has no title field.
+    /// Each display hint comes from the nearest type that sets it: a subtype
+    /// naming only its body keeps its parent's title field.
     public let titleField: String?
     public let bodyField: String?
+    /// The Lucide name of the icon that stands for the type, in kebab case,
+    /// such as `book-open`; `nil` when no type in its chain sets one.
+    ///
+    /// The core has resolved it: the owner's own choice for this type or the
+    /// nearest type that has one, else the nearest author's. A server newer
+    /// than the SDK can send a name the SDK does not know; `MarfaIcons` draws
+    /// a fallback for it.
+    public let icon: String?
     /// The field holding each row's own id at the vendor that writes rows of
     /// exactly this type.
     public let linkField: String?
@@ -90,8 +98,8 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// For an app's previews and tests.
     public init(
         id: String, label: String? = nil, description: String? = nil, parent: String? = nil, version: Int64 = 0,
-        fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil, linkField: String? = nil,
-        roles: [String] = [], compatibleWith: [String] = []
+        fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil, icon: String? = nil,
+        linkField: String? = nil, roles: [String] = [], compatibleWith: [String] = []
     ) {
         self.id = id
         self.label = label
@@ -101,6 +109,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.fields = fields
         self.titleField = titleField
         self.bodyField = bodyField
+        self.icon = icon
         self.linkField = linkField
         self.roles = roles
         self.compatibleWith = compatibleWith
@@ -110,7 +119,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.init(
             id: core.id, label: core.label, description: core.description, parent: core.parent,
             version: core.version, fields: core.fields.map(TypeField.init), titleField: core.titleField,
-            bodyField: core.bodyField, linkField: core.linkField, roles: core.roles,
+            bodyField: core.bodyField, icon: core.icon, linkField: core.linkField, roles: core.roles,
             compatibleWith: core.compatibleWith)
     }
 }
