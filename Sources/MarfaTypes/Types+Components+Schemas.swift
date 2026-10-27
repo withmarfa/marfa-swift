@@ -1523,7 +1523,7 @@ extension Components {
                 case _type = "type"
             }
         }
-        /// Which fields of a type clients show as an item's title and body.
+        /// How clients show a type and its items: the fields that hold an item's title and body, and the type's icon. Each hint comes from the nearest type that sets it.
         ///
         /// - Remark: Generated from `#/components/schemas/DisplayHints`.
         public struct DisplayHints: Codable, Hashable, Sendable {
@@ -1531,30 +1531,38 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/title_field`.
             public var titleField: Swift.String?
-            /// The field that holds an item's body for display.
+            /// The field that holds an item's body for display. The field holds Markdown.
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
+            /// The icon that stands for the type, as the kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`. On a type read back, the owner's own choice replaces the author's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DisplayHints/icon`.
+            public var icon: Swift.String?
             /// A container of undocumented properties.
             public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `DisplayHints`.
             ///
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
-            ///   - bodyField: The field that holds an item's body for display.
+            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown.
+            ///   - icon: The icon that stands for the type, as the kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 titleField: Swift.String? = nil,
                 bodyField: Swift.String? = nil,
+                icon: Swift.String? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.titleField = titleField
                 self.bodyField = bodyField
+                self.icon = icon
                 self.additionalProperties = additionalProperties
             }
             public enum CodingKeys: String, CodingKey {
                 case titleField = "title_field"
                 case bodyField = "body_field"
+                case icon
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1566,9 +1574,14 @@ extension Components {
                     Swift.String.self,
                     forKey: .bodyField
                 )
+                self.icon = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .icon
+                )
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
                     "title_field",
-                    "body_field"
+                    "body_field",
+                    "icon"
                 ])
             }
             public func encode(to encoder: any Swift.Encoder) throws {
@@ -1580,6 +1593,10 @@ extension Components {
                 try container.encodeIfPresent(
                     self.bodyField,
                     forKey: .bodyField
+                )
+                try container.encodeIfPresent(
+                    self.icon,
+                    forKey: .icon
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
@@ -7595,7 +7612,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
             public var version: Swift.Int
-            /// Which fields clients show as an item's title and body.
+            /// How clients show the type and its items: the title field, the body field and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
@@ -7626,7 +7643,7 @@ extension Components {
             ///   - roles: The structural roles the type plays, including those it inherits.
             ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
             ///   - version: The version number the type was last saved with.
-            ///   - displayHints: Which fields clients show as an item's title and body.
+            ///   - displayHints: How clients show the type and its items: the title field, the body field and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
@@ -7852,7 +7869,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NormalizedType/registered_type`.
             public var registeredType: Components.Schemas.MarfaNullableTypeDefinition
-            /// The canonical registered definition, with inherited fields, policies and roles resolved as on `GET /types/{id}`; `null` if its identifier is not registered.
+            /// The canonical registered definition, with inherited fields, policies and roles resolved as on `GET /types/{id}`, with the author's icon and not the owner's; `null` if its identifier is not registered.
             ///
             /// - Remark: Generated from `#/components/schemas/NormalizedType/resolved_type`.
             public var resolvedType: Components.Schemas.MarfaNullableTypeDefinition
@@ -7861,7 +7878,7 @@ extension Components {
             /// - Parameters:
             ///   - _type: The normalized candidate's declared definition, including its label and defaults.
             ///   - registeredType: The canonical registered type's declared definition; `null` if its identifier is not registered.
-            ///   - resolvedType: The canonical registered definition, with inherited fields, policies and roles resolved as on `GET /types/{id}`; `null` if its identifier is not registered.
+            ///   - resolvedType: The canonical registered definition, with inherited fields, policies and roles resolved as on `GET /types/{id}`, with the author's icon and not the owner's; `null` if its identifier is not registered.
             public init(
                 _type: Components.Schemas.TypeDefinition,
                 registeredType: Components.Schemas.MarfaNullableTypeDefinition,
@@ -8150,7 +8167,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with`.
             public var compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload?
-            /// Which fields clients show as an item's title and body.
+            /// How clients show the type and its items: the title field, the body field and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
@@ -8185,7 +8202,7 @@ extension Components {
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
             ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///   - displayHints: Which fields clients show as an item's title and body.
+            ///   - displayHints: How clients show the type and its items: the title field, the body field and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
@@ -8687,7 +8704,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with`.
             public var compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload?
-            /// Which fields clients show as an item's title and body.
+            /// How clients show the type and its items: the title field, the body field and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
@@ -8726,7 +8743,7 @@ extension Components {
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
             ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///   - displayHints: Which fields clients show as an item's title and body.
+            ///   - displayHints: How clients show the type and its items: the title field, the body field and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
@@ -8861,6 +8878,118 @@ extension Components {
                     "retention_policy",
                     "provenance",
                     "id"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal`.
+        public struct InvalidSchemaOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidSchema = "invalid_schema"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidSchemaOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidSchemaOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InvalidSchemaOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidSchemaOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidSchemaOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidSchemaOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidSchemaOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InvalidSchemaOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// The icon to show for a type.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeIconRequest`.
+        public struct TypeIconRequest: Codable, Hashable, Sendable {
+            /// The kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeIconRequest/icon`.
+            public var icon: Swift.String
+            /// Creates a new `TypeIconRequest`.
+            ///
+            /// - Parameters:
+            ///   - icon: The kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`.
+            public init(icon: Swift.String) {
+                self.icon = icon
+            }
+            public enum CodingKeys: String, CodingKey {
+                case icon
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.icon = try container.decode(
+                    Swift.String.self,
+                    forKey: .icon
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "icon"
                 ])
             }
         }

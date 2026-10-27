@@ -7245,13 +7245,20 @@ public struct ItemType: Equatable, Hashable {
     public var fields: [TypeField]
     public var titleField: String?
     public var bodyField: String?
+    /**
+     * The Lucide icon name, kebab-case.
+     */
+    public var icon: String?
     public var linkField: String?
     public var roles: [String]
     public var compatibleWith: [String]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, label: String?, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
+    public init(id: String, label: String?, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, 
+        /**
+         * The Lucide icon name, kebab-case.
+         */icon: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
         self.id = id
         self.label = label
         self.description = description
@@ -7260,6 +7267,7 @@ public struct ItemType: Equatable, Hashable {
         self.fields = fields
         self.titleField = titleField
         self.bodyField = bodyField
+        self.icon = icon
         self.linkField = linkField
         self.roles = roles
         self.compatibleWith = compatibleWith
@@ -7289,6 +7297,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
                 fields: FfiConverterSequenceTypeTypeField.read(from: &buf), 
                 titleField: FfiConverterOptionString.read(from: &buf), 
                 bodyField: FfiConverterOptionString.read(from: &buf), 
+                icon: FfiConverterOptionString.read(from: &buf), 
                 linkField: FfiConverterOptionString.read(from: &buf), 
                 roles: FfiConverterSequenceString.read(from: &buf), 
                 compatibleWith: FfiConverterSequenceString.read(from: &buf)
@@ -7304,6 +7313,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
         FfiConverterSequenceTypeTypeField.write(value.fields, into: &buf)
         FfiConverterOptionString.write(value.titleField, into: &buf)
         FfiConverterOptionString.write(value.bodyField, into: &buf)
+        FfiConverterOptionString.write(value.icon, into: &buf)
         FfiConverterOptionString.write(value.linkField, into: &buf)
         FfiConverterSequenceString.write(value.roles, into: &buf)
         FfiConverterSequenceString.write(value.compatibleWith, into: &buf)
