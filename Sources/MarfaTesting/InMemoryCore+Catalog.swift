@@ -163,8 +163,8 @@ enum Declaring {
     }
 
     /// A declared type with the fields it inherits, as `GET /types/{id}` would
-    /// answer it; a declared type's hints are the nearest set a type in its
-    /// chain declares, taken whole.
+    /// answer it; each display hint is the nearest one a type in its chain
+    /// sets. The fake holds no owner's icon: that choice lives on a server.
     static func resolve(
         _ id: String, declared: [String: JsonObject], given: [String: ItemType], depth: Int = 0
     ) -> ItemType? {
@@ -192,8 +192,9 @@ enum Declaring {
             id: id, label: Properties.string(row, "label"), description: Properties.string(row, "description"),
             parent: parent, version: version,
             fields: fields.values.sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) },
-            titleField: hints.map { Properties.string($0, "title_field") } ?? inherited?.titleField,
-            bodyField: hints.map { Properties.string($0, "body_field") } ?? inherited?.bodyField,
+            titleField: hints.flatMap { Properties.string($0, "title_field") } ?? inherited?.titleField,
+            bodyField: hints.flatMap { Properties.string($0, "body_field") } ?? inherited?.bodyField,
+            icon: hints.flatMap { Properties.string($0, "icon") } ?? inherited?.icon,
             linkField: Properties.string(row, "link_field"), roles: Properties.strings(row, "roles"),
             compatibleWith: Properties.strings(row, "compatible_with"))
     }
