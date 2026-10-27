@@ -2,8 +2,10 @@ import Marfa
 import SwiftUI
 
 extension Image {
-    /// The image for a type's icon, a Lucide name: the SF Symbol that stands for it, else Lucide's own artwork as a
-    /// template image, else a fallback symbol. It tints like a symbol, with `foregroundStyle`.
+    /// The image for a type's icon, given as a Lucide name.
+    ///
+    /// It is the SF Symbol that stands for the name, else Lucide's own artwork as a template image, else a fallback
+    /// symbol. It tints like a symbol, with `foregroundStyle`.
     ///
     /// Lucide's artwork has no font to scale with, so this image has its natural size of 24 points; ``TypeIcon``
     /// sizes it to sit beside text.

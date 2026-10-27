@@ -14,15 +14,17 @@ extension Client {
     /// reads it now.
     ///
     /// `icon` is the kebab-case name of an icon in the Lucide release Marfa pins, such as `book-open`. The server
-    /// refuses any other name with `MarfaError.server` of status 400 and the code `invalid_schema`.
+    /// refuses any other name with `MarfaError.validation` and the code `invalid_schema`.
     public func set(icon: String, forType id: String) async throws -> Components.Schemas.RegisteredType {
         try await answer("setTypeIcon") {
             try await setTypeIcon(path: .init(id: id), body: .json(.init(icon: icon))).ok.body.json._type
         }
     }
 
-    /// Removes the owner's icon for the item type `id`, so the author's shows again, and answers the type as the
-    /// server reads it now. Clearing a type with no owner icon succeeds and changes nothing.
+    /// Removes the owner's icon for the item type `id`, so the author's shows again.
+    ///
+    /// Answers the type as the server reads it now. Clearing a type with no owner icon succeeds and changes
+    /// nothing.
     public func clearIcon(ofType id: String) async throws -> Components.Schemas.RegisteredType {
         try await answer("clearTypeIcon") { try await clearTypeIcon(path: .init(id: id)).ok.body.json._type }
     }

@@ -162,6 +162,8 @@ let type = try await api.set(icon: "scale", forType: "app.example.decision")
 _ = try await api.clearIcon(ofType: "app.example.decision")
 ```
 
+Either call needs the `schema.write` permission and write on the type, and works on a type Marfa ships as well as your own. The server refuses a name that is not in the pinned Lucide release with `MarfaError.validation` and the code `invalid_schema`. Clearing a type that has no owner icon succeeds and changes nothing.
+
 A working copy takes the change when its connection to the server reopens, so another device shows it within about two minutes.
 
 ### Where the icons come from

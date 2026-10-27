@@ -162,9 +162,10 @@ enum Declaring {
         return (id, row)
     }
 
-    /// A declared type with the fields it inherits, as `GET /types/{id}` would
-    /// answer it; each display hint is the nearest one a type in its chain
-    /// sets. The fake holds no owner's icon: that choice lives on a server.
+    /// A declared type with the fields it inherits, as `GET /types/{id}` would answer it.
+    ///
+    /// Each display hint is the nearest one a type in its chain sets. The fake holds no owner's icon: that choice
+    /// lives on a server.
     static func resolve(
         _ id: String, declared: [String: JsonObject], given: [String: ItemType], depth: Int = 0
     ) -> ItemType? {
