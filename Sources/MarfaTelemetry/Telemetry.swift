@@ -26,8 +26,8 @@ struct PendingLog: Sendable {
 /// What may be passed is limited by the types: an error is described by text fixed in the source
 /// (``report(_:during:)``), and a log record carries a `StaticString` name and numbers, booleans or
 /// `StaticString`s. Never pass, or find a way around the types to pass, item text, titles, tags, item ids,
-/// natural keys, keys or credentials, the server's address, file paths, search text, or an error's `message` or
-/// `localizedDescription`: each can hold a person's words.
+/// natural keys, keys or credentials, the instance's identifier, the server's address, file paths, search text, or
+/// an error's `message` or `localizedDescription`: each can hold a person's words or identify their instance.
 ///
 /// A failure that repeats is reported at most once for each `type` and `operation` in 60 seconds, and at most 30
 /// times in an hour. Each exception sent says in `dropped_since_last` how many were withheld since the previous one.

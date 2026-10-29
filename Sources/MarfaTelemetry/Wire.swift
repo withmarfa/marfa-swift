@@ -3,7 +3,8 @@ import Foundation
 /// The bytes of each kind of post.
 ///
 /// Everything that reaches a body comes from a `StaticString`, a number, a boolean, the app's own configuration,
-/// the machine's operating system and chip, a count of withheld reports, or a server refusal code that `FixedErrorText.isCode` accepts.
+/// the machine's operating system and chip, a count of withheld reports, or a server refusal code that
+/// `FixedErrorText.isCode` accepts.
 enum Wire {
     struct Context {
         let configuration: Telemetry.Configuration
