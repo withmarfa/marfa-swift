@@ -29,7 +29,8 @@ struct Reports {
         #expect(properties["$lib_version"] as? String == "1.2.3")
         #expect(properties["service.name"] as? String == "mapp")
         #expect(properties["service.version"] as? String == "1.2.3")
-        #expect(properties["service.instance.id"] as? String == "instance-1")
+        #expect(properties["service.instance.id"] == nil)
+        #expect(properties["dropped_since_last"] as? Int == 0)
         #expect(properties["$exception_level"] as? String == "error")
         #expect(properties["operation"] as? String == "drain")
         #expect(properties["error_code"] as? String == "item_not_found")
@@ -46,7 +47,7 @@ struct Reports {
         #expect(mechanism["handled"] as? Bool == true)
         #expect(mechanism["synthetic"] as? Bool == false)
         let text = String(decoding: request.body, as: UTF8.self)
-        for value in ["secret", "diary", "/Users", "notes"] {
+        for value in ["secret", "diary", "/Users", "notes", "instance"] {
             #expect(!text.contains(value), "\(value)")
         }
     }
@@ -99,6 +100,36 @@ struct Switch {
         #expect(try records(sent).map { ($0["body"] as? [String: Any])?["stringValue"] as? String } == ["kept"])
     }
 
+    @Test func turningItOffWhileASendIsUnderWaySendsNothingMore() async throws {
+        let recorder = Recorder(holdingFirst: true)
+        let telemetry = try configured(recorder)
+        telemetry.report(type: "first", sentence: "the first", during: "test")
+        try await eventually("the first send is held") { recorder.requests.count == 1 }
+        telemetry.report(type: "second", sentence: "the second", during: "test")
+
+        telemetry.isEnabled = false
+        recorder.release()
+        try await Task.sleep(for: .milliseconds(200))
+        await telemetry.flush()
+        #expect(recorder.requests.count == 1)
+    }
+
+    @Test func aReportQueuedBeforeTurningItOffDoesNotSurviveTurningItBackOn() async throws {
+        let recorder = Recorder(holdingFirst: true)
+        let telemetry = try configured(recorder)
+        telemetry.report(type: "first", sentence: "the first", during: "test")
+        try await eventually("the first send is held") { recorder.requests.count == 1 }
+        telemetry.report(type: "second", sentence: "the second", during: "test")
+        telemetry.log("third")
+
+        telemetry.isEnabled = false
+        telemetry.isEnabled = true
+        recorder.release()
+        try await Task.sleep(for: .milliseconds(200))
+        await telemetry.flush()
+        #expect(recorder.requests.count == 1)
+    }
+
     @Test func anUnconfiguredReporterSendsNothingEvenWhenOn() async throws {
         let recorder = Recorder()
         let telemetry = Telemetry(transport: recorder)
@@ -107,6 +138,108 @@ struct Switch {
         telemetry.report(type: "nowhere", sentence: "nowhere", during: "test")
         await telemetry.flush()
         #expect(recorder.requests.isEmpty)
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct Loops {
+    private func sent(_ recorder: Recorder) throws -> [(operation: String?, dropped: Int?)] {
+        try recorder.requests.map { request in
+            let properties = try object(request)["properties"] as? [String: Any]
+            return (properties?["operation"] as? String, properties?["dropped_since_last"] as? Int)
+        }
+    }
+
+    @Test func oneExceptionForATypeAndOperationInSixtySecondsAndTheNextCountsWhatWasWithheld() async throws {
+        let recorder = Recorder()
+        let clock = TestClock()
+        let telemetry = try configured(recorder, clock: clock)
+
+        for _ in 0..<5 {
+            telemetry.report(type: "loop", sentence: "again", during: "drain")
+            clock.advance(.seconds(10))
+            await telemetry.flush()
+        }
+        var seen = try sent(recorder)
+        #expect(seen.count == 1)
+        #expect(seen[0].dropped == 0)
+
+        telemetry.report(type: "loop", sentence: "again", during: "sync")
+        telemetry.report(type: "other", sentence: "again", during: "drain")
+        await telemetry.flush()
+        seen = try sent(recorder)
+        #expect(seen.count == 3)
+        #expect(seen[1].dropped == 4)
+        #expect(seen[2].dropped == 0)
+
+        clock.advance(.seconds(60))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        seen = try sent(recorder)
+        #expect(seen.count == 4)
+        #expect(seen[3].dropped == 0)
+    }
+
+    @Test func aWithheldExceptionDoesNotRestartTheMinute() async throws {
+        let recorder = Recorder()
+        let clock = TestClock()
+        let telemetry = try configured(recorder, clock: clock)
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        clock.advance(.seconds(59))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        clock.advance(.seconds(2))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        let seen = try sent(recorder)
+        #expect(seen.map(\.dropped) == [0, 1])
+    }
+
+    @Test func thirtyAnHourInAllThenMoreWhenTheHourHasPassed() async throws {
+        let recorder = Recorder()
+        let clock = TestClock()
+        let telemetry = try configured(recorder, clock: clock)
+        for _ in 0..<35 {
+            telemetry.report(type: "loop", sentence: "again", during: "drain")
+            await telemetry.flush()
+            clock.advance(.seconds(61))
+        }
+        var seen = try sent(recorder)
+        #expect(seen.count == 30)
+        #expect(seen.allSatisfy { $0.dropped == 0 })
+
+        // The 35 reports took 35 * 61 seconds. The first exception sent, at 0, leaves the hour at 3600.
+        clock.advance(.seconds(3599 - 35 * 61))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        #expect(try sent(recorder).count == 30)
+
+        clock.advance(.seconds(1))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        seen = try sent(recorder)
+        #expect(seen.count == 31)
+        #expect(seen[30].dropped == 6)
+    }
+
+    @Test func aFullQueueCountsWhatItRefusesAsWithheld() async throws {
+        let recorder = Recorder(holdingFirst: true)
+        let clock = TestClock()
+        let telemetry = try configured(recorder, clock: clock)
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        try await eventually("the first send is held") { recorder.requests.count == 1 }
+        for _ in 0..<(Telemetry.exceptionLimit + 1) {
+            clock.advance(.seconds(61))
+            telemetry.report(type: "loop", sentence: "again", during: "drain")
+        }
+        recorder.release()
+        await telemetry.flush()
+        try await eventually("the queue goes out") { recorder.requests.count == 1 + Telemetry.exceptionLimit }
+
+        clock.advance(.seconds(61))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        let seen = try sent(recorder)
+        #expect(seen.last?.dropped == 1)
     }
 }
 
@@ -135,9 +268,13 @@ struct Logs {
             })
         #expect(named["service.name"] == "mapp")
         #expect(named["service.version"] == "1.2.3")
-        #expect(named["service.instance.id"] == "instance-1")
+        #expect(named["service.instance.id"] == nil)
         #expect(named["os.type"] == "darwin")
-        #expect(named["os.version"] != nil)
+        #expect(named["os.name"] == Wire.System.name)
+        #expect(["macOS", "iOS"].contains(named["os.name"] ?? ""))
+        #expect(named["os.version"] == Wire.System.version)
+        #expect(named["host.arch"] == Wire.System.architecture)
+        #expect(["arm64", "x86_64"].contains(named["host.arch"] ?? ""))
 
         let record = try #require(try records(request).first)
         #expect(record["severityNumber"] as? Int == 13)
@@ -201,6 +338,26 @@ struct Logs {
         #expect(attribute(batch[0], "telemetry.dropped_records") == "150")
         #expect(attribute(batch[1], "telemetry.dropped_records") == nil)
         await telemetry.flush()
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct Sending {
+    @Test func aRedirectIsRefusedAndItsTargetIsNeverReached() async throws {
+        let target = try await LoopbackServer { "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n" }
+        let targetPort = target.port
+        let redirecting = try await LoopbackServer {
+            "HTTP/1.1 307 Temporary Redirect\r\nLocation: http://127.0.0.1:\(targetPort)/i/v0/e/\r\n"
+                + "Content-Length: 0\r\nConnection: close\r\n\r\n"
+        }
+
+        let url = try #require(URL(string: "http://127.0.0.1:\(redirecting.port)/i/v0/e/"))
+        await URLSessionTransport().send(
+            TelemetryRequest(
+                url: url, headers: ["Content-Type": "application/json"], body: Data("{}".utf8)))
+
+        #expect(redirecting.connections == 1)
+        #expect(target.connections == 0)
     }
 }
 

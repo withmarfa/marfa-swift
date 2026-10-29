@@ -3,11 +3,10 @@ import Foundation
 /// The bytes of each kind of post.
 ///
 /// Everything that reaches a body comes from a `StaticString`, a number, a boolean, the app's own configuration,
-/// the machine's operating system, or a server refusal code that `FixedErrorText.isCode` accepts.
+/// the machine's operating system and chip, a count of withheld reports, or a server refusal code that `FixedErrorText.isCode` accepts.
 enum Wire {
     struct Context {
         let configuration: Telemetry.Configuration
-        let instanceID: String?
         let distinctID: String
     }
 
@@ -33,9 +32,9 @@ enum Wire {
             ],
             "$exception_level": "error",
             "operation": event.operation,
+            "dropped_since_last": event.dropped,
         ]
         if let code = event.code { properties["error_code"] = code }
-        if let instanceID = context.instanceID { properties["service.instance.id"] = instanceID }
         let body: [String: Any] = [
             "api_key": context.configuration.destination.token,
             "event": "$exception",
@@ -49,15 +48,14 @@ enum Wire {
 
     /// A batch of log records as OTLP/HTTP JSON.
     static func logs(_ records: [PendingLog], dropped: Int, _ context: Context) -> TelemetryRequest? {
-        var resource = [
+        let resource = [
             attribute("service.name", .word(context.configuration.serviceName)),
             attribute("service.version", .word(context.configuration.serviceVersion)),
             attribute("os.type", .word("darwin")),
+            attribute("os.name", .word(System.name)),
             attribute("os.version", .word(System.version)),
+            attribute("host.arch", .word(System.architecture)),
         ]
-        if let instanceID = context.instanceID {
-            resource.append(attribute("service.instance.id", .word(instanceID)))
-        }
         let rendered: [[String: Any]] = records.enumerated().map { index, record in
             var attributes = record.attributes.compactMap { attribute($0.name, $0.value) }
             if index == 0, dropped > 0, let count = attribute("telemetry.dropped_records", .int(dropped)) {

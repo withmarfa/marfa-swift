@@ -202,8 +202,7 @@ Telemetry.shared.configure(
     Telemetry.Configuration(
         destination: try Telemetry.Destination(host: posthogHost, projectToken: projectToken),
         serviceName: "notes",
-        serviceVersion: appVersion,
-        instanceID: { connectedInstanceID }))
+        serviceVersion: appVersion))
 Telemetry.shared.isEnabled = reportingIsOn
 
 Telemetry.shared.report(error, during: "drain")
@@ -214,8 +213,9 @@ await Telemetry.shared.flush()  // when the app quits
 
 - **Destination.** An `https` PostHog host and a project token, or an `http` loopback address for a test. The `Telemetry.Destination` initializer throws `ConfigurationError` for anything else, such as an address with a user name.
 - **Errors.** `report(_:during:)` posts one `$exception` event to `<host>/i/v0/e/`, as the `marfa` command line does: no stack frames, no person, no location lookup. A `MarfaError` is described by `MarfaError.fixedText`, a type and a sentence fixed in the source by an exhaustive `switch`, so a new case fails to compile until someone writes its sentence. `report(type:sentence:during:)` does the same for an error of the app's own.
+- **Loops.** A failure that repeats is not reported every time: one exception for each type and operation in 60 seconds, and 30 in an hour in all. Each exception that goes out carries `dropped_since_last`, the number withheld since the previous one.
 - **Logs.** `log(_:level:attributes:)` queues an OTLP/HTTP JSON record for `<host>/i/v1/logs`. Records go out at 50, or after 30 seconds, or on `flush()`, which waits at most 2 seconds. At most 500 wait: the oldest is dropped, and the next batch counts the drops.
-- **Never sent.** Item text, titles, tags, item ids, natural keys, keys or credentials, the server's address, file paths, search text, and any `message` or `localizedDescription`. A name, an operation and a sentence are `StaticString`s, and an attribute is a number, a boolean or a `StaticString`, so these cannot be passed by accident.
+- **Never sent.** Item text, titles, tags, item ids, natural keys, keys or credentials, the instance's identifier or the server's address, file paths, search text, and any `message` or `localizedDescription`. A name, an operation and a sentence are `StaticString`s, and an attribute is a number, a boolean or a `StaticString`, so these cannot be passed by accident.
 - **Switch.** `isEnabled` is off until the app turns it on. Turning it off drops everything queued, stops a send under way and sends nothing more.
 - **Sending.** One ephemeral `URLSession` with no cookies, cache, credentials or redirects, and one attempt for each post, which gives up after 5 seconds without data or 10 seconds in all. It runs away from the main actor. A call never waits for the network.
 

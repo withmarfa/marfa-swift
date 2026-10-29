@@ -7,6 +7,7 @@ struct PendingException: Sendable {
     let sentence: String
     let code: String?
     let operation: String
+    let dropped: Int
 }
 
 struct PendingLog: Sendable {
@@ -28,6 +29,9 @@ struct PendingLog: Sendable {
 /// natural keys, keys or credentials, the server's address, file paths, search text, or an error's `message` or
 /// `localizedDescription`: each can hold a person's words.
 ///
+/// A failure that repeats is reported at most once for each `type` and `operation` in 60 seconds, and at most 30
+/// times in an hour. Each exception sent says in `dropped_since_last` how many were withheld since the previous one.
+///
 /// Every call returns at once and does its work on a background task. A report that fails to send is lost and is
 /// not retried.
 public final class Telemetry: Sendable {
@@ -44,6 +48,7 @@ public final class Telemetry: Sendable {
         var exceptions: [PendingException] = []
         var logs: [PendingLog] = []
         var dropped = 0
+        var limiter = ExceptionLimiter()
         var drain: Task<Void, Never>?
         var timer: Task<Void, Never>?
         var generation = 0
@@ -52,11 +57,16 @@ public final class Telemetry: Sendable {
     private let state = Mutex(State())
     private let transport: any TelemetryTransport
     private let interval: Duration
+    private let now: @Sendable () -> ContinuousClock.Instant
     private let distinctID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
 
-    package init(transport: any TelemetryTransport, interval: Duration = .seconds(30)) {
+    package init(
+        transport: any TelemetryTransport, interval: Duration = .seconds(30),
+        now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }
+    ) {
         self.transport = transport
         self.interval = interval
+        self.now = now
     }
 
     /// Sets who is reporting and where to.
@@ -91,7 +101,7 @@ public final class Telemetry: Sendable {
     ///   - operation: What the app was doing, such as `"drain"`. Fixed in the source.
     public func report(_ error: MarfaError, during operation: StaticString) {
         let text = error.fixedText
-        enqueue(PendingException(type: text.type, sentence: text.sentence, code: text.code, operation: "\(operation)"))
+        enqueue(type: text.type, sentence: text.sentence, code: text.code, operation: "\(operation)")
     }
 
     /// Reports a failure of the app's own as one `$exception` event.
@@ -101,7 +111,7 @@ public final class Telemetry: Sendable {
     ///   - sentence: One sentence that says what went wrong, with no value in it. Fixed in the source.
     ///   - operation: What the app was doing. Fixed in the source.
     public func report(type: StaticString, sentence: StaticString, during operation: StaticString) {
-        enqueue(PendingException(type: "\(type)", sentence: "\(sentence)", code: nil, operation: "\(operation)"))
+        enqueue(type: "\(type)", sentence: "\(sentence)", code: nil, operation: "\(operation)")
     }
 
     /// Queues a log record.
@@ -154,12 +164,17 @@ public final class Telemetry: Sendable {
         }
     }
 
-    private func enqueue(_ exception: PendingException) {
+    private func enqueue(type: String, sentence: String, code: String?, operation: String) {
+        let at = now()
         let queued = state.withLock { state in
-            guard state.enabled, state.configuration != nil, state.exceptions.count < Self.exceptionLimit else {
+            guard state.enabled, state.configuration != nil else { return false }
+            guard state.exceptions.count < Self.exceptionLimit else {
+                state.limiter.withhold()
                 return false
             }
-            state.exceptions.append(exception)
+            guard let dropped = state.limiter.admit(type: type, operation: operation, at: at) else { return false }
+            state.exceptions.append(
+                PendingException(type: type, sentence: sentence, code: code, operation: operation, dropped: dropped))
             return true
         }
         if queued { startDrain() }
@@ -173,6 +188,7 @@ public final class Telemetry: Sendable {
         state.exceptions = []
         state.logs = []
         state.dropped = 0
+        state.limiter.forgetWithheld()
         state.generation += 1
     }
 
@@ -249,7 +265,6 @@ public final class Telemetry: Sendable {
     }
 
     private func context(_ configuration: Configuration) -> Wire.Context {
-        Wire.Context(
-            configuration: configuration, instanceID: configuration.instanceID?(), distinctID: distinctID)
+        Wire.Context(configuration: configuration, distinctID: distinctID)
     }
 }

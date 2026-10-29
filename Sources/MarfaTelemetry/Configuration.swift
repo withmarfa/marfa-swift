@@ -54,25 +54,16 @@ extension Telemetry {
         let destination: Destination
         let serviceName: String
         let serviceVersion: String
-        let instanceID: (@Sendable () -> String?)?
 
         /// - Parameters:
         ///   - destination: Where to send.
         ///   - serviceName: The app's name, such as `mapp`. It is fixed in the source, so no value read at run time
         ///     can become it.
         ///   - serviceVersion: The app's build version.
-        ///   - instanceID: Answers the connected instance's `instance_id`, which the server's root description
-        ///     gives and the contract treats as non-personal, or `nil` while no instance is connected. It is read
-        ///     on a background task whenever something is sent, never on the caller's. Answer nothing else: an
-        ///     address, a name or a key does not belong here.
-        public init(
-            destination: Destination, serviceName: StaticString, serviceVersion: String,
-            instanceID: (@Sendable () -> String?)? = nil
-        ) {
+        public init(destination: Destination, serviceName: StaticString, serviceVersion: String) {
             self.destination = destination
             self.serviceName = "\(serviceName)"
             self.serviceVersion = serviceVersion
-            self.instanceID = instanceID
         }
     }
 }
