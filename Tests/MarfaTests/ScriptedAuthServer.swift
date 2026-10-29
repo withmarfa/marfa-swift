@@ -15,8 +15,6 @@ final class ScriptedAuthServer: Sendable {
         /// Never answers, as a server that has gone quiet.
         case silence
         case failure(URLError.Code)
-        /// Answers `reply` once `delay` has passed, unless the request was canceled first.
-        case delayed(Duration, Reply)
         /// Answers `reply` once the test lets `hold` go, unless the request was canceled first.
         case held(Hold, Reply)
     }
@@ -191,8 +189,6 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
         switch reply {
         case .silence:
             return
-        case .delayed(let delay, let later):
-            DispatchQueue.global().asyncAfter(deadline: .now() + delay.seconds) { self.deliver(later, for: url) }
         case .held(let hold, let later):
             hold.then { self.deliver(later, for: url) }
         case .failure(let code):

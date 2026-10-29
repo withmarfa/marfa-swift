@@ -10,8 +10,13 @@ func temporaryStore() -> URL {
     FileManager.default.temporaryDirectory.appending(path: "marfa-\(UUID()).sqlite")
 }
 
+/// Waits for `condition`, and returns the moment it holds, so `seconds` only bounds a failure.
+///
+/// The default is far beyond what a test needs: with every test running at once, threads blocked on the store
+/// stall the whole process for ten seconds or more on a loaded machine, and a shorter bound fails with nothing
+/// wrong. A test that checks promptness sets a shorter `seconds` itself.
 func eventually(
-    _ what: String, within seconds: Double = 5, isolation: isolated (any Actor)? = #isolation,
+    _ what: String, within seconds: Double = 30, isolation: isolated (any Actor)? = #isolation,
     _ condition: () async throws -> Bool
 ) async throws {
     let deadline = Date.now.addingTimeInterval(seconds)
@@ -33,7 +38,7 @@ struct Unfinished: Error, CustomStringConvertible {
 /// await that ignores it, such as a task's value or a continuation nobody
 /// resumes: a test waiting on one would hang past its limit.
 func bounded<T: Sendable>(
-    _ what: String, within seconds: Double = 10, _ work: @escaping @Sendable () async throws -> T
+    _ what: String, within seconds: Double = 30, _ work: @escaping @Sendable () async throws -> T
 ) async throws -> T {
     try await withCheckedThrowingContinuation { continuation in
         let answer = Answer(continuation)

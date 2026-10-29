@@ -114,9 +114,13 @@ struct ClientTests {
     }
 
     @Test func aSlowAnswerWithinTheTimeoutSucceeds() async throws {
-        let scripted = ScriptedAuthServer { _ in .delayed(.milliseconds(300), tags) }
-        let answer = try await client(scripted, timeout: .seconds(5)).listTags()
-        _ = try answer.ok
+        let hold = Hold()
+        let scripted = ScriptedAuthServer { _ in .held(hold, tags) }
+        let api = client(scripted)
+        let call = Task { try await api.listTags() }
+        try await eventually("the request is sent and unanswered") { !scripted.requests.isEmpty }
+        hold.release()
+        _ = try await call.value.ok
     }
 
     @Test func aRedirectIsNotFollowedAndTheTokenGoesNowhereElse() async {
