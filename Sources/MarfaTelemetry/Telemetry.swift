@@ -59,8 +59,10 @@ public final class Telemetry: Sendable {
         self.interval = interval
     }
 
-    /// Sets who is reporting and where to. It drops anything queued for an earlier configuration, and sends
-    /// nothing by itself: ``isEnabled`` is off until the app turns it on.
+    /// Sets who is reporting and where to.
+    ///
+    /// It drops anything queued for an earlier configuration and sends nothing by itself. It leaves ``isEnabled``
+    /// as it was, which is off until the app turns it on.
     public func configure(_ configuration: Configuration) {
         state.withLock { state in
             clear(&state)
@@ -68,8 +70,9 @@ public final class Telemetry: Sendable {
         }
     }
 
-    /// Whether reports are sent. It is off until the app turns it on, and the app can change it at any time.
-    /// Turning it off drops everything queued, stops a send under way, and sends nothing more.
+    /// Whether reports are sent.
+    ///
+    /// It is off until the app turns it on, and the app can change it at any time. Turning it off drops everything queued, stops a send under way, and sends nothing more.
     public var isEnabled: Bool {
         get { state.withLock { $0.enabled } }
         set {
@@ -101,7 +104,9 @@ public final class Telemetry: Sendable {
         enqueue(PendingException(type: "\(type)", sentence: "\(sentence)", code: nil, operation: "\(operation)"))
     }
 
-    /// Queues a log record. Records are sent in batches of 50, or after 30 seconds, or by ``flush(deadline:)``.
+    /// Queues a log record.
+    ///
+    /// Records are sent in batches of 50, or after 30 seconds, or by ``flush(deadline:)``.
     /// At most 500 wait; beyond that the oldest is dropped, and the next batch says how many were.
     ///
     /// - Parameters:
@@ -132,8 +137,9 @@ public final class Telemetry: Sendable {
         if send { startDrain() } else if start { startTimer() }
     }
 
-    /// Sends what is queued and waits for it, up to `deadline`, then gives up on what has not finished. Call it
-    /// when the app quits.
+    /// Sends what is queued and waits for it, up to `deadline`, then gives up on what has not finished.
+    ///
+    /// Call it when the app quits.
     public func flush(deadline: Duration = .seconds(2)) async {
         startDrain()
         guard let drain = state.withLock({ $0.drain }) else { return }

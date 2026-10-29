@@ -1,5 +1,7 @@
 extension Telemetry {
-    /// How serious a log record is. OTLP names the severity by number and text.
+    /// How serious a log record is.
+    ///
+    /// OTLP names the severity by number and text.
     public enum LogLevel: Sendable, Hashable {
         case debug, info, warn, error
 
@@ -47,7 +49,9 @@ extension Telemetry {
 
         /// A number computed at run time, such as a count.
         public init(_ value: Int) { self.value = .int(value) }
-        /// A number computed at run time, such as a duration in seconds. A value that is not finite is not sent.
+        /// A number computed at run time, such as a duration in seconds.
+        ///
+        /// A value that is not finite is not sent.
         public init(_ value: Double) { self.value = .double(value) }
         /// A flag computed at run time.
         public init(_ value: Bool) { self.value = .bool(value) }

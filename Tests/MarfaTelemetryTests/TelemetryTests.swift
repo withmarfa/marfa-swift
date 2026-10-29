@@ -40,7 +40,7 @@ struct Reports {
         let exception = try #require(list.first)
         #expect(list.count == 1)
         #expect(exception["type"] as? String == "not_found")
-        #expect(exception["value"] as? String == "the server has nothing at what the request named")
+        #expect(exception["value"] as? String == "nothing was found at what the request named")
         #expect(exception["stacktrace"] == nil)
         let mechanism = try #require(exception["mechanism"] as? [String: Any])
         #expect(mechanism["handled"] as? Bool == true)
@@ -117,7 +117,9 @@ struct Logs {
         let telemetry = try configured(recorder)
         telemetry.log(
             "drain_finished", level: .warn,
-            attributes: ["pending": 3, "ratio": 0.5, "complete": true, "outcome": "ok", "bad": Telemetry.LogAttribute(.nan)])
+            attributes: [
+                "pending": 3, "ratio": 0.5, "complete": true, "outcome": "ok", "bad": Telemetry.LogAttribute(.nan),
+            ])
         await telemetry.flush()
 
         let request = try #require(recorder.requests.first)

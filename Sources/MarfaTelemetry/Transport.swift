@@ -7,7 +7,9 @@ package struct TelemetryRequest: Sendable {
     package let body: Data
 }
 
-/// Sends a request once. It reports nothing back: a report that fails is lost, and the app is told nothing.
+/// Sends a request once.
+///
+/// It reports nothing back: a report that fails is lost, and the app is told nothing.
 package protocol TelemetryTransport: Sendable {
     func send(_ request: TelemetryRequest) async
 }

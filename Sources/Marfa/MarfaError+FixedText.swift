@@ -1,11 +1,13 @@
 /// What an error report may say of a ``MarfaError``: a type and a sentence fixed in the source, and a code.
 ///
 /// An error's own `message`, `path`, `origin`, `location`, `hash` and every other value it carries can hold a note's
-/// words, a file name, an address or an id, so none of them can reach this text: `type` and `sentence` are
-/// `StaticString`s chosen by an exhaustive `switch`, and a new `MarfaError` case fails to compile until someone
-/// writes both for it.
+/// words, a file name, an address or an id, so none of them reaches `type` or `sentence`: both are `StaticString`s
+/// chosen by an exhaustive `switch`, and a new `MarfaError` case fails to compile until someone writes both for it.
+/// The only carried value that can reach `code` is a refusal code with the shape of one.
 public struct FixedErrorText: Sendable, Hashable {
-    /// The case's stable name, such as `not_found`. The same word `MarfaError/code()` answers.
+    /// The case's stable name, such as `not_found`.
+    ///
+    /// It is the word ``MarfaError/code()`` answers.
     public let type: String
     /// One sentence that says what went wrong, with no value from the error in it.
     public let sentence: String
@@ -33,19 +35,21 @@ public struct FixedErrorText: Sendable, Hashable {
 }
 
 extension MarfaError {
-    /// The text an error report may carry for this error. See ``FixedErrorText``.
+    /// The text an error report may carry for this error.
+    ///
+    /// See ``FixedErrorText``.
     public var fixedText: FixedErrorText {
         switch self {
         case .notFound(let code, _):
-            FixedErrorText(type: "not_found", sentence: "the server has nothing at what the request named", serverCode: code)
+            FixedErrorText(type: "not_found", sentence: "nothing was found at what the request named", serverCode: code)
         case .unauthorized(let code, _):
             FixedErrorText(type: "unauthorized", sentence: "the server did not accept the credential", serverCode: code)
         case .forbidden(let code, _):
             FixedErrorText(
-                type: "forbidden", sentence: "the server refused the request because the credential lacks a permission",
+                type: "forbidden", sentence: "the request was refused because the credential lacks a permission",
                 serverCode: code)
         case .validation(let code, _):
-            FixedErrorText(type: "validation", sentence: "the server rejected the request as invalid", serverCode: code)
+            FixedErrorText(type: "validation", sentence: "the request was rejected as invalid", serverCode: code)
         case .unknownType:
             FixedErrorText(type: "unknown_type", sentence: "the server does not know the type that was named")
         case .rateLimited(let code, _, _):

@@ -217,7 +217,7 @@ await Telemetry.shared.flush()  // when the app quits
 - **Logs.** `log(_:level:attributes:)` queues an OTLP/HTTP JSON record for `<host>/i/v1/logs`. Records go out at 50, or after 30 seconds, or on `flush()`, which waits at most 2 seconds. At most 500 wait: the oldest is dropped, and the next batch counts the drops.
 - **Never sent.** Item text, titles, tags, item ids, natural keys, keys or credentials, the server's address, file paths, search text, and any `message` or `localizedDescription`. A name, an operation and a sentence are `StaticString`s, and an attribute is a number, a boolean or a `StaticString`, so these cannot be passed by accident.
 - **Switch.** `isEnabled` is off until the app turns it on. Turning it off drops everything queued, stops a send under way and sends nothing more.
-- **Sending.** One ephemeral `URLSession` with no cookies, cache, credentials or redirects, a 5 second timeout and one attempt for each post, away from the main actor. A call never waits for the network.
+- **Sending.** One ephemeral `URLSession` with no cookies, cache, credentials or redirects, and one attempt for each post, which gives up after 5 seconds without data or 10 seconds in all. It runs away from the main actor. A call never waits for the network.
 
 The [Telemetry guide](https://docs.marfa.so/run/telemetry#what-apps-send) says what Marfa's own apps send and how to turn it off. The product declares the diagnostic data it can send in its own `PrivacyInfo.xcprivacy`.
 

@@ -4,7 +4,9 @@ import Testing
 
 @testable import MarfaTelemetry
 
-/// Keeps every request instead of sending it. With `holdingFirst`, the first send does not return until `release()`.
+/// Keeps every request instead of sending it.
+///
+/// With `holdingFirst`, the first send does not return until `release()`.
 final class Recorder: TelemetryTransport {
     private let seen = Mutex<[TelemetryRequest]>([])
     private let gate: AsyncStream<Void>
@@ -40,7 +42,9 @@ func configured(
 ) throws -> Telemetry {
     let telemetry = Telemetry(transport: recorder, interval: interval)
     telemetry.configure(
-        .init(destination: try destination(), serviceName: "mapp", serviceVersion: "1.2.3", instanceID: { "instance-1" }))
+        .init(
+            destination: try destination(), serviceName: "mapp", serviceVersion: "1.2.3",
+            instanceID: { "instance-1" }))
     telemetry.isEnabled = enabled
     return telemetry
 }

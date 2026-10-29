@@ -1,7 +1,9 @@
 import Foundation
 
-/// The bytes of each kind of post. Everything that reaches a body comes from a `StaticString`, a number, a
-/// boolean, the app's own configuration or the machine's operating system.
+/// The bytes of each kind of post.
+///
+/// Everything that reaches a body comes from a `StaticString`, a number, a boolean, the app's own configuration,
+/// the machine's operating system, or a server refusal code that `FixedErrorText.isCode` accepts.
 enum Wire {
     struct Context {
         let configuration: Telemetry.Configuration
@@ -58,8 +60,8 @@ enum Wire {
         }
         let rendered: [[String: Any]] = records.enumerated().map { index, record in
             var attributes = record.attributes.compactMap { attribute($0.name, $0.value) }
-            if index == 0, dropped > 0 {
-                attributes.append(attribute("telemetry.dropped_records", .int(dropped))!)
+            if index == 0, dropped > 0, let count = attribute("telemetry.dropped_records", .int(dropped)) {
+                attributes.append(count)
             }
             let nanos = String(record.nanoseconds)
             return [
