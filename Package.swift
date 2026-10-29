@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "MarfaAPI", targets: ["MarfaAPI"]),
         .library(name: "MarfaTesting", targets: ["MarfaTesting"]),
         .library(name: "MarfaIcons", targets: ["MarfaIcons"]),
+        .library(name: "MarfaTelemetry", targets: ["MarfaTelemetry"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.11.0"),
@@ -45,6 +46,12 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
+            name: "MarfaTelemetry",
+            dependencies: ["Marfa"],
+            resources: [.process("PrivacyInfo.xcprivacy")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .target(
             name: "MarfaTypes",
             dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
             swiftSettings: [.swiftLanguageMode(.v6)]
@@ -73,6 +80,11 @@ let package = Package(
         .testTarget(
             name: "MarfaIconTests",
             dependencies: ["Marfa", "MarfaIcons"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "MarfaTelemetryTests",
+            dependencies: ["Marfa", "MarfaTelemetry"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
