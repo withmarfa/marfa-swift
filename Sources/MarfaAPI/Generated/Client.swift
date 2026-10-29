@@ -4677,6 +4677,98 @@ public struct Client: ClientProtocol {
             }
         )
     }
+    /// Get an overview
+    ///
+    /// Returns what the instance holds that your credential can reach: types with item counts, edge types, top tags, views and folders, and what your credential may do. Every list is capped. Needs no type access.
+    ///
+    /// - Remark: HTTP `GET /overview`.
+    /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
+    public func getOverview(_ input: Operations.GetOverview.Input) async throws -> Operations.GetOverview.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetOverview.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/overview",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetOverview.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Limit",
+                            as: Components.Headers.XRateLimitLimit.self
+                        ),
+                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Remaining",
+                            as: Components.Headers.XRateLimitRemaining.self
+                        ),
+                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Reset",
+                            as: Components.Headers.XRateLimitReset.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetOverview.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Overview.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// Get the configuration
     ///
     /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
@@ -5075,7 +5167,7 @@ public struct Client: ClientProtocol {
     }
     /// List audit log entries
     ///
-    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins, exports and the files MCP tools fetch from the web here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.

@@ -320,6 +320,13 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `PUT /profile/picture`.
     /// - Remark: Generated from `#/paths//profile/picture/put(replaceProfilePicture)`.
     func replaceProfilePicture(_ input: Operations.ReplaceProfilePicture.Input) async throws -> Operations.ReplaceProfilePicture.Output
+    /// Get an overview
+    ///
+    /// Returns what the instance holds that your credential can reach: types with item counts, edge types, top tags, views and folders, and what your credential may do. Every list is capped. Needs no type access.
+    ///
+    /// - Remark: HTTP `GET /overview`.
+    /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
+    func getOverview(_ input: Operations.GetOverview.Input) async throws -> Operations.GetOverview.Output
     /// Get the configuration
     ///
     /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
@@ -350,7 +357,7 @@ public protocol ClientProtocol: Sendable {
     func getInstanceMetrics(_ input: Operations.GetInstanceMetrics.Input) async throws -> Operations.GetInstanceMetrics.Output
     /// List audit log entries
     ///
-    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins, exports and the files MCP tools fetch from the web here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.
@@ -1014,6 +1021,15 @@ extension ClientProtocol {
             body: body
         ))
     }
+    /// Get an overview
+    ///
+    /// Returns what the instance holds that your credential can reach: types with item counts, edge types, top tags, views and folders, and what your credential may do. Every list is capped. Needs no type access.
+    ///
+    /// - Remark: HTTP `GET /overview`.
+    /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
+    public func getOverview(headers: Operations.GetOverview.Input.Headers = .init()) async throws -> Operations.GetOverview.Output {
+        try await getOverview(Operations.GetOverview.Input(headers: headers))
+    }
     /// Get the configuration
     ///
     /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
@@ -1064,7 +1080,7 @@ extension ClientProtocol {
     }
     /// List audit log entries
     ///
-    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins, exports and the files MCP tools fetch from the web here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.

@@ -3583,32 +3583,33 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal`.
-        public struct ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal`.
+        public struct ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case conflict = "conflict"
                     case idReused = "id_reused"
+                    case itemExists = "item_exists"
                     case linkTaken = "link_taken"
                     case typeMismatch = "type_mismatch"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/code`.
-                public var code: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/code`.
+                public var code: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -3628,8 +3629,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error/details`.
-                public var details: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/details`.
+                public var details: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -3637,9 +3638,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -3653,13 +3654,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal/error`.
-            public var error: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload
-            /// Creates a new `ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal`.
+            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error`.
+            public var error: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload
+            /// Creates a new `ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.ConflictOrIdReusedOrLinkTakenOrTypeMismatchRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -4676,6 +4677,308 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.EdgeNotFoundOrItemNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// What trashing items would move to the trash. Items you can't read are taken too and aren't listed or counted.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TrashPreview`.
+        public struct TrashPreview: Codable, Hashable, Sendable {
+            /// Each item you named, once, in the order you named them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreview/items`.
+            public var items: [Components.Schemas.TrashPreviewItem]
+            /// How many items you can read that trashing the named items would move to the trash, each counted once, the named items included.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreview/count`.
+            public var count: Swift.Int
+            /// A SHA-256 hash, in hex, of every item `count` counts with its version, listed or not. It changes if any of them changes, joins or leaves. Pass it to `POST /items/trash` with the same `ids` to trash only what it covers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreview/digest`.
+            public var digest: Swift.String
+            /// Creates a new `TrashPreview`.
+            ///
+            /// - Parameters:
+            ///   - items: Each item you named, once, in the order you named them.
+            ///   - count: How many items you can read that trashing the named items would move to the trash, each counted once, the named items included.
+            ///   - digest: A SHA-256 hash, in hex, of every item `count` counts with its version, listed or not. It changes if any of them changes, joins or leaves. Pass it to `POST /items/trash` with the same `ids` to trash only what it covers.
+            public init(
+                items: [Components.Schemas.TrashPreviewItem],
+                count: Swift.Int,
+                digest: Swift.String
+            ) {
+                self.items = items
+                self.count = count
+                self.digest = digest
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case count
+                case digest
+            }
+        }
+        /// An item you named and what trashing it would take with it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TrashPreviewItem`.
+        public struct TrashPreviewItem: Codable, Hashable, Sendable {
+            /// The ID of an item you named.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/id`.
+            public var id: Swift.String
+            /// The item's type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/type`.
+            public var _type: Swift.String
+            /// The item's version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/version`.
+            public var version: Swift.Int
+            /// The other items you can read that a cascading edge such as `parent-of` would take into the trash with this item, leaves first, at most 100.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/takes`.
+            public var takes: [Components.Schemas.TrashPreviewEntry]
+            /// How many items you can read that trashing this item would move to the trash, the item itself included.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/count`.
+            public var count: Swift.Int
+            /// `true` if `takes` was cut at its limit. Absent when it lists every item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/truncated`.
+            public var truncated: Swift.Bool?
+            /// Creates a new `TrashPreviewItem`.
+            ///
+            /// - Parameters:
+            ///   - id: The ID of an item you named.
+            ///   - _type: The item's type.
+            ///   - version: The item's version.
+            ///   - takes: The other items you can read that a cascading edge such as `parent-of` would take into the trash with this item, leaves first, at most 100.
+            ///   - count: How many items you can read that trashing this item would move to the trash, the item itself included.
+            ///   - truncated: `true` if `takes` was cut at its limit. Absent when it lists every item.
+            public init(
+                id: Swift.String,
+                _type: Swift.String,
+                version: Swift.Int,
+                takes: [Components.Schemas.TrashPreviewEntry],
+                count: Swift.Int,
+                truncated: Swift.Bool? = nil
+            ) {
+                self.id = id
+                self._type = _type
+                self.version = version
+                self.takes = takes
+                self.count = count
+                self.truncated = truncated
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case _type = "type"
+                case version
+                case takes
+                case count
+                case truncated
+            }
+        }
+        /// An item that trashing another item would take with it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TrashPreviewEntry`.
+        public struct TrashPreviewEntry: Codable, Hashable, Sendable {
+            /// Unique identifier for the item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewEntry/id`.
+            public var id: Swift.String
+            /// The item's type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewEntry/type`.
+            public var _type: Swift.String
+            /// The item's version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPreviewEntry/version`.
+            public var version: Swift.Int
+            /// Creates a new `TrashPreviewEntry`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the item.
+            ///   - _type: The item's type.
+            ///   - version: The item's version.
+            public init(
+                id: Swift.String,
+                _type: Swift.String,
+                version: Swift.Int
+            ) {
+                self.id = id
+                self._type = _type
+                self.version = version
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case _type = "type"
+                case version
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
+        public struct EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case edgeConstraintViolation = "edge_constraint_violation"
+                    case invalidId = "invalid_id"
+                    case missingRequiredField = "missing_required_field"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.EdgeConstraintViolationOrInvalidIdOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal`.
+        public struct TrashPlanChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case trashPlanChanged = "trash_plan_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error/code`.
+                public var code: Components.Schemas.TrashPlanChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error/details`.
+                public var details: Components.Schemas.TrashPlanChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.TrashPlanChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.TrashPlanChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TrashPlanChangedRefusal/error`.
+            public var error: Components.Schemas.TrashPlanChangedRefusal._ErrorPayload
+            /// Creates a new `TrashPlanChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.TrashPlanChangedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -9443,7 +9746,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/SearchResultPage`.
         public struct SearchResultPage: Codable, Hashable, Sendable {
-            /// The results, best match first.
+            /// The results, in the order of `sort`.
             ///
             /// - Remark: Generated from `#/components/schemas/SearchResultPage/data`.
             public var data: [Components.Schemas.SearchResult]
@@ -9454,7 +9757,7 @@ extension Components {
             /// Creates a new `SearchResultPage`.
             ///
             /// - Parameters:
-            ///   - data: The results, best match first.
+            ///   - data: The results, in the order of `sort`.
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.SearchResult],
@@ -9828,6 +10131,386 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case tag
                 case count
+            }
+        }
+        /// A summary of what this instance holds and what your credential may reach.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Overview`.
+        public struct Overview: Codable, Hashable, Sendable {
+            /// The instance's name and the build it runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/instance`.
+            public struct InstancePayload: Codable, Hashable, Sendable {
+                /// The instance's display name.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/instance/name`.
+                public var name: Swift.String
+                /// The build the instance runs.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/instance/version`.
+                public var version: Swift.String
+                /// The release the build was made as. Absent for a build that is not a release.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/instance/release`.
+                public var release: Swift.String?
+                /// Creates a new `InstancePayload`.
+                ///
+                /// - Parameters:
+                ///   - name: The instance's display name.
+                ///   - version: The build the instance runs.
+                ///   - release: The release the build was made as. Absent for a build that is not a release.
+                public init(
+                    name: Swift.String,
+                    version: Swift.String,
+                    release: Swift.String? = nil
+                ) {
+                    self.name = name
+                    self.version = version
+                    self.release = release
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case name
+                    case version
+                    case release
+                }
+            }
+            /// The instance's name and the build it runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/instance`.
+            public var instance: Components.Schemas.Overview.InstancePayload
+            /// The credential that sent the request, and what it may do.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/credential`.
+            public struct CredentialPayload: Codable, Hashable, Sendable {
+                /// `key` for an API key, `app` for a signed-in app's token.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/credential/kind`.
+                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case key = "key"
+                    case app = "app"
+                }
+                /// `key` for an API key, `app` for a signed-in app's token.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/credential/kind`.
+                public var kind: Components.Schemas.Overview.CredentialPayload.KindPayload
+                /// The key's label. Absent for an app.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/credential/label`.
+                public var label: Swift.String?
+                /// Your type map by level, each list sorted and cut at 30 patterns. Absent when the map is empty.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/credential/type_permissions`.
+                public struct TypePermissionsPayload: Codable, Hashable, Sendable {
+                    /// Type patterns you can read and write, such as `core.*`. Absent when none.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Overview/credential/type_permissions/write`.
+                    public var write: [Swift.String]?
+                    /// Type patterns you can only read. Absent when none.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Overview/credential/type_permissions/read`.
+                    public var read: [Swift.String]?
+                    /// Type patterns denied even where a wider pattern grants access. Absent when none.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Overview/credential/type_permissions/none`.
+                    public var none: [Swift.String]?
+                    /// Creates a new `TypePermissionsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - write: Type patterns you can read and write, such as `core.*`. Absent when none.
+                    ///   - read: Type patterns you can only read. Absent when none.
+                    ///   - none: Type patterns denied even where a wider pattern grants access. Absent when none.
+                    public init(
+                        write: [Swift.String]? = nil,
+                        read: [Swift.String]? = nil,
+                        none: [Swift.String]? = nil
+                    ) {
+                        self.write = write
+                        self.read = read
+                        self.none = none
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case write
+                        case read
+                        case none
+                    }
+                }
+                /// Your type map by level, each list sorted and cut at 30 patterns. Absent when the map is empty.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/credential/type_permissions`.
+                public var typePermissions: Components.Schemas.Overview.CredentialPayload.TypePermissionsPayload?
+                /// The permissions you hold. Absent when you hold none.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Overview/credential/permissions`.
+                public var permissions: [Components.Schemas.Permission]?
+                /// Creates a new `CredentialPayload`.
+                ///
+                /// - Parameters:
+                ///   - kind: `key` for an API key, `app` for a signed-in app's token.
+                ///   - label: The key's label. Absent for an app.
+                ///   - typePermissions: Your type map by level, each list sorted and cut at 30 patterns. Absent when the map is empty.
+                ///   - permissions: The permissions you hold. Absent when you hold none.
+                public init(
+                    kind: Components.Schemas.Overview.CredentialPayload.KindPayload,
+                    label: Swift.String? = nil,
+                    typePermissions: Components.Schemas.Overview.CredentialPayload.TypePermissionsPayload? = nil,
+                    permissions: [Components.Schemas.Permission]? = nil
+                ) {
+                    self.kind = kind
+                    self.label = label
+                    self.typePermissions = typePermissions
+                    self.permissions = permissions
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case kind
+                    case label
+                    case typePermissions = "type_permissions"
+                    case permissions
+                }
+            }
+            /// The credential that sent the request, and what it may do.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/credential`.
+            public var credential: Components.Schemas.Overview.CredentialPayload
+            /// The types you can read, most items first, then by identifier, at most 50. Types in the `system` namespace are left out. Absent when you can read none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/types`.
+            public var types: [Components.Schemas.OverviewType]?
+            /// How many active items you can read across every type `types` would list before its cut. Absent when `types` is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/total`.
+            public var total: Swift.Int?
+            /// The edge types you can read or write, sorted by identifier, at most 50. Absent when you can read no type or can use no edge type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/edge_types`.
+            public var edgeTypes: [Components.Schemas.OverviewEdgeType]?
+            /// The most used tags on items you can read, at most 30. Absent when there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/tags`.
+            public var tags: [Components.Schemas.TagCount]?
+            /// The views you can read, sorted by title, at most 30. Absent when there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/views`.
+            public var views: [Components.Schemas.OverviewView]?
+            /// The folders you can read, sorted by title, at most 30. Absent when there are none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/folders`.
+            public var folders: [Components.Schemas.OverviewFolder]?
+            /// Each list that was cut, with how many entries it held before the cut. Names are `types`, `edge_types`, `tags`, `views`, `folders` and `credential.type_permissions.<level>`. Absent when nothing was cut.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/truncated`.
+            public struct TruncatedPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Swift.Int]
+                /// Creates a new `TruncatedPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Swift.Int] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Each list that was cut, with how many entries it held before the cut. Names are `types`, `edge_types`, `tags`, `views`, `folders` and `credential.type_permissions.<level>`. Absent when nothing was cut.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Overview/truncated`.
+            public var truncated: Components.Schemas.Overview.TruncatedPayload?
+            /// Creates a new `Overview`.
+            ///
+            /// - Parameters:
+            ///   - instance: The instance's name and the build it runs.
+            ///   - credential: The credential that sent the request, and what it may do.
+            ///   - types: The types you can read, most items first, then by identifier, at most 50. Types in the `system` namespace are left out. Absent when you can read none.
+            ///   - total: How many active items you can read across every type `types` would list before its cut. Absent when `types` is.
+            ///   - edgeTypes: The edge types you can read or write, sorted by identifier, at most 50. Absent when you can read no type or can use no edge type.
+            ///   - tags: The most used tags on items you can read, at most 30. Absent when there are none.
+            ///   - views: The views you can read, sorted by title, at most 30. Absent when there are none.
+            ///   - folders: The folders you can read, sorted by title, at most 30. Absent when there are none.
+            ///   - truncated: Each list that was cut, with how many entries it held before the cut. Names are `types`, `edge_types`, `tags`, `views`, `folders` and `credential.type_permissions.<level>`. Absent when nothing was cut.
+            public init(
+                instance: Components.Schemas.Overview.InstancePayload,
+                credential: Components.Schemas.Overview.CredentialPayload,
+                types: [Components.Schemas.OverviewType]? = nil,
+                total: Swift.Int? = nil,
+                edgeTypes: [Components.Schemas.OverviewEdgeType]? = nil,
+                tags: [Components.Schemas.TagCount]? = nil,
+                views: [Components.Schemas.OverviewView]? = nil,
+                folders: [Components.Schemas.OverviewFolder]? = nil,
+                truncated: Components.Schemas.Overview.TruncatedPayload? = nil
+            ) {
+                self.instance = instance
+                self.credential = credential
+                self.types = types
+                self.total = total
+                self.edgeTypes = edgeTypes
+                self.tags = tags
+                self.views = views
+                self.folders = folders
+                self.truncated = truncated
+            }
+            public enum CodingKeys: String, CodingKey {
+                case instance
+                case credential
+                case types
+                case total
+                case edgeTypes = "edge_types"
+                case tags
+                case views
+                case folders
+                case truncated
+            }
+        }
+        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists and revokes other apps' access; `instance.read` reads health, metrics, housekeeping, retired platform types, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, resets platform type definitions and cancels bulk jobs; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; and `blobs.manage` manages every blob.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Permission`.
+        @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {
+            case webhooks_manage = "webhooks.manage"
+            case schema_write = "schema.write"
+            case config_manage = "config.manage"
+            case audit_read = "audit.read"
+            case items_purge = "items.purge"
+            case keys_mint = "keys.mint"
+            case grants_manage = "grants.manage"
+            case instance_read = "instance.read"
+            case instance_maintain = "instance.maintain"
+            case connectors_manage = "connectors.manage"
+            case blobs_manage = "blobs.manage"
+            case keys_manage = "keys.manage"
+        }
+        /// A type you can read, and how many active items it has.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OverviewType`.
+        public struct OverviewType: Codable, Hashable, Sendable {
+            /// The type's identifier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewType/id`.
+            public var id: Swift.String
+            /// What the type holds, cut at 100 characters. Absent when the type has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewType/description`.
+            public var description: Swift.String?
+            /// How many active items of the type you can read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewType/count`.
+            public var count: Swift.Int
+            /// Creates a new `OverviewType`.
+            ///
+            /// - Parameters:
+            ///   - id: The type's identifier.
+            ///   - description: What the type holds, cut at 100 characters. Absent when the type has none.
+            ///   - count: How many active items of the type you can read.
+            public init(
+                id: Swift.String,
+                description: Swift.String? = nil,
+                count: Swift.Int
+            ) {
+                self.id = id
+                self.description = description
+                self.count = count
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case description
+                case count
+            }
+        }
+        /// An edge type your edge permissions cover, and at which level.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OverviewEdgeType`.
+        public struct OverviewEdgeType: Codable, Hashable, Sendable {
+            /// The edge type's identifier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/id`.
+            public var id: Swift.String
+            /// What the edge type means, cut at 100 characters. Absent when it has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/description`.
+            public var description: Swift.String?
+            /// `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of its source item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/access`.
+            public var access: Components.Schemas.PermissionLevel
+            /// Creates a new `OverviewEdgeType`.
+            ///
+            /// - Parameters:
+            ///   - id: The edge type's identifier.
+            ///   - description: What the edge type means, cut at 100 characters. Absent when it has none.
+            ///   - access: `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of its source item.
+            public init(
+                id: Swift.String,
+                description: Swift.String? = nil,
+                access: Components.Schemas.PermissionLevel
+            ) {
+                self.id = id
+                self.description = description
+                self.access = access
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case description
+                case access
+            }
+        }
+        /// A view you can read.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OverviewView`.
+        public struct OverviewView: Codable, Hashable, Sendable {
+            /// The ID of the view.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewView/id`.
+            public var id: Swift.String
+            /// The view's title, cut at 100 characters.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewView/title`.
+            public var title: Swift.String
+            /// Creates a new `OverviewView`.
+            ///
+            /// - Parameters:
+            ///   - id: The ID of the view.
+            ///   - title: The view's title, cut at 100 characters.
+            public init(
+                id: Swift.String,
+                title: Swift.String
+            ) {
+                self.id = id
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
+            }
+        }
+        /// A folder you can read.
+        ///
+        /// - Remark: Generated from `#/components/schemas/OverviewFolder`.
+        public struct OverviewFolder: Codable, Hashable, Sendable {
+            /// The ID of the folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewFolder/id`.
+            public var id: Swift.String
+            /// The folder's title, cut at 100 characters.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewFolder/title`.
+            public var title: Swift.String
+            /// Creates a new `OverviewFolder`.
+            ///
+            /// - Parameters:
+            ///   - id: The ID of the folder.
+            ///   - title: The folder's title, cut at 100 characters.
+            public init(
+                id: Swift.String,
+                title: Swift.String
+            ) {
+                self.id = id
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case title
             }
         }
         /// An error response.
@@ -13216,6 +13899,35 @@ extension Components {
                 ])
             }
         }
+        /// A page of the items a view lists.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ViewItemPage`.
+        public struct ViewItemPage: Codable, Hashable, Sendable {
+            /// The items on this page, in the view's sort order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewItemPage/data`.
+            public var data: [Components.Schemas.Item]
+            /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ViewItemPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `ViewItemPage`.
+            ///
+            /// - Parameters:
+            ///   - data: The items on this page, in the view's sort order.
+            ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
+            public init(
+                data: [Components.Schemas.Item],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
         /// An error response.
         ///
         /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
@@ -13530,23 +14242,6 @@ extension Components {
                 case expiresAt = "expires_at"
                 case lastUsedAt = "last_used_at"
             }
-        }
-        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists and revokes other apps' access; `instance.read` reads health, metrics, housekeeping, retired platform types, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, resets platform type definitions and cancels bulk jobs; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; and `blobs.manage` manages every blob.
-        ///
-        /// - Remark: Generated from `#/components/schemas/Permission`.
-        @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {
-            case webhooks_manage = "webhooks.manage"
-            case schema_write = "schema.write"
-            case config_manage = "config.manage"
-            case audit_read = "audit.read"
-            case items_purge = "items.purge"
-            case keys_mint = "keys.mint"
-            case grants_manage = "grants.manage"
-            case instance_read = "instance.read"
-            case instance_maintain = "instance.maintain"
-            case connectors_manage = "connectors.manage"
-            case blobs_manage = "blobs.manage"
-            case keys_manage = "keys.manage"
         }
         /// What a key may do with a type: `read` it, `write` it (which includes reading), or `none`, which denies a type a wildcard entry would reach.
         ///
