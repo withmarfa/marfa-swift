@@ -33,13 +33,14 @@ In a `Package.swift`, add the package and the product:
 
 Each release includes the core prebuilt, so your app needs no Rust toolchain.
 
-The package has five products:
+The package has six products:
 
 - `Marfa`: the working copy, sign-in and folders.
 - `MarfaAPI`: a client for the calls only the instance can answer. See [Call the server directly](#call-the-server-directly).
 - `MarfaTypes`: the instance's wire types, generated from its `openapi.json`. `MarfaAPI` includes them.
 - `MarfaTesting`: a working copy for tests and previews. See [Test and preview](#test-and-preview).
 - `MarfaIcons`: draws an item type's icon. See [Draw a type's icon](#draw-a-types-icon).
+- `MarfaTelemetry`: sends an app's errors and a fixed set of log events to a PostHog project the app chooses. See [Report errors and events](#report-errors-and-events).
 
 ## Example
 
@@ -188,6 +189,37 @@ import MarfaTesting
 ```
 
 Use `FakeCopy` to record writes, choose drain verdicts, and send changes on `changes()`. Unsupported calls throw `FakeCopyError.unsupported`. The `FakeCopy` API documentation lists the supported calls.
+
+## Report errors and events
+
+The `MarfaTelemetry` product sends an app's errors, and a fixed set of log events, to a PostHog project. It has no third-party dependency, **no token and no destination of its own**, and does nothing until the app configures it and turns it on, so an app that does not import it carries none of it.
+
+```swift
+import Marfa
+import MarfaTelemetry
+
+Telemetry.shared.configure(
+    Telemetry.Configuration(
+        destination: try Telemetry.Destination(host: posthogHost, projectToken: projectToken),
+        serviceName: "notes",
+        serviceVersion: appVersion,
+        instanceID: { connectedInstanceID }))
+Telemetry.shared.isEnabled = reportingIsOn
+
+Telemetry.shared.report(error, during: "drain")
+Telemetry.shared.log("drain_finished", attributes: ["pending": 3, "complete": true])
+
+await Telemetry.shared.flush()  // when the app quits
+```
+
+- **Destination.** An `https` PostHog host and a project token, or an `http` loopback address for a test. The `Telemetry.Destination` initializer throws `ConfigurationError` for anything else, such as an address with a user name.
+- **Errors.** `report(_:during:)` posts one `$exception` event to `<host>/i/v0/e/`, as the `marfa` command line does: no stack frames, no person, no location lookup. A `MarfaError` is described by `MarfaError.fixedText`, a type and a sentence fixed in the source by an exhaustive `switch`, so a new case fails to compile until someone writes its sentence. `report(type:sentence:during:)` does the same for an error of the app's own.
+- **Logs.** `log(_:level:attributes:)` queues an OTLP/HTTP JSON record for `<host>/i/v1/logs`. Records go out at 50, or after 30 seconds, or on `flush()`, which waits at most 2 seconds. At most 500 wait: the oldest is dropped, and the next batch counts the drops.
+- **Never sent.** Item text, titles, tags, item ids, natural keys, keys or credentials, the server's address, file paths, search text, and any `message` or `localizedDescription`. A name, an operation and a sentence are `StaticString`s, and an attribute is a number, a boolean or a `StaticString`, so these cannot be passed by accident.
+- **Switch.** `isEnabled` is off until the app turns it on. Turning it off drops everything queued, stops a send under way and sends nothing more.
+- **Sending.** One ephemeral `URLSession` with no cookies, cache, credentials or redirects, a 5 second timeout and one attempt for each post, away from the main actor. A call never waits for the network.
+
+The [Telemetry guide](https://docs.marfa.so/run/telemetry#what-apps-send) says what Marfa's own apps send and how to turn it off. The product declares the diagnostic data it can send in its own `PrivacyInfo.xcprivacy`.
 
 ## Learn more
 
