@@ -46,6 +46,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/delete(deleteItem)`.
     func deleteItem(_ input: Operations.DeleteItem.Input) async throws -> Operations.DeleteItem.Output
+    /// Preview trashing items
+    ///
+    /// Returns what `POST /items/trash` would move to the trash for the same `ids`: each item and every item you can read that a cascading edge such as `parent-of` would take with it. Nothing changes.
+    ///
+    /// - Remark: HTTP `POST /items/trash-preview`.
+    /// - Remark: Generated from `#/paths//items/trash-preview/post(previewItemTrash)`.
+    func previewItemTrash(_ input: Operations.PreviewItemTrash.Input) async throws -> Operations.PreviewItemTrash.Output
+    /// Trash items
+    ///
+    /// Moves the items, and every item a cascading edge such as `parent-of` reaches from them, to the trash in one step, all of them or none of them. You can restore them until the retention window ends. Marfa then purges them.
+    ///
+    /// - Remark: HTTP `POST /items/trash`.
+    /// - Remark: Generated from `#/paths//items/trash/post(trashItems)`.
+    func trashItems(_ input: Operations.TrashItems.Input) async throws -> Operations.TrashItems.Output
     /// Restore an item
     ///
     /// Restores a trashed item to `active`, along with every item its trash took through a cascading edge such as `parent-of`. Items that were already in the trash before then stay there.
@@ -300,7 +314,7 @@ public protocol APIProtocol: Sendable {
     func listItemBackrefs(_ input: Operations.ListItemBackrefs.Input) async throws -> Operations.ListItemBackrefs.Output
     /// Search items
     ///
-    /// Returns a page of the items you can read whose text properties or tags match `q`, ranked by BM25 relevance, with ties ordered by item ID.
+    /// Returns a page of the items you can read whose text properties or tags match `q`, best match first unless you give a `sort`. Items that tie come in ID order.
     ///
     /// - Remark: HTTP `GET /search`.
     /// - Remark: Generated from `#/paths//search/get(searchItems)`.
@@ -543,6 +557,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /views`.
     /// - Remark: Generated from `#/paths//views/post(createView)`.
     func createView(_ input: Operations.CreateView.Input) async throws -> Operations.CreateView.Output
+    /// List a view's items
+    ///
+    /// Returns a page of the items a view lists, in the view's sort order. Items of types you can't read are left out. A view's grouping isn't applied.
+    ///
+    /// - Remark: HTTP `GET /views/{id}/items`.
+    /// - Remark: Generated from `#/paths//views/{id}/items/get(listViewItems)`.
+    func listViewItems(_ input: Operations.ListViewItems.Input) async throws -> Operations.ListViewItems.Output
     /// Update a view
     ///
     /// Updates a view's title, query, sort or group. Each one you send replaces the current value whole, and those you leave out stay as they are. Send `group: null` to remove the grouping. Send the `version` you read.
@@ -865,6 +886,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
     func getInstance(_ input: Operations.GetInstance.Input) async throws -> Operations.GetInstance.Output
+    /// Get an overview
+    ///
+    /// Returns what the instance holds that your credential can reach: types with item counts, edge types, top tags, views and folders, and what your credential may do. Every list is capped. Needs no type access.
+    ///
+    /// - Remark: HTTP `GET /overview`.
+    /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
+    func getOverview(_ input: Operations.GetOverview.Input) async throws -> Operations.GetOverview.Output
     /// Get the configuration
     ///
     /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
@@ -902,7 +930,7 @@ public protocol APIProtocol: Sendable {
     func getInstanceMetrics(_ input: Operations.GetInstanceMetrics.Input) async throws -> Operations.GetInstanceMetrics.Output
     /// List audit log entries
     ///
-    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins, exports and the files MCP tools fetch from the web here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.
@@ -1034,6 +1062,36 @@ extension APIProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// Preview trashing items
+    ///
+    /// Returns what `POST /items/trash` would move to the trash for the same `ids`: each item and every item you can read that a cascading edge such as `parent-of` would take with it. Nothing changes.
+    ///
+    /// - Remark: HTTP `POST /items/trash-preview`.
+    /// - Remark: Generated from `#/paths//items/trash-preview/post(previewItemTrash)`.
+    public func previewItemTrash(
+        headers: Operations.PreviewItemTrash.Input.Headers = .init(),
+        body: Operations.PreviewItemTrash.Input.Body
+    ) async throws -> Operations.PreviewItemTrash.Output {
+        try await previewItemTrash(Operations.PreviewItemTrash.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Trash items
+    ///
+    /// Moves the items, and every item a cascading edge such as `parent-of` reaches from them, to the trash in one step, all of them or none of them. You can restore them until the retention window ends. Marfa then purges them.
+    ///
+    /// - Remark: HTTP `POST /items/trash`.
+    /// - Remark: Generated from `#/paths//items/trash/post(trashItems)`.
+    public func trashItems(
+        headers: Operations.TrashItems.Input.Headers = .init(),
+        body: Operations.TrashItems.Input.Body
+    ) async throws -> Operations.TrashItems.Output {
+        try await trashItems(Operations.TrashItems.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// Restore an item
@@ -1375,11 +1433,13 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)`.
     public func addItemTags(
         path: Operations.AddItemTags.Input.Path,
+        query: Operations.AddItemTags.Input.Query = .init(),
         headers: Operations.AddItemTags.Input.Headers = .init(),
         body: Operations.AddItemTags.Input.Body
     ) async throws -> Operations.AddItemTags.Output {
         try await addItemTags(Operations.AddItemTags.Input(
             path: path,
+            query: query,
             headers: headers,
             body: body
         ))
@@ -1392,10 +1452,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)`.
     public func removeItemTag(
         path: Operations.RemoveItemTag.Input.Path,
+        query: Operations.RemoveItemTag.Input.Query = .init(),
         headers: Operations.RemoveItemTag.Input.Headers = .init()
     ) async throws -> Operations.RemoveItemTag.Output {
         try await removeItemTag(Operations.RemoveItemTag.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1602,7 +1664,7 @@ extension APIProtocol {
     }
     /// Search items
     ///
-    /// Returns a page of the items you can read whose text properties or tags match `q`, ranked by BM25 relevance, with ties ordered by item ID.
+    /// Returns a page of the items you can read whose text properties or tags match `q`, best match first unless you give a `sort`. Items that tie come in ID order.
     ///
     /// - Remark: HTTP `GET /search`.
     /// - Remark: Generated from `#/paths//search/get(searchItems)`.
@@ -2113,6 +2175,23 @@ extension APIProtocol {
         try await createView(Operations.CreateView.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// List a view's items
+    ///
+    /// Returns a page of the items a view lists, in the view's sort order. Items of types you can't read are left out. A view's grouping isn't applied.
+    ///
+    /// - Remark: HTTP `GET /views/{id}/items`.
+    /// - Remark: Generated from `#/paths//views/{id}/items/get(listViewItems)`.
+    public func listViewItems(
+        path: Operations.ListViewItems.Input.Path,
+        query: Operations.ListViewItems.Input.Query = .init(),
+        headers: Operations.ListViewItems.Input.Headers = .init()
+    ) async throws -> Operations.ListViewItems.Output {
+        try await listViewItems(Operations.ListViewItems.Input(
+            path: path,
+            query: query,
+            headers: headers
         ))
     }
     /// Update a view
@@ -2787,6 +2866,15 @@ extension APIProtocol {
     public func getInstance(headers: Operations.GetInstance.Input.Headers = .init()) async throws -> Operations.GetInstance.Output {
         try await getInstance(Operations.GetInstance.Input(headers: headers))
     }
+    /// Get an overview
+    ///
+    /// Returns what the instance holds that your credential can reach: types with item counts, edge types, top tags, views and folders, and what your credential may do. Every list is capped. Needs no type access.
+    ///
+    /// - Remark: HTTP `GET /overview`.
+    /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
+    public func getOverview(headers: Operations.GetOverview.Input.Headers = .init()) async throws -> Operations.GetOverview.Output {
+        try await getOverview(Operations.GetOverview.Input(headers: headers))
+    }
     /// Get the configuration
     ///
     /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
@@ -2846,7 +2934,7 @@ extension APIProtocol {
     }
     /// List audit log entries
     ///
-    /// Returns audit log entries, newest first. Marfa records changes, sign-ins and exports here, not other reads. Requires `audit.read`.
+    /// Returns audit log entries, newest first. Marfa records changes, sign-ins, exports and the files MCP tools fetch from the web here, not other reads. Requires `audit.read`.
     ///
     /// - Remark: HTTP `GET /audit`.
     /// - Remark: Generated from `#/paths//audit/get(listAuditLog)`.
