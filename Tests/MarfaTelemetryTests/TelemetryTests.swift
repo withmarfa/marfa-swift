@@ -180,6 +180,26 @@ struct Loops {
         #expect(seen[3].dropped == 0)
     }
 
+    @Test func turningItOffAndOnOrConfiguringAgainKeepsTheWaitsAndTheCount() async throws {
+        let recorder = Recorder()
+        let clock = TestClock()
+        let telemetry = try configured(recorder, clock: clock)
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        telemetry.isEnabled = false
+        telemetry.isEnabled = true
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        telemetry.configure(.init(destination: try destination(), serviceName: "mapp", serviceVersion: "1.2.3"))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        #expect(try sent(recorder).count == 1)
+
+        clock.advance(.seconds(61))
+        telemetry.report(type: "loop", sentence: "again", during: "drain")
+        await telemetry.flush()
+        #expect(try sent(recorder).map(\.dropped) == [0, 2])
+    }
+
     @Test func aWithheldExceptionDoesNotRestartTheMinute() async throws {
         let recorder = Recorder()
         let clock = TestClock()

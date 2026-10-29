@@ -188,7 +188,6 @@ public final class Telemetry: Sendable {
         state.exceptions = []
         state.logs = []
         state.dropped = 0
-        state.limiter.forgetWithheld()
         state.generation += 1
     }
 

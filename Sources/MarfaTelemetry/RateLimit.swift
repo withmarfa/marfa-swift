@@ -35,7 +35,4 @@ struct ExceptionLimiter {
 
     /// Counts an exception that was never queued for another reason.
     mutating func withhold() { withheld += 1 }
-
-    /// Forgets the count, not the waits, since a count belongs to the reports that were dropped with the queue.
-    mutating func forgetWithheld() { withheld = 0 }
 }
