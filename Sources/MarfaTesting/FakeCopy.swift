@@ -112,11 +112,19 @@ public final class FakeCopy: Sendable {
 }
 
 private final class Chooser: Sendable {
-    private let chosen = Mutex<@Sendable (Marfa.QueuedWrite) -> Marfa.Verdict?> { _ in .accepted }
+    /// Holds the function in a struct field.
+    ///
+    /// Held as the `Mutex`'s own value, each read came back inside one more conversion wrapper, so the call for
+    /// the thousandth write of a drain stood on a thousand wrappers and overflowed the stack.
+    private struct Chosen: Sendable {
+        var call: @Sendable (Marfa.QueuedWrite) -> Marfa.Verdict?
+    }
+
+    private let chosen = Mutex(Chosen { _ in .accepted })
 
     var verdict: @Sendable (Marfa.QueuedWrite) -> Marfa.Verdict? {
-        get { chosen.withLock { $0 } }
-        set { chosen.withLock { $0 = newValue } }
+        get { chosen.withLock { $0.call } }
+        set { chosen.withLock { $0.call = newValue } }
     }
 }
 
