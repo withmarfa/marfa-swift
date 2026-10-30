@@ -39,8 +39,16 @@ struct PackedListingDifferential {
         }
     }
 
+    /// Some properties are a megabyte, so this avoids a `String(format:)` for each byte.
     static func hex(_ text: String) -> String {
-        "CAST(X'" + Data(text.utf8).map { String(format: "%02X", $0) }.joined() + "' AS TEXT)"
+        let digits = Array("0123456789ABCDEF".utf8)
+        var out: [UInt8] = []
+        out.reserveCapacity(text.utf8.count * 2)
+        for byte in text.utf8 {
+            out.append(digits[Int(byte >> 4)])
+            out.append(digits[Int(byte & 0xF)])
+        }
+        return "CAST(X'" + String(decoding: out, as: UTF8.self) + "' AS TEXT)"
     }
 
     static func json(_ text: String, _ random: inout Random) -> String {
@@ -117,14 +125,9 @@ struct PackedListingDifferential {
         ])
     }
 
-    @Test(arguments: [UInt64(1), 2, 3, 0xC0FFEE])
-    func randomRowsReadFromTheListingAsUniFFIReadsEachAlone(seed: UInt64) async throws {
+    /// The SQL that writes 150 random rows and their tags.
+    static func script(seed: UInt64) -> String {
         var random = Random(state: seed)
-        let store = temporaryStore()
-        let copy = try await WorkingCopy.open(store: store)
-        _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "seed"]))
-        await copy.close()
-
         var statements: [String] = []
         for index in 0..<150 {
             let id = "r\(index)-" + random.text(most: 6)
@@ -147,7 +150,20 @@ struct PackedListingDifferential {
                 statements.append("INSERT INTO tags (item_id, tag) VALUES (\(Self.hex(id)),\(Self.hex(tag)))")
             }
         }
-        try PropertyValues.damage(store, "BEGIN;" + statements.joined(separator: ";\n") + ";COMMIT;")
+        return "BEGIN;" + statements.joined(separator: ";\n") + ";COMMIT;"
+    }
+
+    @Test(arguments: [UInt64(1), 2, 3, 0xC0FFEE])
+    func randomRowsReadFromTheListingAsUniFFIReadsEachAlone(seed: UInt64) async throws {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store)
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "seed"]))
+        await copy.close()
+
+        // Off the cooperative pool: a script with megabyte properties is long synchronous work, and the cases
+        // running at once would hold every thread on a small runner and stall the suites that time themselves.
+        let script = try await background { Self.script(seed: seed) }
+        try PropertyValues.damage(store, script)
 
         let reopened = try await WorkingCopy.open(store: store)
         let listed = try await reopened.items.list(ListFilters(allStates: true))
