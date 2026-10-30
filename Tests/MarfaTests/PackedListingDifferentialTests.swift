@@ -5,7 +5,10 @@ import Testing
 
 /// Rows written straight into a store, with values a local create can't make, read through the packed listing and
 /// through UniFFI's record of one item, which must agree to the bit.
-@Suite(.timeLimit(.minutes(2)))
+///
+/// The seeds run one at a time: reading megabyte rows keeps a thread busy for a second or more on a small runner, and
+/// four at once would take every core from the suites that time themselves.
+@Suite(.serialized, .timeLimit(.minutes(2)))
 struct PackedListingDifferential {
     /// SplitMix64, so a failure names a seed that reproduces it.
     struct Random {
@@ -39,7 +42,6 @@ struct PackedListingDifferential {
         }
     }
 
-    /// Some properties are a megabyte, so this avoids a `String(format:)` for each byte.
     static func hex(_ text: String) -> String {
         let digits = Array("0123456789ABCDEF".utf8)
         var out: [UInt8] = []
@@ -104,18 +106,21 @@ struct PackedListingDifferential {
         return "{" + members.joined(separator: ",") + "}"
     }
 
+    /// The SQL for a row's stored properties.
     static func properties(_ random: inout Random) -> String {
         switch random.below(40) {
-        case 0: return "{\"title\":"
-        case 1: return "[1]"
-        case 2: return "{\"t\":\"\\ud800\"}"
-        case 3: return "{\"t\":1e400}"
-        case 4: return String(repeating: "[", count: 200) + String(repeating: "]", count: 200)
+        case 0: return hex("{\"title\":")
+        case 1: return hex("[1]")
+        case 2: return hex("{\"t\":\"\\ud800\"}")
+        case 3: return hex("{\"t\":1e400}")
+        case 4: return hex(String(repeating: "[", count: 200) + String(repeating: "]", count: 200))
         case 5:
             let deep = String(repeating: "[", count: 62) + "null" + String(repeating: "]", count: 62)
-            return "{\"deep\":\(deep)}"
-        case 6: return "{\"title\":\"\(String(repeating: "x", count: 1_000_000))\",\"body\":\"\"}"
-        default: return object(&random, depth: 0, most: 12)
+            return hex("{\"deep\":\(deep)}")
+        // A title of a million `x`s, built by SQLite: written out in the script, a few megabyte rows take seconds of
+        // processor time in a debug build, enough on a three-core runner to hold up the suites that time themselves.
+        case 6: return "'{\"title\":\"' || replace(hex(zeroblob(500000)), '0', 'x') || '\",\"body\":\"\"}'"
+        default: return hex(object(&random, depth: 0, most: 12))
         }
     }
 
@@ -143,7 +148,7 @@ struct PackedListingDifferential {
                 INSERT INTO items (id,type,state,tier,version,schema_version,source,source_id,occurred_at,created_at,
                 updated_at,properties,capture_latitude,capture_longitude) VALUES (\(Self.hex(id)),\(type),'\(state)',\(tier),
                 \(Int64(bitPattern: random.next())),\(random.pick([Int64.min, Int64.max, 0, -1, 2])),\(Self.hex(random.text())),
-                \(sourceId),\(at(&random)),\(at(&random)),\(at(&random)),\(Self.hex(Self.properties(&random))),\(Self.optionalReal(&random)),
+                \(sourceId),\(at(&random)),\(at(&random)),\(at(&random)),\(Self.properties(&random)),\(Self.optionalReal(&random)),
                 \(Self.optionalReal(&random)))
                 """)
             for tag in Set((0..<random.below(5)).map { _ in random.text(most: 6) }) {
@@ -160,10 +165,8 @@ struct PackedListingDifferential {
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "seed"]))
         await copy.close()
 
-        // Off the cooperative pool: a script with megabyte properties is long synchronous work, and the cases
-        // running at once would hold every thread on a small runner and stall the suites that time themselves.
-        let script = try await background { Self.script(seed: seed) }
-        try PropertyValues.damage(store, script)
+        // Off the cooperative pool: SQLite writing megabyte rows is long synchronous work.
+        try await background { try PropertyValues.damage(store, Self.script(seed: seed)) }
 
         let reopened = try await WorkingCopy.open(store: store)
         let listed = try await reopened.items.list(ListFilters(allStates: true))
