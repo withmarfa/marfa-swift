@@ -3,7 +3,7 @@ import MarfaCore
 
 /// A listing's items cross from the core packed into one buffer, because UniFFI's generated reader costs several
 /// microseconds a field-heavy record. The layout is the one `core/bindings/swift/src/packed.rs` in withmarfa/marfa
-/// states and writes; `PackedRowsTests` holds the bytes both sides agree on.
+/// states and writes; the `PackedListing` tests hold the bytes both sides agree on.
 extension MarfaCore.Listing {
     var answer: Rows<Item> {
         get throws(MarfaError) { Rows(try PackedRows.items(rows), completeness: completeness) }
