@@ -2,7 +2,7 @@
 
 ## Lucide
 
-The SVG artwork in `Sources/MarfaIcons/Lucide.xcassets` and the icon names in `Sources/MarfaIcons/LucidePinned.swift` come from Lucide (`lucide-static`, https://lucide.dev), under this license:
+The SVG artwork in `Sources/MarfaIcons/Lucide.xcassets` and the icon IDs in `Sources/MarfaIcons/LucideIconSet.swift` come from Lucide (https://lucide.dev), through the `@iconify-json/lucide` package (ISC), under this license:
 
 ```
 ISC License
@@ -49,6 +49,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Simple Icons
+
+The SVG artwork in `Sources/MarfaBrandIcons/SimpleIcons.xcassets` and the icon IDs in `Sources/MarfaBrandIcons/SimpleIconsIconSet.swift` come from Simple Icons (https://simpleicons.org), through the `@iconify-json/simple-icons` package (CC0 1.0). Simple Icons is dedicated to the public domain under CC0 1.0 Universal (https://creativecommons.org/publicdomain/zero/1.0/), which needs no notice to be kept.
+
+The marks are the trademarks of their owners. CC0 covers the artwork Simple Icons drew, not the right to use a brand's mark; an app that shows one is responsible for using it as the brand allows.
 
 ## rosetta-icons
 

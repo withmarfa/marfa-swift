@@ -1,51 +1,51 @@
-// Regenerates what the type icons ship from one pin: the Lucide name list at marfa's pinned commit, and the SVG
-// of every name that Sources/MarfaIcons/LucideSymbols.swift gives no SF Symbol, taken from the `lucide-static`
-// release the list names.
+// Regenerates what the type icons ship from one pin: for each Iconify set marfa accepts, the icon list at marfa's
+// pinned commit, and the SVG of every icon the package draws itself, taken from the `@iconify-json` package at the
+// version that list names.
 //
 //   scripts/icons.mjs                                  # reads .build/marfa, the checkout scripts/core.sh makes
 //   MARFA_MONOREPO=<checkout> scripts/icons.mjs        # a clean checkout already at the pin
 //
-// Writes Sources/MarfaIcons/LucidePinned.swift and Sources/MarfaIcons/Lucide.xcassets, and removes any image
-// the table now covers.
+// Lucide: Sources/MarfaIcons/LucideIconSet.swift and Sources/MarfaIcons/Lucide.xcassets, with an image only for an
+// icon that Sources/MarfaIcons/LucideSymbols.swift gives no SF Symbol.
+// Simple Icons: Sources/MarfaBrandIcons/SimpleIconsIconSet.swift and Sources/MarfaBrandIcons/SimpleIcons.xcassets,
+// with an image for every icon.
 import { spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const source = process.env.MARFA_MONOREPO ?? join(root, ".build/marfa");
-const listPath = join(source, "packages/types/generated/lucide-icons.json");
-if (!existsSync(listPath)) {
-  console.error(`icons.mjs: ${listPath} does not exist; run scripts/core.sh first, or set MARFA_MONOREPO`);
-  process.exit(1);
-}
-const { lucide_version: version, icons: names } = JSON.parse(readFileSync(listPath, "utf8"));
-if (!/^\d+\.\d+\.\d+$/.test(version) || !Array.isArray(names) || names.length === 0) {
-  console.error("icons.mjs: the name list has no exact version or no names");
-  process.exit(1);
-}
 
-const table = readFileSync(join(root, "Sources/MarfaIcons/LucideSymbols.swift"), "utf8");
-const mapped = new Map([...table.matchAll(/^\s*"([a-z0-9-]+)": "([a-z0-9.]+)",$/gm)].map((m) => [m[1], m[2]]));
-const known = new Set(names);
-const strays = [...mapped.keys()].filter((name) => !known.has(name));
-if (strays.length > 0) {
-  console.error(`icons.mjs: the table names icons Lucide ${version} does not have: ${strays.join(", ")}`);
-  process.exit(1);
-}
-const drawn = names.filter((name) => !mapped.has(name));
+const sets = [
+  {
+    prefix: "lucide",
+    title: "Lucide",
+    enumName: "LucideIconSet",
+    target: "MarfaIcons",
+    catalog: "Lucide.xcassets",
+    summary: "General-purpose icons.",
+    symbols: true,
+  },
+  {
+    prefix: "simple-icons",
+    title: "Simple Icons",
+    enumName: "SimpleIconsIconSet",
+    target: "MarfaBrandIcons",
+    catalog: "SimpleIcons.xcassets",
+    summary: "Brand marks.",
+    symbols: false,
+  },
+];
 
-// SVG lets an arc's two flags run into the number after them ("a2 2 0 0020 0"), and Lucide's minifier does. Core
-// SVG, which draws an asset catalog's SVG, reads that wrong, so every arc is written with its parameters spaced.
+const fail = (message) => {
+  console.error(`icons.mjs: ${message}`);
+  process.exit(1);
+};
+
+// SVG lets an arc's two flags run into the number after them ("a2 2 0 0020 0"). Core SVG, which draws an asset
+// catalog's SVG, reads that wrong, so every arc is written with its parameters spaced.
 const separator = /^[\s,]*/;
 const numeral = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/;
 const flag = /^[01]/;
@@ -79,69 +79,105 @@ function spaceArcs(d) {
 const spaced = (svg) => svg.replace(/\sd="([^"]*)"/g, (_, d) => ` d="${spaceArcs(d)}"`);
 
 const scratch = mkdtempSync(join(tmpdir(), "marfa-icons-"));
+const run = (command, args, cwd) => {
+  const result = spawnSync(command, args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (result.status !== 0) fail(`${command} ${args.join(" ")} failed\n${result.stderr}`);
+  return result.stdout;
+};
+
 try {
-  const run = (command, args, cwd) => {
-    const result = spawnSync(command, args, { cwd, encoding: "utf8" });
-    if (result.status !== 0) {
-      console.error(`icons.mjs: ${command} ${args.join(" ")} failed\n${result.stderr}`);
-      process.exit(1);
+  for (const set of sets) {
+    const listPath = join(source, `packages/types/generated/icon-set-${set.prefix}.json`);
+    if (!existsSync(listPath)) fail(`${listPath} does not exist; run scripts/core.sh first, or set MARFA_MONOREPO`);
+    const list = JSON.parse(readFileSync(listPath, "utf8"));
+    const { version, icons: names } = list;
+    const pkg = `@iconify-json/${set.prefix}`;
+    if (list.prefix !== set.prefix || list.package !== pkg) fail(`${listPath} is not the list for ${pkg}`);
+    if (!/^\d+\.\d+\.\d+$/.test(version) || !Array.isArray(names) || names.length === 0) {
+      fail(`the ${set.prefix} list has no exact version or no names`);
     }
-    return result.stdout;
-  };
-  const tarball = run("npm", ["pack", `lucide-static@${version}`, "--silent", "--pack-destination", scratch], scratch).trim();
-  run("tar", ["-xzf", join(scratch, tarball), "-C", scratch], scratch);
-  const packaged = JSON.parse(readFileSync(join(scratch, "package/package.json"), "utf8"));
-  if (packaged.version !== version) {
-    console.error(`icons.mjs: asked for lucide-static ${version} and got ${packaged.version}`);
-    process.exit(1);
-  }
-  const icons = join(scratch, "package/icons");
-  const missing = drawn.filter((name) => !existsSync(join(icons, `${name}.svg`)));
-  if (missing.length > 0) {
-    console.error(`icons.mjs: lucide-static ${version} has no SVG for: ${missing.join(", ")}`);
-    process.exit(1);
-  }
+    const bad = names.filter((name) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(name));
+    if (bad.length > 0) fail(`the ${set.prefix} list has names that are not kebab case: ${bad.join(", ")}`);
+    const known = new Set(names);
+    const idOf = (name) => `${set.prefix}:${name}`;
 
-  const catalog = join(root, "Sources/MarfaIcons/Lucide.xcassets");
-  rmSync(catalog, { recursive: true, force: true });
-  mkdirSync(catalog, { recursive: true });
-  writeFileSync(join(catalog, "Contents.json"), JSON.stringify({ info: { author: "xcode", version: 1 } }, null, 2) + "\n");
-  for (const name of drawn) {
-    const folder = join(catalog, `lucide-${name}.imageset`);
-    mkdirSync(folder);
-    writeFileSync(join(folder, `${name}.svg`), spaced(readFileSync(join(icons, `${name}.svg`), "utf8")));
+    let mapped = new Map();
+    if (set.symbols) {
+      const table = readFileSync(join(root, "Sources/MarfaIcons/LucideSymbols.swift"), "utf8");
+      mapped = new Map([...table.matchAll(/^\s*"([a-z0-9-]+):([a-z0-9-]+)": "([a-z0-9.]+)",$/gm)].map((m) => [`${m[1]}:${m[2]}`, m[3]]));
+      const bareOrForeign = table.match(new RegExp(`^\\s*"(?!${set.prefix}:)[^"]*": "`, "m"));
+      if (bareOrForeign) fail(`the table has a key that is not a ${set.prefix} ID: ${bareOrForeign[0].trim()}`);
+      const strays = [...mapped.keys()].filter((id) => !known.has(id.slice(set.prefix.length + 1)));
+      if (strays.length > 0) fail(`the table names icons ${pkg} ${version} does not have: ${strays.join(", ")}`);
+    }
+    const drawn = names.filter((name) => !mapped.has(idOf(name)));
+
+    const dir = join(scratch, set.prefix);
+    mkdirSync(dir);
+    const tarball = run("npm", ["pack", `${pkg}@${version}`, "--silent", "--pack-destination", dir], dir).trim();
+    run("tar", ["-xzf", join(dir, tarball), "-C", dir], dir);
+    const packaged = JSON.parse(readFileSync(join(dir, "package/package.json"), "utf8"));
+    if (packaged.name !== pkg || packaged.version !== version) {
+      fail(`asked for ${pkg} ${version} and got ${packaged.name} ${packaged.version}`);
+    }
+    const data = JSON.parse(readFileSync(join(dir, "package/icons.json"), "utf8"));
+    if (data.prefix !== set.prefix) fail(`${pkg} holds the set "${data.prefix}"`);
+    const missing = drawn.filter((name) => data.icons[name]?.body === undefined);
+    if (missing.length > 0) fail(`${pkg} ${version} has no artwork for: ${missing.join(", ")}`);
+
+    const svgOf = (name) => {
+      const icon = data.icons[name];
+      const width = icon.width ?? data.width;
+      const height = icon.height ?? data.height;
+      return (
+        `<!-- ${pkg}@${version} -->\n` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+        `${spaced(icon.body)}</svg>\n`
+      );
+    };
+
+    const sources = join(root, "Sources", set.target);
+    const catalog = join(sources, set.catalog);
+    rmSync(catalog, { recursive: true, force: true });
+    mkdirSync(catalog, { recursive: true });
+    writeFileSync(join(catalog, "Contents.json"), JSON.stringify({ info: { author: "xcode", version: 1 } }, null, 2) + "\n");
+    for (const name of drawn) {
+      const folder = join(catalog, `${set.prefix}-${name}.imageset`);
+      mkdirSync(folder);
+      writeFileSync(join(folder, `${name}.svg`), svgOf(name));
+      writeFileSync(
+        join(folder, "Contents.json"),
+        JSON.stringify(
+          {
+            images: [{ filename: `${name}.svg`, idiom: "universal" }],
+            info: { author: "xcode", version: 1 },
+            properties: { "preserves-vector-representation": true, "template-rendering-intent": "template" },
+          },
+          null,
+          2,
+        ) + "\n",
+      );
+    }
+
+    const lines = names.map((name) => `        "${idOf(name)}",`).join("\n");
     writeFileSync(
-      join(folder, "Contents.json"),
-      JSON.stringify(
-        {
-          images: [{ filename: `${name}.svg`, idiom: "universal" }],
-          info: { author: "xcode", version: 1 },
-          properties: { "preserves-vector-representation": true, "template-rendering-intent": "template" },
-        },
-        null,
-        2,
-      ) + "\n",
-    );
-  }
-
-  const lines = names.map((name) => `        "${name}",`).join("\n");
-  writeFileSync(
-    join(root, "Sources/MarfaIcons/LucidePinned.swift"),
-    `// Generated by scripts/icons.mjs from the Lucide release marfa pins. Never edited.
-/// The Lucide release Marfa pins, and every icon name the server accepts at it: the names an app can offer a person
-/// to choose from. `TypeIcon` draws each one.
-public enum LucidePinned {
-    /// The Lucide release.
+      join(sources, `${set.enumName}.swift`),
+      `// Generated by scripts/icons.mjs from the ${set.title} release marfa pins. Never edited.
+/// The ${set.title} release Marfa pins, and every icon ID the server accepts from it: the IDs an app can offer a
+/// person to choose from, each \`${set.prefix}:<name>\`.
+public enum ${set.enumName} {
+    /// The release of \`${pkg}\`.
     public static let version = "${version}"
 
-    /// Every icon name the server accepts at this release, in alphabetical order.
-    public static let names: [String] = [
+    /// Every icon ID the server accepts from this release, in alphabetical order.
+    public static let ids: [String] = [
 ${lines}
     ]
 }
 `,
-  );
-  console.log(`Lucide ${version}: ${names.length} names, ${mapped.size} SF Symbols, ${drawn.length} drawn from SVG`);
+    );
+    console.log(`${set.title} ${version}: ${names.length} icons, ${mapped.size} SF Symbols, ${drawn.length} drawn from SVG`);
+  }
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }

@@ -80,12 +80,13 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// naming only its body keeps its parent's title field.
     public let titleField: String?
     public let bodyField: String?
-    /// The Lucide name of the icon that stands for the type, in kebab case,
-    /// such as `book-open`; `nil` when no type in its chain sets one.
+    /// The Iconify ID of the icon that stands for the type, `<set>:<name>`
+    /// such as `lucide:book-open` or `simple-icons:github`; `nil` when no
+    /// type in its chain sets one.
     ///
     /// The core has resolved it: the owner's own choice for this type or the
     /// nearest type that has one, else the nearest author's. A server newer
-    /// than the SDK can send a name the SDK does not know; `MarfaIcons` draws
+    /// than the SDK can send an ID the SDK does not know; `MarfaIcons` draws
     /// a fallback for it.
     public let icon: String?
     /// The field holding each row's own id at the vendor that writes rows of

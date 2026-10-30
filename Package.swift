@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "MarfaAPI", targets: ["MarfaAPI"]),
         .library(name: "MarfaTesting", targets: ["MarfaTesting"]),
         .library(name: "MarfaIcons", targets: ["MarfaIcons"]),
+        .library(name: "MarfaBrandIcons", targets: ["MarfaBrandIcons"]),
         .library(name: "MarfaTelemetry", targets: ["MarfaTelemetry"]),
     ],
     dependencies: [
@@ -43,6 +44,12 @@ let package = Package(
             name: "MarfaIcons",
             dependencies: ["Marfa"],
             resources: [.process("Lucide.xcassets")],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .target(
+            name: "MarfaBrandIcons",
+            dependencies: ["MarfaIcons"],
+            resources: [.process("SimpleIcons.xcassets")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
@@ -80,6 +87,11 @@ let package = Package(
         .testTarget(
             name: "MarfaIconTests",
             dependencies: ["Marfa", "MarfaIcons"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "MarfaBrandIconTests",
+            dependencies: ["Marfa", "MarfaIcons", "MarfaBrandIcons"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

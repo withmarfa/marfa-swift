@@ -19,23 +19,47 @@ private func symbolExists(_ name: String) -> Bool {
     #endif
 }
 
-private func shippedArtwork(_ name: String) -> Bool {
+private func shippedArtwork(_ id: String) -> Bool {
     #if canImport(AppKit)
-    TypeIconArtwork.bundle.image(forResource: NSImage.Name(TypeIconArtwork.assetName(name))) != nil
+    TypeIconArtwork.bundle.image(forResource: NSImage.Name(TypeIconArtwork.assetName(id))) != nil
     #else
-    UIImage(named: TypeIconArtwork.assetName(name), in: TypeIconArtwork.bundle, with: nil) != nil
+    UIImage(named: TypeIconArtwork.assetName(id), in: TypeIconArtwork.bundle, with: nil) != nil
     #endif
 }
 
+private let sourceRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+
+/// The list marfa generates for an icon set at the pinned commit, from the checkout `MARFA_MONOREPO` names.
+private func pinnedList(_ prefix: String) throws -> (version: String, ids: [String])? {
+    guard let checkout = ProcessInfo.processInfo.environment["MARFA_MONOREPO"] else { return nil }
+    let file = URL(fileURLWithPath: checkout).appendingPathComponent("packages/types/generated/icon-set-\(prefix).json")
+    struct List: Decodable {
+        let version: String
+        let icons: [String]
+    }
+    let list = try JSONDecoder().decode(List.self, from: Data(contentsOf: file))
+    return (list.version, list.icons.map { "\(prefix):\($0)" })
+}
+
+/// Stands in for the brand product, which this target does not link.
+private let someBrandArtwork = BrandArtwork(
+    bundle: .main, ids: ["simple-icons:github", "simple-icons:apple"])
+
 @Suite struct IconTableTests {
-    @Test func everyMappedNameIsInThePinnedList() {
-        let pinned = Set(LucidePinned.names)
+    @Test func everyMappedIDIsInThePinnedList() {
+        let pinned = Set(LucideIconSet.ids)
         let strays = LucideSymbols.table.keys.filter { !pinned.contains($0) }.sorted()
-        #expect(strays.isEmpty, "Lucide \(LucidePinned.version) has no icon named \(strays)")
+        #expect(strays.isEmpty, "Lucide \(LucideIconSet.version) has no icon with the ID \(strays)")
+    }
+
+    @Test func everyIDIsALucideID() {
+        #expect(LucideIconSet.ids.allSatisfy { $0.hasPrefix("lucide:") && !$0.dropFirst(7).contains(":") })
+        #expect(LucideSymbols.table.keys.allSatisfy { $0.hasPrefix("lucide:") })
     }
 
     @Test func theListHasNoRepeats() {
-        #expect(Set(LucidePinned.names).count == LucidePinned.names.count)
+        #expect(Set(LucideIconSet.ids).count == LucideIconSet.ids.count)
     }
 
     @Test func everyMappedSymbolExistsOnThisSDK() {
@@ -47,34 +71,66 @@ private func shippedArtwork(_ name: String) -> Bool {
         #expect(symbolExists(TypeIconArtwork.fallbackSymbol))
     }
 
-    @Test func everyPinnedNameWithoutASymbolShipsItsArtwork() {
-        let lacking = LucidePinned.names.filter { LucideSymbols.table[$0] == nil && !shippedArtwork($0) }
+    @Test func everyPinnedIDWithoutASymbolShipsItsArtwork() {
+        let lacking = LucideIconSet.ids.filter { LucideSymbols.table[$0] == nil && !shippedArtwork($0) }
         #expect(lacking.isEmpty, "no artwork shipped for \(lacking)")
     }
 
-    @Test func noArtworkShipsForAMappedName() throws {
-        let catalog = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/MarfaIcons/Lucide.xcassets")
+    private var catalog: URL { sourceRoot.appendingPathComponent("Sources/MarfaIcons/Lucide.xcassets") }
+
+    @Test func noArtworkShipsForAMappedID() throws {
         let shipped = try FileManager.default.contentsOfDirectory(atPath: catalog.path)
             .filter { $0.hasSuffix(".imageset") }
-            .map { String($0.dropFirst("lucide-".count).dropLast(".imageset".count)) }
+            .map { "lucide:" + $0.dropFirst("lucide-".count).dropLast(".imageset".count) }
         #expect(
             Set(shipped) == TypeIconArtwork.drawn,
             "the catalog holds artwork the table covers, or lacks some; run scripts/icons.mjs")
     }
 
-    @Test(arguments: ["bot", "ticket", "scale", "gavel", "notebook-pen", "folder-kanban", "file-code"])
-    func aNameWithNoGoodSymbolIsDrawnFromLucide(name: String) {
-        #expect(TypeIconArtwork(name: name) == .lucide(name))
+    @Test func theArtworkIsFromTheReleaseTheListNames() throws {
+        let stamp = "<!-- @iconify-json/lucide@\(LucideIconSet.version) -->\n"
+        let sets = try FileManager.default.contentsOfDirectory(atPath: catalog.path).filter {
+            $0.hasSuffix(".imageset")
+        }
+        var stale: [String] = []
+        for set in sets {
+            let folder = catalog.appendingPathComponent(set)
+            let svgs = try FileManager.default.contentsOfDirectory(atPath: folder.path).filter { $0.hasSuffix(".svg") }
+            for svg in svgs
+            where !(try String(contentsOf: folder.appendingPathComponent(svg), encoding: .utf8)).hasPrefix(stamp) {
+                stale.append(set)
+            }
+        }
+        #expect(
+            !sets.isEmpty && stale.isEmpty, "artwork from another release: \(stale.prefix(5)); run scripts/icons.mjs")
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil))
+    func theCheckoutIsNamedWhereItIsRequired() throws {
+        #expect(try pinnedList("lucide") != nil, "MARFA_LIVE_REQUIRED is set, and MARFA_MONOREPO is not")
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["MARFA_MONOREPO"] != nil))
+    func theListIsTheOneMarfaPinsAtTheCommit() throws {
+        let pinned = try #require(try pinnedList("lucide"))
+        #expect(LucideIconSet.version == pinned.version, "run scripts/icons.mjs")
+        #expect(LucideIconSet.ids == pinned.ids, "run scripts/icons.mjs")
     }
 
     @Test(arguments: [
-        ("book-open", "book"), ("rss", "dot.radiowaves.up.forward"), ("briefcase", "briefcase"), ("globe", "globe"),
-        ("sticky-note", "note.text"), ("message-square", "bubble.left"),
+        "lucide:bot", "lucide:ticket", "lucide:scale", "lucide:gavel", "lucide:notebook-pen", "lucide:folder-kanban",
+        "lucide:file-code",
     ])
-    func aNameWithAGoodSymbolIsDrawnAsIt(name: String, symbol: String) {
-        #expect(TypeIconArtwork(name: name) == .symbol(symbol))
+    func anIDWithNoGoodSymbolIsDrawnFromLucide(id: String) {
+        #expect(TypeIconArtwork(id: id, brand: nil) == .lucide(id))
+    }
+
+    @Test(arguments: [
+        ("lucide:book-open", "book"), ("lucide:rss", "dot.radiowaves.up.forward"), ("lucide:briefcase", "briefcase"),
+        ("lucide:globe", "globe"), ("lucide:sticky-note", "note.text"), ("lucide:message-square", "bubble.left"),
+    ])
+    func anIDWithAGoodSymbolIsDrawnAsIt(id: String, symbol: String) {
+        #expect(TypeIconArtwork(id: id, brand: nil) == .symbol(symbol))
     }
 
     /// The `icon` of every type in marfa's `packages/types/core` at the pin.
@@ -84,12 +140,30 @@ private func shippedArtwork(_ name: String) -> Bool {
         "library-big", "tv", "audio-lines", "message-square", "sticky-note", "square-check-big",
     ])
     func everyIconTheCoreTypesCarryIsDrawn(name: String) {
-        #expect(TypeIconArtwork(name: name) != .fallback)
+        #expect(TypeIconArtwork(id: "lucide:\(name)", brand: nil) != .fallback)
     }
 
-    @Test(arguments: [nil, "", "no-such-icon", "Book-Open", "book open"])
-    func aMissingOrUnknownNameFallsBack(name: String?) {
-        #expect(TypeIconArtwork(name: name) == .fallback)
+    @Test(
+        arguments: [
+            nil, "", "book-open", "bot", "no-such-icon", "lucide:", "lucide:no-such-icon", "lucide:Book-Open",
+            "lucide:book open", "Lucide:book-open", "lucide:lucide:bot", "no-such-set:bot", "simple-icons:no-such-icon",
+            ":bot", "lucide-bot",
+        ] as [String?])
+    func aMissingBareOrUnknownIDFallsBack(id: String?) {
+        #expect(TypeIconArtwork(id: id, brand: nil) == .fallback)
+        #expect(TypeIconArtwork(id: id, brand: someBrandArtwork) == .fallback)
+    }
+
+    @Test func aBrandIDDrawsFallbackWithoutBrandArtworkAndItsMarkWith() {
+        #expect(TypeIconArtwork(id: "simple-icons:github", brand: nil) == .fallback)
+        #expect(TypeIconArtwork(id: "simple-icons:github", brand: someBrandArtwork) == .brand("simple-icons:github"))
+        #expect(
+            TypeIconArtwork(id: "simple-icons:not-supplied", brand: someBrandArtwork) == .fallback,
+            "the supplied artwork decides which brand IDs it can draw")
+    }
+
+    @Test func aBareNameThatIsABrandNameDrawsFallbackEvenWithBrandArtwork() {
+        #expect(TypeIconArtwork(id: "github", brand: someBrandArtwork) == .fallback)
     }
 }
 
@@ -122,33 +196,42 @@ private func shippedArtwork(_ name: String) -> Bool {
         return count == 0 ? nil : (sum.0 / count / 255, sum.1 / count / 255, sum.2 / count / 255)
     }
 
-    @Test(arguments: ["gavel", "bot", "book-open", nil, "no-such-icon"] as [String?])
-    func anIconDrawsSomething(name: String?) throws {
-        #expect(ink(try pixels(TypeIcon(name: name).foregroundStyle(.black))) != nil)
+    @Test(
+        arguments: ["lucide:gavel", "lucide:bot", "lucide:book-open", nil, "lucide:no-such-icon", "book-open"]
+            as [String?])
+    func anIconDrawsSomething(id: String?) throws {
+        #expect(ink(try pixels(TypeIcon(id: id).foregroundStyle(.black))) != nil)
+    }
+
+    @Test(arguments: ["simple-icons:github", nil] as [String?])
+    func aBrandIDWithNoBrandArtworkDrawsTheFallbackSymbol(id: String?) throws {
+        let artwork = TypeIconArtwork(id: id, brand: nil)
+        #expect(artwork == .fallback)
+        #expect(ink(try pixels(Image(artwork: artwork, brand: nil).foregroundStyle(.black))) != nil)
     }
 
     @Test func everyShippedArtworkDrawsSomething() throws {
         var blank: [String] = []
-        for name in TypeIconArtwork.drawn.sorted()
-        where ink(try pixels(Image(typeIcon: name).resizable().frame(width: 24, height: 24).foregroundStyle(.black)))
+        for id in TypeIconArtwork.drawn.sorted()
+        where ink(try pixels(Image(typeIcon: id).resizable().frame(width: 24, height: 24).foregroundStyle(.black)))
             == nil
         {
-            blank.append(name)
+            blank.append(id)
         }
         #expect(blank.isEmpty, "drew nothing: \(blank)")
     }
 
-    @Test(arguments: ["gavel", "book-open", "no-such-icon"])
-    func anIconTakesTheForegroundStyle(name: String) throws {
+    @Test(arguments: ["lucide:gavel", "lucide:book-open", "lucide:no-such-icon", "book-open"])
+    func anIconTakesTheForegroundStyle(id: String) throws {
         let color = try #require(
-            ink(try pixels(TypeIcon(name: name).foregroundStyle(Color(red: 1, green: 0, blue: 0)))))
+            ink(try pixels(TypeIcon(id: id).foregroundStyle(Color(red: 1, green: 0, blue: 0)))))
         #expect(color.red > 0.9 && color.green < 0.1 && color.blue < 0.1)
     }
 
-    @Test(arguments: ["gavel", "book-open"])
-    func anIconWithNoStyleFollowsLightAndDark(name: String) throws {
-        let light = try #require(ink(try pixels(TypeIcon(name: name).foregroundStyle(.primary), scheme: .light)))
-        let dark = try #require(ink(try pixels(TypeIcon(name: name).foregroundStyle(.primary), scheme: .dark)))
+    @Test(arguments: ["lucide:gavel", "lucide:book-open"])
+    func anIconWithNoStyleFollowsLightAndDark(id: String) throws {
+        let light = try #require(ink(try pixels(TypeIcon(id: id).foregroundStyle(.primary), scheme: .light)))
+        let dark = try #require(ink(try pixels(TypeIcon(id: id).foregroundStyle(.primary), scheme: .dark)))
         #expect(light.red < 0.3, "dark ink on a light appearance")
         #expect(dark.red > 0.7, "light ink on a dark appearance")
     }
