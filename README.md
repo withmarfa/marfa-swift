@@ -156,6 +156,8 @@ let group = try await copy.catalog.statusGroup(of: item)   // read with the item
 let groups = try await copy.catalog.statusGroups(of: items)
 ```
 
+`statusGroup(of:)` throws `MarfaError.notFound` for an item whose type the catalog does not hold, as `itemType(_:)` does. `statusGroups(of:)` gives `nil` for that item and reads the rest.
+
 The group is `nil` for an item that holds no status, holds a word its type does not declare, or has a type with no status field. A write that changes the status to a word the type does not declare throws `MarfaError.validation` with the code `invalid_properties`. An edit that leaves the field alone does not.
 
 A listing, a view and a folder select by group with the `status_group` term in a `filter`. This lists the open items of every type that has a status field:
@@ -167,7 +169,7 @@ let open = try await copy.items.list(
 
 An item in no group matches neither `eq` nor `neq`; `status_group not_exists` selects it. The server refuses a group name that is not one of the four, with `MarfaError.validation`.
 
-`core.event` has a `status` of its own that is not a status field: one of three fixed values, with no groups. `EventStatus` names them, and `EventStatus(event:)` reads an event's.
+`core.event` has a `status` of its own that is not a status field: one of three fixed values, with no groups. `EventStatus` names them. A subtype cannot change them, so `copy.catalog.eventStatus(of: item)` reads the status of an item of `core.event` or of a type that descends from it, such as one a connector declares, and gives `nil` for any other item.
 
 ## Draw a type's icon
 

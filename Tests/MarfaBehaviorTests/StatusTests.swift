@@ -84,6 +84,10 @@ struct StatusOffline {
         } throws: { error in
             if case .notFound("type_not_found", _)? = error as? MarfaError { true } else { false }
         }
+        #expect(
+            try await copy.catalog.statusGroups(of: [started, unknown, note, unknown, started]) == [
+                .inProgress, nil, nil, nil, .inProgress,
+            ], "a type the catalog does not hold gives that item nothing and fails no other")
         await copy.close()
     }
 
@@ -165,6 +169,12 @@ struct StatusOffline {
         await copy.close()
     }
 
+    static func statuses(of items: [Item], in copy: WorkingCopy) async throws -> [EventStatus?] {
+        var statuses: [EventStatus?] = []
+        for item in items { statuses.append(try await copy.catalog.eventStatus(of: item)) }
+        return statuses
+    }
+
     @Test(arguments: CopyKind.allCases)
     func anEventsStatusIsOneOfThreeValuesTheSDKTypes(kind: CopyKind) async throws {
         let copy = try await kind.open()
@@ -173,15 +183,23 @@ struct StatusOffline {
             let draft = Draft(type: "core.event", properties: ["title": "Standup", "status": .string(status.rawValue)])
             events.append(try await Self.made(draft, in: copy))
         }
-        #expect(events.map { EventStatus(event: $0) } == [.tentative, .confirmed, .canceled])
+        #expect(try await Self.statuses(of: events, in: copy) == [.tentative, .confirmed, .canceled])
         let bare = try await Self.made(Draft(type: "core.event", properties: ["title": "x"]), in: copy)
-        #expect(EventStatus(event: bare) == nil, "an event with no status has none to read")
+        #expect(try await copy.catalog.eventStatus(of: bare) == nil, "an event with no status has none to read")
         let note = try await Self.made(
             Draft(type: "core.note", properties: ["body": "b", "status": "confirmed"]), in: copy)
-        #expect(EventStatus(event: note) == nil, "an item that is not an event has no event status")
+        #expect(try await copy.catalog.eventStatus(of: note) == nil, "an item that is not an event has no event status")
         var unknown = events[0]
         unknown.properties["status"] = "postponed"
-        #expect(EventStatus(event: unknown) == nil, "a value this SDK does not know")
+        #expect(try await copy.catalog.eventStatus(of: unknown) == nil, "a value this SDK does not know")
+        unknown.properties["status"] = 3
+        #expect(try await copy.catalog.eventStatus(of: unknown) == nil, "a value that is not a string")
+        unknown.type = "app.nope.type"
+        await #expect {
+            _ = try await copy.catalog.eventStatus(of: unknown)
+        } throws: { error in
+            if case .notFound("type_not_found", _)? = error as? MarfaError { true } else { false }
+        }
 
         await #expect {
             _ = try await copy.items.create(
@@ -198,6 +216,42 @@ struct StatusOffline {
                 events[0].id, Edit(properties: ["status": "maybe"], baseVersion: 0))
         } throws: { error in
             if case .validation("invalid_properties", _)? = error as? MarfaError { true } else { false }
+        }
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aSubtypeOfEventHoldsTheSameThreeValuesAndIsReadTheSame(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        try await copy.declareTypes([
+            ["id": "app.test.meeting", "parent": "core.event"],
+            ["id": "app.test.standup", "parent": "app.test.meeting"],
+            ["id": "app.test.errand", "parent": "core.task"],
+        ])
+        var meetings: [Item] = []
+        for type in ["app.test.meeting", "app.test.standup"] {
+            for status in EventStatus.allCases {
+                let draft = Draft(type: type, properties: ["title": "Sync", "status": .string(status.rawValue)])
+                meetings.append(try await Self.made(draft, in: copy))
+            }
+        }
+        #expect(
+            try await Self.statuses(of: meetings, in: copy)
+                == [.tentative, .confirmed, .canceled, .tentative, .confirmed, .canceled],
+            "a subtype, and a subtype of it, are events")
+        let errand = try await Self.made(
+            Draft(type: "app.test.errand", properties: ["title": "Post", "status": "completed"]), in: copy)
+        #expect(try await copy.catalog.eventStatus(of: errand) == nil, "a subtype of another type is not an event")
+
+        await #expect {
+            _ = try await copy.items.create(
+                Draft(type: "app.test.meeting", properties: ["title": "x", "status": "postponed"]))
+        } throws: { error in
+            if case .validation("invalid_properties", let message)? = error as? MarfaError {
+                message.hasSuffix("status: Must be one of \"tentative\", \"confirmed\", \"canceled\"")
+            } else {
+                false
+            }
         }
         await copy.close()
     }
