@@ -143,6 +143,34 @@ _ = try await api.register(
 
 `Client` has no call that creates, gets, changes or deletes one item or edge, and none for search or events: those go through the working copy, so each item has one path. It offers no bulk changes either. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect, and it waits 30 seconds for the instance to send more; pass `Client(_:timeout:)` a longer time for a call such as `runHousekeeping(_:)` that answers only when its work is done.
 
+## Read where an item stands
+
+A type with a `status` field, such as `core.task`, declares the words its items can hold, and puts each word in one of four groups that every type shares: `not_started`, `in_progress`, `completed` and `canceled`. `StatusGroup` names the four, so an app can tell what is open, active or finished without knowing a type's own words. `ItemType.statusWords` lists the words in order, each with its group, and `statusField` names the field. A subtype lists its parent's words first and then the ones it adds.
+
+```swift
+let task = try await copy.catalog.itemType("core.task")
+task.statusWords                          // not_started, in_progress, completed, canceled
+task.statusGroup(of: "completed")         // .completed
+
+let group = try await copy.catalog.statusGroup(of: item)   // read with the item's own type
+let groups = try await copy.catalog.statusGroups(of: items)
+```
+
+`statusGroup(of:)` throws `MarfaError.notFound` for an item whose type the catalog does not hold, as `itemType(_:)` does. `statusGroups(of:)` gives `nil` for that item and reads the rest.
+
+The group is `nil` for an item that holds no status, holds a word its type does not declare, or has a type with no status field. A write that changes the status to a word the type does not declare throws `MarfaError.validation` with the code `invalid_properties`. An edit that leaves the field alone does not.
+
+A listing, a view and a folder select by group with the `status_group` term in a `filter`. This lists the open items of every type that has a status field:
+
+```swift
+let open = try await copy.items.list(
+    ListFilters(filter: "status_group neq \"completed\" AND status_group neq \"canceled\""))
+```
+
+An item in no group matches neither `eq` nor `neq`; `status_group not_exists` selects it. The server refuses a group name that is not one of the four, with `MarfaError.validation`.
+
+`core.event` has a `status` of its own that is not a status field: one of three fixed values, with no groups. `EventStatus` names them. A subtype cannot change them, so `copy.catalog.eventStatus(of: item)` reads the status of an item of `core.event` or of a type that descends from it, such as one a connector declares, and gives `nil` for any other item.
+
 ## Draw a type's icon
 
 An item type carries one icon, an [Iconify](https://iconify.design) ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open` for a general icon from [Lucide](https://lucide.dev), or `simple-icons:github` for a brand mark from [Simple Icons](https://simpleicons.org). A bare name such as `book-open` is not an ID. `ItemType.icon` holds the ID the core resolved: the owner's own choice for the type or the nearest type that has one, else the nearest author's. It is `nil` when no type in the chain sets one.
@@ -207,6 +235,8 @@ import MarfaTesting
 ```
 
 Use `FakeCopy` to record writes, choose drain verdicts, and send changes on `changes()`. Unsupported calls throw `FakeCopyError.unsupported`. The `FakeCopy` API documentation lists the supported calls.
+
+The fake takes the status words of the types you give it and refuses a write that changes a status to a word the type does not declare, as the real copy does. It does not run a `filter`, `status_group` included, and it does not declare a type with a status field, so both throw `FakeCopyError.unsupported`.
 
 ## Report errors and events
 

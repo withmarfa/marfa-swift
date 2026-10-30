@@ -319,7 +319,7 @@ struct LiveRestart {
             #expect(try await copy.items.get(whole)?.properties == ["body": "only this"])
             let movedRead = try #require(try await copy.items.get(moved))
             _ = try await copy.items.update(
-                moved, Edit(properties: ["status": "open"], baseVersion: movedRead.version, type: "core.task"))
+                moved, Edit(properties: ["status": "in_progress"], baseVersion: movedRead.version, type: "core.task"))
             let pinnedRead = try #require(try await copy.items.get(pinned))
             _ = try await copy.items.update(pinned, Edit(baseVersion: pinnedRead.version, tier: .feed))
             // Shown before it is sent.
@@ -346,7 +346,7 @@ struct LiveRestart {
             #expect(try await Self.read(own, whole).item?["properties"] == .object(["body": "only this"]))
             let movedThere = try #require(try await Self.read(own, moved).item)
             #expect(movedThere["type"] == "core.task")
-            #expect(movedThere["properties"]?.object?["status"] == "open")
+            #expect(movedThere["properties"]?.object?["status"] == "in_progress")
             #expect(try await Self.read(own, pinned).item?["tier"] == "feed")
             // A move out of the slice lets an unpinned row go once answered,
             // and keeps a pinned one.

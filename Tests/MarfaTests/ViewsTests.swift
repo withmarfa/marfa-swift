@@ -294,7 +294,9 @@ extension LiveWorkingCopies {
                     "title": .string("Tasks \(tag)"),
                     "query": ["types": ["core.task"], "filter": .string("tags contains \"\(tag)\"")],
                     "sort": sort,
-                    "group": ["by": "properties.status", "order": ["todo", "done"], "hidden": .array(hidden)],
+                    "group": [
+                        "by": "properties.status", "order": ["not_started", "completed"], "hidden": .array(hidden),
+                    ],
                 ])
                 _ = try await copy.hydrate(types: ["core.task", "system.view"], tier: .all)
                 return Board(copy: copy, tag: tag, view: view, ids: ids)
@@ -302,13 +304,15 @@ extension LiveWorkingCopies {
         }
 
         @Test func aViewIsReadWithItsSortItemsAndGroups() async throws {
-            let board = try await Board.make([("b", "todo"), ("a", "todo"), ("c", "done"), ("d", "later")])
+            let board = try await Board.make([
+                ("b", "not_started"), ("a", "not_started"), ("c", "completed"), ("d", "in_progress"),
+            ])
             let copy = board.copy
 
             let view = try #require(try await copy.items.view(board.view))
             #expect(view.version == 1 && view.state == .active)
             #expect(view.settings.sort == [ViewSort(by: "properties.title", direction: .ascending)])
-            #expect(view.settings.group?.order == ["todo", "done"])
+            #expect(view.settings.group?.order == ["not_started", "completed"])
             #expect(try await copy.items.views().map(\.id).contains(board.view))
 
             #expect(
@@ -318,7 +322,9 @@ extension LiveWorkingCopies {
                 "a page of the sorted whole")
 
             let groups = try await copy.items.groups(inView: board.view)
-            #expect(groups.map(\.key) == ["todo", "done", "later"], "the named groups first, then the rest")
+            #expect(
+                groups.map(\.key) == ["not_started", "completed", "in_progress"],
+                "the named groups first, then the rest")
             #expect(groups.map(\.count) == [2, 1, 1])
 
             #expect(try await copy.search("a", inView: board.view).allSatisfy { $0.item.tags.contains(board.tag) })
@@ -327,7 +333,7 @@ extension LiveWorkingCopies {
         }
 
         @Test func aViewWithNoSortOrGroupListsEveryItemInOneGroup() async throws {
-            let board = try await Board.make([("b", "todo"), ("a", "done")])
+            let board = try await Board.make([("b", "not_started"), ("a", "completed")])
             let bare = try await Live.writeView([
                 "title": .string("Bare \(board.tag)"),
                 "query": ["types": ["core.task"], "filter": .string("tags contains \"\(board.tag)\"")],
@@ -353,11 +359,11 @@ extension LiveWorkingCopies {
 
         @Test func aHiddenGroupLeavesTheGroupsAndNotTheItems() async throws {
             let board = try await Board.make(
-                [("a", "todo"), ("b", "done"), ("c", "later")], hidden: ["done"])
+                [("a", "not_started"), ("b", "completed"), ("c", "in_progress")], hidden: ["completed"])
             let copy = board.copy
             let view = try #require(try await copy.items.view(board.view))
-            #expect(view.settings.group?.hidden == ["done"])
-            #expect(try await copy.items.groups(inView: board.view).map(\.key) == ["todo", "later"])
+            #expect(view.settings.group?.hidden == ["completed"])
+            #expect(try await copy.items.groups(inView: board.view).map(\.key) == ["not_started", "in_progress"])
             #expect(
                 try await copy.items.list(inView: board.view).map(\.title) == ["a", "b", "c"],
                 "the witness: the view still lists the hidden group's items")
@@ -366,7 +372,7 @@ extension LiveWorkingCopies {
         }
 
         @Test func aLiveQueryOverAViewFollowsItemsEnteringLeavingAndChangingGroup() async throws {
-            let board = try await Board.make([("a", "todo"), ("b", "todo"), ("c", "done")])
+            let board = try await Board.make([("a", "not_started"), ("b", "not_started"), ("c", "completed")])
             let copy = board.copy
             let groups = await LiveQuery(copy, reading: .groups(inView: board.view))
             let items = await LiveQuery(copy, reading: .list(inView: board.view))
@@ -380,29 +386,34 @@ extension LiveWorkingCopies {
                 let loading = [await groups.isLoading, await items.isLoading]
                 return !loading.contains(true)
             }
-            #expect(await counts() == ["todo": 2, "done": 1])
+            #expect(await counts() == ["not_started": 2, "completed": 1])
             #expect(await items.value.map(\.title) == ["a", "b", "c"])
 
             let entered = try await copy.items.create(
                 Draft(
-                    type: "core.task", properties: ["title": "d", "status": "todo"], tags: [board.tag], tier: .library))
+                    type: "core.task", properties: ["title": "d", "status": "not_started"], tags: [board.tag],
+                    tier: .library))
             let enteredId = try #require(entered.itemId)
-            try await eventually("an item entering shows in its group") { await counts() == ["todo": 3, "done": 1] }
+            try await eventually("an item entering shows in its group") {
+                await counts() == ["not_started": 3, "completed": 1]
+            }
             try await eventually("and in the view's sort") { await items.value.map(\.title) == ["a", "b", "c", "d"] }
 
             let moved = try #require(board.ids["a"])
             _ = try await copy.items.update(
                 moved,
-                Edit(properties: ["status": "done"], baseVersion: try #require(try await copy.items.get(moved)).version)
+                Edit(
+                    properties: ["status": "completed"],
+                    baseVersion: try #require(try await copy.items.get(moved)).version)
             )
             try await eventually("an item changing group moves between counts") {
-                await counts() == ["todo": 2, "done": 2]
+                await counts() == ["not_started": 2, "completed": 2]
             }
             #expect(await groups.error == nil)
 
             _ = try await copy.tags.remove(board.tag, from: enteredId)
             try await eventually("an item leaving the view leaves its group") {
-                await counts() == ["todo": 1, "done": 2]
+                await counts() == ["not_started": 1, "completed": 2]
             }
             try await eventually("and the view") { await items.value.map(\.title) == ["a", "b", "c"] }
 
@@ -413,13 +424,13 @@ extension LiveWorkingCopies {
             _ = try await other.items.update(
                 changed,
                 Edit(
-                    properties: ["status": "later"],
+                    properties: ["status": "in_progress"],
                     baseVersion: try #require(try await other.items.get(changed)).version))
             _ = try await other.queue.drain()
             _ = try await copy.catchUp()
             try await eventually("a change the server tells moves the item too") {
                 let now = await counts()
-                return now["later"] == 1 && now["done"] == 2 && now["todo", default: 0] == 0
+                return now["in_progress"] == 1 && now["completed"] == 2 && now["not_started", default: 0] == 0
             }
             let errors = [await groups.error == nil, await items.error == nil]
             #expect(!errors.contains(false))
@@ -430,7 +441,9 @@ extension LiveWorkingCopies {
         }
 
         @Test func aViewFilteredByABackrefIsAnsweredWhereTheCopyHoldsThatEdgeTypeWhole() async throws {
-            let board = try await Board.make([("parent", "todo"), ("child", "todo"), ("loner", "todo")])
+            let board = try await Board.make([
+                ("parent", "not_started"), ("child", "not_started"), ("loner", "not_started"),
+            ])
             let copy = board.copy
             _ = try await copy.edges.create(
                 from: try #require(board.ids["parent"]), to: try #require(board.ids["child"]), type: "parent-of")
@@ -457,7 +470,7 @@ extension LiveWorkingCopies {
         }
 
         @Test func aViewTheCopyCannotAnswerWholeIsRefusedWithItsReason() async throws {
-            let board = try await Board.make([("a", "todo")])
+            let board = try await Board.make([("a", "not_started")])
             let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
             _ = try await copy.hydrate(types: ["core.note", "system.view"], tier: .all)
             let reason: @Sendable (Error) -> Bool = { error in

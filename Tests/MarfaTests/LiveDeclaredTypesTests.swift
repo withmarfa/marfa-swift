@@ -75,6 +75,50 @@ extension LiveWorkingCopies {
             }
         }
 
+        @Test func aSubtypeThatAddsAStatusWordIsReadWithItsParentsWordsAndGroups() async throws {
+            let suffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+            let type = "app.swift\(suffix).chore"
+            let minted = try await key(for: type, source: "swift-\(suffix)", canRegister: true)
+            let copy = try await WorkingCopy.open(store: Live.store(), server: minted.server)
+            do {
+                try await copy.declareTypes([
+                    [
+                        "id": .string(type), "parent": "core.task",
+                        "fields": [
+                            "status": [
+                                "type": "status", "status_values": [["value": "blocked", "group": "in_progress"]],
+                            ]
+                        ],
+                    ]
+                ])
+                let queued = try await copy.items.create(
+                    Draft(type: type, properties: ["title": "Fix", "status": "blocked"], tier: .library))
+                let hydrated = try await copy.hydrate(types: [type], tier: .library)
+                #expect(hydrated.registeredTypes == [type])
+                let drained = try await copy.queue.drain()
+                #expect(drained.verdicts.first { $0.id == queued.id }?.verdict == .accepted)
+
+                let chore = try await copy.catalog.itemType(type)
+                #expect(
+                    chore.statusWords.map(\.value) == [
+                        "not_started", "in_progress", "completed", "canceled", "blocked",
+                    ])
+                #expect(chore.statusGroup(of: "blocked") == .inProgress)
+                let itemId = try #require(queued.itemId)
+                let item = try #require(try await copy.items.get(itemId))
+                #expect(try await copy.catalog.statusGroup(of: item) == .inProgress)
+                let open = try await copy.items.list(
+                    ListFilters(type: type, filter: "status_group eq \"in_progress\""))
+                #expect(open.map(\.id) == [item.id])
+                await copy.close()
+                _ = try await request("DELETE", "keys/\(minted.id)")
+            } catch {
+                await copy.close()
+                _ = try? await request("DELETE", "keys/\(minted.id)")
+                throw error
+            }
+        }
+
         @Test func aRegistrationRefusalReportsItsCauseAndKeepsOfflineContent() async throws {
             let suffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
             let type = "app.swift\(suffix).entry"
