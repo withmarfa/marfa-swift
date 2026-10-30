@@ -135,12 +135,14 @@ private let someBrandArtwork = BrandArtwork(
 
     /// The `icon` of every type in marfa's `packages/types/core` at the pin.
     @Test(arguments: [
-        "bookmark", "layers", "shapes", "user", "map-pin", "calendar", "file-music", "file-image", "file",
-        "file-video-camera", "globe", "highlighter", "disc-3", "newspaper", "book-open", "circle-play", "film",
-        "library-big", "tv", "audio-lines", "message-square", "sticky-note", "square-check-big",
+        "lucide:bookmark", "lucide:layers", "lucide:shapes", "lucide:user", "lucide:map-pin", "lucide:calendar",
+        "lucide:file-music", "lucide:file-image", "lucide:file", "lucide:file-video-camera", "lucide:globe",
+        "lucide:highlighter", "lucide:disc-3", "lucide:newspaper", "lucide:book-open", "lucide:circle-play",
+        "lucide:film", "lucide:library-big", "lucide:tv", "lucide:audio-lines", "lucide:message-square",
+        "lucide:sticky-note", "lucide:square-check-big",
     ])
-    func everyIconTheCoreTypesCarryIsDrawn(name: String) {
-        #expect(TypeIconArtwork(id: "lucide:\(name)", brand: nil) != .fallback)
+    func everyIconTheCoreTypesCarryIsDrawn(id: String) {
+        #expect(TypeIconArtwork(id: id, brand: nil) != .fallback)
     }
 
     @Test(
