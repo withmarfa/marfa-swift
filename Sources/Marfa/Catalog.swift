@@ -101,9 +101,8 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     public let statusField: String?
     /// The words the status field takes, each with its group, in order.
     ///
-    /// The core has resolved them: a subtype
-    /// holds the words of its ancestors first and its own after, so a word that an item of this type can hold is
-    /// here. Empty for a type with no status field.
+    /// The core has resolved them: a subtype holds the words of its ancestors first and its own after, so every word
+    /// an item of this type can hold is here. Empty for a type with no status field.
     public let statusWords: [StatusWord]
 
     /// For an app's previews and tests.

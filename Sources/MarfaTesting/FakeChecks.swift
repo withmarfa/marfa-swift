@@ -90,8 +90,7 @@ enum Checks {
 
     /// An enum value against the values its field lists, as the core judges it.
     ///
-    /// A list the fake cannot quote as the
-    /// core does, and an enum that lists none, throw `unsupported`.
+    /// A list the fake cannot quote as the core does, and an enum that lists none, throw `unsupported`.
     private static func enumValue(_ value: JsonValue, of field: TypeField, call: String) throws {
         guard let listed = Properties.value(field.definition, "enum_values"), case .array(let entries) = listed,
             !entries.isEmpty
@@ -119,8 +118,7 @@ enum Checks {
 
     /// The words a status field lists, each with its group, in order.
     ///
-    /// A list the fake cannot read throws
-    /// `unsupported`.
+    /// A list the fake cannot read throws `unsupported`.
     static func words(of field: TypeField, call: String) throws -> [(word: String, group: String)] {
         guard let listed = Properties.value(field.definition, "status_values"), case .array(let entries) = listed
         else { throw FakeCopyError.unsupported(call: "\(call) with a status field that lists no words") }
