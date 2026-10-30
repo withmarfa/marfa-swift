@@ -7458,7 +7458,7 @@ public struct ItemType: Equatable, Hashable {
     public var titleField: String?
     public var bodyField: String?
     /**
-     * The Lucide icon name, kebab-case.
+     * The Iconify icon ID, `<set>:<name>`, such as `lucide:book-open`.
      */
     public var icon: String?
     public var linkField: String?
@@ -7469,7 +7469,7 @@ public struct ItemType: Equatable, Hashable {
     // declare one manually.
     public init(id: String, label: String?, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, 
         /**
-         * The Lucide icon name, kebab-case.
+         * The Iconify icon ID, `<set>:<name>`, such as `lucide:book-open`.
          */icon: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
         self.id = id
         self.label = label

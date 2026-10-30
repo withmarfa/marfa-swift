@@ -69050,7 +69050,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `invalid_schema`: `icon` isn't the name of an icon in the pinned Lucide release (`details.errors` names it).
+            /// `invalid_schema`: `icon` isn't the ID of an icon in a pinned set (`details.errors` names it).
             /// - `validation_error`: the query has a parameter this endpoint doesn't take.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/icon/put(setTypeIcon)/responses/400`.
@@ -172052,7 +172052,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/type_icons_skipped`.
                         public var typeIconsSkipped: Swift.Double
-                        /// How many of the owner's type icons Marfa skipped for each reason: `already_set` when the instance already has an owner icon for the type, `unknown_icon` when the name is not an icon of the Lucide release Marfa pins.
+                        /// How many of the owner's type icons Marfa skipped for each reason: `already_set` when the instance already has an owner icon for the type, `unknown_icon` when the icon isn't the ID of an icon in a set Marfa pins.
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/type_icons_skipped_reasons`.
                         public struct TypeIconsSkippedReasonsPayload: Codable, Hashable, Sendable {
@@ -172072,7 +172072,7 @@ public enum Operations {
                                 try encoder.encodeAdditionalProperties(additionalProperties)
                             }
                         }
-                        /// How many of the owner's type icons Marfa skipped for each reason: `already_set` when the instance already has an owner icon for the type, `unknown_icon` when the name is not an icon of the Lucide release Marfa pins.
+                        /// How many of the owner's type icons Marfa skipped for each reason: `already_set` when the instance already has an owner icon for the type, `unknown_icon` when the icon isn't the ID of an icon in a set Marfa pins.
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/type_icons_skipped_reasons`.
                         public var typeIconsSkippedReasons: Operations.RestoreArchive.Output.Ok.Body.JsonPayload.TypeIconsSkippedReasonsPayload
@@ -172092,7 +172092,7 @@ public enum Operations {
                         ///   - edgeTypesSkipped: How many edge types Marfa skipped because the instance already registers them identically.
                         ///   - typeIconsAdded: How many of the owner's type icons Marfa added, for types the instance had no owner icon for.
                         ///   - typeIconsSkipped: How many of the owner's type icons Marfa skipped.
-                        ///   - typeIconsSkippedReasons: How many of the owner's type icons Marfa skipped for each reason: `already_set` when the instance already has an owner icon for the type, `unknown_icon` when the name is not an icon of the Lucide release Marfa pins.
+                        ///   - typeIconsSkippedReasons: How many of the owner's type icons Marfa skipped for each reason: `already_set` when the instance already has an owner icon for the type, `unknown_icon` when the icon isn't the ID of an icon in a set Marfa pins.
                         public init(
                             imported: Swift.Double,
                             duplicates: Swift.Double,

@@ -1535,7 +1535,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
-            /// The icon that stands for the type, as the kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`. On a type read back, the owner's own choice replaces the author's.
+            /// The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/icon`.
             public var icon: Swift.String?
@@ -1546,7 +1546,7 @@ extension Components {
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
             ///   - bodyField: The field that holds an item's body for display. The field holds Markdown.
-            ///   - icon: The icon that stands for the type, as the kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`. On a type read back, the owner's own choice replaces the author's.
+            ///   - icon: The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 titleField: Swift.String? = nil,
@@ -9696,14 +9696,14 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/TypeIconRequest`.
         public struct TypeIconRequest: Codable, Hashable, Sendable {
-            /// The kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`.
+            /// An Iconify ID, `<set>:<name>`, from a set and version Marfa pins: `lucide` or `simple-icons`, such as `lucide:calendar-days` or `simple-icons:github`.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeIconRequest/icon`.
             public var icon: Swift.String
             /// Creates a new `TypeIconRequest`.
             ///
             /// - Parameters:
-            ///   - icon: The kebab-case name of an icon in the Lucide release Marfa pins, such as `calendar-days`.
+            ///   - icon: An Iconify ID, `<set>:<name>`, from a set and version Marfa pins: `lucide` or `simple-icons`, such as `lucide:calendar-days` or `simple-icons:github`.
             public init(icon: Swift.String) {
                 self.icon = icon
             }
