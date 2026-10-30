@@ -69,7 +69,7 @@ struct FakeStatusBehavior {
     @Test(
         arguments: [
             ["not_words": 1], ["status_values": []], ["status_values": [["value": "open"]]],
-            ["status_values": [["value": "open", "group": "later"], ["value": 3, "group": "completed"]]],
+            ["status_values": [["value": "open", "group": "not_started"], ["value": 3, "group": "completed"]]],
         ] as [JSONObject])
     func aStatusFieldTheFakeCannotReadIsUnsupportedWhateverTheWord(listing: JSONObject) async throws {
         var definition: JSONObject = ["type": "status"]
