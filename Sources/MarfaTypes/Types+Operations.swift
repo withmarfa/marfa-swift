@@ -50,7 +50,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/tags`.
                 public var tags: Swift.String?
-                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, matches by relationship and needs read on that edge type. `edge[<type>]=<id>` also works as a query parameter of its own.
+                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/filter`.
                 public var filter: Swift.String?
@@ -105,7 +105,7 @@ public enum Operations {
                 ///   - source: Only return items stamped with this source.
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - tags: Comma-separated tags. Only return items that carry all of them.
-                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, matches by relationship and needs read on that edge type. `edge[<type>]=<id>` also works as a query parameter of its own.
+                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
                 ///   - sort: Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`, such as `properties.due_at`. Properties sort by stored value, so an enum property sorts alphabetically, not by meaning.
                 ///   - direction: Sort direction
                 ///   - occurredAfter: Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
@@ -20684,7 +20684,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/tags`.
                 public var tags: Swift.String?
-                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, matches by relationship and needs read on that edge type. `edge[<type>]=<id>` also works as a query parameter of its own.
+                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/filter`.
                 public var filter: Swift.String?
@@ -20723,7 +20723,7 @@ public enum Operations {
                 ///   - source: Only return items stamped with this source.
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - tags: Comma-separated tags. Only return items that carry all of them.
-                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, matches by relationship and needs read on that edge type. `edge[<type>]=<id>` also works as a query parameter of its own.
+                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
                 ///   - occurredAfter: Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
                 ///   - occurredBefore: Only return items whose own time (`occurred_at`, else `created_at`) is before this time.
                 ///   - updatedAfter: Only return items changed at or after this time. Send the latest `updated_at` you hold, and deduplicate by ID, as items can share an instant. Ordered by `updated_at`, then ID, ascending, so leave out `sort` and `direction`. Purges aren't reported.

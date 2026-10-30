@@ -170,7 +170,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition`.
         public struct EdgePropertyDefinition: Codable, Hashable, Sendable {
-            /// The property's type: one of the field types a type's `fields` take, except `thumbnail`.
+            /// The property's type: one of the field types a type's `fields` take, except `thumbnail` and `status`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/type`.
             public var _type: Swift.String
@@ -197,7 +197,7 @@ extension Components {
             /// Creates a new `EdgePropertyDefinition`.
             ///
             /// - Parameters:
-            ///   - _type: The property's type: one of the field types a type's `fields` take, except `thumbnail`.
+            ///   - _type: The property's type: one of the field types a type's `fields` take, except `thumbnail` and `status`.
             ///   - description: What the property holds.
             ///   - required: `true` if every edge of the type must have the property.
             ///   - enumValues: The values an `enum` property takes.
@@ -8033,7 +8033,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/FieldDefinition`.
         public struct FieldDefinition: Codable, Hashable, Sendable {
-            /// The field's type. A `thumbnail` holds an image of at most 16 KiB, as a base64 `data:` URI of type `image/png`, `image/jpeg` or `image/webp`. A type has at most one, never as an array's `items_type` or under `title`, `body`, `description` or `name`.
+            /// The field's type. A `thumbnail` is a base64 `data:` URI of a PNG, JPEG or WebP image up to 16 KiB, never `title`, `body`, `description` or `name`; a `status` is a word from `status_values`. A type has at most one of each, never as `items_type`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
             @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -8049,8 +8049,9 @@ extension Components {
                 case array = "array"
                 case object = "object"
                 case thumbnail = "thumbnail"
+                case status = "status"
             }
-            /// The field's type. A `thumbnail` holds an image of at most 16 KiB, as a base64 `data:` URI of type `image/png`, `image/jpeg` or `image/webp`. A type has at most one, never as an array's `items_type` or under `title`, `body`, `description` or `name`.
+            /// The field's type. A `thumbnail` is a base64 `data:` URI of a PNG, JPEG or WebP image up to 16 KiB, never `title`, `body`, `description` or `name`; a `status` is a word from `status_values`. A type has at most one of each, never as `items_type`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
             public var _type: Components.Schemas.FieldDefinition._TypePayload
@@ -8066,6 +8067,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/enum_values`.
             public var enumValues: [Swift.String]?
+            /// The words a `status` field takes, each in a group: `not_started`, `in_progress`, `completed` or `canceled`. A subtype lists only the words it adds. A type read answers every word, inherited first; the type list answers the type's own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/status_values`.
+            public var statusValues: [Components.Schemas.StatusValue]?
             /// The type of each element of an `array` field. A write is refused if an element is not a value of that type.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_type`.
@@ -8103,10 +8108,11 @@ extension Components {
             /// Creates a new `FieldDefinition`.
             ///
             /// - Parameters:
-            ///   - _type: The field's type. A `thumbnail` holds an image of at most 16 KiB, as a base64 `data:` URI of type `image/png`, `image/jpeg` or `image/webp`. A type has at most one, never as an array's `items_type` or under `title`, `body`, `description` or `name`.
+            ///   - _type: The field's type. A `thumbnail` is a base64 `data:` URI of a PNG, JPEG or WebP image up to 16 KiB, never `title`, `body`, `description` or `name`; a `status` is a word from `status_values`. A type has at most one of each, never as `items_type`.
             ///   - description: What the field holds.
             ///   - required: `true` if an item of the type must have a value for it.
             ///   - enumValues: The values an `enum` field allows.
+            ///   - statusValues: The words a `status` field takes, each in a group: `not_started`, `in_progress`, `completed` or `canceled`. A subtype lists only the words it adds. A type read answers every word, inherited first; the type list answers the type's own.
             ///   - itemsType: The type of each element of an `array` field. A write is refused if an element is not a value of that type.
             ///   - format: A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
             ///   - searchable: `false` if full-text search should skip the field. Items still return it.
@@ -8118,6 +8124,7 @@ extension Components {
                 description: Swift.String? = nil,
                 required: Swift.Bool? = nil,
                 enumValues: [Swift.String]? = nil,
+                statusValues: [Components.Schemas.StatusValue]? = nil,
                 itemsType: Swift.String? = nil,
                 format: Components.Schemas.FieldDefinition.FormatPayload? = nil,
                 searchable: Swift.Bool? = nil,
@@ -8129,6 +8136,7 @@ extension Components {
                 self.description = description
                 self.required = required
                 self.enumValues = enumValues
+                self.statusValues = statusValues
                 self.itemsType = itemsType
                 self.format = format
                 self.searchable = searchable
@@ -8141,6 +8149,7 @@ extension Components {
                 case description
                 case required
                 case enumValues = "enum_values"
+                case statusValues = "status_values"
                 case itemsType = "items_type"
                 case format
                 case searchable
@@ -8164,6 +8173,10 @@ extension Components {
                 self.enumValues = try container.decodeIfPresent(
                     [Swift.String].self,
                     forKey: .enumValues
+                )
+                self.statusValues = try container.decodeIfPresent(
+                    [Components.Schemas.StatusValue].self,
+                    forKey: .statusValues
                 )
                 self.itemsType = try container.decodeIfPresent(
                     Swift.String.self,
@@ -8190,6 +8203,7 @@ extension Components {
                     "description",
                     "required",
                     "enum_values",
+                    "status_values",
                     "items_type",
                     "format",
                     "searchable",
@@ -8216,6 +8230,10 @@ extension Components {
                     forKey: .enumValues
                 )
                 try container.encodeIfPresent(
+                    self.statusValues,
+                    forKey: .statusValues
+                )
+                try container.encodeIfPresent(
                     self.itemsType,
                     forKey: .itemsType
                 )
@@ -8236,6 +8254,44 @@ extension Components {
                     forKey: .maxItems
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// One word a `status` field takes, with its group.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StatusValue`.
+        public struct StatusValue: Codable, Hashable, Sendable {
+            /// The word, such as `in_review`: a lowercase letter, then up to 63 lowercase letters, digits and underscores.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StatusValue/value`.
+            public var value: Swift.String
+            /// The group the word belongs to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StatusValue/group`.
+            @frozen public enum GroupPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case notStarted = "not_started"
+                case inProgress = "in_progress"
+                case completed = "completed"
+                case canceled = "canceled"
+            }
+            /// The group the word belongs to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StatusValue/group`.
+            public var group: Components.Schemas.StatusValue.GroupPayload
+            /// Creates a new `StatusValue`.
+            ///
+            /// - Parameters:
+            ///   - value: The word, such as `in_review`: a lowercase letter, then up to 63 lowercase letters, digits and underscores.
+            ///   - group: The group the word belongs to.
+            public init(
+                value: Swift.String,
+                group: Components.Schemas.StatusValue.GroupPayload
+            ) {
+                self.value = value
+                self.group = group
+            }
+            public enum CodingKeys: String, CodingKey {
+                case value
+                case group
             }
         }
         /// A type says which fields the items of that type hold, and what else Marfa does for them.
