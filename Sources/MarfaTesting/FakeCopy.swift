@@ -21,6 +21,7 @@ import Synchronization
 ///
 /// - Reads: `items.list(_:sort:)` without `filter`, including `source`, the
 ///   updated and occurred ranges and a sort on a property, `items.get(_:)`,
+///   `items.get(_:includingBin:)`, `edges.get(_:)` for one ID or many,
 ///   `edges.from(_:)`, `edges.to(_:)`, `edges.ofType(_:)`, the four reads of
 ///   `catalog`, `catalog.fromServer()`, which throws `noServer` as a copy
 ///   without a server does, `declaredTypes()` and `status()`.
@@ -41,7 +42,9 @@ import Synchronization
 /// - `changes()`, which tells the app's own writes, and the changes ``send(_:)``
 ///   puts on it.
 ///
-/// Every other call throws ``FakeCopyError/unsupported(call:)``.
+/// Every other call throws ``FakeCopyError/unsupported(call:)``, including
+/// `changes(since:most:)`, since the fake records no changes to name, and the
+/// reads of body links.
 ///
 /// The fake is not a second engine. A call, or an input to a call, that it
 /// cannot match exactly and cheaply throws ``FakeCopyError/unsupported(call:)``

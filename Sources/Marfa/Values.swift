@@ -250,10 +250,6 @@ extension Rows: RandomAccessCollection {
     public subscript(position: Int) -> Row { rows[position] }
 }
 
-extension MarfaCore.Listing {
-    var answer: Rows<Item> { Rows(items, completeness: completeness) }
-}
-
 extension MarfaCore.Found {
     var answer: Rows<SearchHit> { Rows(hits, completeness: completeness) }
 }

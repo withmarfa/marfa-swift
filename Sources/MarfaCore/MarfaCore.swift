@@ -1032,7 +1032,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * reached a server checks what it queues against them and the types
      * Marfa ships, and a hydration registers the ones the instance lacks,
      * where the key may. The call is the app's whole set and replaces every
-     * earlier declaration.
+     * earlier declaration. A set that names one id twice throws `Invalid`.
      */
     func declareTypes(types: [JsonObject]) throws 
     
@@ -1386,6 +1386,38 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func searchInFolder(query: String, id: String, limit: UInt32) throws  -> Found
     
+    /**
+     * `body_links` for each item the copy holds outside the bin and can
+     * read, by id; any other id is left out.
+     */
+    func bodyLinksOf(ids: [String]) throws  -> [String: BodyLinks]
+    
+    /**
+     * The items and edges changed since `cursor`, or `everything` where
+     * they cannot be named one by one, such as with no cursor or more than
+     * `most` changed. Throws `HydrationIncomplete` where the copy is not
+     * whole, as every read of edges does. Take the cursor before reading
+     * what it covers, and keep the earlier cursor until that read succeeds.
+     */
+    func changesSince(cursor: String?, most: UInt32) throws  -> CopyChanges
+    
+    /**
+     * The edge the copy holds by `id`, or `nil`.
+     */
+    func edge(id: String) throws  -> Edge?
+    
+    /**
+     * Each edge the copy holds of `ids`, once each, in the order named.
+     */
+    func getEdges(ids: [String]) throws  -> [Edge]
+    
+    /**
+     * `get` for each id, under one snapshot: each item the copy holds, once
+     * each, in the order named. An id the copy does not hold is left out,
+     * and so is an item in the bin unless `include_bin`.
+     */
+    func getItems(ids: [String], includeBin: Bool) throws  -> Listing
+    
     func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?) throws  -> ViewRow
     
     func createView(settings: JsonObject, idempotencyKey: String?) throws  -> ViewRow
@@ -1675,7 +1707,7 @@ open func dataVersion()throws  -> Int64  {
      * reached a server checks what it queues against them and the types
      * Marfa ships, and a hydration registers the ones the instance lacks,
      * where the key may. The call is the app's whole set and replaces every
-     * earlier declaration.
+     * earlier declaration. A set that names one id twice throws `Invalid`.
      */
 open func declareTypes(types: [JsonObject])throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_declare_types(
@@ -2431,6 +2463,75 @@ open func searchInFolder(query: String, id: String, limit: UInt32)throws  -> Fou
         FfiConverterString.lower(query),
         FfiConverterString.lower(id),
         FfiConverterUInt32.lower(limit),$0
+    )
+})
+}
+    
+    /**
+     * `body_links` for each item the copy holds outside the bin and can
+     * read, by id; any other id is left out.
+     */
+open func bodyLinksOf(ids: [String])throws  -> [String: BodyLinks]  {
+    return try  FfiConverterDictionaryStringTypeBodyLinks.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_body_links_of(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(ids),$0
+    )
+})
+}
+    
+    /**
+     * The items and edges changed since `cursor`, or `everything` where
+     * they cannot be named one by one, such as with no cursor or more than
+     * `most` changed. Throws `HydrationIncomplete` where the copy is not
+     * whole, as every read of edges does. Take the cursor before reading
+     * what it covers, and keep the earlier cursor until that read succeeds.
+     */
+open func changesSince(cursor: String?, most: UInt32)throws  -> CopyChanges  {
+    return try  FfiConverterTypeCopyChanges_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_changes_since(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(cursor),
+        FfiConverterUInt32.lower(most),$0
+    )
+})
+}
+    
+    /**
+     * The edge the copy holds by `id`, or `nil`.
+     */
+open func edge(id: String)throws  -> Edge?  {
+    return try  FfiConverterOptionTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_edge(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),$0
+    )
+})
+}
+    
+    /**
+     * Each edge the copy holds of `ids`, once each, in the order named.
+     */
+open func getEdges(ids: [String])throws  -> [Edge]  {
+    return try  FfiConverterSequenceTypeEdge.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_get_edges(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(ids),$0
+    )
+})
+}
+    
+    /**
+     * `get` for each id, under one snapshot: each item the copy holds, once
+     * each, in the order named. An id the copy does not hold is left out,
+     * and so is an item in the bin unless `include_bin`.
+     */
+open func getItems(ids: [String], includeBin: Bool)throws  -> Listing  {
+    return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_get_items(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(ids),
+        FfiConverterBool.lower(includeBin),$0
     )
 })
 }
@@ -4420,6 +4521,117 @@ public func FfiConverterTypeConfirmedRemoval_lift(_ buf: RustBuffer) throws -> C
 #endif
 public func FfiConverterTypeConfirmedRemoval_lower(_ value: ConfirmedRemoval) -> RustBuffer {
     return FfiConverterTypeConfirmedRemoval.lower(value)
+}
+
+
+/**
+ * What changed in the copy since a cursor `changes_since` gave.
+ */
+public struct CopyChanges: Equatable, Hashable {
+    /**
+     * Where the next call starts from.
+     */
+    public var cursor: String
+    /**
+     * True where the changes cannot be named one by one, and the four lists
+     * are empty: read the whole copy again.
+     */
+    public var everything: Bool
+    /**
+     * Each changed item the copy holds, in the bin or out.
+     */
+    public var items: [String]
+    /**
+     * Each changed item the copy no longer holds.
+     */
+    public var removedItems: [String]
+    /**
+     * Each changed edge the copy holds.
+     */
+    public var edges: [String]
+    /**
+     * Each changed edge the copy no longer holds.
+     */
+    public var removedEdges: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Where the next call starts from.
+         */cursor: String, 
+        /**
+         * True where the changes cannot be named one by one, and the four lists
+         * are empty: read the whole copy again.
+         */everything: Bool, 
+        /**
+         * Each changed item the copy holds, in the bin or out.
+         */items: [String], 
+        /**
+         * Each changed item the copy no longer holds.
+         */removedItems: [String], 
+        /**
+         * Each changed edge the copy holds.
+         */edges: [String], 
+        /**
+         * Each changed edge the copy no longer holds.
+         */removedEdges: [String]) {
+        self.cursor = cursor
+        self.everything = everything
+        self.items = items
+        self.removedItems = removedItems
+        self.edges = edges
+        self.removedEdges = removedEdges
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CopyChanges: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCopyChanges: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CopyChanges {
+        return
+            try CopyChanges(
+                cursor: FfiConverterString.read(from: &buf), 
+                everything: FfiConverterBool.read(from: &buf), 
+                items: FfiConverterSequenceString.read(from: &buf), 
+                removedItems: FfiConverterSequenceString.read(from: &buf), 
+                edges: FfiConverterSequenceString.read(from: &buf), 
+                removedEdges: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CopyChanges, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.cursor, into: &buf)
+        FfiConverterBool.write(value.everything, into: &buf)
+        FfiConverterSequenceString.write(value.items, into: &buf)
+        FfiConverterSequenceString.write(value.removedItems, into: &buf)
+        FfiConverterSequenceString.write(value.edges, into: &buf)
+        FfiConverterSequenceString.write(value.removedEdges, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCopyChanges_lift(_ buf: RustBuffer) throws -> CopyChanges {
+    return try FfiConverterTypeCopyChanges.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCopyChanges_lower(_ value: CopyChanges) -> RustBuffer {
+    return FfiConverterTypeCopyChanges.lower(value)
 }
 
 
@@ -7801,13 +8013,23 @@ public func FfiConverterTypeListedFolder_lower(_ value: ListedFolder) -> RustBuf
  * The items a local list answers, and whether the copy was whole.
  */
 public struct Listing: Equatable, Hashable {
-    public var items: [Item]
+    /**
+     * Each `Item`, in order, in the layout `packed.rs` states: a whole
+     * copy's listing read as records costs Swift several microseconds an
+     * item.
+     */
+    public var rows: Data
     public var completeness: Completeness
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(items: [Item], completeness: Completeness) {
-        self.items = items
+    public init(
+        /**
+         * Each `Item`, in order, in the layout `packed.rs` states: a whole
+         * copy's listing read as records costs Swift several microseconds an
+         * item.
+         */rows: Data, completeness: Completeness) {
+        self.rows = rows
         self.completeness = completeness
     }
 
@@ -7827,13 +8049,13 @@ public struct FfiConverterTypeListing: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Listing {
         return
             try Listing(
-                items: FfiConverterSequenceTypeItem.read(from: &buf), 
+                rows: FfiConverterData.read(from: &buf), 
                 completeness: FfiConverterTypeCompleteness.read(from: &buf)
         )
     }
 
     public static func write(_ value: Listing, into buf: inout [UInt8]) {
-        FfiConverterSequenceTypeItem.write(value.items, into: &buf)
+        FfiConverterData.write(value.rows, into: &buf)
         FfiConverterTypeCompleteness.write(value.completeness, into: &buf)
     }
 }
@@ -13073,6 +13295,30 @@ fileprivate struct FfiConverterOptionTypeAttachments: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeEdge: FfiConverterRustBuffer {
+    typealias SwiftType = Edge?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEdge.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEdge.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeEdgeMove: FfiConverterRustBuffer {
     typealias SwiftType = EdgeMove?
 
@@ -14370,6 +14616,32 @@ fileprivate struct FfiConverterDictionaryStringString: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterDictionaryStringTypeBodyLinks: FfiConverterRustBuffer {
+    public static func write(_ value: [String: BodyLinks], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for (key, value) in value {
+            FfiConverterString.write(key, into: &buf)
+            FfiConverterTypeBodyLinks.write(value, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [String: BodyLinks] {
+        let len: Int32 = try readInt(&buf)
+        var dict = [String: BodyLinks]()
+        dict.reserveCapacity(Int(len))
+        for _ in 0..<len {
+            let key = try FfiConverterString.read(from: &buf)
+            let value = try FfiConverterTypeBodyLinks.read(from: &buf)
+            dict[key] = value
+        }
+        return dict
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustBuffer {
     public static func write(_ value: [String: [String]], into buf: inout [UInt8]) {
         let len = Int32(value.count)
@@ -14490,7 +14762,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_data_version() != 13314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 32035) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 6605) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_declared_types() != 51849) {
@@ -14653,6 +14925,21 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_search_in_folder() != 25178) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_body_links_of() != 23854) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_changes_since() != 8878) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_edge() != 37957) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_get_edges() != 24708) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_get_items() != 44104) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_change_view() != 11627) {

@@ -914,6 +914,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /config`.
     /// - Remark: Generated from `#/paths//config/put(replaceConfig)`.
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
+    /// Get the instance's health
+    ///
+    /// Returns whether the instance is serving and the state of each component it depends on. Needs no credential.
+    ///
+    /// - Remark: HTTP `GET /health`.
+    /// - Remark: Generated from `#/paths//health/get(getHealth)`.
+    func getHealth(_ input: Operations.GetHealth.Input) async throws -> Operations.GetHealth.Output
     /// List attention items
     ///
     /// Returns current concerns for the owner or a private local command. Failed or timed-out checks appear as unavailable items alongside known concerns. An empty list means every check completed without a concern.
@@ -2913,6 +2920,15 @@ extension APIProtocol {
             headers: headers,
             body: body
         ))
+    }
+    /// Get the instance's health
+    ///
+    /// Returns whether the instance is serving and the state of each component it depends on. Needs no credential.
+    ///
+    /// - Remark: HTTP `GET /health`.
+    /// - Remark: Generated from `#/paths//health/get(getHealth)`.
+    public func getHealth(headers: Operations.GetHealth.Input.Headers = .init()) async throws -> Operations.GetHealth.Output {
+        try await getHealth(Operations.GetHealth.Input(headers: headers))
     }
     /// List attention items
     ///
