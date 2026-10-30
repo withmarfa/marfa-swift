@@ -85,7 +85,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/updated_before`.
                 public var updatedBefore: Swift.String?
-                /// The maximum number of results to return.
+                /// The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/limit`.
                 public var limit: Swift.Int?
@@ -112,7 +112,7 @@ public enum Operations {
                 ///   - occurredBefore: Only return items whose own time (`occurred_at`, else `created_at`) is before this time.
                 ///   - updatedAfter: Only return items changed at or after this time. Send the latest `updated_at` you hold, and deduplicate by ID, as items can share an instant. Ordered by `updated_at`, then ID, ascending, so leave out `sort` and `direction`. Purges aren't reported.
                 ///   - updatedBefore: Only return items changed before this time. It doesn't change the ordering, so it works with any `sort`.
-                ///   - limit: The maximum number of results to return.
+                ///   - limit: The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 ///   - include: Comma-separated extras. `edges`, `metadata` and `extensions` add that data to each item. `system` also returns `system.*` items, which are left out by default; a `system.` type filter does the same.
                 public init(
@@ -47697,7 +47697,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/edges/GET/query/updated_before`.
                 public var updatedBefore: Swift.String?
-                /// The maximum number of results to return.
+                /// The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///
                 /// - Remark: Generated from `#/paths/edges/GET/query/limit`.
                 public var limit: Swift.Int?
@@ -47711,7 +47711,7 @@ public enum Operations {
                 ///   - edgeType: Only return edges of these edge types, comma-separated, up to 10.
                 ///   - updatedAfter: Only return edges that changed at or after this RFC 3339 time. Orders results by `updated_at`, then `id`, ascending, and a cursor from the default order doesn't continue it. Edges can share a time, so deduplicate by `id`.
                 ///   - updatedBefore: Only return edges that changed before this RFC 3339 time. It doesn't change the order.
-                ///   - limit: The maximum number of results to return.
+                ///   - limit: The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     edgeType: Swift.String? = nil,
@@ -56503,7 +56503,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/edges/GET/query/edge_type`.
                 public var edgeType: Swift.String?
-                /// The maximum number of results to return.
+                /// The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/edges/GET/query/limit`.
                 public var limit: Swift.Int?
@@ -56515,7 +56515,7 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - edgeType: Only return edges of these edge types, comma-separated, up to 10.
-                ///   - limit: The maximum number of results to return.
+                ///   - limit: The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     edgeType: Swift.String? = nil,
@@ -57739,7 +57739,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/backrefs/GET/query/edge_type`.
                 public var edgeType: Swift.String?
-                /// The maximum number of results to return.
+                /// The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/backrefs/GET/query/limit`.
                 public var limit: Swift.Int?
@@ -57751,7 +57751,7 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - edgeType: Only return edges of these edge types, comma-separated, up to 10.
-                ///   - limit: The maximum number of results to return.
+                ///   - limit: The maximum number of results to return. Up to 500; a larger value is read as 500.
                 ///   - cursor: The `next_cursor` from the previous page. Leave it out to get the first page.
                 public init(
                     edgeType: Swift.String? = nil,
