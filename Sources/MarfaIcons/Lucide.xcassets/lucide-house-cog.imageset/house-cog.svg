@@ -1,25 +1,2 @@
-<!-- @license lucide-static v1.61.0 - ISC -->
-<svg
-  class="lucide lucide-house-cog"
-  xmlns="http://www.w3.org/2000/svg"
-  width="24"
-  height="24"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M10.584 21H5a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 .709 -1.527l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10.001v.583" />
-  <path d="M14 12H10a1 1 0 0 0 -1 1v8" />
-  <path d="m14.305 19.53.923-.382" />
-  <path d="m15.229 16.852-.924-.383" />
-  <path d="m16.852 15.228-.383-.923" />
-  <path d="m16.852 20.773-.383.924" />
-  <path d="m19.148 15.228.383-.923" />
-  <path d="m19.53 21.697-.382-.924" />
-  <path d="m20.773 16.852.922-.383" />
-  <path d="m20.773 19.148.922.383" />
-  <circle cx="18" cy="18" r="3" />
-</svg>
+<!-- @iconify-json/lucide@1.2.149 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M10.584 21H5a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 .709 -1.527l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10.001v.583"/><path d="M14 12h-4a1 1 0 0 0 -1 1v8m5.305-1.47l.923-.382m.001-2.296l-.924-.383m2.547-1.241l-.383-.923m.383 6.468l-.383.924m2.679-6.469l.383-.923m-.001 7.392l-.382-.924m1.625-3.921l.922-.383m-.922 2.679l.922.383"/><circle cx="18" cy="18" r="3"/></g></svg>

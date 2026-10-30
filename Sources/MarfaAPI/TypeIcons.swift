@@ -13,8 +13,9 @@ extension Client {
     /// Sets the owner's icon for the item type `id`, one Marfa ships included, and answers the type as the server
     /// reads it now.
     ///
-    /// `icon` is the kebab-case name of an icon in the Lucide release Marfa pins, such as `book-open`. The server
-    /// refuses any other name with `MarfaError.validation` and the code `invalid_schema`.
+    /// `icon` is an Iconify ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open`, or `simple-icons:github`
+    /// for a brand mark. The server refuses any other ID, a bare name included, with `MarfaError.validation` and the
+    /// code `invalid_schema`.
     public func set(icon: String, forType id: String) async throws -> Components.Schemas.RegisteredType {
         try await answer("setTypeIcon") {
             try await setTypeIcon(path: .init(id: id), body: .json(.init(icon: icon))).ok.body.json._type

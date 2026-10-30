@@ -2,45 +2,61 @@ import Marfa
 import SwiftUI
 
 extension Image {
-    /// The image for a type's icon, given as a Lucide name.
+    /// The image for a type's icon, given as an Iconify ID such as `lucide:book-open`.
     ///
-    /// It is the SF Symbol that stands for the name, else Lucide's own artwork as a template image, else a fallback
-    /// symbol. It tints like a symbol, with `foregroundStyle`.
+    /// It is the SF Symbol that stands for a `lucide:` ID, else Lucide's own artwork as a template image, else a
+    /// fallback symbol. A `simple-icons:` ID draws its brand mark when `MarfaBrandIcons` is registered. It tints
+    /// like a symbol, with `foregroundStyle`.
     ///
-    /// Lucide's artwork has no font to scale with, so this image has its natural size of 24 points; ``TypeIcon``
-    /// sizes it to sit beside text.
-    public init(typeIcon name: String?) {
-        switch TypeIconArtwork(name: name) {
+    /// Artwork has no font to scale with, so this image has its natural size of 24 points; ``TypeIcon`` sizes it to
+    /// sit beside text.
+    public init(typeIcon id: String?) {
+        let brand = BrandArtwork.current
+        self.init(artwork: TypeIconArtwork(id: id, brand: brand), brand: brand)
+    }
+
+    init(artwork: TypeIconArtwork, brand: BrandArtwork?) {
+        switch artwork {
         case .symbol(let symbol): self.init(systemName: symbol)
-        case .lucide(let name): self = Image(TypeIconArtwork.assetName(name), bundle: .module).renderingMode(.template)
+        case .lucide(let id): self = Image(TypeIconArtwork.assetName(id), bundle: .module).renderingMode(.template)
+        case .brand(let id):
+            guard let brand else {
+                self.init(systemName: TypeIconArtwork.fallbackSymbol)
+                return
+            }
+            self = Image(BrandArtwork.assetName(id), bundle: brand.bundle).renderingMode(.template)
         case .fallback: self.init(systemName: TypeIconArtwork.fallbackSymbol)
         }
     }
 }
 
-/// A type's icon, drawn as an SF Symbol where one suits the Lucide name and from Lucide's artwork where none does.
+/// A type's icon, drawn as an SF Symbol where one suits the `lucide:` ID and from artwork where none does.
 ///
 /// Both tint with `foregroundStyle` and follow light and dark appearance, and both size with the surrounding font
-/// and Dynamic Type. A `nil` name, and a name this version of the package does not know, draw a fallback and never
-/// fail.
+/// and Dynamic Type. A `nil` ID, a bare name, an unknown set or name, and a `simple-icons:` ID with no brand artwork
+/// registered draw a fallback and never fail.
 public struct TypeIcon: View {
-    private let name: String?
+    private let id: String?
     @ScaledMetric(relativeTo: .body) private var drawnSize: CGFloat = 17
 
-    /// `name` is a Lucide name, such as `ItemType.icon`; `nil` draws the fallback.
-    public init(name: String?) {
-        self.name = name
+    /// `id` is an Iconify ID such as `lucide:book-open`, as `ItemType.icon` holds it; `nil` draws the fallback.
+    public init(id: String?) {
+        self.id = id
     }
 
     public init(_ type: ItemType) {
-        self.init(name: type.icon)
+        self.init(id: type.icon)
     }
 
     public var body: some View {
-        if case .lucide = TypeIconArtwork(name: name) {
-            Image(typeIcon: name).resizable().aspectRatio(contentMode: .fit).frame(width: drawnSize, height: drawnSize)
-        } else {
-            Image(typeIcon: name)
+        let brand = BrandArtwork.current
+        let artwork = TypeIconArtwork(id: id, brand: brand)
+        let image = Image(artwork: artwork, brand: brand)
+        switch artwork {
+        case .lucide, .brand:
+            image.resizable().aspectRatio(contentMode: .fit).frame(width: drawnSize, height: drawnSize)
+        case .symbol, .fallback:
+            image
         }
     }
 }

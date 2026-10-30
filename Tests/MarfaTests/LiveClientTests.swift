@@ -76,31 +76,39 @@ extension LiveWorkingCopies {
             let title = Components.Schemas.FieldDefinition(_type: .string)
             _ = try await api.register(
                 itemType: .init(
-                    fields: .init(additionalProperties: ["title": title]), displayHints: .init(icon: "folder"),
+                    fields: .init(additionalProperties: ["title": title]), displayHints: .init(icon: "lucide:folder"),
                     id: id))
             func stored() async throws -> String? {
                 try await api.getType(path: .init(id: id)).ok.body.json.value1.displayHints?.icon
             }
-            #expect(try await stored() == "folder", "the author's icon shows before the owner chooses")
+            #expect(try await stored() == "lucide:folder", "the author's icon shows before the owner chooses")
 
-            let set = try await api.set(icon: "book-open", forType: id)
-            #expect(set.value1.displayHints?.icon == "book-open")
-            #expect(try await stored() == "book-open", "a read of the type shows the owner's icon")
+            let set = try await api.set(icon: "lucide:book-open", forType: id)
+            #expect(set.value1.displayHints?.icon == "lucide:book-open")
+            #expect(try await stored() == "lucide:book-open", "a read of the type shows the owner's icon")
 
-            let refused = await #expect(throws: MarfaError.self) {
-                try await api.set(icon: "no-such-icon", forType: id)
+            let brand = try await api.set(icon: "simple-icons:github", forType: id)
+            #expect(brand.value1.displayHints?.icon == "simple-icons:github", "a brand mark is an accepted icon")
+            _ = try await api.set(icon: "lucide:book-open", forType: id)
+
+            for refusedID in ["lucide:no-such-icon", "book-open", "no-such-set:github"] {
+                let refused = await #expect(throws: MarfaError.self) {
+                    try await api.set(icon: refusedID, forType: id)
+                }
+                guard case .validation(let code, _)? = refused else {
+                    Issue.record("expected a validation refusal for \(refusedID), got \(String(describing: refused))")
+                    return
+                }
+                #expect(code == "invalid_schema", "\(refusedID)")
+                #expect(try await stored() == "lucide:book-open", "a refused ID changes nothing")
             }
-            guard case .validation(let code, _)? = refused else {
-                Issue.record("expected a validation refusal, got \(String(describing: refused))")
-                return
-            }
-            #expect(code == "invalid_schema")
-            #expect(try await stored() == "book-open", "a refused name changes nothing")
 
             let cleared = try await api.clearIcon(ofType: id)
-            #expect(cleared.value1.displayHints?.icon == "folder")
-            #expect(try await stored() == "folder", "clearing brings the author's icon back")
-            #expect(try await api.clearIcon(ofType: id).value1.displayHints?.icon == "folder", "clearing twice is fine")
+            #expect(cleared.value1.displayHints?.icon == "lucide:folder")
+            #expect(try await stored() == "lucide:folder", "clearing brings the author's icon back")
+            #expect(
+                try await api.clearIcon(ofType: id).value1.displayHints?.icon == "lucide:folder",
+                "clearing twice is fine")
 
             try await api.delete(itemType: id)
         }

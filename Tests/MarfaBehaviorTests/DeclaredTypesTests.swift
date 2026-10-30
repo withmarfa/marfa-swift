@@ -122,18 +122,18 @@ struct DeclaredTypesOffline {
         try await copy.declareTypes([
             [
                 "id": "app.notes.base", "parent": "core.note",
-                "display_hints": ["title_field": "heading", "icon": "notebook-pen"],
+                "display_hints": ["title_field": "heading", "icon": "lucide:notebook-pen"],
             ],
             ["id": "app.notes.memo", "parent": "app.notes.base", "display_hints": ["body_field": "text"]],
-            ["id": "app.notes.starred", "parent": "app.notes.memo", "display_hints": ["icon": "star"]],
+            ["id": "app.notes.starred", "parent": "app.notes.memo", "display_hints": ["icon": "lucide:star"]],
             ["id": "app.notes.bare", "parent": "app.notes.starred"],
             ["id": "app.notes.orphan"],
         ])
         let memo = try await copy.catalog.itemType("app.notes.memo")
-        #expect(memo.titleField == "heading" && memo.bodyField == "text" && memo.icon == "notebook-pen")
+        #expect(memo.titleField == "heading" && memo.bodyField == "text" && memo.icon == "lucide:notebook-pen")
         let starred = try await copy.catalog.itemType("app.notes.starred")
-        #expect(starred.titleField == "heading" && starred.bodyField == "text" && starred.icon == "star")
-        #expect(try await copy.catalog.itemType("app.notes.bare").icon == "star")
+        #expect(starred.titleField == "heading" && starred.bodyField == "text" && starred.icon == "lucide:star")
+        #expect(try await copy.catalog.itemType("app.notes.bare").icon == "lucide:star")
         #expect(try await copy.catalog.itemType("app.notes.orphan").icon == nil, "no type in its chain sets one")
         await copy.close()
     }
