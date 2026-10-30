@@ -85,7 +85,8 @@ extension LiveWorkingCopies {
         .timeLimit(.minutes(2)))
     struct LiveCopyGaps {
         @Test func theCatalogIsReadBeforeTheFirstFillAndTheCopyIsLeftAlone() async throws {
-            let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
+            // A fixed budget, since the default one follows the volume's free space, which other suites change.
+            let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server, fileBudget: .keepAll)
             let before = try await copy.status()
             let catalog = try await copy.catalog.fromServer()
             #expect(catalog.itemTypes.contains { $0.id == "core.note" })
