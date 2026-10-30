@@ -812,12 +812,12 @@ struct ARefill {
             $0.hydrateFails = .Unauthorized(code: "invalid_key", message: "no")
             $0.hydrateFailsFirst = 1
         }
-        let copy = Self.copy(core, pace: .init(first: .seconds(3), most: .seconds(3), settle: .seconds(30)))
+        let copy = Self.copy(core, pace: .init(first: .seconds(60), most: .seconds(60), settle: .seconds(30)))
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the stop reached the app") { heard.stops.count == 1 }
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
-        try await eventually("the second refill was made at once", within: 1.5) {
+        try await eventually("the second refill was made at once", within: 15) {
             heard.all.last == refreshed(.hydrated)
         }
         await copy.close()
