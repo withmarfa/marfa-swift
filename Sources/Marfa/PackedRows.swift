@@ -16,13 +16,25 @@ extension MarfaCore.Listing {
 }
 
 enum PackedRows {
+    /// The layout's version, `FORMAT` in the core's `packed.rs`.
+    static let format = 1
+
+    /// The fewest bytes an item takes: an empty ID, type, properties and source, no options and no tags.
+    static let smallestItem = 56
+
     static func items(_ rows: Data) throws(MarfaError) -> [Item] {
         let read: Result<[Item], MarfaError> = rows.withUnsafeBytes { bytes in
             var reader = Reader(bytes: bytes)
             do throws(MarfaError) {
+                let format = try reader.count()
+                guard format == Self.format else {
+                    throw MarfaError.decoding(
+                        message: "invalid listing from the core: format \(format), where this package reads format "
+                            + "\(Self.format)")
+                }
                 let count = try reader.count()
                 var items: [Item] = []
-                items.reserveCapacity(min(count, bytes.count))
+                items.reserveCapacity(min(count, bytes.count / Self.smallestItem))
                 for _ in 0..<count { items.append(try reader.item()) }
                 guard reader.offset == bytes.count else { throw reader.failure("bytes after the last item") }
                 return .success(items)
@@ -35,6 +47,7 @@ enum PackedRows {
 
     static func pack(_ items: [Item]) -> Data {
         var writer = Writer()
+        writer.count(format)
         writer.count(items.count)
         for item in items { writer.item(item) }
         return writer.bytes
@@ -114,7 +127,7 @@ enum PackedRows {
             let updatedAt = try text()
             let tagCount = try count()
             var tags: [String] = []
-            tags.reserveCapacity(min(tagCount, bytes.count - offset))
+            tags.reserveCapacity(min(tagCount, (bytes.count - offset) / 4))
             for _ in 0..<tagCount { tags.append(try text()) }
             let latitude = try optional { reader throws(MarfaError) in try reader.double() }
             let longitude = try optional { reader throws(MarfaError) in try reader.double() }
@@ -129,9 +142,11 @@ enum PackedRows {
         }
 
         mutating func object() throws(MarfaError) -> JSONObject {
+            try nest()
+            defer { depth -= 1 }
             let count = try count()
             var members: [JSONMember] = []
-            members.reserveCapacity(min(count, bytes.count - offset))
+            members.reserveCapacity(min(count, (bytes.count - offset) / 5))
             for _ in 0..<count {
                 let key = try text()
                 members.append(JSONMember(key: key, value: try value()))
@@ -155,16 +170,13 @@ enum PackedRows {
                 values.reserveCapacity(min(count, bytes.count - offset))
                 for _ in 0..<count { values.append(try value()) }
                 return .array(values)
-            case 7:
-                try nest()
-                defer { depth -= 1 }
-                return .object(try object())
+            case 7: return .object(try object())
             case let mark: throw failure("a value marked \(mark)")
             }
         }
 
-        /// The core holds no value nested deeper than its `MAX_JSON_DEPTH`, and a recursive read of one much deeper
-        /// would overflow a secondary thread's stack.
+        /// The core answers no properties nested deeper than its `MAX_JSON_DEPTH`, counting the properties object as
+        /// the first level, and a recursive read of a value much deeper would overflow a secondary thread's stack.
         static let depthLimit = 64
 
         private mutating func nest() throws(MarfaError) {

@@ -134,9 +134,9 @@ struct CopyReads {
 /// The listing a read of many items answers crosses from the core as one buffer the package reads back.
 @Suite(.timeLimit(.minutes(1)))
 struct PackedListing {
-    /// The bytes `the_layout_is_the_one_the_swift_package_reads` in the core's `packed.rs` holds.
+    /// The bytes `the_layout_of_a_plain_item_is_the_one_the_swift_package_reads` in the core's `packed.rs` holds.
     static let agreed: [UInt8] = {
-        var bytes: [UInt8] = [1, 0, 0, 0]
+        var bytes: [UInt8] = [1, 0, 0, 0, 1, 0, 0, 0]
         bytes += [2, 0, 0, 0] + Array("id".utf8)
         bytes += [9, 0, 0, 0] + Array("core.note".utf8)
         bytes += [1, 0, 0, 0, 1, 0, 0, 0] + Array("k".utf8) + [3, 1, 0, 0, 0, 0, 0, 0, 0]
@@ -169,6 +169,34 @@ struct PackedListing {
         tags: ["x", ""], captureLatitude: 51.5, captureLongitude: -0.12, title: "Title", body: "",
         unreadableProperties: "why")
 
+    /// The bytes `the_layout_of_a_full_item_is_the_one_the_swift_package_reads` in the core's `packed.rs` holds.
+    static let fullBytes: [UInt8] = {
+        func text(_ text: String) -> [UInt8] {
+            withUnsafeBytes(of: UInt32(text.utf8.count).littleEndian, Array.init) + Array(text.utf8)
+        }
+        func bits<T>(_ value: T) -> [UInt8] { withUnsafeBytes(of: value, Array.init) }
+        var bytes: [UInt8] = [1, 0, 0, 0, 1, 0, 0, 0]
+        bytes += text("a") + text("core.note")
+        bytes += [8, 0, 0, 0]
+        bytes += text("null") + [0]
+        bytes += text("no") + [1]
+        bytes += text("yes") + [2]
+        bytes += text("integer") + [3] + bits(Int64.min.littleEndian)
+        bytes += text("number") + [4] + bits((-0.5).bitPattern.littleEndian)
+        bytes += text("text") + [5] + text("é ✓ \u{0}")
+        bytes += text("array") + [6, 2, 0, 0, 0, 3, 1, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0]
+        bytes += text("object") + [7, 1, 0, 0, 0, 0, 0, 0, 0, 0]
+        bytes += [3, 2]
+        bytes += bits(Int64(7).littleEndian) + bits(Int64(2).littleEndian)
+        bytes += text("device") + [1] + text("source")
+        for at in ["2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"] { bytes += text(at) }
+        bytes += [2, 0, 0, 0] + text("x") + text("")
+        bytes += [1] + bits((51.5).bitPattern.littleEndian)
+        bytes += [1] + bits((-0.12).bitPattern.littleEndian)
+        bytes += [1] + text("Title") + [1] + text("") + [1] + text("why")
+        return bytes
+    }()
+
     static func refused(_ bytes: [UInt8]) -> Bool {
         do {
             _ = try PackedRows.items(Data(bytes))
@@ -182,6 +210,23 @@ struct PackedListing {
     @Test func theAgreedBytesReadAsTheItemAndTheItemPacksAsThem() throws {
         #expect(try PackedRows.items(Data(Self.agreed)) == [Self.plain])
         #expect(PackedRows.pack([Self.plain]) == Data(Self.agreed))
+        #expect(try PackedRows.items(Data(Self.fullBytes)) == [Self.full])
+        #expect(PackedRows.pack([Self.full]) == Data(Self.fullBytes))
+    }
+
+    @Test func aListingOfAnotherFormatIsRefusedNamingBoth() {
+        var other = Self.agreed
+        other[0] = 2
+        do {
+            _ = try PackedRows.items(Data(other))
+            Issue.record("a listing of format 2 was read")
+        } catch {
+            if case .decoding(let message) = error {
+                #expect(message.contains("format 2, where this package reads format 1"), "\(message)")
+            } else {
+                Issue.record("\(error)")
+            }
+        }
     }
 
     @Test func everyFieldAndValueReadsBackAsItWasPacked() throws {
@@ -204,30 +249,52 @@ struct PackedListing {
             #expect(Self.refused(Array(packed.prefix(length))), "cut at \(length)")
         }
         #expect(Self.refused(packed + [0]))
-        #expect(Self.refused([0xFF, 0xFF, 0xFF, 0xFF]), "a count far beyond the bytes")
+        #expect(Self.refused([1, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]), "a count far beyond the bytes")
 
         var badState = Self.agreed
-        badState[4 + 6 + 13 + 18] = 4
+        badState[8 + 6 + 13 + 18] = 4
         #expect(Self.refused(badState))
         var badValue = Self.agreed
-        badValue[4 + 6 + 13 + 9] = 8
+        badValue[8 + 6 + 13 + 9] = 8
         #expect(Self.refused(badValue))
     }
 
     @Test func aValueNestedBeyondTheLimitIsRefused() {
+        /// Properties nested `depth` arrays deep, inside the properties object.
         func nested(_ depth: Int) -> [UInt8] {
             var item = Array(PackedRows.pack([Self.plain]))
             // The value of `k`, one integer, becomes `depth` arrays, each holding the next, around null.
-            let at = 4 + 6 + 13 + 9
+            let at = 8 + 6 + 13 + 9
             var value: [UInt8] = []
             for _ in 0..<depth { value += [6, 1, 0, 0, 0] }
             value.append(0)
             item.replaceSubrange(at..<at + 9, with: value)
             return item
         }
-        #expect(!Self.refused(nested(PackedRows.Reader.depthLimit)))
-        #expect(Self.refused(nested(PackedRows.Reader.depthLimit + 1)))
+        #expect(!Self.refused(nested(PackedRows.Reader.depthLimit - 1)))
+        #expect(Self.refused(nested(PackedRows.Reader.depthLimit)))
         #expect(Self.refused(nested(10_000)))
+    }
+
+    @Test func aRowNestedPastTheLimitIsListedUnreadableAsAReadOfItAnswers() async throws {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store)
+        let kept = try #require(
+            try await copy.items.create(Draft(type: "core.note", properties: ["title": "Kept"])).itemId)
+        let deep = try #require(
+            try await copy.items.create(Draft(type: "core.note", properties: ["title": "Deep"])).itemId)
+        await copy.close()
+        let nested = String(repeating: "[", count: 69) + "null" + String(repeating: "]", count: 69)
+        try PropertyValues.damage(store, "UPDATE items SET properties = '{\"deep\":\(nested)}' WHERE id = '\(deep)'")
+
+        let reopened = try await WorkingCopy.open(store: store)
+        let listed = try await reopened.items.list(ListFilters())
+        #expect(Set(listed.map(\.id)) == [kept, deep])
+        let held = try #require(listed.first { $0.id == deep })
+        #expect(held.properties.members.isEmpty)
+        #expect(held.unreadableProperties != nil)
+        #expect(try await reopened.items.get(deep) == held)
+        await reopened.close()
     }
 
     @Test func aListingFromTheCoreReadsAsEachItemReadAlone() async throws {
