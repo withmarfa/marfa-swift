@@ -103,7 +103,8 @@ public enum CopyChanges: Sendable, Hashable {
 public struct ChangedRows: Sendable, Hashable {
     /// Each changed item the copy holds, in the bin or out.
     ///
-    /// Read them with ``Items/get(_:includingBin:)``; one the read leaves out has gone to the bin.
+    /// Read them with ``Items/get(_:includingBin:)``; one the read leaves out has gone to the bin, unless the answer is
+    /// `.partial`, when a hydration that started since may not have brought it back yet.
     public var items: [String]
     /// Each changed item the copy no longer holds.
     public var removedItems: [String]
