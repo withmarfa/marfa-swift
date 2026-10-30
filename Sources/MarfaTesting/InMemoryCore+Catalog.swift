@@ -86,7 +86,7 @@ enum Declaring {
 
     private static let fieldTypes = [
         "string", "number", "integer", "boolean", "url", "email", "datetime", "date", "enum", "array", "object",
-        "thumbnail",
+        "thumbnail", "status",
     ]
 
     private static let grammar =
@@ -147,6 +147,11 @@ enum Declaring {
                     throw Refuse.invalid(
                         "\(id) declares \(member.key) as \"\(kind)\", which is not a field type: one of "
                             + fieldTypes.joined(separator: ", "))
+                }
+                if kind == "status" || Properties.value(field, "status_values") != nil
+                    || Properties.string(field, "items_type") == "status"
+                {
+                    throw FakeCopyError.unsupported(call: "declareTypes with a status field or status words in \(id)")
                 }
             }
         case .some:

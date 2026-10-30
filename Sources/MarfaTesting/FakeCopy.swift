@@ -51,8 +51,14 @@ import Synchronization
 /// instead of being answered differently. That includes a `filter`, an
 /// `occurredAt` outside the forms it checks, a capture coordinate that is out
 /// of range or has no partner, a body that links to another item, a tag with
-/// surrounding whitespace, and a value for any field but a string field it can
-/// judge. It also differs from a real copy in these ways:
+/// surrounding whitespace, a value for any field but a string, an enum that
+/// lists its values or a status field it can judge, and `declareTypes(_:)` with
+/// a status field or status words. A filter that names `status_group` is a `filter`, so the fake
+/// does not answer it. It judges a status word as the core does, refusing
+/// `invalid_properties` a create that names a word the type does not declare, or
+/// an update that changes the word to one, or moves the item to a type that
+/// does not declare the word it holds, and leaving a stored word an update does
+/// not change. It also differs from a real copy in these ways:
 ///
 /// - A drain answers each write with the verdict ``verdict`` chooses, one drain
 ///   at a time. A refused write puts back the row it changed, as the real copy

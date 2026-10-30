@@ -95,6 +95,16 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     public let roles: [String]
     /// The sibling types this one asserts a structural superset of.
     public let compatibleWith: [String]
+    /// The name of the type's `status` field, or `nil` for a type with none.
+    ///
+    /// A type has at most one.
+    public let statusField: String?
+    /// The words the status field takes, each with its group, in order.
+    ///
+    /// The core has resolved them: a subtype
+    /// holds the words of its ancestors first and its own after, so a word that an item of this type can hold is
+    /// here. Empty for a type with no status field.
+    public let statusWords: [StatusWord]
 
     /// For an app's previews and tests.
     public init(
@@ -114,6 +124,9 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.linkField = linkField
         self.roles = roles
         self.compatibleWith = compatibleWith
+        let status = fields.first { $0.type == "status" }
+        statusField = status?.name
+        statusWords = status.map { StatusWord.words(in: $0.definition) } ?? []
     }
 
     init(_ core: MarfaCore.ItemType) {

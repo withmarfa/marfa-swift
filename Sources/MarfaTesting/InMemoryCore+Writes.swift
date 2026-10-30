@@ -25,6 +25,7 @@ extension InMemoryCore {
             let kept = Self.droppingOptionalNulls(draft.properties, of: type)
             try Checks.properties(kept, of: type, call: "items.create")
             try Self.requireFields(of: type, in: kept)
+            try Checks.statusWord(kept, of: type, call: "items.create")
             let properties = Self.inAnswerOrder(kept, of: type, in: types)
             let id = draft.id ?? Minted.id()
             var body = JsonObject(members: [
@@ -148,7 +149,11 @@ extension InMemoryCore {
             // An edit based on an earlier version did not read the copy's row,
             // so it cannot know which properties it clears: it merges.
             let replacing = edit.replaceProperties && base == held.version
+            let before = held.properties
             held.properties = Properties.merged(held.properties, with: edit.properties, replacing: replacing)
+            // A status word is judged where the edit changes it, and a move changes every property.
+            let written = retype == nil ? Self.changed(edit.properties, from: before) : held.properties
+            if let target { try Checks.statusWord(written, of: target, call: "items.update") }
             if let type = types[retype ?? held.type], base == held.version {
                 try Self.requireFields(of: type, in: held.properties)
             }
@@ -406,6 +411,11 @@ extension InMemoryCore {
     }
 
     // MARK: Shared
+
+    /// The properties of `written` whose value differs from the one `held` has under the same name.
+    private static func changed(_ written: JsonObject, from held: JsonObject) -> JsonObject {
+        JsonObject(members: written.members.filter { Properties.value(held, $0.key) != $0.value })
+    }
 
     private static func requireFields(of type: ItemType, in properties: JsonObject) throws {
         for field in type.fields where field.required && Properties.value(properties, field.name) == nil {

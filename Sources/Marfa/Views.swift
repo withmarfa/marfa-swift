@@ -75,7 +75,8 @@ public struct ViewQuery: Sendable, Hashable {
     public var tier: SliceTier?
     /// `nil` lists active and archived items.
     public var states: [ItemState]?
-    /// An expression in the server's listing grammar.
+    /// An expression in the server's listing grammar, which takes the `status_group` term as ``ListFilters`` says:
+    /// `status_group neq "completed" AND status_group neq "canceled"` holds the open items.
     public var filter: String?
     /// An item id: that item and everything it reaches along `parent-of`.
     public var beneath: String?

@@ -273,6 +273,13 @@ public typealias Edit = MarfaCore.Edit
 
 /// With `state` unset, a list answers active items only; `allStates` lifts
 /// that, and a named `state` wins over both.
+///
+/// `filter` is an expression in the server's listing grammar. Its `status_group` term selects items by the group of
+/// the word their status field holds, as their own type declares it: `eq` and `neq` take a ``StatusGroup`` raw
+/// value, and `exists` and `not_exists` take none. An item whose type has no status field, or that holds no word or
+/// one its type does not declare, is in no group, so only `not_exists` selects it. The open items of every type
+/// with a status field are `status_group neq "completed" AND status_group neq "canceled"`. Match a type's own word
+/// with `properties.<field> eq`.
 public typealias ListFilters = MarfaCore.ListFilters
 
 /// `state` and `allStates` work as in ``ListFilters``. `type` includes its
