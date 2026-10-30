@@ -143,6 +143,28 @@ final class InMemoryCore: CoreProtocol, Sendable {
         return Listing(items: listed, completeness: .complete)
     }
 
+    func getItems(ids: [String], includeBin: Bool) throws -> Listing {
+        let found: [Item] = state.withLock { state in
+            var seen: Set<String> = []
+            return ids.compactMap { id in
+                guard seen.insert(id).inserted, let item = state.items[id] else { return nil }
+                return includeBin || item.state != .trashed ? item : nil
+            }
+        }
+        return Listing(items: found, completeness: .complete)
+    }
+
+    func edge(id: String) throws -> Edge? {
+        state.withLock { $0.edges[id] }
+    }
+
+    func getEdges(ids: [String]) throws -> [Edge] {
+        state.withLock { state in
+            var seen: Set<String> = []
+            return ids.compactMap { id in seen.insert(id).inserted ? state.edges[id] : nil }
+        }
+    }
+
     func edgesFrom(id: String) throws -> [Edge] {
         state.withLock { $0.edgesInOrder.filter { $0.sourceId == id } }
     }

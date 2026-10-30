@@ -2382,6 +2382,385 @@ extension Components {
                 case error
             }
         }
+        /// The instance's health: the worst state of its components, and each one's state.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Health`.
+        public struct Health: Codable, Hashable, Sendable {
+            /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case ok = "ok"
+                case degraded = "degraded"
+                case down = "down"
+            }
+            /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/status`.
+            public var status: Components.Schemas.Health.StatusPayload
+            /// Each component checked: reading and writing the database, free disk space and the blob store.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/components`.
+            public struct ComponentsPayload: Codable, Hashable, Sendable {
+                /// Whether the database answers a read.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/database`.
+                public struct DatabasePayload: Codable, Hashable, Sendable {
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database/status`.
+                    @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case ok = "ok"
+                        case degraded = "degraded"
+                        case down = "down"
+                    }
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database/status`.
+                    public var status: Components.Schemas.Health.ComponentsPayload.DatabasePayload.StatusPayload
+                    /// How long the check took, in milliseconds.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database/latency_ms`.
+                    public var latencyMs: Swift.Int?
+                    /// What went wrong. Present only for a caller that holds `instance.read`.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database/error`.
+                    public var error: Swift.String?
+                    /// Creates a new `DatabasePayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///   - latencyMs: How long the check took, in milliseconds.
+                    ///   - error: What went wrong. Present only for a caller that holds `instance.read`.
+                    public init(
+                        status: Components.Schemas.Health.ComponentsPayload.DatabasePayload.StatusPayload,
+                        latencyMs: Swift.Int? = nil,
+                        error: Swift.String? = nil
+                    ) {
+                        self.status = status
+                        self.latencyMs = latencyMs
+                        self.error = error
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case status
+                        case latencyMs = "latency_ms"
+                        case error
+                    }
+                }
+                /// Whether the database answers a read.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/database`.
+                public var database: Components.Schemas.Health.ComponentsPayload.DatabasePayload
+                /// Whether the database commits a write.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/database_write`.
+                public struct DatabaseWritePayload: Codable, Hashable, Sendable {
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database_write/status`.
+                    @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case ok = "ok"
+                        case degraded = "degraded"
+                        case down = "down"
+                    }
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database_write/status`.
+                    public var status: Components.Schemas.Health.ComponentsPayload.DatabaseWritePayload.StatusPayload
+                    /// How long the check took, in milliseconds.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database_write/latency_ms`.
+                    public var latencyMs: Swift.Int?
+                    /// What went wrong. Present only for a caller that holds `instance.read`.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/database_write/error`.
+                    public var error: Swift.String?
+                    /// Creates a new `DatabaseWritePayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///   - latencyMs: How long the check took, in milliseconds.
+                    ///   - error: What went wrong. Present only for a caller that holds `instance.read`.
+                    public init(
+                        status: Components.Schemas.Health.ComponentsPayload.DatabaseWritePayload.StatusPayload,
+                        latencyMs: Swift.Int? = nil,
+                        error: Swift.String? = nil
+                    ) {
+                        self.status = status
+                        self.latencyMs = latencyMs
+                        self.error = error
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case status
+                        case latencyMs = "latency_ms"
+                        case error
+                    }
+                }
+                /// Whether the database commits a write.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/database_write`.
+                public var databaseWrite: Components.Schemas.Health.ComponentsPayload.DatabaseWritePayload
+                /// Whether the disk has room to write.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/disk`.
+                public struct DiskPayload: Codable, Hashable, Sendable {
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/disk/status`.
+                    @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case ok = "ok"
+                        case degraded = "degraded"
+                        case down = "down"
+                    }
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/disk/status`.
+                    public var status: Components.Schemas.Health.ComponentsPayload.DiskPayload.StatusPayload
+                    /// How long the check took, in milliseconds.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/disk/latency_ms`.
+                    public var latencyMs: Swift.Int?
+                    /// What went wrong. Present only for a caller that holds `instance.read`.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/disk/error`.
+                    public var error: Swift.String?
+                    /// Creates a new `DiskPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///   - latencyMs: How long the check took, in milliseconds.
+                    ///   - error: What went wrong. Present only for a caller that holds `instance.read`.
+                    public init(
+                        status: Components.Schemas.Health.ComponentsPayload.DiskPayload.StatusPayload,
+                        latencyMs: Swift.Int? = nil,
+                        error: Swift.String? = nil
+                    ) {
+                        self.status = status
+                        self.latencyMs = latencyMs
+                        self.error = error
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case status
+                        case latencyMs = "latency_ms"
+                        case error
+                    }
+                }
+                /// Whether the disk has room to write.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/disk`.
+                public var disk: Components.Schemas.Health.ComponentsPayload.DiskPayload
+                /// Whether the blob store on disk answers.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/blob_storage`.
+                public struct BlobStoragePayload: Codable, Hashable, Sendable {
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/blob_storage/status`.
+                    @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case ok = "ok"
+                        case degraded = "degraded"
+                        case down = "down"
+                    }
+                    /// `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/blob_storage/status`.
+                    public var status: Components.Schemas.Health.ComponentsPayload.BlobStoragePayload.StatusPayload
+                    /// How long the check took, in milliseconds.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/blob_storage/latency_ms`.
+                    public var latencyMs: Swift.Int?
+                    /// What went wrong. Present only for a caller that holds `instance.read`.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/components/blob_storage/error`.
+                    public var error: Swift.String?
+                    /// Creates a new `BlobStoragePayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+                    ///   - latencyMs: How long the check took, in milliseconds.
+                    ///   - error: What went wrong. Present only for a caller that holds `instance.read`.
+                    public init(
+                        status: Components.Schemas.Health.ComponentsPayload.BlobStoragePayload.StatusPayload,
+                        latencyMs: Swift.Int? = nil,
+                        error: Swift.String? = nil
+                    ) {
+                        self.status = status
+                        self.latencyMs = latencyMs
+                        self.error = error
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case status
+                        case latencyMs = "latency_ms"
+                        case error
+                    }
+                }
+                /// Whether the blob store on disk answers.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/components/blob_storage`.
+                public var blobStorage: Components.Schemas.Health.ComponentsPayload.BlobStoragePayload
+                /// Creates a new `ComponentsPayload`.
+                ///
+                /// - Parameters:
+                ///   - database: Whether the database answers a read.
+                ///   - databaseWrite: Whether the database commits a write.
+                ///   - disk: Whether the disk has room to write.
+                ///   - blobStorage: Whether the blob store on disk answers.
+                public init(
+                    database: Components.Schemas.Health.ComponentsPayload.DatabasePayload,
+                    databaseWrite: Components.Schemas.Health.ComponentsPayload.DatabaseWritePayload,
+                    disk: Components.Schemas.Health.ComponentsPayload.DiskPayload,
+                    blobStorage: Components.Schemas.Health.ComponentsPayload.BlobStoragePayload
+                ) {
+                    self.database = database
+                    self.databaseWrite = databaseWrite
+                    self.disk = disk
+                    self.blobStorage = blobStorage
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case database
+                    case databaseWrite = "database_write"
+                    case disk
+                    case blobStorage = "blob_storage"
+                }
+            }
+            /// Each component checked: reading and writing the database, free disk space and the blob store.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/components`.
+            public var components: Components.Schemas.Health.ComponentsPayload
+            /// The platform types this build no longer ships.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/platform_types`.
+            public struct PlatformTypesPayload: Codable, Hashable, Sendable {
+                /// How many platform types the instance holds that this build no longer ships.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/platform_types/retired`.
+                public var retired: Swift.Int
+                /// Creates a new `PlatformTypesPayload`.
+                ///
+                /// - Parameters:
+                ///   - retired: How many platform types the instance holds that this build no longer ships.
+                public init(retired: Swift.Int) {
+                    self.retired = retired
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case retired
+                }
+            }
+            /// The platform types this build no longer ships.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/platform_types`.
+            public var platformTypes: Components.Schemas.Health.PlatformTypesPayload
+            /// Stored values this build does not recognize.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values`.
+            public struct UnrecognizedStoredValuesPayload: Codable, Hashable, Sendable {
+                /// How many stored rows hold a value this build does not recognize.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values/rows`.
+                public var rows: Swift.Int
+                /// `true` if the scan for such rows ran. `false` means `rows` is unknown.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values/scanned`.
+                public var scanned: Swift.Bool
+                /// Creates a new `UnrecognizedStoredValuesPayload`.
+                ///
+                /// - Parameters:
+                ///   - rows: How many stored rows hold a value this build does not recognize.
+                ///   - scanned: `true` if the scan for such rows ran. `false` means `rows` is unknown.
+                public init(
+                    rows: Swift.Int,
+                    scanned: Swift.Bool
+                ) {
+                    self.rows = rows
+                    self.scanned = scanned
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case rows
+                    case scanned
+                }
+            }
+            /// Stored values this build does not recognize.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values`.
+            public var unrecognizedStoredValues: Components.Schemas.Health.UnrecognizedStoredValuesPayload
+            /// Where the server runs. Present only when it is configured.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/placement`.
+            public struct PlacementPayload: Codable, Hashable, Sendable {
+                /// The region the server runs in.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/placement/region`.
+                public var region: Swift.String?
+                /// The location the server runs in.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/placement/location`.
+                public var location: Swift.String?
+                /// The country the server runs in.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/placement/country`.
+                public var country: Swift.String?
+                /// Creates a new `PlacementPayload`.
+                ///
+                /// - Parameters:
+                ///   - region: The region the server runs in.
+                ///   - location: The location the server runs in.
+                ///   - country: The country the server runs in.
+                public init(
+                    region: Swift.String? = nil,
+                    location: Swift.String? = nil,
+                    country: Swift.String? = nil
+                ) {
+                    self.region = region
+                    self.location = location
+                    self.country = country
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case region
+                    case location
+                    case country
+                }
+            }
+            /// Where the server runs. Present only when it is configured.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/placement`.
+            public var placement: Components.Schemas.Health.PlacementPayload?
+            /// The build the instance runs, when it is known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/version`.
+            public var version: Swift.String?
+            /// Creates a new `Health`.
+            ///
+            /// - Parameters:
+            ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+            ///   - components: Each component checked: reading and writing the database, free disk space and the blob store.
+            ///   - platformTypes: The platform types this build no longer ships.
+            ///   - unrecognizedStoredValues: Stored values this build does not recognize.
+            ///   - placement: Where the server runs. Present only when it is configured.
+            ///   - version: The build the instance runs, when it is known.
+            public init(
+                status: Components.Schemas.Health.StatusPayload,
+                components: Components.Schemas.Health.ComponentsPayload,
+                platformTypes: Components.Schemas.Health.PlatformTypesPayload,
+                unrecognizedStoredValues: Components.Schemas.Health.UnrecognizedStoredValuesPayload,
+                placement: Components.Schemas.Health.PlacementPayload? = nil,
+                version: Swift.String? = nil
+            ) {
+                self.status = status
+                self.components = components
+                self.platformTypes = platformTypes
+                self.unrecognizedStoredValues = unrecognizedStoredValues
+                self.placement = placement
+                self.version = version
+            }
+            public enum CodingKeys: String, CodingKey {
+                case status
+                case components
+                case platformTypes = "platform_types"
+                case unrecognizedStoredValues = "unrecognized_stored_values"
+                case placement
+                case version
+            }
+        }
         /// A page of trashed item summaries.
         ///
         /// - Remark: Generated from `#/components/schemas/TrashPage`.
@@ -7576,7 +7955,7 @@ extension Components {
             /// Every type.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/data`.
-            public var data: [Components.Schemas.RegisteredType]
+            public var data: [Components.Schemas.ListedType]
             /// Always `null`: Marfa returns every type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/next_cursor`.
@@ -7587,7 +7966,7 @@ extension Components {
             ///   - data: Every type.
             ///   - nextCursor: Always `null`: Marfa returns every type in one page.
             public init(
-                data: [Components.Schemas.RegisteredType],
+                data: [Components.Schemas.ListedType],
                 nextCursor: Swift.String? = nil
             ) {
                 self.data = data
@@ -7598,39 +7977,39 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
-        /// A type says which fields the items of that type hold, and what else Marfa does for them.
+        /// A type in the list of types: its own definition, with the roles it declares and the roles it plays.
         ///
-        /// - Remark: Generated from `#/components/schemas/RegisteredType`.
-        public struct RegisteredType: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/RegisteredType/value1`.
-            public var value1: Components.Schemas.TypeDefinition
-            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+        /// - Remark: Generated from `#/components/schemas/ListedType`.
+        public struct ListedType: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ListedType/value1`.
+            public var value1: Components.Schemas.RegisteredType
+            /// - Remark: Generated from `#/components/schemas/ListedType/value2`.
             public struct Value2Payload: Codable, Hashable, Sendable {
-                /// The type's recorded origin and creator.
+                /// The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
                 ///
-                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/provenance`.
-                public var provenance: Components.Schemas.TypeProvenance
+                /// - Remark: Generated from `#/components/schemas/ListedType/value2/own_roles`.
+                public var ownRoles: [Components.Schemas.TypeRole]
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
-                ///   - provenance: The type's recorded origin and creator.
-                public init(provenance: Components.Schemas.TypeProvenance) {
-                    self.provenance = provenance
+                ///   - ownRoles: The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
+                public init(ownRoles: [Components.Schemas.TypeRole]) {
+                    self.ownRoles = ownRoles
                 }
                 public enum CodingKeys: String, CodingKey {
-                    case provenance
+                    case ownRoles = "own_roles"
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
-            public var value2: Components.Schemas.RegisteredType.Value2Payload
-            /// Creates a new `RegisteredType`.
+            /// - Remark: Generated from `#/components/schemas/ListedType/value2`.
+            public var value2: Components.Schemas.ListedType.Value2Payload
+            /// Creates a new `ListedType`.
             ///
             /// - Parameters:
             ///   - value1:
             ///   - value2:
             public init(
-                value1: Components.Schemas.TypeDefinition,
-                value2: Components.Schemas.RegisteredType.Value2Payload
+                value1: Components.Schemas.RegisteredType,
+                value2: Components.Schemas.ListedType.Value2Payload
             ) {
                 self.value1 = value1
                 self.value2 = value2
@@ -7857,6 +8236,52 @@ extension Components {
                     forKey: .maxItems
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// A type says which fields the items of that type hold, and what else Marfa does for them.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RegisteredType`.
+        public struct RegisteredType: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value1`.
+            public var value1: Components.Schemas.TypeDefinition
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// The type's recorded origin and creator.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/provenance`.
+                public var provenance: Components.Schemas.TypeProvenance
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - provenance: The type's recorded origin and creator.
+                public init(provenance: Components.Schemas.TypeProvenance) {
+                    self.provenance = provenance
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case provenance
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+            public var value2: Components.Schemas.RegisteredType.Value2Payload
+            /// Creates a new `RegisteredType`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.TypeDefinition,
+                value2: Components.Schemas.RegisteredType.Value2Payload
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
             }
         }
         /// A type says which fields the items of that type hold, and what else Marfa does for them.

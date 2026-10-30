@@ -33,6 +33,14 @@ extension InMemoryCore {
         try unsupported("items.links")
     }
 
+    func bodyLinksOf(ids: [String]) throws -> [String: BodyLinks] {
+        try unsupported("items.links(in:)")
+    }
+
+    func changesSince(cursor: String?, most: UInt32) throws -> CopyChanges {
+        try unsupported("changes(since:most:)")
+    }
+
     func catchUp(stop: Stop?) throws -> CatchUpReport {
         try unsupported("catchUp")
     }
