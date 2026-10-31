@@ -29,7 +29,7 @@ struct LinkPartsOffline {
         #expect(
             link.range.location
                 != text.distance(
-                    from: text.startIndex, to: try #require(text.firstRange(of: "[["))?.lowerBound ?? text.startIndex))
+                    from: text.startIndex, to: try #require(text.firstRange(of: "[[")).lowerBound))
         #expect(slice(text, link.range) == "[[Café]]")
         #expect(slice(text, link.name.range) == "Café")
         let range = try #require(Range(link.range, in: text))

@@ -28,7 +28,7 @@ struct EdgeChecksOffline {
         }
     }
 
-    /// The message without its leading "validation (code): " and with item ids replaced.
+    /// The message without its kind and code prefix, with item ids replaced.
     static func normalised(_ message: String) -> String {
         message.replacingOccurrences(of: "^[A-Za-z ]+ \\([a-z_]+\\): ", with: "", options: .regularExpression)
             .replacingOccurrences(
