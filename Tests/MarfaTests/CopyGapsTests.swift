@@ -246,7 +246,7 @@ struct ReplacedRefusedCopy {
     }
 
     /// A store another server's copy made opens, and keeps its writes; the first call that reaches the server says
-    /// it is the wrong one, before anything is sent.
+    /// it is the wrong one, without sending its request.
     @Test func aStoreFromAnotherServerOpensAndItsFirstServerCallSaysSo() async throws {
         let store = temporaryStore()
         let copy = try await WorkingCopy.open(store: store)

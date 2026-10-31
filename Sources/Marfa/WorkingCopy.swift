@@ -88,10 +88,11 @@ public final class WorkingCopy: Sendable {
     /// and the file budget the old store recorded. What only the old store held does not stay: pins, the position
     /// in the server's events and the declared types. Hydrate the new copy as you would a new one.
     ///
-    /// A store another server's copy made opens, and keeps its writes. The open does not ask the server, so the
-    /// first call that does, such as ``hydrate(types:tier:edgeTypes:)``, throws `wrongServer` before it sends
-    /// anything. To start again on this server, read `queue` for what would be lost, close the copy, and call
-    /// ``remove(store:unsent:)``.
+    /// A store made against a server at another address opens, and keeps its writes. The open does not ask the
+    /// server. The first call that does, such as ``hydrate(types:tier:edgeTypes:)``, first asks which instance
+    /// answers: where it is the one the store was made against, the store follows it to the new address, and
+    /// otherwise the call throws `wrongServer` without sending its request. To start again on this server, read
+    /// `queue` for what would be lost, close the copy, and call ``remove(store:unsent:)``.
     ///
     /// `fileBudget` chooses the budget of the cache of fetched files, as ``Blobs/setBudget(_:)`` does, trimming to
     /// it before this returns; left `nil`, the copy keeps the choice its store holds, which is the default

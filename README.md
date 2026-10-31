@@ -242,7 +242,7 @@ The fake takes the status words of the types you give it and refuses a write tha
 
 Every call throws `MarfaError`. Three properties say what an error means, so an app does not need its own list of cases:
 
-- `isOffline`: the server could not be reached, so nothing was sent.
+- `isOffline`: the server could not be reached, or its answer did not arrive. A write may still have reached the server.
 - `isKeyRefusal`: the key or sign-in no longer works. Ask the person to sign in again, or get a new key. A `forbidden` error is never a key refusal: the key is valid but lacks a permission.
 - `isTransient`: asking again later can clear it. No key refusal is transient, and every offline error is.
 

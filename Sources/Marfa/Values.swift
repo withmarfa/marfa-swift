@@ -5,7 +5,8 @@ internal import MarfaCore
 ///
 /// Three properties say what an error means for an app, so that it needs no list of cases of its own:
 ///
-/// - ``isOffline``: the server could not be reached, so nothing was sent.
+/// - ``isOffline``: the server could not be reached, or its answer did not arrive. A write may still have reached
+///   the server.
 /// - ``isKeyRefusal``: the key or sign-in no longer works. Asking again cannot clear it; the person signs in
 ///   again or the app gets a new key. It is `true` for `unauthorized`, `signedOut`, and a `copyExpired` or
 ///   `streamIncomplete` whose reason is `credential_ended`. It is never `true` for `forbidden`: the server answers
@@ -111,7 +112,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// A call that needs the server found the device offline, so nothing was sent.
     case noConnection(message: String)
 
-    /// The server could not be reached, so nothing was sent.
+    /// The server could not be reached, or its answer did not arrive.
+    ///
+    /// A `network` error can come after the request was sent, so a write may have reached the server.
     public var isOffline: Bool {
         switch self {
         case .network, .noConnection: true
