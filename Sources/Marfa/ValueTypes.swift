@@ -425,7 +425,7 @@ public struct QueuedWrite: Sendable, Hashable {
     /// app to do, and has no verdict meanwhile.
     public var waiting: Bool
     /// What the write sends, or sent; a refused write that carried content
-    /// keeps it here, through `forgetAnswered()`, until `discard(_:)`.
+    /// keeps it here, through `forgetAnswered()` and `takeAnswered()`, until `discard(_:)`.
     public var body: JSONObject
     /// The server's answer, whole, as it arrived: the JSON it held, or, for
     /// an answer that was not JSON, its text as a string.
@@ -772,8 +772,8 @@ public struct Status: Sendable, Hashable {
     public var catalogVersion: UInt64?
     /// The cache of fetched files: its setting, the budget in force and the bytes held.
     public var fileCache: FileCache
-    /// When the copy last heard from its server; `nil` where the core has recorded no time, which the core this
-    /// package is built against does not yet do.
+    /// When the copy last finished a pull from its server without error, by the device's clock; `nil` where it has
+    /// not since the store was made or a hydration last cleared it.
     public var lastSynced: Date?
 
     public init(
@@ -809,7 +809,8 @@ public struct Status: Sendable, Hashable {
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
             hydration: Hydration(core.hydration), items: core.items, itemsExpected: core.itemsExpected,
             itemsListed: core.itemsListed, edges: core.edges, catalogVersion: core.catalogVersion,
-            instanceId: core.instanceId, fileCache: FileCache(core.fileCache))
+            instanceId: core.instanceId, fileCache: FileCache(core.fileCache),
+            lastSynced: core.syncedAt.flatMap(ItemDate.utcInstant))
     }
 
     var core: MarfaCore.Status {
@@ -817,7 +818,7 @@ public struct Status: Sendable, Hashable {
             serverOrigin: serverOrigin, instanceId: instanceId, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
             sliceEdgeTypes: sliceEdgeTypes, pinned: pinned, eventCursor: eventCursor, hydration: hydration.core,
             items: items, itemsExpected: itemsExpected, itemsListed: itemsListed, edges: edges,
-            catalogVersion: catalogVersion, fileCache: fileCache.core)
+            catalogVersion: catalogVersion, syncedAt: lastSynced.map(ItemDate.instant), fileCache: fileCache.core)
     }
 }
 
