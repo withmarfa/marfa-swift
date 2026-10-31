@@ -326,7 +326,7 @@ final class Feed: Sendable {
     ///
     /// One that waited, for the same slice as a hydration that just completed under the same key, returns that one's
     /// report while the copy is still whole.
-    func hydrate(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String]) async throws
+    func hydrate(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], inPlaceOnly: Bool) async throws
         -> MarfaCore.HydrateReport
     {
         let waited = try await takeFill()
@@ -340,7 +340,7 @@ final class Feed: Sendable {
         {
             return filled.report
         }
-        return try await fill(types: types, tier: tier, edgeTypes: edgeTypes, byRefill: false)
+        return try await fill(types: types, tier: tier, edgeTypes: edgeTypes, byRefill: false, inPlaceOnly: inPlaceOnly)
     }
 
     /// Runs the app's catch-up after any hydration or catch-up this copy is running, since the core refuses one
@@ -397,7 +397,7 @@ final class Feed: Sendable {
     /// `admitted` is asked under the core's lease, which a key change waits for, so the fill runs under the key it
     /// approved; where it answers `false` the fill throws `KeyChanged` and tells nothing.
     private func fill(
-        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], byRefill: Bool,
+        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], byRefill: Bool, inPlaceOnly: Bool,
         admitted: @escaping @Sendable () -> Bool = { true }
     ) async throws -> MarfaCore.HydrateReport {
         let suspensions = locked { state in
@@ -410,7 +410,7 @@ final class Feed: Sendable {
             report = try await holder.runUntilCanceled { core, stop in
                 guard admitted() else { throw KeyChanged() }
                 return try core.hydrateWith(
-                    types: types, tier: tier, edgeTypes: edgeTypes, inPlaceOnly: byRefill, stop: stop)
+                    types: types, tier: tier, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly, stop: stop)
             }
         } catch let error as KeyChanged {
             throw error
@@ -499,6 +499,7 @@ final class Feed: Sendable {
                 // A key changed since this attempt began may read under another reach than the one vouched for.
                 _ = try await fill(
                     types: status.sliceTypes, tier: tier, edgeTypes: status.sliceEdgeTypes, byRefill: true,
+                    inPlaceOnly: true,
                     admitted: { [self] in
                         locked { $0.suspensions == suspensions && $0.refill.vouched }
                     })

@@ -149,6 +149,123 @@ struct HydrationLifecycle {
         await copy.close()
     }
 
+    private static func staleCopy(_ script: HydrationScript, _ server: LocalServer) async throws -> WorkingCopy {
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        script.set("/items", [.page(["held", "gone"])])
+        _ = try await copy.hydrate(types: ["*"], tier: .library)
+        script.set("/events", [.agedOut])
+        await #expect(throws: MarfaError.self) { _ = try await copy.catchUp() }
+        try #require(try await copy.status().hydration == .stale)
+        return copy
+    }
+
+    private static func refused(_ reason: String) -> (any Error) -> Bool {
+        { error in
+            if case .copyExpired(let given, _)? = error as? MarfaError { given == reason } else { false }
+        }
+    }
+
+    @Test(arguments: [(["core.note"], SliceTier.library), (["*"], SliceTier.all)])
+    func aFillOnlyInPlaceOverAnotherSliceIsRefusedBeforeItChangesAnythingAndTheCopyStaysStale(
+        types: [String], tier: SliceTier
+    ) async throws {
+        let script = HydrationScript()
+        let server = try await script.start()
+        defer { server.stop() }
+        let copy = try await Self.staleCopy(script, server)
+        let queued = try await Self.queueEdits(copy)
+        script.set("/events", [.stream(cursor: "60")])
+        script.set("/items", [.page(["arrived"])])
+        let before = server.log.all.count
+
+        await #expect(
+            performing: { _ = try await copy.hydrate(types: types, tier: tier, inPlaceOnly: true) },
+            throws: Self.refused("slice_changed"))
+
+        #expect(try await copy.status().hydration == .stale, "a kept copy reads stale")
+        #expect(try await copy.items.get("gone") != nil)
+        #expect(try await copy.items.get("arrived") == nil)
+        try await Self.expectEdits(copy, queued: queued)
+        #expect(!server.log.all.dropFirst(before).contains { $0.hasPrefix("GET /items?") }, "it read a page first")
+
+        // The same slice fills in place, and keeps the queue.
+        let report = try await copy.hydrate(types: ["*"], tier: .library, inPlaceOnly: true)
+        #expect(report.inPlace)
+        #expect(try await copy.status().hydration == .complete)
+        #expect(try await copy.items.get("gone") == nil)
+        #expect(try await copy.items.get("arrived") != nil)
+        try await Self.expectEdits(copy, queued: queued)
+        await copy.close()
+    }
+
+    @Test func aCompleteCopyAskedToFillOnlyInPlaceIsNotStaleAndKeepsEverything() async throws {
+        let script = HydrationScript()
+        let server = try await script.start()
+        defer { server.stop() }
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        script.set("/items", [.page(["held", "gone"])])
+        _ = try await copy.hydrate(types: ["*"], tier: .library)
+
+        await #expect(
+            performing: { _ = try await copy.hydrate(types: ["*"], tier: .library, inPlaceOnly: true) },
+            throws: Self.refused("not_stale"))
+
+        #expect(try await copy.status().hydration == .complete)
+        #expect(try await copy.items.get("gone") != nil)
+        await copy.close()
+    }
+
+    @Test func aFillOnlyInPlaceThatTheServerRefusesEndsTheCopyWhichReadsExpiredNotStale() async throws {
+        let script = HydrationScript()
+        let server = try await script.start()
+        defer { server.stop() }
+        let copy = try await Self.staleCopy(script, server)
+        script.set("/events", [.stream(cursor: "60")])
+        script.set("/items", [.refused])
+
+        await #expect(throws: MarfaError.self) {
+            _ = try await copy.hydrate(types: ["*"], tier: .library, inPlaceOnly: true)
+        }
+
+        #expect(try await copy.status().hydration == .expired, "an ended copy reads expired")
+        await copy.close()
+    }
+
+    @Test func aWriteHeldForAnotherInstanceIsReleasedToTheCurrentOneOrWithdrawn() async throws {
+        let script = HydrationScript()
+        let server = try await script.start()
+        defer { server.stop() }
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        script.set("/items", [.page(["held", "gone"])])
+        _ = try await copy.hydrate(types: ["*"], tier: .library)
+        let queued = try await Self.queueEdits(copy)
+
+        // The server is now another instance, so a fill that keeps the copy is refused, naming why.
+        script.set("/", [.another])
+        script.set("/events", [.stream(cursor: "60", instance: "another")])
+        await #expect(
+            performing: { _ = try await copy.hydrate(types: ["*"], tier: .library, inPlaceOnly: true) },
+            throws: Self.refused("instance_changed"))
+        #expect(try await copy.queue.all().map(\.id) == queued, "the refusal changed the queue")
+
+        // Hydrating afresh builds the copy from the other instance and holds the writes queued before it.
+        script.set("/items", [.page(["held"])])
+        _ = try await copy.hydrate(types: ["*"], tier: .library)
+        let held = try await copy.queue.all()
+        #expect(held.map(\.id) == queued)
+        #expect(held.allSatisfy { if case .blocked(.instanceChanged, _)? = $0.verdict { true } else { false } })
+
+        // One held write is withdrawn, which reads its row from the server.
+        let withdrawn = try await copy.queue.withdraw(queued[1])
+        #expect(withdrawn)
+        // The other is released to the current instance and goes on the next drain.
+        #expect(try await copy.queue.release(reason: .instanceChanged) == 1)
+        script.set("/items/held", [.unavailable])
+        _ = try? await copy.queue.drain()
+        #expect(server.log.all.contains { $0.hasPrefix("PATCH /items/held?") }, "the released write was not sent")
+        await copy.close()
+    }
+
     private static func queueEdits(_ copy: WorkingCopy) async throws -> [String] {
         let held = try #require(try await copy.items.get("held"))
         let edit = try await copy.items.update(
@@ -233,13 +350,21 @@ private final class HydrationScript: Sendable {
             return .json(#"{"data":[\#(rows.joined(separator: ","))],"next_cursor":\#(cursor)}"#)
         }
 
-        static func stream(cursor: String) -> Self {
+        static func stream(cursor: String, instance: String = "test-instance") -> Self {
             Self(
                 answer: (
                     200, "text/event-stream",
-                    marker("stream_cursor", cursor: cursor) + marker("stream_live", cursor: cursor)
+                    marker("stream_cursor", cursor: cursor, instance: instance)
+                        + marker("stream_live", cursor: cursor, instance: instance)
                 ))
         }
+
+        static let another = Self.json(
+            #"{"name":"t","version":"1","release":null,"instance_id":"another","contract":\#(marfaContractVersion),"features":[]}"#
+        )
+
+        static let refused = Self(
+            answer: (401, "application/json", #"{"error":{"code":"unauthorized","message":"the key was refused"}}"#))
 
         static let unavailable = Self(
             answer: (503, "application/json", #"{"error":{"code":"unavailable","message":"interrupted"}}"#))
@@ -250,8 +375,8 @@ private final class HydrationScript: Sendable {
                     + "event: catchup_too_old\ndata: {\"event_type\":\"catchup_too_old\",\"min_retained_id\":\"50\",\"requested\":\"10\"}\n\n"
             ))
 
-        private static func marker(_ kind: String, cursor: String) -> String {
-            "event: \(kind)\ndata: {\"event_type\":\"\(kind)\",\"cursor\":\"\(cursor)\",\"instance_id\":\"test-instance\",\"reach\":\"\(LocalServer.reach)\"}\n\n"
+        private static func marker(_ kind: String, cursor: String, instance: String = "test-instance") -> String {
+            "event: \(kind)\ndata: {\"event_type\":\"\(kind)\",\"cursor\":\"\(cursor)\",\"instance_id\":\"\(instance)\",\"reach\":\"\(LocalServer.reach)\"}\n\n"
         }
     }
 }
