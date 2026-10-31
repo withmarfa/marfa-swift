@@ -6,13 +6,49 @@ import Foundation
 public struct ItemSnapshot: Sendable, Hashable, Identifiable {
     /// Who or what made the write that replaced this state.
     public struct Writer: Sendable, Hashable {
-        public enum Kind: String, Sendable, Hashable, CaseIterable {
-            case browser, app, key, local
+        public enum Kind: Sendable, Hashable {
+            /// The owner's browser.
+            case browser
+            /// An app the owner approved.
+            case app
+            /// An API key.
+            case key
+            /// The local command on the server's machine.
+            case local
+            /// A kind of sign-in this build does not know, as the server names it.
+            case other(String)
+
+            public init(rawValue: String) {
+                switch rawValue {
+                case "browser": self = .browser
+                case "app": self = .app
+                case "key": self = .key
+                case "local": self = .local
+                default: self = .other(rawValue)
+                }
+            }
+
+            /// The kind as the server names it.
+            public var rawValue: String {
+                switch self {
+                case .browser: "browser"
+                case .app: "app"
+                case .key: "key"
+                case .local: "local"
+                case .other(let name): name
+                }
+            }
         }
 
         public let kind: Kind
         public let id: String
         public let name: String
+
+        public init(kind: Kind, id: String, name: String) {
+            self.kind = kind
+            self.id = id
+            self.name = name
+        }
     }
 
     public let id: String
@@ -26,9 +62,27 @@ public struct ItemSnapshot: Sendable, Hashable, Identifiable {
     /// The `occurred_at` the item had at this version.
     public let occurredAt: ItemDate?
     public let sourceID: String?
+    /// The sign-in that made the write, or `nil` where the server recorded none, as for a change the server made
+    /// itself.
     public let writer: Writer?
     /// When the snapshot was taken, which is when the write that replaced this state happened.
     public let createdAt: Date
+
+    public init(
+        id: String, itemID: String, version: Int, type: String, tier: Tier, properties: JSONObject,
+        occurredAt: ItemDate?, sourceID: String?, writer: Writer?, createdAt: Date
+    ) {
+        self.id = id
+        self.itemID = itemID
+        self.version = version
+        self.type = type
+        self.tier = tier
+        self.properties = properties
+        self.occurredAt = occurredAt
+        self.sourceID = sourceID
+        self.writer = writer
+        self.createdAt = createdAt
+    }
 }
 
 /// One page of an item's snapshots, oldest first.
@@ -38,6 +92,11 @@ public struct ItemSnapshotPage: Sendable, Hashable {
     ///
     /// A page can be short, or empty, with more to follow, so stop only when this is `nil`.
     public let next: String?
+
+    public init(snapshots: [ItemSnapshot], next: String?) {
+        self.snapshots = snapshots
+        self.next = next
+    }
 }
 
 /// A change to one setting: a new value, or the removal of the value so the server's default applies.
@@ -63,10 +122,42 @@ public struct InstanceConfig: Sendable, Hashable {
     public var grantInactivityDays: Int?
     public var auditRetentionDays: Int?
     public var eventLogRetentionHours: Int?
+    /// Days the server keeps inbound webhook deliveries a connector has marked handled; `0` keeps them with no age
+    /// limit.
+    public var inboundHandledRetentionDays: Int?
+    /// Days the server keeps inbound webhook deliveries no connector has marked handled; `0` keeps them with no age
+    /// limit.
+    public var inboundPendingRetentionDays: Int?
     public var enrichmentEnabled: Bool?
     public var enrichmentOCREnabled: Bool?
     public var errorReportingEnabled: Bool?
     public var heartbeatEnabled: Bool?
+
+    public init(
+        instanceID: String, name: String? = nil, trashRetentionDays: Int? = nil, versionRecentDays: Int? = nil,
+        versionDailySnapshotDays: Int? = nil, versionWeeklySnapshotDays: Int? = nil, versionMaxVersions: Int? = nil,
+        grantInactivityDays: Int? = nil, auditRetentionDays: Int? = nil, eventLogRetentionHours: Int? = nil,
+        inboundHandledRetentionDays: Int? = nil, inboundPendingRetentionDays: Int? = nil,
+        enrichmentEnabled: Bool? = nil, enrichmentOCREnabled: Bool? = nil, errorReportingEnabled: Bool? = nil,
+        heartbeatEnabled: Bool? = nil
+    ) {
+        self.instanceID = instanceID
+        self.name = name
+        self.trashRetentionDays = trashRetentionDays
+        self.versionRecentDays = versionRecentDays
+        self.versionDailySnapshotDays = versionDailySnapshotDays
+        self.versionWeeklySnapshotDays = versionWeeklySnapshotDays
+        self.versionMaxVersions = versionMaxVersions
+        self.grantInactivityDays = grantInactivityDays
+        self.auditRetentionDays = auditRetentionDays
+        self.eventLogRetentionHours = eventLogRetentionHours
+        self.inboundHandledRetentionDays = inboundHandledRetentionDays
+        self.inboundPendingRetentionDays = inboundPendingRetentionDays
+        self.enrichmentEnabled = enrichmentEnabled
+        self.enrichmentOCREnabled = enrichmentOCREnabled
+        self.errorReportingEnabled = errorReportingEnabled
+        self.heartbeatEnabled = heartbeatEnabled
+    }
 }
 
 /// The settings to change; a field left `nil` is not sent, so the server keeps it as it is.
@@ -80,6 +171,8 @@ public struct InstanceConfigPatch: Sendable, Hashable {
     public var grantInactivityDays: SettingChange<Int>?
     public var auditRetentionDays: SettingChange<Int>?
     public var eventLogRetentionHours: SettingChange<Int>?
+    public var inboundHandledRetentionDays: SettingChange<Int>?
+    public var inboundPendingRetentionDays: SettingChange<Int>?
     public var enrichmentEnabled: SettingChange<Bool>?
     public var enrichmentOCREnabled: SettingChange<Bool>?
     public var errorReportingEnabled: SettingChange<Bool>?
@@ -105,6 +198,8 @@ public struct InstanceConfigPatch: Sendable, Hashable {
         put("grant_inactivity_days", grantInactivityDays)
         put("audit_retention_days", auditRetentionDays)
         put("event_log_retention_hours", eventLogRetentionHours)
+        put("inbound_handled_retention_days", inboundHandledRetentionDays)
+        put("inbound_pending_retention_days", inboundPendingRetentionDays)
         put("enrichment_enabled", enrichmentEnabled)
         put("enrichment_ocr_enabled", enrichmentOCREnabled)
         put("error_reporting_enabled", errorReportingEnabled)
@@ -114,8 +209,10 @@ public struct InstanceConfigPatch: Sendable, Hashable {
 }
 
 extension Server {
-    /// How long a call waits for the server to answer before it throws, so an unreachable server never leaves an
-    /// app waiting.
+    /// How long a call may take in all before it throws ``MarfaError/network(message:)``.
+    ///
+    /// An unreachable or stalled server then never leaves an app waiting. The limit covers renewing a refused
+    /// access token and sending again.
     public static let defaultTimeout = Duration.seconds(20)
 
     /// The snapshots of the item `id`, oldest first, one page at a time.
@@ -124,6 +221,10 @@ extension Server {
     /// the server's default applies when it is `nil`. The server answers an item it cannot read, in the trash or of
     /// a type the key does not reach, with ``MarfaError/notFound(code:message:)``. Calls read the key this server
     /// holds, as a working copy does.
+    ///
+    /// A snapshot whose `created_at` this build cannot read makes the whole page throw
+    /// ``MarfaError/decoding(message:)`` rather than leave the snapshot out, which would show the item's history with
+    /// a version missing. The server records that time itself, so only a server writing it in another form does this.
     public func snapshots(
         ofItem id: String, after cursor: String? = nil, limit: Int? = nil, timeout: Duration = Server.defaultTimeout
     ) async throws(MarfaError) -> ItemSnapshotPage {
@@ -148,8 +249,7 @@ extension Server {
     /// Changes the settings in `patch` and answers the settings as stored.
     ///
     /// Only the fields set on `patch` are sent. `instanceID`, from an earlier ``config(timeout:)``, makes the server
-    /// refuse the change with ``MarfaError/server(status:code:message:)`` code `instance_changed` when the address
-    /// now reaches another instance.
+    /// refuse the change with ``MarfaError/instanceChanged(message:)`` when the address now reaches another instance.
     public func updateConfig(
         _ patch: InstanceConfigPatch, expecting instanceID: String? = nil, timeout: Duration = Server.defaultTimeout
     ) async throws(MarfaError) -> InstanceConfig {
@@ -206,11 +306,7 @@ extension Server {
             id: wire.id, itemID: wire.itemId, version: wire.version, type: wire.type,
             tier: wire.tier == "feed" ? .feed : .library, properties: wire.properties,
             occurredAt: ItemDate.parse(wire.occurredAt), sourceID: wire.sourceId,
-            writer: wire.writer.flatMap { writer in
-                ItemSnapshot.Writer.Kind(rawValue: writer.kind).map {
-                    .init(kind: $0, id: writer.id, name: writer.name)
-                }
-            },
+            writer: wire.writer.map { .init(kind: .init(rawValue: $0.kind), id: $0.id, name: $0.name) },
             createdAt: created)
     }
 }
@@ -269,6 +365,8 @@ private struct InstanceConfigWire: Decodable {
     let grantInactivityDays: Int?
     let auditRetentionDays: Int?
     let eventLogRetentionHours: Int?
+    let inboundHandledRetentionDays: Int?
+    let inboundPendingRetentionDays: Int?
     let enrichmentEnabled: Bool?
     let enrichmentOcrEnabled: Bool?
     let errorReportingEnabled: Bool?
@@ -284,6 +382,8 @@ private struct InstanceConfigWire: Decodable {
         case grantInactivityDays = "grant_inactivity_days"
         case auditRetentionDays = "audit_retention_days"
         case eventLogRetentionHours = "event_log_retention_hours"
+        case inboundHandledRetentionDays = "inbound_handled_retention_days"
+        case inboundPendingRetentionDays = "inbound_pending_retention_days"
         case enrichmentEnabled = "enrichment_enabled"
         case enrichmentOcrEnabled = "enrichment_ocr_enabled"
         case errorReportingEnabled = "error_reporting_enabled"
@@ -298,7 +398,9 @@ extension InstanceConfig {
             versionRecentDays: wire.versionRecentDays, versionDailySnapshotDays: wire.versionDailySnapshotDays,
             versionWeeklySnapshotDays: wire.versionWeeklySnapshotDays, versionMaxVersions: wire.versionMaxVersions,
             grantInactivityDays: wire.grantInactivityDays, auditRetentionDays: wire.auditRetentionDays,
-            eventLogRetentionHours: wire.eventLogRetentionHours, enrichmentEnabled: wire.enrichmentEnabled,
+            eventLogRetentionHours: wire.eventLogRetentionHours,
+            inboundHandledRetentionDays: wire.inboundHandledRetentionDays,
+            inboundPendingRetentionDays: wire.inboundPendingRetentionDays, enrichmentEnabled: wire.enrichmentEnabled,
             enrichmentOCREnabled: wire.enrichmentOcrEnabled, errorReportingEnabled: wire.errorReportingEnabled,
             heartbeatEnabled: wire.heartbeatEnabled)
     }

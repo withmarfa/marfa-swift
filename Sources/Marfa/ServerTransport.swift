@@ -1,5 +1,6 @@
 import Foundation
 internal import MarfaTypes
+import Synchronization
 
 /// The session a client's requests go through, closed when the last client using it is released.
 package final class Connection: Sendable {
@@ -109,9 +110,42 @@ extension Server {
     /// Sends one request to the server and answers the body of a success, as the generated client does: the key, or
     /// the sign-in's access token, is sent as a bearer token; a refused access token is renewed once and the request
     /// sent again; a redirect is never followed; and every failure throws a ``MarfaError``.
+    ///
+    /// `timeout` limits the whole call, renewal and second request included: once it passes, the call throws
+    /// ``MarfaError/network(message:)`` and the request is canceled. A renewal already under way finishes on its own,
+    /// so the token it keeps is never lost.
     func send(
         _ method: String, _ path: String, query: [URLQueryItem] = [], headers: [String: String] = [:],
         body: Data? = nil, timeout: Duration
+    ) async throws(MarfaError) -> Data {
+        let first = FirstAnswer<Result<Data, MarfaError>>()
+        let work = Task {
+            do throws(MarfaError) {
+                let data = try await unlimited(
+                    method, path, query: query, headers: headers, body: body, timeout: timeout)
+                first.answer(.success(data))
+            } catch {
+                first.answer(.failure(error))
+            }
+        }
+        let origin = origin
+        let timer = Task {
+            guard (try? await Task.sleep(for: timeout)) != nil else { return }
+            first.answer(.failure(.network(message: "\(origin) did not answer within \(timeout)")))
+            work.cancel()
+        }
+        defer { timer.cancel() }
+        return try await withTaskCancellationHandler {
+            await first.value
+        } onCancel: {
+            first.answer(.failure(.canceled(message: "the request to \(origin) was canceled")))
+            work.cancel()
+        }.get()
+    }
+
+    private func unlimited(
+        _ method: String, _ path: String, query: [URLQueryItem], headers: [String: String], body: Data?,
+        timeout: Duration
     ) async throws(MarfaError) -> Data {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw .invalid(message: "the address of \(origin) is not one a request can be made to")
@@ -119,7 +153,10 @@ extension Server {
         var base = components.percentEncodedPath
         while base.hasSuffix("/") { base.removeLast() }
         components.percentEncodedPath = base + path
-        components.queryItems = query.isEmpty ? nil : query
+        components.percentEncodedQuery =
+            query.isEmpty
+            ? nil
+            : query.map { "\(Server.queryPart($0.name))=\(Server.queryPart($0.value ?? ""))" }.joined(separator: "&")
         guard let target = components.url else {
             throw .invalid(message: "the request to \(origin) could not be made")
         }
@@ -173,9 +210,64 @@ extension Server {
         value.addingPercentEncoding(withAllowedCharacters: segmentCharacters) ?? value
     }
 
+    /// A query name or value as a request carries it. `URLQueryItem` leaves `+` as it is, which a server reads as a
+    /// space, so this escapes it with the separators.
+    static func queryPart(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: queryCharacters) ?? value
+    }
+
+    private static let queryCharacters: CharacterSet = {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+")
+        return allowed
+    }()
+
     private static let segmentCharacters: CharacterSet = {
         var allowed = CharacterSet.urlPathAllowed
         allowed.remove("/")
         return allowed
     }()
+}
+
+/// The first of several answers to arrive, which a waiter takes whether it starts waiting before or after.
+private final class FirstAnswer<Value: Sendable>: Sendable {
+    private enum State {
+        case waiting
+        case listening(CheckedContinuation<Value, Never>)
+        case answered(Value)
+        case taken
+    }
+
+    private let state = Mutex(State.waiting)
+
+    func answer(_ value: Value) {
+        let listener = state.withLock { state -> CheckedContinuation<Value, Never>? in
+            switch state {
+            case .waiting:
+                state = .answered(value)
+                return nil
+            case .listening(let continuation):
+                state = .taken
+                return continuation
+            case .answered, .taken: return nil
+            }
+        }
+        listener?.resume(returning: value)
+    }
+
+    var value: Value {
+        get async {
+            await withCheckedContinuation { continuation in
+                let ready = state.withLock { state -> Value? in
+                    guard case .answered(let value) = state else {
+                        state = .listening(continuation)
+                        return nil
+                    }
+                    state = .taken
+                    return value
+                }
+                if let ready { continuation.resume(returning: ready) }
+            }
+        }
+    }
 }

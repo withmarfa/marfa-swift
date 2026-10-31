@@ -21,7 +21,10 @@ final class ScriptedAuthServer: Sendable {
 
     struct Request: Sendable {
         let method: String
+        /// The path as sent, still percent-encoded.
         let path: String
+        /// The query as sent, still percent-encoded, or `nil` for none.
+        var query: String? = nil
         let headers: [String: String]
         let body: Data
 
@@ -180,7 +183,9 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
         }
         let headers = (request.allHTTPHeaderFields ?? [:])
         let reply = server.handle(
-            .init(method: request.httpMethod ?? "GET", path: url.path(), headers: headers, body: body))
+            .init(
+                method: request.httpMethod ?? "GET", path: url.path(), query: url.query(), headers: headers, body: body)
+        )
         deliver(reply, for: url)
     }
 

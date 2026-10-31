@@ -59,6 +59,7 @@ struct ServerCallsTests {
             let page = try await server.snapshots(ofItem: "i1", after: "c1", limit: 2)
             let request = try #require(scripted.requests(to: "/items/i1/versions").first)
             #expect(request.method == "GET")
+            #expect(request.query == "limit=2&cursor=c1")
             #expect(request.headers["Authorization"] == "Bearer at-1")
             #expect(page.next == "c2")
             #expect(page.snapshots.map(\.version) == [2, 1])
@@ -78,10 +79,108 @@ struct ServerCallsTests {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in reply(#"{"data": [], "next_cursor": null}"#) }
             let server = try signedIn(scripted, keychain)
-            let page = try await server.snapshots(ofItem: "a/b", after: "c 1", limit: 5)
+            let page = try await server.snapshots(ofItem: "a/b", after: "c 1&x=2+y/z", limit: 5)
             #expect(page.snapshots.isEmpty && page.next == nil)
             let request = try #require(scripted.requests.first)
-            #expect(request.path.hasSuffix("/versions"))
+            #expect(request.path == "/items/a%2Fb/versions", "an identifier is one path segment")
+            #expect(request.query?.contains("+") == false, "a server reads + in a query as a space")
+            let sent = URLComponents(string: "?" + (request.query ?? ""))?.queryItems ?? []
+            #expect(
+                sent == [URLQueryItem(name: "limit", value: "5"), URLQueryItem(name: "cursor", value: "c 1&x=2+y/z")])
+        }
+    }
+
+    @Test func aSnapshotOfAnUnknownWriterKindKeepsTheKindItWasGiven() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer { _ in
+                reply(
+                    """
+                    {"data": [{"id": "v1", "item_id": "i1", "version": 1, "properties": {}, "type": "core.note",
+                     "tier": "library", "occurred_at": "2026-10-27", "source_id": null,
+                     "writer": {"kind": "robot", "id": "r1", "name": "Robot"},
+                     "created_at": "2026-10-27T14:00:00.000Z"}], "next_cursor": null}
+                    """)
+            }
+            let page = try await signedIn(scripted, keychain).snapshots(ofItem: "i1")
+            let writer = try #require(page.snapshots.first?.writer, "a writer of an unknown kind is still a writer")
+            #expect(writer.kind == .other("robot") && writer.kind.rawValue == "robot")
+            #expect(writer.id == "r1" && writer.name == "Robot")
+        }
+    }
+
+    @Test func aSnapshotWithATimeThisBuildCannotReadFailsThePage() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer { _ in
+                reply(versions.replacingOccurrences(of: "2026-10-26T14:00:00.000Z", with: "yesterday"))
+            }
+            let error = await failure { try await signedIn(scripted, keychain).snapshots(ofItem: "i1") }
+            #expect(error?.code() == "decoding", "\(String(describing: error))")
+        }
+    }
+
+    @Test func writerKindsReadAsTheServerNamesThem() {
+        for kind in [ItemSnapshot.Writer.Kind.browser, .app, .key, .local, .other("robot")] {
+            #expect(ItemSnapshot.Writer.Kind(rawValue: kind.rawValue) == kind)
+        }
+    }
+
+    @Test func appsCanBuildTheValuesForPreviews() {
+        let snapshot = ItemSnapshot(
+            id: "v1", itemID: "i1", version: 1, type: "core.note", tier: .library, properties: ["title": "A"],
+            occurredAt: nil, sourceID: nil, writer: .init(kind: .app, id: "g1", name: "MAPP"),
+            createdAt: Date(timeIntervalSince1970: 0))
+        let page = ItemSnapshotPage(snapshots: [snapshot], next: nil)
+        #expect(page.snapshots == [snapshot])
+        let config = InstanceConfig(instanceID: "inst", name: "Home", inboundPendingRetentionDays: 7)
+        #expect(config.name == "Home" && config.inboundPendingRetentionDays == 7 && config.trashRetentionDays == nil)
+    }
+
+    @Test func aServerMadeFromAKeySendsTheKeyOverItsOwnConnection() async throws {
+        let local = try await LocalServer.start(contract: marfaContractVersion)
+        defer { local.stop() }
+        let page = try await Server(url: local.url, key: "mk_plain").snapshots(ofItem: "a/b", after: "c1", limit: 3)
+        #expect(page.snapshots.isEmpty && page.next == nil)
+        let head = try #require(local.log.all.first)
+        #expect(head.hasPrefix("GET /items/a%2Fb/versions?limit=3&cursor=c1 HTTP/1.1\r\n"), "\(head)")
+        #expect(head.lowercased().contains("authorization: bearer mk_plain\r\n"), "\(head)")
+    }
+
+    @Test func aServerMadeFromAKeyIsNeverRenewed() async throws {
+        let local = try await LocalServer.start(contract: marfaContractVersion) { _, _ in
+            (401, "application/json", #"{"error": {"code": "unauthorized", "message": "no"}}"#)
+        }
+        defer { local.stop() }
+        let error = await failure { try await Server(url: local.url, key: "mk_plain").config() }
+        #expect(error?.code() == "unauthorized", "\(String(describing: error))")
+        #expect(local.log.all.count == 1)
+    }
+
+    @Test func aServerThatNeverAnswersThrowsOnceTheTimeoutPasses() async throws {
+        let local = try await LocalServer.start(contract: marfaContractVersion, holdsResponse: true)
+        defer { local.stop() }
+        let started = ContinuousClock.now
+        let error = await failure {
+            try await Server(url: local.url, key: "mk_plain").config(timeout: .milliseconds(500))
+        }
+        #expect(error?.code() == "network", "\(String(describing: error))")
+        #expect(ContinuousClock.now - started < .seconds(10))
+    }
+
+    @Test func theTimeoutCoversRenewingTheTokenAndSendingAgain() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let renewal = Hold()
+            defer { renewal.release() }
+            let scripted = ScriptedAuthServer { request in
+                request.path == "/auth/oauth2/token"
+                    ? .held(
+                        renewal, .json(200, ["access_token": "at-2", "refresh_token": "rt-2", "token_type": "Bearer"]))
+                    : refused(401, "unauthorized")
+            }
+            let server = try signedIn(scripted, keychain)
+            let started = ContinuousClock.now
+            let error = await failure { try await server.config(timeout: .seconds(1)) }
+            #expect(error?.code() == "network", "\(String(describing: error))")
+            #expect(ContinuousClock.now - started < .seconds(10), "a renewal that never ends does not hold the call")
         }
     }
 
@@ -154,7 +253,8 @@ struct ServerCallsTests {
                     """
                     {"instance_id": "inst", "name": "Home", "trash_retention_days": 30, "version_recent_days": 7,
                      "version_daily_snapshot_days": 30, "version_weekly_snapshot_days": 90, "version_max_versions": 50,
-                     "enrichment_enabled": true, "enforcement": {"strict_mode": {"types": ["a"]}}}
+                     "enrichment_enabled": true, "inbound_handled_retention_days": 14,
+                     "inbound_pending_retention_days": 0, "enforcement": {"strict_mode": {"types": ["a"]}}}
                     """)
             }
             let config = try await signedIn(scripted, keychain).config()
@@ -162,6 +262,7 @@ struct ServerCallsTests {
             #expect(config.trashRetentionDays == 30 && config.versionRecentDays == 7)
             #expect(config.versionDailySnapshotDays == 30 && config.versionWeeklySnapshotDays == 90)
             #expect(config.versionMaxVersions == 50 && config.enrichmentEnabled == true)
+            #expect(config.inboundHandledRetentionDays == 14 && config.inboundPendingRetentionDays == 0)
             #expect(config.heartbeatEnabled == nil && config.grantInactivityDays == nil)
         }
     }
@@ -174,6 +275,8 @@ struct ServerCallsTests {
             patch.name = .set("Renamed")
             patch.versionMaxVersions = .clear
             patch.enrichmentEnabled = .set(false)
+            patch.inboundHandledRetentionDays = .set(30)
+            patch.inboundPendingRetentionDays = .clear
             let stored = try await server.updateConfig(patch, expecting: "inst")
             #expect(stored.name == "Renamed")
             let request = try #require(scripted.requests(to: "/config").first)
@@ -181,7 +284,13 @@ struct ServerCallsTests {
             #expect(request.headers["X-Marfa-Instance-Id"] == "inst")
             #expect(request.headers["Content-Type"] == "application/json")
             let body = request.json
-            #expect(Set(body.keys) == ["name", "version_max_versions", "enrichment_enabled"])
+            #expect(
+                Set(body.keys) == [
+                    "name", "version_max_versions", "enrichment_enabled", "inbound_handled_retention_days",
+                    "inbound_pending_retention_days",
+                ])
+            #expect(body["inbound_handled_retention_days"] as? Int == 30)
+            #expect(body["inbound_pending_retention_days"] is NSNull)
             #expect(body["name"] as? String == "Renamed")
             #expect(body["version_max_versions"] is NSNull)
             #expect(body["enrichment_enabled"] as? Bool == false)
@@ -206,7 +315,7 @@ struct ServerCallsTests {
             var patch = InstanceConfigPatch()
             patch.name = .clear
             let error = await failure { try await server.updateConfig(patch, expecting: "old") }
-            guard case .server(409, "instance_changed", _)? = error else {
+            guard case .instanceChanged? = error else {
                 Issue.record("expected instance_changed, got \(String(describing: error))")
                 return
             }
