@@ -26,12 +26,12 @@ public final class WorkingCopy: Sendable {
 
     init(
         holder: CoreHolder, hasServer: Bool, refillPace: Feed.RefillPace = .standard,
-        refillClock: Feed.RefillClock = .continuous, instanceAt: @escaping Feed.InstanceAt = Feed.instanceAt
+        refillClock: Feed.RefillClock = .continuous
     ) {
         self.holder = holder
         feed = Feed(
             holder: holder, watched: hasServer || holder.handle == .reader, refillPace: refillPace,
-            clock: refillClock, instanceAt: instanceAt)
+            clock: refillClock)
         items = Items(holder: holder, feed: feed)
         edges = Edges(holder: holder, feed: feed)
         tags = Tags(holder: holder, feed: feed)
@@ -327,17 +327,22 @@ public final class WorkingCopy: Sendable {
     /// cursor go, as it can while a Mac sleeps, `status().hydration` is
     /// `.stale` and the copy fills itself again over the slice it holds, as
     /// `hydrate` does, telling the streams `.refreshed(.hydrated)`, and the
-    /// follow carries on. It does so only while the instance answering at the
-    /// server is the one the copy was built from, and the key is the one the
-    /// follow used. An attempt the network or the server fails is told
+    /// follow carries on. It does so only while the key is the one the follow
+    /// used, and the core keeps every row, queued write and file the copy
+    /// holds: it refuses the fill in place, before it changes anything, when
+    /// it could not. An attempt the network or the server fails is told
     /// `.refreshed(.unfinished)` and tried again after one second, then
     /// further apart, up to five minutes apart. A copy the app is hydrating,
     /// or has made whole, is left to that hydration.
     ///
     /// Otherwise every stream is told `.stopped`: when the follow stops with
-    /// any other error, when the server refuses the refill, when another
-    /// instance answers (`copyExpired` with the reason `instance_changed`),
-    /// and when the copy was already stale as the follow began, such as after
+    /// any other error, when the server refuses the refill, when the core
+    /// refuses to fill in place (`copyExpired` with the reason
+    /// `instance_changed` for another instance at the copy's server,
+    /// `reach_changed` for a reach other than the one the copy was built under, `slice_changed`,
+    /// `head_past_log` for a server restored to an earlier point, or
+    /// `not_stale` for a copy that is not waiting to be filled again), and
+    /// when the copy was already stale as the follow began, such as after
     /// `useKey` or on a store opened stale (`copyExpired` with the reason
     /// `catchup_too_old`). For a `.stale` copy, hydrate the same slice to fill
     /// it again. A stopped stream stays stopped until the app's next hydration

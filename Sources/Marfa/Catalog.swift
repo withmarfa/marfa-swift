@@ -115,9 +115,13 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         icon: String? = nil,
         linkField: String? = nil, roles: [String] = [], compatibleWith: [String] = []
     ) {
+        // An empty label or plural names nothing, as the core reads one.
+        let label = label.flatMap { $0.isEmpty ? nil : $0 }
         self.id = id
         self.label = label
-        self.plural = plural ?? DerivedNames.plural(fromLabel: label ?? DerivedNames.label(fromID: id))
+        self.plural =
+            plural.flatMap { $0.isEmpty ? nil : $0 }
+            ?? DerivedNames.plural(fromLabel: label ?? DerivedNames.label(fromID: id))
         self.description = description
         self.parent = parent
         self.version = version

@@ -167,6 +167,66 @@ struct ItemsOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func aListOrSearchNamingATypeTheCatalogLacksIsRefusedAndAWildcardIsNot(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        _ = try await Self.note("held", in: copy)
+        func unknown(_ name: String) -> (any Error) -> Bool {
+            { error in
+                if case .unknownType(let message)? = error as? MarfaError {
+                    message == "Unknown type: \(name)"
+                } else {
+                    false
+                }
+            }
+        }
+        await #expect(
+            performing: { _ = try await copy.items.list(ListFilters(type: "app.nope.type")) },
+            throws: unknown("app.nope.type"))
+        await #expect(
+            performing: { _ = try await copy.search("held", filters: SearchFilters(type: "app.nope.type")) },
+            throws: unknown("app.nope.type"))
+        #expect(try await copy.items.list(ListFilters(type: "app.nope.*")).isEmpty)
+        #expect(try await copy.search("held", filters: SearchFilters(type: "app.nope.*")).isEmpty)
+        #expect(try await copy.items.list(ListFilters(type: "core.note")).count == 1)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func theBinTimesAnItemAndOrdersTheBinNewestFirst(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let first = try await Self.note("first", in: copy)
+        let second = try await Self.note("second", in: copy)
+        let third = try #require(
+            try await copy.items.create(
+                Draft(type: "core.note", properties: ["title": "third", "body": "b"], state: .trashed)
+            ).itemId)
+        #expect(try await copy.items.list(ListFilters(state: .trashed)).first?.trashedAt != nil)
+        #expect(try await copy.items.list(ListFilters(state: .active)).allSatisfy { $0.trashedAt == nil })
+
+        // Sent to the bin in the reverse of the order they were made.
+        _ = try await copy.items.delete(second)
+        try await Task.sleep(for: .milliseconds(20))
+        _ = try await copy.items.transition(first, to: .trashed)
+        let binned = try await copy.items.list(ListFilters(state: .trashed))
+        #expect(binned.map(\.id) == [first, second, third])
+        #expect(binned.allSatisfy { $0.trashedAt != nil })
+        let byCreation = try await copy.items.list(ListFilters(state: .trashed), sort: Sort(field: .createdAt))
+        #expect(byCreation.map(\.id) == [third, second, first])
+        let oldest = try await copy.items.list(ListFilters(state: .trashed), sort: Sort(direction: .ascending))
+        #expect(oldest.map(\.id) == [third, second, first])
+
+        // A row already in the bin keeps its time; one that leaves it loses the time.
+        let before = try #require(
+            try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == second }?.trashedAt)
+        _ = try await copy.items.transition(second, to: .trashed)
+        #expect(try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == second }?.trashedAt == before)
+        _ = try await copy.items.restore(second)
+        #expect(try await copy.items.get(second)?.trashedAt == nil)
+        #expect(try await copy.items.list(ListFilters(allStates: true)).first { $0.id == second }?.trashedAt == nil)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func aDeletedItemLeavesReadsAndListsUntilRestored(kind: CopyKind) async throws {
         let copy = try await kind.open()
         let id = try await Self.note("A", in: copy)

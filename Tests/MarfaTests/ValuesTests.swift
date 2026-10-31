@@ -372,6 +372,9 @@ struct CatalogTypes {
 
     @Test func aTypeAndAFieldThatNameNoLabelOrPluralGetTheCoreOnes() {
         #expect(Marfa.ItemType(id: "user.recipe-card").plural == "Recipe Cards")
+        let blank = Marfa.ItemType(id: "user.recipe-card", label: "", plural: "")
+        #expect(blank.label == nil && blank.plural == "Recipe Cards")
+        #expect(Marfa.ItemType(id: "user.recipe-card", label: "Dish", plural: "").plural == "Dishes")
         #expect(Marfa.TypeField(name: "due_at", type: "date", declaredBy: "user.task").label == "Due At")
         #expect(Marfa.ItemType(id: "user.person", label: "Person").plural == "Persons")
         #expect(Marfa.ItemType(id: "user.city", label: "City").plural == "Cities")
