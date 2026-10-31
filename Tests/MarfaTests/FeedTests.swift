@@ -589,6 +589,25 @@ struct ARefill {
         await copy.close()
     }
 
+    @Test func aRateLimitLongerThanTheLongestRefillWaitIsWaitedOutInFull() async throws {
+        let core = Self.stale()
+        core.state.withLock {
+            $0.hydrateFails = .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 600)
+            $0.hydrateFailsFirst = 1
+        }
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock: clock)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill waits") { clock.waiting == 1 }
+        #expect(clock.requested == [.seconds(600)])
+        clock.advance(by: .seconds(599))
+        #expect(core.state.withLock { $0.hydrations.count } == 1)
+        clock.advance(by: .seconds(1))
+        try await eventually("the refill was made") { heard.all.last == refreshed(.hydrated) }
+        await copy.close()
+    }
+
     @Test func aFollowThatStopsAgainSoonAfterARefillWaitsBeforeTheNext() async throws {
         let core = Self.stale()
         let clock = ManualClock()

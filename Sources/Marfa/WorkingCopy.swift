@@ -412,9 +412,14 @@ public final class WorkingCopy: Sendable {
     ///   doubling up to 5 minutes apart, and never sooner than a rate limit's `retryAfterSeconds` asks. A follow that
     ///   ran 5 minutes since it last failed starts again from 5 seconds.
     /// - A follow the core stopped with any other error is `.stopped`, and a catch-up is tried every 5 minutes, since
-    ///   the server may change. A server event does not make it `.following`; the catch-up that succeeds does. When
-    ///   the core's own fault ended the follow, the sequence hears nothing, local writes included, until that
-    ///   catch-up succeeds and the follow starts again.
+    ///   the server may change. A server event does not make it `.following`; the catch-up that succeeds does.
+    /// - When the core's own fault ends the follow, the sequence still hears the copy's own writes, and the server's
+    ///   events again once a catch-up succeeds and the follow starts again.
+    /// - A refill of a stale copy is `.connecting`, and `.offline` while a failure that may mend itself holds it up;
+    ///   it is tried again by itself, never sooner than a rate limit asks.
+    /// - A reader is `.local` while it watches the writer's saves. When the core ends that watch on a fault, the
+    ///   reader is `.stopped` and takes the watch again after the same waits as `.offline`, then asks to read
+    ///   everything.
     /// - A key the server refused is `.keyRefused`, and nothing is tried until ``useKey(_:)``, which catches up at
     ///   once with the new key.
     /// - A copy that must be hydrated first is `.needsHydration`, and nothing is tried until a hydration completes.

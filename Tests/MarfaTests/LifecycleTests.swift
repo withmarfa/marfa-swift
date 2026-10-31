@@ -231,6 +231,116 @@ struct ALifecycle {
         await copy.close()
     }
 
+    @Test func aCopyWhoseStreamTheCoreEndedStillHearsItsOwnWritesAndJoinsTheWatchAgainOnceACatchUpSucceeds()
+        async throws
+    {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock)
+        var updates = copy.updates().makeAsyncIterator()
+        var update = await updates.next()
+        while update?.connection != .following { update = await updates.next() }
+
+        core.fail(0, with: .Io(message: "disk"))
+        while update?.connection != .offline(.io(message: "disk")) { update = await updates.next() }
+        try await eventually("the stream was let go") { copy.feed.count == 0 }
+
+        let own: [(Marfa.Change.Origin, Reread)] = [
+            (.local(.createItem), .parts(Reread.Parts(queue: true))),
+            (.refreshed(.viewWritten), .parts(Reread.Parts(views: true))),
+            (.refreshed(.forgotten), .parts(Reread.Parts(queue: true))),
+        ]
+        for (origin, reread) in own {
+            copy.announce(Marfa.Change(origin: origin, itemId: nil, edgeId: nil))
+            let heard = try #require(await updates.next(), "\(origin)")
+            #expect(heard.reread == reread, "\(origin)")
+            #expect(heard.connection == .offline(.io(message: "disk")))
+        }
+
+        clock.advance(by: try await Self.wait(clock, after: 0))
+        while update?.connection != .following { update = await updates.next() }
+        try await eventually("the watch was joined again") { core.places.count == 2 && copy.feed.count == 1 }
+        copy.announce(Marfa.Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+        #expect(await updates.next()?.reread == .parts(Reread.Parts(catalog: true)))
+        await copy.close()
+    }
+
+    @Test func aReaderWhoseStreamTheCoreEndedIsStoppedAndTakesItAgainAfterAWait() async throws {
+        let core = FakeCore.reader()
+        let clock = ManualClock()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false, refillClock: .init(clock))
+        let updates = Updates(copy.updates())
+        try await eventually("watching the writer's saves") { updates.connection == .local && core.places.count == 1 }
+
+        core.state.withLock { $0.watchRefused = .Io(message: "disk") }
+        core.fail(0, with: .Io(message: "disk"))
+        try await eventually("stopped") { updates.connection == .stopped(.io(message: "disk")) }
+        #expect(try await Self.wait(clock, after: 0) == .seconds(5))
+        clock.advance(by: .seconds(5))
+        // The watch refused the stream again, so the next wait is longer.
+        #expect(try await Self.wait(clock, after: 1) == .seconds(10))
+        #expect(updates.connection == .stopped(.io(message: "disk")))
+
+        core.state.withLock { $0.watchRefused = nil }
+        let before = updates.all.count
+        clock.advance(by: .seconds(10))
+        try await eventually("watching again") { updates.connection == .local && core.places.count == 2 }
+        // A save made while no stream was held went unseen.
+        try await eventually("asked to read everything") {
+            updates.all[before...].contains { $0.reread == .everything }
+        }
+        #expect(copy.feed.count == 1)
+        await copy.close()
+    }
+
+    @Test func aRefillThatFailsForNowShowsTheCopyOfflineUntilItSucceeds() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock)
+        let updates = Updates(copy.updates())
+        try await eventually("following") { updates.connection == .following }
+
+        core.state.withLock {
+            $0.hydration = .stale
+            $0.slice = (["core.note"], .library, [])
+            $0.hydrationCompletes = true
+            $0.hydrateFails = .Network(message: "offline")
+            $0.hydrateFailsFirst = 1
+        }
+        core.change(0, .watchFailed(reason: ARefill.agedOut, cursor: "3"))
+        try await eventually("offline") { updates.connection == .offline(.network(message: "offline")) }
+        #expect(updates.all.contains { $0.connection == .connecting })
+        try await ARefill.letWaitsPass(on: clock, until: updates.connection == .following)
+        #expect(core.state.withLock { $0.hydrations.count } == 2)
+        await copy.close()
+    }
+
+    @Test func aSecondActivationNeverTellsThePreviousRunsConnection() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock)
+        let first = Updates(copy.updates())
+        try await eventually("following") { first.connection == .following }
+        first.cancel()
+        try await eventually("the follow was let go") { copy.feed.count == 0 }
+        core.state.withLock { $0.catchUpFails = Self.offline }
+
+        for round in 0..<200 {
+            let told = await withTaskGroup(of: CopyConnection?.self) { group in
+                for _ in 0..<2 {
+                    group.addTask {
+                        var updates = copy.updates().makeAsyncIterator()
+                        return await updates.next()?.connection
+                    }
+                }
+                return await group.reduce(into: [CopyConnection?]()) { $0.append($1) }
+            }
+            #expect(!told.contains(.following), "round \(round)")
+            try await eventually("the follow was let go") { copy.feed.count == 0 }
+        }
+        await copy.close()
+    }
+
     // MARK: Ending
 
     @Test func aCloseWhileWaitingToAskAgainEndsTheWaitAndTheSequence() async throws {

@@ -24,6 +24,18 @@ final class Feed: Sendable {
         static let standard = RefillPace(first: .seconds(1), most: .seconds(300), settle: .seconds(300))
     }
 
+    /// What the feed tells the copy's lifecycle, apart from any stream.
+    enum Event: Sendable {
+        /// A hydration began, the app's or, where `byRefill`, a refill's.
+        case fillBegan(byRefill: Bool)
+        case fillEnded
+        /// A refill failed with an error that may mend itself, and will be tried again.
+        case refillFailed(MarfaError)
+        /// The copy announced one of its own changes, which reaches the lifecycle even while the core has ended its
+        /// stream.
+        case announced(Change)
+    }
+
     /// The time a refill and the copy's lifecycle read and wait by, so a test can drive them.
     struct RefillClock: Sendable {
         private let reading: @Sendable () -> Duration
@@ -57,7 +69,7 @@ final class Feed: Sendable {
         /// A refill's own fill was cut off by a failure that mends itself, so a copy left `.inProgress` is its own.
         var unfinished = false
         var attempts = 0
-        /// The wait a rate limit named for the next attempt.
+        /// The wait a rate limit named for the next attempt, up to ``Lifecycle/longestWait``.
         var retryAfter: Duration = .zero
         /// The clock's reading when the last refill's fill ended.
         var filledAt: Duration?
@@ -75,6 +87,8 @@ final class Feed: Sendable {
         /// Last told the server is unreachable, which a new place in the watch is given.
         var unreachable = false
         var addedWhileSuspended = false
+        /// Told the copy's own announcements; the lifecycle hears them as an ``Event`` instead.
+        let announced: Bool
     }
 
     private struct State {
@@ -97,8 +111,8 @@ final class Feed: Sendable {
         var fillWaiters: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)] = []
         /// The hydration that held the turn last, where it completed.
         var lastFill: Fill?
-        /// Told as each hydration begins and ends, and whether a refill runs it.
-        var fillObserver: (@Sendable (_ began: Bool, _ byRefill: Bool) -> Void)?
+        /// Told each ``Event``.
+        var observer: (@Sendable (Event) -> Void)?
     }
 
     private struct Fill {
@@ -151,11 +165,17 @@ final class Feed: Sendable {
     /// Whether a refill is running, which it is until after it has noted when its fill ended.
     var isRefilling: Bool { locked { $0.refill.running } }
 
-    func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
+    /// Holds a stream and gives it a place in the core's watch.
+    ///
+    /// A stream added with `announced` false is told only what the core tells.
+    func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID(), announced: Bool = true)
+        -> UUID?
+    {
         let (added, joins) = locked { state -> (Bool, Bool) in
             guard !state.closed else { return (false, false) }
             let suspended = state.suspends > 0
-            state.streams[token] = Stream(continuation: continuation, addedWhileSuspended: suspended)
+            state.streams[token] = Stream(
+                continuation: continuation, addedWhileSuspended: suspended, announced: announced)
             return (true, !suspended)
         }
         guard added else {
@@ -166,9 +186,12 @@ final class Feed: Sendable {
         return token
     }
 
-    func observeFills(_ observer: @escaping @Sendable (_ began: Bool, _ byRefill: Bool) -> Void) {
-        locked { $0.fillObserver = observer }
+    func observe(_ observer: @escaping @Sendable (Event) -> Void) {
+        locked { $0.observer = observer }
     }
+
+    /// Whether the feed holds the stream, which it no longer does once the core ended or refused its place.
+    func holds(_ token: UUID) -> Bool { locked { $0.streams[token] != nil } }
 
     func remove(_ token: UUID) {
         let subscription = locked { state in state.streams.removeValue(forKey: token)?.subscription }
@@ -180,9 +203,11 @@ final class Feed: Sendable {
     }
 
     func announce(_ change: Change) {
-        for continuation in locked({ $0.streams.values.map(\.continuation) }) {
-            continuation.yield(change)
+        let (continuations, observer) = locked { state in
+            (state.streams.values.filter(\.announced).map(\.continuation), state.observer)
         }
+        observer?(.announced(change))
+        for continuation in continuations { continuation.yield(change) }
     }
 
     /// Ends every stream, takes each out of the watch, and returns once the core
@@ -409,13 +434,13 @@ final class Feed: Sendable {
         let (suspensions, observer) = locked { state in
             state.lastFill = nil
             if !byRefill { state.refill.unfinished = false }
-            return (state.suspensions, state.fillObserver)
+            return (state.suspensions, state.observer)
         }
-        observer?(true, byRefill)
+        observer?(.fillBegan(byRefill: byRefill))
         // The fill ends before its outcome is told, so no progress read after the outcome asks for the rows again.
         var ended = false
         let end = {
-            if !ended { observer?(false, byRefill) }
+            if !ended { observer?(.fillEnded) }
             ended = true
         }
         defer { end() }
@@ -461,7 +486,7 @@ final class Feed: Sendable {
                 state.refill.attempts += 1
                 let backoff =
                     attempts == 0 ? .zero : min(refillPace.first * (1 << min(attempts - 1, 30)), refillPace.most)
-                let delay = max(backoff, min(state.refill.retryAfter, refillPace.most))
+                let delay = max(backoff, state.refill.retryAfter)
                 state.refill.retryAfter = .zero
                 let owed = state.refill.waiting
                 state.refill.waiting = []
@@ -475,10 +500,14 @@ final class Feed: Sendable {
                 defer { releaseFill() }
                 failure = try await refillOnce()
             } catch let error as MarfaError where error.isTransient {
-                locked { state in
+                let observer = locked { state in
                     state.refill.waiting.formUnion(next.owed)
-                    if case .rateLimited(_, _, let seconds?) = error { state.refill.retryAfter = .seconds(seconds) }
+                    if case .rateLimited(_, _, let seconds?) = error {
+                        state.refill.retryAfter = min(.seconds(seconds), Lifecycle.longestWait)
+                    }
+                    return state.observer
                 }
+                observer?(.refillFailed(error))
                 continue
             } catch {
                 failure = error as? MarfaError ?? .store(message: "\(error)")

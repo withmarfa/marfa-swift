@@ -21,6 +21,9 @@ public enum CopyConnection: Sendable, Hashable {
     case offline(MarfaError)
     /// The follow stopped with an error that asking again may not clear, such as a refusal from the server. The
     /// copy tries again every five minutes, in case the server changed.
+    ///
+    /// For a reader, the core ended its watch of the writer's saves on a fault. The reader takes it again by itself,
+    /// further apart each time, and is `.local` once it has.
     case stopped(MarfaError)
     /// The server refused the copy's key. Nothing is tried again until ``WorkingCopy/useKey(_:)`` gives the copy a
     /// new one.
@@ -153,10 +156,10 @@ public struct CopyUpdates: AsyncSequence, Sendable {
 /// Keeps a writer's follow of its server going while ``WorkingCopy/updates()`` is iterated, and turns what the copy
 /// tells its streams into updates, each to read again by.
 ///
-/// It holds one stream of the feed, so the core follows the server while any update sequence is held. The core
-/// itself waits out failures of the network and the server while its follow has a stream; what it leaves to its
-/// caller, a follow it stopped, a stream it ended on a fault and a drain that left writes undelivered, is tried again
-/// here.
+/// It holds one stream of the feed, so the core follows the server while any update sequence is held, and hears the
+/// copy's own announcements apart from that stream, so they arrive while the core has ended it. The core itself waits
+/// out failures of the network and the server while its follow has a stream; what it leaves to its caller, a follow
+/// it stopped, a stream it ended on a fault and a drain that left writes undelivered, is tried again here.
 final class Lifecycle: Sendable {
     /// How soon the lifecycle tries again, and how often it reads the copy's status.
     struct Pace: Sendable {
@@ -258,8 +261,13 @@ final class Lifecycle: Sendable {
         self.hasServer = hasServer
         self.pace = pace
         self.clock = clock
-        feed.observeFills { [weak self] began, byRefill in
-            if began { self?.fillBegan(byRefill: byRefill) } else { self?.fillEnded() }
+        feed.observe { [weak self] event in
+            switch event {
+            case .fillBegan(let byRefill): self?.fillBegan(byRefill: byRefill)
+            case .fillEnded: self?.fillEnded()
+            case .refillFailed(let error): self?.refillFailed(error)
+            case .announced(let change): self?.heard(change, run: nil)
+            }
         }
     }
 
@@ -281,16 +289,23 @@ final class Lifecycle: Sendable {
         let (signals, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         let id = UUID()
         continuation.onTermination = { [weak self] _ in self?.leave(id) }
-        let starts = locked { state -> Bool in
+        let follows = self.follows
+        let starts = locked { state -> (run: Int, epoch: Int)? in
             state.consumers[id] = Consumer(signal: continuation, pending: Pending(everything: true))
             state.signals.append(continuation)
-            guard !state.closed, !state.active else { return false }
+            guard !state.closed, !state.active else { return nil }
             state.active = true
             state.run += 1
             state.epoch += 1
-            return true
+            // Reset with the run, so no consumer reads the run before's connection.
+            state.attempts = 0
+            state.drainAttempts = 0
+            state.followingSince = nil
+            state.connection = follows ? .connecting : .local
+            if state.fills > 0 { startProgress(&state) }
+            return (state.run, state.epoch)
         }
-        if starts { start() }
+        if let starts { start(run: starts.run, epoch: starts.epoch) }
         return CopyUpdates(lifecycle: self, id: id, signals: signals)
     }
 
@@ -420,15 +435,7 @@ final class Lifecycle: Sendable {
 
     // MARK: Running
 
-    private func start() {
-        let (run, epoch) = locked { state -> (Int, Int) in
-            state.attempts = 0
-            state.drainAttempts = 0
-            state.followingSince = nil
-            state.connection = follows ? .connecting : .local
-            if state.fills > 0 { startProgress(&state) }
-            return (state.run, state.epoch)
-        }
+    private func start(run: Int, epoch: Int) {
         takeStream(run)
         guard follows else { return }
         Task { [weak self] in await self?.begin(epoch) }
@@ -437,8 +444,13 @@ final class Lifecycle: Sendable {
     /// A writer with a server follows it; a reader, or a copy without a server, has nothing to follow.
     private var follows: Bool { hasServer && holder.handle == .writer }
 
-    /// Holds a stream of the feed, so the core follows the server, and hears what the copy tells it.
-    private func takeStream(_ run: Int) {
+    /// A reader watches the writer's saves through its stream.
+    private var reads: Bool { holder.handle == .reader }
+
+    /// Holds a stream of the feed, so the core follows the server, and hears what the core tells it; says whether
+    /// the core gave the stream a place, or will once a key change ends.
+    @discardableResult
+    private func takeStream(_ run: Int) -> Bool {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
         let token = UUID()
         continuation.onTermination = { [feed] _ in feed.remove(token) }
@@ -456,9 +468,9 @@ final class Lifecycle: Sendable {
         guard taken else {
             task.cancel()
             continuation.finish()
-            return
+            return false
         }
-        _ = feed.add(continuation, as: token)
+        return feed.add(continuation, as: token, announced: false) != nil && feed.holds(token)
     }
 
     /// The first step of a run: a copy that holds a completed hydration is caught up, which says whether the
@@ -509,9 +521,14 @@ final class Lifecycle: Sendable {
     func failed(_ error: any Error, epoch: Int? = nil) {
         let error = error as? MarfaError ?? .store(message: "\(error)")
         locked { state in
-            guard state.active, !state.closed, !state.keyChanging, epoch == nil || epoch == state.epoch,
-                state.connection != .local
-            else { return }
+            guard state.active, !state.closed, !state.keyChanging, epoch == nil || epoch == state.epoch else { return }
+            guard follows else {
+                // Only a reader's watch, ended on a fault, fails here; the app's own calls prove nothing of it.
+                guard epoch != nil, reads, Self.failure(error) != .ignored else { return }
+                set(&state, .stopped(error))
+                scheduleRetake(&state, after: backoff(&state, retryAfter: Self.retryAfter(error)))
+                return
+            }
             switch Self.failure(error) {
             case .ignored:
                 return
@@ -571,6 +588,23 @@ final class Lifecycle: Sendable {
         }
     }
 
+    /// Takes a reader's stream again after `wait`, and shows it `.local` once the core gave it a place.
+    private func scheduleRetake(_ state: inout State, after wait: Duration) {
+        cancelRetry(&state)
+        let (run, epoch) = (state.run, state.epoch)
+        state.retry = Task { [weak self, clock] in
+            do { try await clock.sleep(for: wait) } catch { return }
+            guard let self, self.claimRetry(epoch), self.takeStream(run) else { return }
+            self.locked { state in
+                guard state.active, state.run == run, state.streamHeld else { return }
+                state.followingSince = clock.now
+                set(&state, .local)
+                // A save made while no stream was held went unseen.
+                mark(&state) { $0.everything = true }
+            }
+        }
+    }
+
     /// Lets the waiting retry go on, unless a stop or a key change came first; a later success then won't cancel
     /// the pull it runs.
     private func claimRetry(_ epoch: Int) -> Bool {
@@ -581,12 +615,13 @@ final class Lifecycle: Sendable {
         }
     }
 
-    private func heard(_ change: Change, run: Int) {
+    /// What the core told the lifecycle's stream of `run`, or, with no `run`, what the copy announced.
+    private func heard(_ change: Change, run: Int?) {
         var pulled = false
         var failure: MarfaError?
         var drain: Result<DrainReport, MarfaError>?
         let epoch = locked { state -> Int? in
-            guard state.run == run, state.active else { return nil }
+            guard run == nil || state.run == run, state.active else { return nil }
             switch change.origin {
             case .local, .answered:
                 mark(&state) {
@@ -673,13 +708,18 @@ final class Lifecycle: Sendable {
     /// The stream ended.
     ///
     /// The copy closed, or the core ended it on a fault after telling it `.stopped`, which scheduled a catch-up
-    /// that takes a stream again when it succeeds. A stream ended with no reason told is taken again the same way.
+    /// that takes a stream again when it succeeds, or, for a reader, a wait before it takes one again. A stream ended
+    /// with no reason told is taken again the same way.
     private func streamEnded(run: Int) {
         locked { state in
             guard state.run == run else { return }
             state.stream = nil
             state.streamHeld = false
             guard state.active, !state.closed, !state.keyChanging, state.retry == nil else { return }
+            guard follows else {
+                if reads { scheduleRetake(&state, after: backoff(&state, retryAfter: .zero)) }
+                return
+            }
             switch state.connection {
             case .following, .connecting, .offline:
                 set(&state, .connecting)
@@ -816,6 +856,17 @@ final class Lifecycle: Sendable {
                 }
             }
             startProgress(&state)
+        }
+    }
+
+    /// A refill failed for now and waits to try again, so the copy cannot reach its server.
+    private func refillFailed(_ error: MarfaError) {
+        locked { state in
+            guard state.active, !state.closed, !state.keyChanging else { return }
+            switch state.connection {
+            case .following, .connecting, .offline: set(&state, .offline(error))
+            default: break
+            }
         }
     }
 
