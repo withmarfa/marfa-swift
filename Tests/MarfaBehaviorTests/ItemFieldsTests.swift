@@ -166,6 +166,25 @@ struct ItemFieldsOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func aListNarrowsByDatesAndAnItemReadsItsOwnTimesAsDates(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let early = try await Self.note(copy, "early") { $0.occurredAt = "2026-01-01T00:00:00.000Z" }
+        let late = try await Self.note(copy, "late") { $0.occurredAt = "2026-03-01T00:00:00.000Z" }
+        func ids(_ filters: ListFilters) async throws -> [String] { try await copy.items.list(filters).map(\.id) }
+        let january = Date(timeIntervalSince1970: 1_767_225_600)
+        let march = Date(timeIntervalSince1970: 1_772_323_200)
+        var after = ListFilters()
+        after.occurredAfterDate = january
+        #expect(try await ids(after) == [late.id])
+        var before = ListFilters()
+        before.occurredBeforeDate = march
+        #expect(try await ids(before) == [early.id])
+        #expect(early.occurredDate == january && late.occurredDate == march)
+        #expect(early.createdDate != nil && early.trashedDate == nil)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func aListAfterATimeIsOldestChangedFirstAndRefusesAnotherOrder(kind: CopyKind) async throws {
         let copy = try await kind.open()
         let first = try await Self.note(copy, "first")
