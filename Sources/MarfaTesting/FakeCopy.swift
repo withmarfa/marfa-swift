@@ -198,7 +198,7 @@ extension SavedView {
 extension Marfa.ItemType {
     fileprivate var held: MarfaCore.ItemType {
         MarfaCore.ItemType(
-            id: id, label: label, description: description, parent: parent, version: version,
+            id: id, label: label, plural: plural, description: description, parent: parent, version: version,
             fields: fields.map(\.held), titleField: titleField, bodyField: bodyField, icon: icon, linkField: linkField,
             roles: roles, compatibleWith: compatibleWith)
     }
@@ -207,7 +207,8 @@ extension Marfa.ItemType {
 extension Marfa.TypeField {
     fileprivate var held: MarfaCore.TypeField {
         MarfaCore.TypeField(
-            name: name, fieldType: type, required: required, description: description, declaredBy: declaredBy,
+            name: name, fieldType: type, required: required, label: label, description: description,
+            declaredBy: declaredBy,
             definition: definition.core)
     }
 }
@@ -225,7 +226,7 @@ extension Marfa.EdgeType {
             reverseName: reverseName,
             writtenAt: placed, sourceTypeConstraints: sourceTypeConstraints,
             targetTypeConstraints: targetTypeConstraints, cascadeOnDelete: cascadeOnDelete,
-            properties: properties.map(\.held), shipped: shipped)
+            properties: properties.map(\.held), shipped: shipped, acyclic: acyclic, flat: flat)
     }
 }
 #endif

@@ -56,6 +56,21 @@ struct Values {
         #expect(same(Marfa.JSONObject(members: [member]), Marfa.JSONObject(members: [member]).core))
     }
 
+    @Test func aFilterCarriesEveryTypeAndStateTheCoreNames() {
+        var list = Marfa.ListFilters(type: "core.note", state: .archived)
+        #expect(list.types == ["core.note"] && list.states == [.archived])
+        #expect(list.type == "core.note" && list.state == .archived)
+        list.types = ["core.note", "core.task"]
+        list.states = [.active, .archived]
+        #expect(Marfa.ListFilters(list.core) == list)
+        #expect(list.core.types == ["core.note", "core.task"] && list.core.states == [.active, .archived])
+        #expect(list.type == nil && list.state == nil, "several are not one")
+        var search = Marfa.SearchFilters()
+        search.types = ["core.note", "core.task"]
+        #expect(Marfa.SearchFilters(search.core) == search)
+        #expect(Marfa.ListFilters().core.types == nil && Marfa.ListFilters().core.states == nil)
+    }
+
     @Test func jsonRoundTripsThroughItsText() throws {
         let properties: JSONObject = [
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
@@ -297,13 +312,15 @@ struct OwnValueTypes {
 struct CatalogTypes {
     static func field(_ name: String, declaredBy: String, definition: JSONObject) -> MarfaCore.TypeField {
         MarfaCore.TypeField(
-            name: name, fieldType: "string", required: true, description: "d", declaredBy: declaredBy,
+            name: name, fieldType: "string", required: true, label: "Field \(name)", description: "d",
+            declaredBy: declaredBy,
             definition: definition.core)
     }
 
     @Test func anItemTypeArrivesWithEachFieldAndWhereItIsDeclared() {
         let core = MarfaCore.ItemType(
-            id: "user.recipe", label: "Recipe", description: "A dish", parent: "user.dish", version: 3,
+            id: "user.recipe", label: "Recipe", plural: "Recipes to cook", description: "A dish", parent: "user.dish",
+            version: 3,
             fields: [
                 Self.field(
                     "serves", declaredBy: "user.dish", definition: ["type": "string", "required": true, "x": [1, 2]]),
@@ -315,13 +332,14 @@ struct CatalogTypes {
         #expect(
             type
                 == Marfa.ItemType(
-                    id: "user.recipe", label: "Recipe", description: "A dish", parent: "user.dish", version: 3,
+                    id: "user.recipe", label: "Recipe", plural: "Recipes to cook", description: "A dish",
+                    parent: "user.dish", version: 3,
                     fields: [
                         Marfa.TypeField(
-                            name: "serves", type: "string", required: true, description: "d",
+                            name: "serves", label: "Field serves", type: "string", required: true, description: "d",
                             declaredBy: "user.dish", definition: ["type": "string", "required": true, "x": [1, 2]]),
                         Marfa.TypeField(
-                            name: "title", type: "string", required: true, description: "d",
+                            name: "title", label: "Field title", type: "string", required: true, description: "d",
                             declaredBy: "user.recipe", definition: ["type": "string"]),
                     ],
                     titleField: "title", bodyField: "method", icon: "lucide:chef-hat", linkField: "vendor_id",
@@ -335,7 +353,7 @@ struct CatalogTypes {
             reverseName: "mentored-by", writtenAt: .target, sourceTypeConstraints: ["core.person"],
             targetTypeConstraints: ["*"], cascadeOnDelete: "block",
             properties: [Self.field("since", declaredBy: "mentor-of", definition: ["type": "string"])],
-            shipped: false)
+            shipped: false, acyclic: true, flat: true)
         let type = Marfa.EdgeType(core)
         #expect(
             type
@@ -346,9 +364,20 @@ struct CatalogTypes {
                     cascadeOnDelete: "block",
                     properties: [
                         Marfa.TypeField(
-                            name: "since", type: "string", required: true, description: "d",
+                            name: "since", label: "Field since", type: "string", required: true, description: "d",
                             declaredBy: "mentor-of", definition: ["type": "string"])
-                    ]))
+                    ],
+                    acyclic: true, flat: true))
+    }
+
+    @Test func aTypeAndAFieldThatNameNoLabelOrPluralGetTheCoreOnes() {
+        #expect(Marfa.ItemType(id: "user.recipe-card").plural == "Recipe Cards")
+        #expect(Marfa.TypeField(name: "due_at", type: "date", declaredBy: "user.task").label == "Due At")
+        #expect(Marfa.ItemType(id: "user.person", label: "Person").plural == "Persons")
+        #expect(Marfa.ItemType(id: "user.city", label: "City").plural == "Cities")
+        #expect(Marfa.ItemType(id: "user.day", label: "Day").plural == "Days")
+        #expect(Marfa.ItemType(id: "user.box", label: "Box").plural == "Boxes")
+        #expect(Marfa.ItemType(id: "user.dish", label: "Dish", plural: "Dishes!").plural == "Dishes!")
     }
 
     @Test func anEdgeTypeWithNoReverseLabelNamesBothEndsByItsLabel() {

@@ -14,19 +14,16 @@ import SQLite3
 extension InMemoryCore {
     func search(query: String, filters: SearchFilters, limit: UInt32) throws -> Found {
         if filters.filter != nil { throw FakeCopyError.unsupported(call: "search(filter:)") }
-        let root = try filters.type.flatMap { try Self.root(of: $0) }
+        let roots = try Self.roots(of: filters.types)
+        let named = try Self.states(of: filters.states, allStates: filters.allStates)
         let occurredAfter = try filters.occurredAfter.map(Checks.occurred)
         let occurredBefore = try filters.occurredBefore.map(Checks.occurred)
         return try state.withLock { state in
             let types = state.resolvedItemTypes()
             let beneath = filters.beneath.map { state.reached(from: $0) }
             let allowed = state.items.values.filter { item in
-                if let root, !Self.reaches(item.type, root, in: types) { return false }
-                if let named = filters.state {
-                    guard item.state == named else { return false }
-                } else if !filters.allStates {
-                    guard item.state == .active else { return false }
-                }
+                if let roots, !roots.contains(where: { Self.reaches(item.type, $0, in: types) }) { return false }
+                if let named, !named.contains(item.state) { return false }
                 if let tier = filters.tier, item.tier != tier { return false }
                 if let occurredAfter, item.occurredAt <= occurredAfter { return false }
                 if let occurredBefore, item.occurredAt >= occurredBefore { return false }

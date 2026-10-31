@@ -2,6 +2,8 @@
 import Foundation
 import MarfaCore
 
+import enum Marfa.DerivedNames
+
 extension InMemoryCore {
     func itemTypes() throws -> [ItemType] {
         state.withLock { state in
@@ -167,6 +169,29 @@ enum Declaring {
         return (id, row)
     }
 
+    /// The definition with every label filled, as `GET /types/{id}` answers it: a field, or a member of its entries,
+    /// that names none takes the one its name makes.
+    private static func labeled(_ definition: JsonObject, name: String) -> JsonObject {
+        func filled(_ object: JsonObject, _ name: String) -> JsonObject {
+            guard Properties.string(object, "label") == nil else { return object }
+            var object = object
+            object.members.append(JsonMember(key: "label", value: .string(DerivedNames.label(fromName: name))))
+            return object
+        }
+        var definition = filled(definition, name)
+        if let at = definition.members.firstIndex(where: { $0.key == "items_fields" }),
+            case .object(var entries) = definition.members[at].value
+        {
+            for index in entries.members.indices {
+                if case .object(let entry) = entries.members[index].value {
+                    entries.members[index].value = .object(filled(entry, entries.members[index].key))
+                }
+            }
+            definition.members[at].value = .object(entries)
+        }
+        return definition
+    }
+
     /// A declared type with the fields it inherits, as `GET /types/{id}` would answer it.
     ///
     /// Each display hint is the nearest one a type in its chain sets. The fake holds no owner's icon: that choice
@@ -183,9 +208,11 @@ enum Declaring {
             guard case .object(let definition) = member.value else { continue }
             var required = false
             if case .bool(true)? = Properties.value(definition, "required") { required = true }
+            let labeled = Self.labeled(definition, name: member.key)
             fields[Array(member.key.utf8)] = TypeField(
                 name: member.key, fieldType: Properties.string(definition, "type") ?? "", required: required,
-                description: Properties.string(definition, "description"), declaredBy: id, definition: definition)
+                label: Properties.string(definition, "label") ?? DerivedNames.label(fromName: member.key),
+                description: Properties.string(definition, "description"), declaredBy: id, definition: labeled)
         }
         let hints = Properties.object(row, "display_hints")
         var version: Int64 = 0
@@ -194,8 +221,14 @@ enum Declaring {
         case .number(let number)?: version = Int64(exactly: number.rounded(.towardZero)) ?? 0
         default: break
         }
+        let label = Properties.string(row, "label")
+        let plural = Properties.string(row, "plural").flatMap { $0.isEmpty ? nil : $0 }
         return ItemType(
-            id: id, label: Properties.string(row, "label"), description: Properties.string(row, "description"),
+            id: id, label: label,
+            plural: plural
+                ?? DerivedNames.plural(
+                    fromLabel: label.flatMap { $0.isEmpty ? nil : $0 } ?? DerivedNames.label(fromID: id)),
+            description: Properties.string(row, "description"),
             parent: parent, version: version,
             fields: fields.values.sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) },
             titleField: hints.flatMap { Properties.string($0, "title_field") } ?? inherited?.titleField,

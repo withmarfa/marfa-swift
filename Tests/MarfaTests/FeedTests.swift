@@ -845,6 +845,18 @@ struct ARefill {
         await copy.close()
     }
 
+    @Test func aRefillFillsInPlaceOnlyAndTheAppsOwnHydrationMayReplaceTheCopy() async throws {
+        let core = Self.stale()
+        let copy = Self.copy(core)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill filled the copy") { heard.all.last == refreshed(.hydrated) }
+        #expect(core.state.withLock { $0.hydrationsInPlaceOnly } == [true])
+        _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+        #expect(core.state.withLock { $0.hydrationsInPlaceOnly } == [true, false])
+        await copy.close()
+    }
+
     @Test func aRefillAfterAStopStartsAtOnce() async throws {
         let core = Self.stale()
         core.state.withLock {

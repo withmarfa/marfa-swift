@@ -61,11 +61,25 @@ extension InMemoryCore {
         preconditionFailure("the package never follows a core directly; MarfaTesting has no follow")
     }
 
+    func checkEdge(draft: EdgeDraft) throws {
+        throw FakeCopyError.unsupported(call: "edges.check")
+    }
+
+    func itemDisplays(items: [ItemDisplayInput]) throws -> [ItemDisplay] {
+        try unsupported("items.displays")
+    }
+
+    func linkCandidates(item: String?, targets: [String]) throws -> [LinkCandidates] {
+        try unsupported("links.candidates")
+    }
+
     func hydrate(types: [String], tier: SliceTier, stop: Stop?) throws -> HydrateReport {
         try unsupported("hydrate")
     }
 
-    func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?) throws -> HydrateReport {
+    func hydrateWith(
+        types: [String], tier: SliceTier, edgeTypes: [String], inPlaceOnly: Bool, stop: Stop?
+    ) throws -> HydrateReport {
         try unsupported("hydrate")
     }
 

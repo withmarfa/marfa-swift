@@ -22,11 +22,11 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/items/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Only return items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
+                /// Only return items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/type`.
                 public var _type: Swift.String?
-                /// Only return items in this lifecycle state. Without it, you get `active` items. Send `any` to get every state.
+                /// Only return items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, you get `active` items. Send `any` on its own to get every state.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/state`.
                 public var state: Swift.String?
@@ -50,22 +50,22 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/tags`.
                 public var tags: Swift.String?
-                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
+                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on it; `edge[<type>]=<id>` also works as a query parameter. `status_group` matches by status group; `properties.<field>.<member>`, by a list entry.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/filter`.
                 public var filter: Swift.String?
-                /// Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`, such as `properties.due_at`. Properties sort by stored value, so an enum property sorts alphabetically, not by meaning.
+                /// Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`. Properties sort by stored value: an enum sorts alphabetically. Defaults to `created_at`, or for `state=trashed` alone the trash time, which you can't name here.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/sort`.
                 public var sort: Swift.String?
-                /// Sort direction
+                /// Sort direction. Defaults to `desc`.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/direction`.
                 @frozen public enum DirectionPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case asc = "asc"
                     case desc = "desc"
                 }
-                /// Sort direction
+                /// Sort direction. Defaults to `desc`.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/direction`.
                 public var direction: Operations.ListItems.Input.Query.DirectionPayload?
@@ -100,14 +100,14 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - _type: Only return items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
-                ///   - state: Only return items in this lifecycle state. Without it, you get `active` items. Send `any` to get every state.
+                ///   - _type: Only return items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
+                ///   - state: Only return items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, you get `active` items. Send `any` on its own to get every state.
                 ///   - source: Only return items stamped with this source.
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - tags: Comma-separated tags. Only return items that carry all of them.
-                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
-                ///   - sort: Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`, such as `properties.due_at`. Properties sort by stored value, so an enum property sorts alphabetically, not by meaning.
-                ///   - direction: Sort direction
+                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on it; `edge[<type>]=<id>` also works as a query parameter. `status_group` matches by status group; `properties.<field>.<member>`, by a list entry.
+                ///   - sort: Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`. Properties sort by stored value: an enum sorts alphabetically. Defaults to `created_at`, or for `state=trashed` alone the trash time, which you can't name here.
+                ///   - direction: Sort direction. Defaults to `desc`.
                 ///   - occurredAfter: Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
                 ///   - occurredBefore: Only return items whose own time (`occurred_at`, else `created_at`) is before this time.
                 ///   - updatedAfter: Only return items changed at or after this time. Send the latest `updated_at` you hold, and deduplicate by ID, as items can share an instant. Ordered by `updated_at`, then ID, ascending, so leave out `sort` and `direction`. Purges aren't reported.
@@ -1333,7 +1333,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/POST/requestBody/json/tags`.
                     public var tags: [Swift.String]?
-                    /// Edges to create with the item, as edge type to a list of target item IDs. The new item is the source. Marfa creates the item and all its edges, or none. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                    /// Edges to create with the item, as edge type to a list of target item IDs. The new item is the source. Marfa creates the item and all its edges, or none. When the request lands on an item by its natural key, each type you name replaces that item's edges of the type, and an edge to an ID you still list stays as it is. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     ///
                     /// - Remark: Generated from `#/paths/items/POST/requestBody/json/edges`.
                     public struct EdgesPayload: Codable, Hashable, Sendable {
@@ -1353,7 +1353,7 @@ public enum Operations {
                             try encoder.encodeAdditionalProperties(additionalProperties)
                         }
                     }
-                    /// Edges to create with the item, as edge type to a list of target item IDs. The new item is the source. Marfa creates the item and all its edges, or none. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                    /// Edges to create with the item, as edge type to a list of target item IDs. The new item is the source. Marfa creates the item and all its edges, or none. When the request lands on an item by its natural key, each type you name replaces that item's edges of the type, and an edge to an ID you still list stays as it is. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     ///
                     /// - Remark: Generated from `#/paths/items/POST/requestBody/json/edges`.
                     public var edges: Operations.CreateItem.Input.Body.JsonPayload.EdgesPayload?
@@ -1373,7 +1373,7 @@ public enum Operations {
                     ///   - captureLatitude: The latitude where the item was captured.
                     ///   - captureLongitude: The longitude where the item was captured.
                     ///   - tags: Tags to put on the item: at most 100, each up to 128 characters.
-                    ///   - edges: Edges to create with the item, as edge type to a list of target item IDs. The new item is the source. Marfa creates the item and all its edges, or none. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                    ///   - edges: Edges to create with the item, as edge type to a list of target item IDs. The new item is the source. Marfa creates the item and all its edges, or none. When the request lands on an item by its natural key, each type you name replaces that item's edges of the type, and an edge to an ID you still list stays as it is. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     public init(
                         _type: Swift.String,
                         properties: Operations.CreateItem.Input.Body.JsonPayload.PropertiesPayload? = nil,
@@ -4504,7 +4504,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/source_id`.
                     public var sourceId: Swift.String?
-                    /// Edge types to replace, each mapped to the item IDs it should now point to. An empty list removes every edge of that type. Types you don't name are untouched. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                    /// Edge types to replace, each mapped to the item IDs it should now point to. An edge to an ID you still list stays as it is, with its properties. An empty list removes every edge of that type. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/edges`.
                     public struct EdgesPayload: Codable, Hashable, Sendable {
@@ -4524,7 +4524,7 @@ public enum Operations {
                             try encoder.encodeAdditionalProperties(additionalProperties)
                         }
                     }
-                    /// Edge types to replace, each mapped to the item IDs it should now point to. An empty list removes every edge of that type. Types you don't name are untouched. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                    /// Edge types to replace, each mapped to the item IDs it should now point to. An edge to an ID you still list stays as it is, with its properties. An empty list removes every edge of that type. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/edges`.
                     public var edges: Operations.UpdateItem.Input.Body.JsonPayload.EdgesPayload?
@@ -4540,7 +4540,7 @@ public enum Operations {
                     ///   - tier: Moves the item between `library` and `feed`.
                     ///   - occurredAt: When the item occurred, as an ISO 8601 time.
                     ///   - sourceId: The item's new `source_id`. Marfa moves its natural key under the item's own `source`, which never changes.
-                    ///   - edges: Edge types to replace, each mapped to the item IDs it should now point to. An empty list removes every edge of that type. Types you don't name are untouched. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                    ///   - edges: Edge types to replace, each mapped to the item IDs it should now point to. An edge to an ID you still list stays as it is, with its properties. An empty list removes every edge of that type. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     public init(
                         properties: Operations.UpdateItem.Input.Body.JsonPayload.PropertiesPayload? = nil,
                         _type: Swift.String? = nil,
@@ -19186,7 +19186,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/tags`.
                         public var tags: [Swift.String]?
-                        /// Edge types to set, each mapped to the target item IDs the item should now point to. Types you don't name are untouched. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                        /// Edge types to set, each mapped to the target item IDs the item should now point to. An edge to an ID you still list stays as it is, with its properties. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/edges`.
                         public struct EdgesPayload: Codable, Hashable, Sendable {
@@ -19206,7 +19206,7 @@ public enum Operations {
                                 try encoder.encodeAdditionalProperties(additionalProperties)
                             }
                         }
-                        /// Edge types to set, each mapped to the target item IDs the item should now point to. Types you don't name are untouched. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                        /// Edge types to set, each mapped to the target item IDs the item should now point to. An edge to an ID you still list stays as it is, with its properties. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                         ///
                         /// - Remark: Generated from `#/paths/items/bulk/POST/requestBody/json/ItemsPayload/edges`.
                         public var edges: Operations.BulkUpsertItems.Input.Body.JsonPayload.ItemsPayloadPayload.EdgesPayload?
@@ -19224,7 +19224,7 @@ public enum Operations {
                         ///   - sourceId: The item's identifier at its source. With `source`, it is the natural key that matches an existing item.
                         ///   - version: The version you read, used when the entry matches an existing item: the update then applies only if the item is still at this version.
                         ///   - tags: Tags to put on the item: at most 100, each up to 128 characters.
-                        ///   - edges: Edge types to set, each mapped to the target item IDs the item should now point to. Types you don't name are untouched. An edge made this way carries no properties, so an edge type that requires one refuses the write.
+                        ///   - edges: Edge types to set, each mapped to the target item IDs the item should now point to. An edge to an ID you still list stays as it is, with its properties. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                         public init(
                             id: Swift.String? = nil,
                             _type: Swift.String,
@@ -20656,11 +20656,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/by`.
                 public var by: Operations.GetItemStats.Input.Query.ByPayload?
-                /// Only return items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
+                /// Only return items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/type`.
                 public var _type: Swift.String?
-                /// Only count items in this lifecycle state. Without it, every state is counted, as with `any`.
+                /// Only count items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, every state is counted, as with `any`.
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/state`.
                 public var state: Swift.String?
@@ -20684,7 +20684,7 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/tags`.
                 public var tags: Swift.String?
-                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
+                /// A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on it; `edge[<type>]=<id>` also works as a query parameter. `status_group` matches by status group; `properties.<field>.<member>`, by a list entry.
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/filter`.
                 public var filter: Swift.String?
@@ -20718,12 +20718,12 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - by: Grouping axis. Defaults to `state`.
-                ///   - _type: Only return items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
-                ///   - state: Only count items in this lifecycle state. Without it, every state is counted, as with `any`.
+                ///   - _type: Only return items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
+                ///   - state: Only count items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, every state is counted, as with `any`.
                 ///   - source: Only return items stamped with this source.
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - tags: Comma-separated tags. Only return items that carry all of them.
-                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on that edge type; `edge[<type>]=<id>` also works as a query parameter. `status_group`, such as `status_group neq "completed"`, matches by status group.
+                ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on it; `edge[<type>]=<id>` also works as a query parameter. `status_group` matches by status group; `properties.<field>.<member>`, by a list entry.
                 ///   - occurredAfter: Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
                 ///   - occurredBefore: Only return items whose own time (`occurred_at`, else `created_at`) is before this time.
                 ///   - updatedAfter: Only return items changed at or after this time. Send the latest `updated_at` you hold, and deduplicate by ID, as items can share an instant. Ordered by `updated_at`, then ID, ascending, so leave out `sort` and `direction`. Purges aren't reported.
@@ -22694,11 +22694,11 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/occurrences/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Window start, ISO 8601. An event overlaps the window if it starts before `to` and ends after this time. Its end is `ends_at`, else its start plus `duration`. A whole-day event fills whole days in its `timezone`, or in UTC if it has none.
+                /// Window start, ISO 8601. No zone means UTC; a date is its UTC midnight. An event overlaps if it starts before `to` and ends after this. Its end is `ends_at`, else start plus `duration`. A whole-day event fills whole days in its `timezone`, else UTC.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/from`.
                 public var from: Swift.String
-                /// Window end, ISO 8601. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
+                /// Window end, ISO 8601, read as `from` is. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/to`.
                 public var to: Swift.String
@@ -22709,8 +22709,8 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - from: Window start, ISO 8601. An event overlaps the window if it starts before `to` and ends after this time. Its end is `ends_at`, else its start plus `duration`. A whole-day event fills whole days in its `timezone`, or in UTC if it has none.
-                ///   - to: Window end, ISO 8601. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
+                ///   - from: Window start, ISO 8601. No zone means UTC; a date is its UTC midnight. An event overlaps if it starts before `to` and ends after this. Its end is `ends_at`, else start plus `duration`. A whole-day event fills whole days in its `timezone`, else UTC.
+                ///   - to: Window end, ISO 8601, read as `from` is. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
                 ///   - _type: Only return events of this type, or of the event types a wildcard matches.
                 public init(
                     from: Swift.String,
@@ -58821,11 +58821,11 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/q`.
                 public var q: Swift.String
-                /// Only return items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
+                /// Only return items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/type`.
                 public var _type: Swift.String?
-                /// Only return items in this lifecycle state. Without it, you get `active` items. `any` searches every state, but trashed items are never searchable.
+                /// Only return items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, you get `active` items. `any` on its own searches every state. Trashed items are never searchable.
                 ///
                 /// - Remark: Generated from `#/paths/search/GET/query/state`.
                 public var state: Swift.String?
@@ -58900,8 +58900,8 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - q: The text to search for. Marfa matches every word by its stem, in any order, and the last word as the start of a word. Wrap the query in double quotes to match a phrase.
-                ///   - _type: Only return items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
-                ///   - state: Only return items in this lifecycle state. Without it, you get `active` items. `any` searches every state, but trashed items are never searchable.
+                ///   - _type: Only return items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
+                ///   - state: Only return items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, you get `active` items. `any` on its own searches every state. Trashed items are never searchable.
                 ///   - source: Only return items stamped with this source.
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - include: Comma-separated extras. `system` also returns `system.*` items, which are left out by default. A `system.` type filter does the same.
@@ -63207,7 +63207,7 @@ public enum Operations {
     }
     /// Replace a type
     ///
-    /// Replaces a registered type's whole schema and returns it. A field you leave out is removed, but items keep their values for it. `metadata.types:write` alone can add optional fields and change `label`, `description`, `display_hints` or `version`.
+    /// Replaces a type's whole schema and returns it. A field left out is removed; items keep their values. `metadata.types:write` alone can add optional fields and change labels, descriptions, `plural`, `display_hints` and `version`.
     ///
     /// - Remark: HTTP `PUT /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)`.
@@ -93608,7 +93608,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: a setting is malformed or undeclared, such as a `system.*` type or a `first_placement` outside the folder. `details.errors[0].path` or `details.unknown_body_fields` names it.
+            /// - `validation_error`: a setting is malformed or undeclared, such as a `system.*` type, a `..` placement or a `backref` filter. `details.errors[0].path` or `details.unknown_body_fields` names it.
             /// - `missing_required_field`: `title` is missing.
             /// - `unknown_type`: a setting's type is unknown.
             /// - `invalid_properties`: `defaults.properties` has a whole number a 64-bit float can't keep.
@@ -170731,11 +170731,11 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/export/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Only export items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
+                /// Only export items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
                 ///
                 /// - Remark: Generated from `#/paths/export/GET/query/type`.
                 public var _type: Swift.String?
-                /// Only export items in this lifecycle state. Without it, you get every state but `trashed`. Send `any` to include trashed items too.
+                /// Only export items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, you get every state but `trashed`. Send `any` on its own to include trashed items too.
                 ///
                 /// - Remark: Generated from `#/paths/export/GET/query/state`.
                 public var state: Swift.String?
@@ -170776,8 +170776,8 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - _type: Only export items of this type or a subtype. A wildcard such as `core.*` matches every type under that prefix.
-                ///   - state: Only export items in this lifecycle state. Without it, you get every state but `trashed`. Send `any` to include trashed items too.
+                ///   - _type: Only export items of these types and their subtypes: a comma-separated list of up to 10, such as `core.note,app.*`. A wildcard such as `core.*` matches every type under that prefix.
+                ///   - state: Only export items in these lifecycle states: one state or a comma-separated list, such as `active,archived`. Without it, you get every state but `trashed`. Send `any` on its own to include trashed items too.
                 ///   - source: Only export items stamped with this source.
                 ///   - occurredAfter: Only export items whose own time (`occurred_at`, else `created_at`) is after this time.
                 ///   - occurredBefore: Only export items whose own time (`occurred_at`, else `created_at`) is before this time.
@@ -172281,7 +172281,7 @@ public enum Operations {
                 }
             }
             /// - `validation_error`: the body isn't a valid archive, lacks one of its four files (`details.entries`), repeats an entry, is at another version, has an invalid row, or has a file over 64 MiB.
-            /// - `invalid_properties`: a `core` or `system` item breaks its type, an event's schedule can't unfold, or `strict_mode` refuses a property.
+            /// - `invalid_properties`: a `core` or `system` item breaks its type or its schedule can't unfold, or `strict_mode` refuses a property.
             /// - `invalid_schema`: an archived type is invalid or has an unknown key.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/400`.

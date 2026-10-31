@@ -165,7 +165,7 @@ enum Checks {
         }
     }
 
-    private static let plain: Set<String> = ["type", "description", "required", "searchable"]
+    private static let plain: Set<String> = ["type", "label", "description", "required", "searchable"]
 
     /// What a field of a kind may hold besides what every field does, which the fake judges.
     private static let extra: [String: Set<String>] = ["status": ["status_values"], "enum": ["enum_values"]]

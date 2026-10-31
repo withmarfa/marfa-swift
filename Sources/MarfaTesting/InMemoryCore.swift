@@ -113,17 +113,14 @@ final class InMemoryCore: CoreProtocol, Sendable {
         let updatedBefore = try filters.updatedBefore.map(Checks.occurred)
         let listed: [Item] = try state.withLock { state in
             let types = state.resolvedItemTypes()
-            let root = try filters.type.flatMap { try Self.root(of: $0) }
+            let roots = try Self.roots(of: filters.types)
+            let named = try Self.states(of: filters.states, allStates: filters.allStates)
             let beneath = filters.beneath.map { state.reached(from: $0) }
             var found = state.items.values.filter { item in
-                if let root {
-                    guard Self.reaches(item.type, root, in: types) else { return false }
+                if let roots {
+                    guard roots.contains(where: { Self.reaches(item.type, $0, in: types) }) else { return false }
                 }
-                if let state = filters.state {
-                    guard item.state == state else { return false }
-                } else if !filters.allStates {
-                    guard item.state == .active else { return false }
-                }
+                if let named, !named.contains(item.state) { return false }
                 if let tier = filters.tier, item.tier != tier { return false }
                 if let source = filters.source, !item.source.isBytes(source) { return false }
                 if let occurredAfter, item.occurredAt <= occurredAfter { return false }
@@ -175,6 +172,45 @@ final class InMemoryCore: CoreProtocol, Sendable {
 
     func edgesOfType(edgeType: String) throws -> [Edge] {
         state.withLock { $0.edgesInOrder.filter { $0.edgeType == edgeType } }
+    }
+
+    /// The roots a `types` list names, as the core reads one: entries trimmed, blank ones dropped, repeats removed,
+    /// and `*` refused. `nil` where the list is unset.
+    static func roots(of types: [String]?) throws -> [String]? {
+        guard let types else { return nil }
+        var entries: [String] = []
+        for entry in types.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        where !entry.isEmpty && !entries.contains(entry) {
+            entries.append(entry)
+        }
+        guard !entries.isEmpty else {
+            throw Refuse.validation(
+                "validation_error", "The type filter names no type. Name a type, or leave the filter out.")
+        }
+        guard entries.count <= 10 else {
+            throw Refuse.validation("validation_error", "Too many types in filter (max 10)")
+        }
+        return try entries.map { entry in
+            guard entry != "*" else {
+                throw Refuse.validation("validation_error", "Invalid type identifier: \(entry)")
+            }
+            return try root(of: entry) ?? entry
+        }
+    }
+
+    /// The states a `states` list names, or `nil` for the active state alone unless `allStates` lifts it.
+    static func states(of states: [ItemState]?, allStates: Bool) throws -> Set<ItemState>? {
+        switch states {
+        case nil: return allStates ? nil : [.active]
+        case []?:
+            throw Refuse.validation(
+                "validation_error", "The state filter names no state. Name a state, or leave the filter out.")
+        case _? where allStates:
+            throw Refuse.validation(
+                "validation_error",
+                "The state filter names states beside every state. Name the states, or ask for every state, not both.")
+        case let named?: return Set(named)
+        }
     }
 
     static func root(of name: String) throws -> String? {

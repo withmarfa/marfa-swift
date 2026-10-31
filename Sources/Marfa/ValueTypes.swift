@@ -101,6 +101,9 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     /// answer to it while the server answers other writes. `QueuedWrite.lastFailure`
     /// says what it met. Release it to send it again, or withdraw it.
     case failingAlone
+    /// The write was queued against an instance other than the one the copy has been built from since, and is sent
+    /// only once released.
+    case instanceChanged
 
     init(_ core: MarfaCore.BlockedReason) {
         switch core {
@@ -109,6 +112,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .ancestorUnavailable: self = .ancestorUnavailable
         case .conflictUnresolved: self = .conflictUnresolved
         case .failingAlone: self = .failingAlone
+        case .instanceChanged: self = .instanceChanged
         }
     }
 
@@ -119,6 +123,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .ancestorUnavailable: .ancestorUnavailable
         case .conflictUnresolved: .conflictUnresolved
         case .failingAlone: .failingAlone
+        case .instanceChanged: .instanceChanged
         }
     }
 }

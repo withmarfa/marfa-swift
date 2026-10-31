@@ -260,7 +260,19 @@ struct ItemsOffline {
                 first, second, third, memo,
             ])
         #expect(try await copy.items.list(ListFilters(type: "core.task"), sort: ascending).map(\.id) == [task])
-        #expect(try await copy.items.list(ListFilters(type: "*"), sort: ascending).count == 5)
+        #expect(try await copy.items.list(ListFilters(), sort: ascending).count == 5)
+        var several = ListFilters()
+        several.types = ["core.task", "core.note"]
+        #expect(try await copy.items.list(several, sort: ascending).count == 5)
+        several.types = ["core.task"]
+        several.states = [.active, .archived]
+        #expect(try await copy.items.list(several, sort: ascending).map(\.id) == [task])
+        several.types = []
+        await #expect {
+            _ = try await copy.items.list(several)
+        } throws: { error in
+            if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
+        }
         #expect(try await copy.items.list(ListFilters(tags: ["a"]), sort: ascending).map(\.id) == [first, second])
         #expect(try await copy.items.list(ListFilters(tags: ["a", "b"]), sort: ascending).map(\.id) == [second])
         #expect(try await copy.items.list(ListFilters(tier: .feed), sort: ascending).map(\.id) == [third])
@@ -269,6 +281,16 @@ struct ItemsOffline {
         #expect(try await copy.items.list(ListFilters(offset: 9), sort: ascending).isEmpty)
         await #expect {
             _ = try await copy.items.list(ListFilters(type: "Not A Type"))
+        } throws: { error in
+            if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
+        }
+        await #expect {
+            _ = try await copy.items.list(ListFilters(type: "*"))
+        } throws: { error in
+            if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
+        }
+        await #expect {
+            _ = try await copy.items.list(ListFilters(state: .archived, allStates: true))
         } throws: { error in
             if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
         }

@@ -22,7 +22,7 @@ extension MarfaCore.Listing {
 
 enum PackedRows {
     /// The layout's version, `FORMAT` in the core's `packed.rs`.
-    static let format = 1
+    static let format = 2
 
     /// The fewest bytes an item takes: an empty ID, type, properties and source, no options and no tags.
     static let smallestItem = 56
@@ -136,6 +136,7 @@ enum PackedRows {
             for _ in 0..<tagCount { tags.append(try text()) }
             let latitude = try optional { reader throws(MarfaError) in try reader.double() }
             let longitude = try optional { reader throws(MarfaError) in try reader.double() }
+            let trashedAt = try optional { reader throws(MarfaError) in try reader.text() }
             let title = try optional { reader throws(MarfaError) in try reader.text() }
             let body = try optional { reader throws(MarfaError) in try reader.text() }
             let unreadable = try optional { reader throws(MarfaError) in try reader.text() }
@@ -143,7 +144,8 @@ enum PackedRows {
                 id: id, type: type, properties: properties, state: state, tier: tier, version: version,
                 schemaVersion: schemaVersion, source: source, sourceId: sourceId, occurredAt: occurredAt,
                 createdAt: createdAt, updatedAt: updatedAt, tags: tags, captureLatitude: latitude,
-                captureLongitude: longitude, title: title, body: body, unreadableProperties: unreadable)
+                captureLongitude: longitude, trashedAt: trashedAt, title: title, body: body,
+                unreadableProperties: unreadable)
         }
 
         mutating func object() throws(MarfaError) -> JSONObject {
@@ -250,6 +252,7 @@ enum PackedRows {
             for tag in item.tags { text(tag) }
             optional(item.captureLatitude) { $0.double($1) }
             optional(item.captureLongitude) { $0.double($1) }
+            optional(item.trashedAt) { $0.text($1) }
             optional(item.title) { $0.text($1) }
             optional(item.body) { $0.text($1) }
             optional(item.unreadableProperties) { $0.text($1) }

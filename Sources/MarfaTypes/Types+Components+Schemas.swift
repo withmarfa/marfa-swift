@@ -109,6 +109,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/shipped`.
             public var shipped: Swift.Bool
+            /// `true` if the server refuses an edge of this type that closes a cycle through other edges of the type. Every edge type refuses an edge from an item to itself.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/acyclic`.
+            public var acyclic: Swift.Bool
+            /// `true` if the server refuses an edge of this type whose source type its `target_type_constraints` admit, so an item that can be a target is never a source.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EdgeType/flat`.
+            public var flat: Swift.Bool
             /// Creates a new `EdgeType`.
             ///
             /// - Parameters:
@@ -124,6 +132,8 @@ extension Components {
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
+            ///   - acyclic: `true` if the server refuses an edge of this type that closes a cycle through other edges of the type. Every edge type refuses an edge from an item to itself.
+            ///   - flat: `true` if the server refuses an edge of this type whose source type its `target_type_constraints` admit, so an item that can be a target is never a source.
             public init(
                 id: Swift.String,
                 label: Swift.String,
@@ -136,7 +146,9 @@ extension Components {
                 propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload,
                 reverseName: Swift.String? = nil,
                 writtenAt: Components.Schemas.EdgeType.WrittenAtPayload,
-                shipped: Swift.Bool
+                shipped: Swift.Bool,
+                acyclic: Swift.Bool,
+                flat: Swift.Bool
             ) {
                 self.id = id
                 self.label = label
@@ -150,6 +162,8 @@ extension Components {
                 self.reverseName = reverseName
                 self.writtenAt = writtenAt
                 self.shipped = shipped
+                self.acyclic = acyclic
+                self.flat = flat
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -164,6 +178,8 @@ extension Components {
                 case reverseName = "reverse_name"
                 case writtenAt = "written_at"
                 case shipped
+                case acyclic
+                case flat
             }
         }
         /// One property an edge of an edge type can carry.
@@ -190,7 +206,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
             public var itemsType: Swift.String?
-            /// A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
+            /// A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it, and `currency` limits it to three capital letters. It can't be `thumbnail`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
             public var format: Swift.String?
@@ -202,7 +218,7 @@ extension Components {
             ///   - required: `true` if every edge of the type must have the property.
             ///   - enumValues: The values an `enum` property takes.
             ///   - itemsType: The type of each element of an `array` property. A write is refused if an element is not a value of that type. It can't be `thumbnail`.
-            ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it. It can't be `thumbnail`.
+            ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it, and `currency` limits it to three capital letters. It can't be `thumbnail`.
             public init(
                 _type: Swift.String,
                 description: Swift.String? = nil,
@@ -702,6 +718,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/updated_at`.
             public var updatedAt: Swift.String
+            /// When the item went to the trash, in UTC, or when a `system.*` item was revoked. A later write to the item leaves it as it is, and a restore clears it. `null` for an item outside the trash, and for one an archive restored to the trash without a time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/trashed_at`.
+            public var trashedAt: Swift.String?
             /// Always `true` where present: the item went to the trash with another item, through a cascading edge such as `parent-of`. Present while it stays in the trash. Absent on an item trashed on its own.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/trashed_by_cascade`.
@@ -793,6 +813,7 @@ extension Components {
             ///   - occurredAt: When the item happened, in UTC. Defaults to when it was created.
             ///   - createdAt: When the item was created, in UTC.
             ///   - updatedAt: When the item was last written, in UTC. A tag or extension write moves it too.
+            ///   - trashedAt: When the item went to the trash, in UTC, or when a `system.*` item was revoked. A later write to the item leaves it as it is, and a restore clears it. `null` for an item outside the trash, and for one an archive restored to the trash without a time.
             ///   - trashedByCascade: Always `true` where present: the item went to the trash with another item, through a cascading edge such as `parent-of`. Present while it stays in the trash. Absent on an item trashed on its own.
             ///   - trashedWith: The ID of the item whose trash took this one into the trash, beside `trashed_by_cascade`, whatever became of that item since. Present only if you can read that item's type.
             ///   - edges: The item's outbound edges you can read, by edge type, each the first page that `GET /items/{id}/edges` continues. Empty if `source_filter` leaves the item out. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
@@ -812,6 +833,7 @@ extension Components {
                 occurredAt: Swift.String,
                 createdAt: Swift.String,
                 updatedAt: Swift.String,
+                trashedAt: Swift.String? = nil,
                 trashedByCascade: Swift.Bool? = nil,
                 trashedWith: Swift.String? = nil,
                 edges: Components.Schemas.Item.EdgesPayload? = nil,
@@ -831,6 +853,7 @@ extension Components {
                 self.occurredAt = occurredAt
                 self.createdAt = createdAt
                 self.updatedAt = updatedAt
+                self.trashedAt = trashedAt
                 self.trashedByCascade = trashedByCascade
                 self.trashedWith = trashedWith
                 self.edges = edges
@@ -851,6 +874,7 @@ extension Components {
                 case occurredAt = "occurred_at"
                 case createdAt = "created_at"
                 case updatedAt = "updated_at"
+                case trashedAt = "trashed_at"
                 case trashedByCascade = "trashed_by_cascade"
                 case trashedWith = "trashed_with"
                 case edges
@@ -7982,9 +8006,13 @@ extension Components {
         /// - Remark: Generated from `#/components/schemas/ListedType`.
         public struct ListedType: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ListedType/value1`.
-            public var value1: Components.Schemas.RegisteredType
+            public var value1: Components.Schemas.TypeDefinition
             /// - Remark: Generated from `#/components/schemas/ListedType/value2`.
             public struct Value2Payload: Codable, Hashable, Sendable {
+                /// The type's recorded origin and creator.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ListedType/value2/provenance`.
+                public var provenance: Components.Schemas.TypeProvenance
                 /// The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ListedType/value2/own_roles`.
@@ -7992,11 +8020,17 @@ extension Components {
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
+                ///   - provenance: The type's recorded origin and creator.
                 ///   - ownRoles: The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
-                public init(ownRoles: [Components.Schemas.TypeRole]) {
+                public init(
+                    provenance: Components.Schemas.TypeProvenance,
+                    ownRoles: [Components.Schemas.TypeRole]
+                ) {
+                    self.provenance = provenance
                     self.ownRoles = ownRoles
                 }
                 public enum CodingKeys: String, CodingKey {
+                    case provenance
                     case ownRoles = "own_roles"
                 }
             }
@@ -8008,7 +8042,7 @@ extension Components {
             ///   - value1:
             ///   - value2:
             public init(
-                value1: Components.Schemas.RegisteredType,
+                value1: Components.Schemas.TypeDefinition,
                 value2: Components.Schemas.ListedType.Value2Payload
             ) {
                 self.value1 = value1
@@ -8055,6 +8089,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/type`.
             public var _type: Components.Schemas.FieldDefinition._TypePayload
+            /// A name for people to read, up to 100 characters. Leave it out and a type read answers the nearest one a type above names, else one made from the field's name, such as `Due At` for `due_at`. The type list answers only the declared label.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/label`.
+            public var label: Swift.String?
             /// What the field holds.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/description`.
@@ -8075,7 +8113,31 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_type`.
             public var itemsType: Swift.String?
-            /// A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
+            /// The members of each entry of an `array` field whose `items_type` is `object`, by name. A write is refused if an entry has another member, lacks a required one, holds a value a member does not take, or has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_fields`.
+            public struct ItemsFieldsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.EntryMember]
+                /// Creates a new `ItemsFieldsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.EntryMember] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The members of each entry of an `array` field whose `items_type` is `object`, by name. A write is refused if an entry has another member, lacks a required one, holds a value a member does not take, or has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_fields`.
+            public var itemsFields: Components.Schemas.FieldDefinition.ItemsFieldsPayload?
+            /// Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
             @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -8086,8 +8148,10 @@ extension Components {
                 case thumbnail = "thumbnail"
                 case bcp47 = "bcp47"
                 case iso3166 = "iso3166"
+                case currency = "currency"
+                case phone = "phone"
             }
-            /// A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
+            /// Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
             public var format: Components.Schemas.FieldDefinition.FormatPayload?
@@ -8103,64 +8167,92 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxItems`.
             public var maxItems: Swift.Int?
+            /// The lowest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may raise it, never lower or drop it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/minimum`.
+            public var minimum: Swift.Double?
+            /// The highest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may lower it, never raise or drop it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maximum`.
+            public var maximum: Swift.Double?
             /// A container of undocumented properties.
             public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `FieldDefinition`.
             ///
             /// - Parameters:
             ///   - _type: The field's type. A `thumbnail` is a base64 `data:` URI of a PNG, JPEG or WebP image up to 16 KiB, never `title`, `body`, `description` or `name`; a `status` is a word from `status_values`. A type has at most one of each, never as `items_type`.
+            ///   - label: A name for people to read, up to 100 characters. Leave it out and a type read answers the nearest one a type above names, else one made from the field's name, such as `Due At` for `due_at`. The type list answers only the declared label.
             ///   - description: What the field holds.
             ///   - required: `true` if an item of the type must have a value for it.
             ///   - enumValues: The values an `enum` field allows.
             ///   - statusValues: The words a `status` field takes, each in a group: `not_started`, `in_progress`, `completed` or `canceled`. A subtype lists only the words it adds. A type read answers every word, inherited first; the type list answers the type's own.
             ///   - itemsType: The type of each element of an `array` field. A write is refused if an element is not a value of that type.
-            ///   - format: A refinement of a `string` field, or of an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the field's `type`, and all but `thumbnail` an array's `items_type`. `bcp47` and `iso3166` stay as `format`.
+            ///   - itemsFields: The members of each entry of an `array` field whose `items_type` is `object`, by name. A write is refused if an entry has another member, lacks a required one, holds a value a member does not take, or has none.
+            ///   - format: Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///   - searchable: `false` if full-text search should skip the field. Items still return it.
             ///   - maxLength: The longest value a `string` or `enum` field allows.
             ///   - maxItems: The most elements an `array` field allows.
+            ///   - minimum: The lowest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may raise it, never lower or drop it.
+            ///   - maximum: The highest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may lower it, never raise or drop it.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 _type: Components.Schemas.FieldDefinition._TypePayload,
+                label: Swift.String? = nil,
                 description: Swift.String? = nil,
                 required: Swift.Bool? = nil,
                 enumValues: [Swift.String]? = nil,
                 statusValues: [Components.Schemas.StatusValue]? = nil,
                 itemsType: Swift.String? = nil,
+                itemsFields: Components.Schemas.FieldDefinition.ItemsFieldsPayload? = nil,
                 format: Components.Schemas.FieldDefinition.FormatPayload? = nil,
                 searchable: Swift.Bool? = nil,
                 maxLength: Swift.Int? = nil,
                 maxItems: Swift.Int? = nil,
+                minimum: Swift.Double? = nil,
+                maximum: Swift.Double? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self._type = _type
+                self.label = label
                 self.description = description
                 self.required = required
                 self.enumValues = enumValues
                 self.statusValues = statusValues
                 self.itemsType = itemsType
+                self.itemsFields = itemsFields
                 self.format = format
                 self.searchable = searchable
                 self.maxLength = maxLength
                 self.maxItems = maxItems
+                self.minimum = minimum
+                self.maximum = maximum
                 self.additionalProperties = additionalProperties
             }
             public enum CodingKeys: String, CodingKey {
                 case _type = "type"
+                case label
                 case description
                 case required
                 case enumValues = "enum_values"
                 case statusValues = "status_values"
                 case itemsType = "items_type"
+                case itemsFields = "items_fields"
                 case format
                 case searchable
                 case maxLength
                 case maxItems
+                case minimum
+                case maximum
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 self._type = try container.decode(
                     Components.Schemas.FieldDefinition._TypePayload.self,
                     forKey: ._type
+                )
+                self.label = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .label
                 )
                 self.description = try container.decodeIfPresent(
                     Swift.String.self,
@@ -8182,6 +8274,10 @@ extension Components {
                     Swift.String.self,
                     forKey: .itemsType
                 )
+                self.itemsFields = try container.decodeIfPresent(
+                    Components.Schemas.FieldDefinition.ItemsFieldsPayload.self,
+                    forKey: .itemsFields
+                )
                 self.format = try container.decodeIfPresent(
                     Components.Schemas.FieldDefinition.FormatPayload.self,
                     forKey: .format
@@ -8198,17 +8294,29 @@ extension Components {
                     Swift.Int.self,
                     forKey: .maxItems
                 )
+                self.minimum = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .minimum
+                )
+                self.maximum = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .maximum
+                )
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
                     "type",
+                    "label",
                     "description",
                     "required",
                     "enum_values",
                     "status_values",
                     "items_type",
+                    "items_fields",
                     "format",
                     "searchable",
                     "maxLength",
-                    "maxItems"
+                    "maxItems",
+                    "minimum",
+                    "maximum"
                 ])
             }
             public func encode(to encoder: any Swift.Encoder) throws {
@@ -8216,6 +8324,10 @@ extension Components {
                 try container.encode(
                     self._type,
                     forKey: ._type
+                )
+                try container.encodeIfPresent(
+                    self.label,
+                    forKey: .label
                 )
                 try container.encodeIfPresent(
                     self.description,
@@ -8238,6 +8350,10 @@ extension Components {
                     forKey: .itemsType
                 )
                 try container.encodeIfPresent(
+                    self.itemsFields,
+                    forKey: .itemsFields
+                )
+                try container.encodeIfPresent(
                     self.format,
                     forKey: .format
                 )
@@ -8252,6 +8368,14 @@ extension Components {
                 try container.encodeIfPresent(
                     self.maxItems,
                     forKey: .maxItems
+                )
+                try container.encodeIfPresent(
+                    self.minimum,
+                    forKey: .minimum
+                )
+                try container.encodeIfPresent(
+                    self.maximum,
+                    forKey: .maximum
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
@@ -8294,50 +8418,216 @@ extension Components {
                 case group
             }
         }
-        /// A type says which fields the items of that type hold, and what else Marfa does for them.
+        /// One member of the entries of an `array` field.
         ///
-        /// - Remark: Generated from `#/components/schemas/RegisteredType`.
-        public struct RegisteredType: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/RegisteredType/value1`.
-            public var value1: Components.Schemas.TypeDefinition
-            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
-            public struct Value2Payload: Codable, Hashable, Sendable {
-                /// The type's recorded origin and creator.
-                ///
-                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/provenance`.
-                public var provenance: Components.Schemas.TypeProvenance
-                /// Creates a new `Value2Payload`.
-                ///
-                /// - Parameters:
-                ///   - provenance: The type's recorded origin and creator.
-                public init(provenance: Components.Schemas.TypeProvenance) {
-                    self.provenance = provenance
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case provenance
-                }
+        /// - Remark: Generated from `#/components/schemas/EntryMember`.
+        public struct EntryMember: Codable, Hashable, Sendable {
+            /// The member's type: `string`, `email`, `url`, `enum`, `boolean`, `integer`, `number`, `date` or `datetime`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/type`.
+            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case string = "string"
+                case number = "number"
+                case integer = "integer"
+                case boolean = "boolean"
+                case url = "url"
+                case email = "email"
+                case datetime = "datetime"
+                case date = "date"
+                case _enum = "enum"
+                case array = "array"
+                case object = "object"
+                case thumbnail = "thumbnail"
+                case status = "status"
             }
-            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
-            public var value2: Components.Schemas.RegisteredType.Value2Payload
-            /// Creates a new `RegisteredType`.
+            /// The member's type: `string`, `email`, `url`, `enum`, `boolean`, `integer`, `number`, `date` or `datetime`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/type`.
+            public var _type: Components.Schemas.EntryMember._TypePayload
+            /// A name for people to read, up to 100 characters. Leave it out and a type read answers the nearest one a type above names, else one made from the member's name, such as `Due At` for `due_at`. The type list answers only the declared label.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/label`.
+            public var label: Swift.String?
+            /// What the member holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/description`.
+            public var description: Swift.String?
+            /// `true` if every entry must have the member.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/required`.
+            public var required: Swift.Bool?
+            /// The values an `enum` member allows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/enum_values`.
+            public var enumValues: [Swift.String]?
+            /// A refinement of a `string` member, as a field's `format`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/format`.
+            @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case url = "url"
+                case email = "email"
+                case datetime = "datetime"
+                case date = "date"
+                case thumbnail = "thumbnail"
+                case bcp47 = "bcp47"
+                case iso3166 = "iso3166"
+                case currency = "currency"
+                case phone = "phone"
+            }
+            /// A refinement of a `string` member, as a field's `format`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/format`.
+            public var format: Components.Schemas.EntryMember.FormatPayload?
+            /// The longest value a `string` or `enum` member allows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/maxLength`.
+            public var maxLength: Swift.Int?
+            /// The lowest value the member allows, itself included. Only a `number` or `integer` member takes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/minimum`.
+            public var minimum: Swift.Double?
+            /// The highest value the member allows, itself included. Only a `number` or `integer` member takes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EntryMember/maximum`.
+            public var maximum: Swift.Double?
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+            /// Creates a new `EntryMember`.
             ///
             /// - Parameters:
-            ///   - value1:
-            ///   - value2:
+            ///   - _type: The member's type: `string`, `email`, `url`, `enum`, `boolean`, `integer`, `number`, `date` or `datetime`.
+            ///   - label: A name for people to read, up to 100 characters. Leave it out and a type read answers the nearest one a type above names, else one made from the member's name, such as `Due At` for `due_at`. The type list answers only the declared label.
+            ///   - description: What the member holds.
+            ///   - required: `true` if every entry must have the member.
+            ///   - enumValues: The values an `enum` member allows.
+            ///   - format: A refinement of a `string` member, as a field's `format`.
+            ///   - maxLength: The longest value a `string` or `enum` member allows.
+            ///   - minimum: The lowest value the member allows, itself included. Only a `number` or `integer` member takes it.
+            ///   - maximum: The highest value the member allows, itself included. Only a `number` or `integer` member takes it.
+            ///   - additionalProperties: A container of undocumented properties.
             public init(
-                value1: Components.Schemas.TypeDefinition,
-                value2: Components.Schemas.RegisteredType.Value2Payload
+                _type: Components.Schemas.EntryMember._TypePayload,
+                label: Swift.String? = nil,
+                description: Swift.String? = nil,
+                required: Swift.Bool? = nil,
+                enumValues: [Swift.String]? = nil,
+                format: Components.Schemas.EntryMember.FormatPayload? = nil,
+                maxLength: Swift.Int? = nil,
+                minimum: Swift.Double? = nil,
+                maximum: Swift.Double? = nil,
+                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
-                self.value1 = value1
-                self.value2 = value2
+                self._type = _type
+                self.label = label
+                self.description = description
+                self.required = required
+                self.enumValues = enumValues
+                self.format = format
+                self.maxLength = maxLength
+                self.minimum = minimum
+                self.maximum = maximum
+                self.additionalProperties = additionalProperties
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case label
+                case description
+                case required
+                case enumValues = "enum_values"
+                case format
+                case maxLength
+                case minimum
+                case maximum
             }
             public init(from decoder: any Swift.Decoder) throws {
-                self.value1 = try .init(from: decoder)
-                self.value2 = try .init(from: decoder)
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decode(
+                    Components.Schemas.EntryMember._TypePayload.self,
+                    forKey: ._type
+                )
+                self.label = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.description = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.required = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                self.enumValues = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .enumValues
+                )
+                self.format = try container.decodeIfPresent(
+                    Components.Schemas.EntryMember.FormatPayload.self,
+                    forKey: .format
+                )
+                self.maxLength = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .maxLength
+                )
+                self.minimum = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .minimum
+                )
+                self.maximum = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .maximum
+                )
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                    "type",
+                    "label",
+                    "description",
+                    "required",
+                    "enum_values",
+                    "format",
+                    "maxLength",
+                    "minimum",
+                    "maximum"
+                ])
             }
             public func encode(to encoder: any Swift.Encoder) throws {
-                try self.value1.encode(to: encoder)
-                try self.value2.encode(to: encoder)
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(
+                    self._type,
+                    forKey: ._type
+                )
+                try container.encodeIfPresent(
+                    self.label,
+                    forKey: .label
+                )
+                try container.encodeIfPresent(
+                    self.description,
+                    forKey: .description
+                )
+                try container.encodeIfPresent(
+                    self.required,
+                    forKey: .required
+                )
+                try container.encodeIfPresent(
+                    self.enumValues,
+                    forKey: .enumValues
+                )
+                try container.encodeIfPresent(
+                    self.format,
+                    forKey: .format
+                )
+                try container.encodeIfPresent(
+                    self.maxLength,
+                    forKey: .maxLength
+                )
+                try container.encodeIfPresent(
+                    self.minimum,
+                    forKey: .minimum
+                )
+                try container.encodeIfPresent(
+                    self.maximum,
+                    forKey: .maximum
+                )
+                try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
         /// A type says which fields the items of that type hold, and what else Marfa does for them.
@@ -8352,6 +8642,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/label`.
             public var label: Swift.String?
+            /// The type's plural name for people to read, such as `People`. Never inherited. Left out of the list of types where the type declares none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/plural`.
+            public var plural: Swift.String?
             /// What the type is for.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/description`.
@@ -8421,6 +8715,7 @@ extension Components {
             /// - Parameters:
             ///   - id: Unique identifier for the type.
             ///   - label: The type's name for people to read.
+            ///   - plural: The type's plural name for people to read, such as `People`. Never inherited. Left out of the list of types where the type declares none.
             ///   - description: What the type is for.
             ///   - parent: The identifier of the type this one inherits from.
             ///   - compatibleWith: The types this one is a structural superset of.
@@ -8435,6 +8730,7 @@ extension Components {
             public init(
                 id: Swift.String,
                 label: Swift.String? = nil,
+                plural: Swift.String? = nil,
                 description: Swift.String? = nil,
                 parent: Swift.String? = nil,
                 compatibleWith: [Swift.String]? = nil,
@@ -8449,6 +8745,7 @@ extension Components {
             ) {
                 self.id = id
                 self.label = label
+                self.plural = plural
                 self.description = description
                 self.parent = parent
                 self.compatibleWith = compatibleWith
@@ -8464,6 +8761,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case id
                 case label
+                case plural
                 case description
                 case parent
                 case compatibleWith = "compatible_with"
@@ -8475,6 +8773,62 @@ extension Components {
                 case versionPolicy = "version_policy"
                 case mergePolicy = "merge_policy"
                 case retentionPolicy = "retention_policy"
+            }
+        }
+        /// A type says which fields the items of that type hold, and what else Marfa does for them.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RegisteredType`.
+        public struct RegisteredType: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value1`.
+            public var value1: Components.Schemas.TypeDefinition
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// The type's plural name for people to read, such as `People`: the one the type declares, else one made from its label. Never inherited.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/plural`.
+                public var plural: Swift.String
+                /// The type's recorded origin and creator.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/provenance`.
+                public var provenance: Components.Schemas.TypeProvenance
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - plural: The type's plural name for people to read, such as `People`: the one the type declares, else one made from its label. Never inherited.
+                ///   - provenance: The type's recorded origin and creator.
+                public init(
+                    plural: Swift.String,
+                    provenance: Components.Schemas.TypeProvenance
+                ) {
+                    self.plural = plural
+                    self.provenance = provenance
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case plural
+                    case provenance
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
+            public var value2: Components.Schemas.RegisteredType.Value2Payload
+            /// Creates a new `RegisteredType`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.TypeDefinition,
+                value2: Components.Schemas.RegisteredType.Value2Payload
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
             }
         }
         /// An error response.
@@ -8882,10 +9236,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/parent`.
             public var parent: Swift.String?
-            /// A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
+            /// A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/label`.
             public var label: Swift.String?
+            /// The label's plural, up to 100 characters, such as `People`. Leave it out and Marfa adds `s`, `es` or `ies` to the label by the regular English rule.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/plural`.
+            public var plural: Swift.String?
             /// What the type is for.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/description`.
@@ -8981,7 +9339,8 @@ extension Components {
             ///   - fields: The type's own fields, by name.
             ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
-            ///   - label: A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
+            ///   - label: A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
+            ///   - plural: The label's plural, up to 100 characters, such as `People`. Leave it out and Marfa adds `s`, `es` or `ies` to the label by the regular English rule.
             ///   - description: What the type is for.
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
@@ -8997,6 +9356,7 @@ extension Components {
                 version: Swift.Int? = nil,
                 parent: Swift.String? = nil,
                 label: Swift.String? = nil,
+                plural: Swift.String? = nil,
                 description: Swift.String? = nil,
                 roles: [Swift.String]? = nil,
                 required: [Swift.String]? = nil,
@@ -9012,6 +9372,7 @@ extension Components {
                 self.version = version
                 self.parent = parent
                 self.label = label
+                self.plural = plural
                 self.description = description
                 self.roles = roles
                 self.required = required
@@ -9028,6 +9389,7 @@ extension Components {
                 case version
                 case parent
                 case label
+                case plural
                 case description
                 case roles
                 case required
@@ -9056,6 +9418,10 @@ extension Components {
                 self.label = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .label
+                )
+                self.plural = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .plural
                 )
                 self.description = try container.decodeIfPresent(
                     Swift.String.self,
@@ -9102,6 +9468,7 @@ extension Components {
                     "version",
                     "parent",
                     "label",
+                    "plural",
                     "description",
                     "roles",
                     "required",
@@ -9419,10 +9786,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/parent`.
             public var parent: Swift.String?
-            /// A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
+            /// A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/label`.
             public var label: Swift.String?
+            /// The label's plural, up to 100 characters, such as `People`. Leave it out and Marfa adds `s`, `es` or `ies` to the label by the regular English rule.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/plural`.
+            public var plural: Swift.String?
             /// What the type is for.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/description`.
@@ -9522,7 +9893,8 @@ extension Components {
             ///   - fields: The type's own fields, by name.
             ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
-            ///   - label: A name for people to read. Leave it out and Marfa derives one from the last segment of the identifier.
+            ///   - label: A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
+            ///   - plural: The label's plural, up to 100 characters, such as `People`. Leave it out and Marfa adds `s`, `es` or `ies` to the label by the regular English rule.
             ///   - description: What the type is for.
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
@@ -9539,6 +9911,7 @@ extension Components {
                 version: Swift.Int? = nil,
                 parent: Swift.String? = nil,
                 label: Swift.String? = nil,
+                plural: Swift.String? = nil,
                 description: Swift.String? = nil,
                 roles: [Swift.String]? = nil,
                 required: [Swift.String]? = nil,
@@ -9555,6 +9928,7 @@ extension Components {
                 self.version = version
                 self.parent = parent
                 self.label = label
+                self.plural = plural
                 self.description = description
                 self.roles = roles
                 self.required = required
@@ -9572,6 +9946,7 @@ extension Components {
                 case version
                 case parent
                 case label
+                case plural
                 case description
                 case roles
                 case required
@@ -9601,6 +9976,10 @@ extension Components {
                 self.label = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .label
+                )
+                self.plural = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .plural
                 )
                 self.description = try container.decodeIfPresent(
                     Swift.String.self,
@@ -9651,6 +10030,7 @@ extension Components {
                     "version",
                     "parent",
                     "label",
+                    "plural",
                     "description",
                     "roles",
                     "required",
@@ -10845,7 +11225,7 @@ extension Components {
                 case truncated
             }
         }
-        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists and revokes other apps' access; `instance.read` reads health, metrics, housekeeping, retired platform types, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, resets platform type definitions and cancels bulk jobs; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; and `blobs.manage` manages every blob.
+        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists and revokes other apps' access; `instance.read` reads health, metrics, housekeeping, retired platform types, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, removes retired platform types and cancels bulk jobs; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; and `blobs.manage` manages every blob.
         ///
         /// - Remark: Generated from `#/components/schemas/Permission`.
         @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {

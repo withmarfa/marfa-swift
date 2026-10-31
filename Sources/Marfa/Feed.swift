@@ -419,7 +419,8 @@ final class Feed: Sendable {
         do {
             report = try await holder.runUntilCanceled { core, stop in
                 guard admitted() else { throw KeyChanged() }
-                return try core.hydrateWith(types: types, tier: tier, edgeTypes: edgeTypes, stop: stop)
+                return try core.hydrateWith(
+                    types: types, tier: tier, edgeTypes: edgeTypes, inPlaceOnly: byRefill, stop: stop)
             }
         } catch let error as KeyChanged {
             throw error

@@ -70,6 +70,9 @@ public struct ServerCatalog: Sendable, Hashable {
 public struct ItemType: Sendable, Hashable, Identifiable {
     public let id: String
     public let label: String?
+    /// The name an app shows for more than one item of the type, such as `People`: the type's own, else one made
+    /// from its label.
+    public let plural: String
     public let description: String?
     public let parent: String?
     public let version: Int64
@@ -107,12 +110,14 @@ public struct ItemType: Sendable, Hashable, Identifiable {
 
     /// For an app's previews and tests.
     public init(
-        id: String, label: String? = nil, description: String? = nil, parent: String? = nil, version: Int64 = 0,
-        fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil, icon: String? = nil,
+        id: String, label: String? = nil, plural: String? = nil, description: String? = nil, parent: String? = nil,
+        version: Int64 = 0, fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil,
+        icon: String? = nil,
         linkField: String? = nil, roles: [String] = [], compatibleWith: [String] = []
     ) {
         self.id = id
         self.label = label
+        self.plural = plural ?? DerivedNames.plural(fromLabel: label ?? DerivedNames.label(fromID: id))
         self.description = description
         self.parent = parent
         self.version = version
@@ -130,8 +135,9 @@ public struct ItemType: Sendable, Hashable, Identifiable {
 
     init(_ core: MarfaCore.ItemType) {
         self.init(
-            id: core.id, label: core.label, description: core.description, parent: core.parent,
-            version: core.version, fields: core.fields.map(TypeField.init), titleField: core.titleField,
+            id: core.id, label: core.label, plural: core.plural, description: core.description,
+            parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
+            titleField: core.titleField,
             bodyField: core.bodyField, icon: core.icon, linkField: core.linkField, roles: core.roles,
             compatibleWith: core.compatibleWith)
     }
@@ -140,6 +146,9 @@ public struct ItemType: Sendable, Hashable, Identifiable {
 /// A field of an item type, or a property of an edge type.
 public struct TypeField: Sendable, Hashable, Identifiable {
     public let name: String
+    /// The name an app shows for the field: the nearest one its type's chain names, else one made from its name, such
+    /// as `Due At` for `due_at`.
+    public let label: String
     /// The field's own type, such as `string` or `thumbnail`.
     public let type: String
     public let required: Bool
@@ -154,10 +163,11 @@ public struct TypeField: Sendable, Hashable, Identifiable {
 
     /// For an app's previews and tests.
     public init(
-        name: String, type: String, required: Bool = false, description: String? = nil, declaredBy: String,
-        definition: JSONObject = [:]
+        name: String, label: String? = nil, type: String, required: Bool = false, description: String? = nil,
+        declaredBy: String, definition: JSONObject = [:]
     ) {
         self.name = name
+        self.label = label ?? DerivedNames.label(fromName: name)
         self.type = type
         self.required = required
         self.description = description
@@ -167,7 +177,8 @@ public struct TypeField: Sendable, Hashable, Identifiable {
 
     init(_ core: MarfaCore.TypeField) {
         self.init(
-            name: core.name, type: core.fieldType, required: core.required, description: core.description,
+            name: core.name, label: core.label, type: core.fieldType, required: core.required,
+            description: core.description,
             declaredBy: core.declaredBy, definition: JSONObject(core.definition))
     }
 }
@@ -215,13 +226,17 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     public let properties: [TypeField]
     /// Whether Marfa ships it, rather than the instance registering it.
     public let shipped: Bool
+    /// Whether the server refuses an edge of this type that closes a cycle through other edges of the type.
+    public let acyclic: Bool
+    /// Whether the server refuses a source its own target constraints admit.
+    public let flat: Bool
 
     /// For an app's previews and tests; `reverseLabel` is `label` where it is `nil`, as the server answers it.
     public init(
         id: String, label: String, reverseLabel: String? = nil, description: String? = nil, cardinality: String,
         reverseName: String? = nil, writtenAt: EdgeWrittenAt = .source, sourceTypeConstraints: [String] = ["*"],
         targetTypeConstraints: [String] = ["*"], cascadeOnDelete: String = "orphan", properties: [TypeField] = [],
-        shipped: Bool = false
+        shipped: Bool = false, acyclic: Bool = false, flat: Bool = false
     ) {
         self.id = id
         self.label = label
@@ -235,6 +250,8 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
         self.cascadeOnDelete = cascadeOnDelete
         self.properties = properties
         self.shipped = shipped
+        self.acyclic = acyclic
+        self.flat = flat
     }
 
     init(_ core: MarfaCore.EdgeType) {
@@ -243,6 +260,42 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
             cardinality: core.cardinality, reverseName: core.reverseName, writtenAt: EdgeWrittenAt(core.writtenAt),
             sourceTypeConstraints: core.sourceTypeConstraints, targetTypeConstraints: core.targetTypeConstraints,
             cascadeOnDelete: core.cascadeOnDelete, properties: core.properties.map(TypeField.init),
-            shipped: core.shipped)
+            shipped: core.shipped, acyclic: core.acyclic, flat: core.flat)
+    }
+}
+
+/// The names the core gives a type or a field that names none, which an app's previews and the fake working copy
+/// need to answer as the core does.
+package enum DerivedNames {
+    /// The last segment of a type's id, each hyphen and underscore made a space and each word capitalized.
+    package static func label(fromID id: String) -> String {
+        label(fromName: String(id.split(separator: ".", omittingEmptySubsequences: false).last ?? ""))
+    }
+
+    /// Each hyphen and underscore made a space and the first character at the start or after a space capitalized,
+    /// so `due_at` becomes `Due At`.
+    package static func label(fromName name: String) -> String {
+        var label = ""
+        var wordStart = true
+        for character in name {
+            let spaced: Character = character == "-" || character == "_" ? " " : character
+            label += wordStart ? spaced.uppercased() : String(spaced)
+            wordStart = spaced == " "
+        }
+        return label
+    }
+
+    /// The regular English plural on lowercase letters: a consonant and `y` become `ies`, an ending of `s`, `x`, `z`,
+    /// `ch` or `sh` takes `es`, and any other label takes `s`.
+    package static func plural(fromLabel label: String) -> String {
+        let characters = Array(label)
+        if characters.count >= 2, characters[characters.count - 1] == "y",
+            let before = characters.dropLast().last, before.isASCII, before.isLowercase,
+            !"aeiou".contains(before)
+        {
+            return String(label.dropLast()) + "ies"
+        }
+        if ["s", "x", "z", "ch", "sh"].contains(where: label.hasSuffix) { return label + "es" }
+        return label + "s"
     }
 }
