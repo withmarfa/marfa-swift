@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   # CodeQL reads Swift from a build it watches, and the package builds only
-  # beside the core's framework: the one `pin-bump.yml` and `ci.yml` keep for
+  # beside the core's framework: the one `ci.yml` keeps on `main` for
   # this pin, or one built here when that has gone.
   swift:
     name: Analyze (swift)

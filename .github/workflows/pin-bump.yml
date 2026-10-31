@@ -11,9 +11,10 @@ name: Bump the core pin
 # cannot build, because the package no longer compiles against the new core,
 # opens an issue instead of a pull request.
 #
-# The run is on `main`, so what it saves to the Actions cache is read by every
-# pull request: the core and the command line for the new pin are built here
-# once, and the first pull request after a bump builds no Rust.
+# It saves nothing to the Actions cache. The run checks out code this repository
+# does not control, and what it saved would be read by every pull request. The
+# merge of the bump pushes to `main`, which runs `ci.yml`, and that saves the
+# core's output and the command line for the new pin from `main`.
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -118,68 +119,9 @@ jobs:
           HEAD: ${{ steps.decide.outputs.head }}
         run: echo "${HEAD}" > core.pin
 
-      # The names `ci.yml` looks for, read now that the pin has moved and
-      # before `core.sh` runs, as `ci.yml` reads them on a clean checkout.
-      - name: Name the caches
-        id: names
-        if: ${{ steps.decide.outputs.bump == 'true' }}
-        env:
-          CORE_HASH: ${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
-          PIN_HASH: ${{ hashFiles('core.pin') }}
-          TOOL_HASH: ${{ hashFiles('.build/marfa/core/bindings/swift/build.sh') }}
-        run: |
-          {
-            echo "core=core-output-${RUNNER_OS}-${CORE_HASH}"
-            echo "cli=marfa-cli-${RUNNER_OS}-${PIN_HASH}"
-            echo "tool=cargo-swift-${RUNNER_OS}-${TOOL_HASH}"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Cache the tool that packages the core
-        if: ${{ steps.decide.outputs.bump == 'true' }}
-        uses: actions/cache@v6
-        with:
-          path: ~/.cargo/bin/cargo-swift
-          key: ${{ steps.names.outputs.tool }}
-      - name: Cache the generator's build
-        if: ${{ steps.decide.outputs.bump == 'true' }}
-        uses: actions/cache@v6
-        with:
-          path: ${{ github.workspace }}/.build/generator-build
-          key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
-
       - name: Regenerate
         if: ${{ steps.decide.outputs.bump == 'true' }}
         run: scripts/core.sh
-
-      # Saved before the build, so a bump whose package no longer compiles has
-      # still built the core. The paths are `ci.yml`'s, since both make one
-      # cache's name. A dry run saves nothing.
-      - name: Keep what the new pin generates
-        if: ${{ steps.decide.outputs.bump == 'true' && env.REAL_RUN == 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            Frameworks/MarfaCoreFFI.xcframework
-            Sources/MarfaCore
-            Sources/MarfaTypes
-            Sources/MarfaAPI/Generated
-          key: ${{ steps.names.outputs.core }}
-
-      - name: Build the command line at the new pin
-        if: ${{ steps.decide.outputs.bump == 'true' && env.REAL_RUN == 'true' }}
-        env:
-          CARGO_TARGET_DIR: ${{ github.workspace }}/.build/cli-target
-        run: |
-          cargo build --locked -p marfa-cli --manifest-path "${MARFA_MONOREPO}/core/Cargo.toml"
-          mkdir -p .build/marfa-cli
-          cp "${CARGO_TARGET_DIR}/debug/marfa" .build/marfa-cli/marfa
-
-      - name: Keep the command line the new pin builds
-        if: ${{ steps.decide.outputs.bump == 'true' && env.REAL_RUN == 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: .build/marfa-cli
-          key: ${{ steps.names.outputs.cli }}
 
       - name: Build
         if: ${{ steps.decide.outputs.bump == 'true' }}

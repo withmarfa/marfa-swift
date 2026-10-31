@@ -87,7 +87,7 @@ jobs:
           shellcheck scripts/*.sh
       - name: Test the retry and failure reports
         run: |
-          scripts/retried-tests.test.sh
+          scripts/test-verdict.test.sh
           scripts/report-pin-bump-failure.test.sh
 
   # Not on a draft, and on a pull request not until `Lint Swift` has passed. A
@@ -157,9 +157,9 @@ jobs:
 
       # What core.sh makes depends only on the pin, the script and the
       # generator, so a change that leaves them alone reuses what it made
-      # last time and builds no Rust. `pin-bump.yml` saves it from `main` for
-      # each new pin, which every pull request can read, so the first pull
-      # request after a bump hits it. The caches here are all small: a cargo
+      # last time and builds no Rust. A run on `main` saves it, which every
+      # pull request can read, so the first pull request after a bump merges
+      # hits it. The caches here are all small: a cargo
       # build folder is 1.7 GB, and two of them evicted these.
       - name: Restore what the pin generates
         id: core
@@ -266,19 +266,27 @@ jobs:
           service="$(sed -n 's/^ *let service = "\(.*\)"$/\1/p' Tests/MarfaTests/CredentialTests.swift)"
           [[ "${service}" =~ ^[a-z.-]+$ ]] || { echo "::error::CredentialTests.swift names no one service"; exit 1; }
           scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-before"
-          # A test that fails is run once more. One that then passes is flaky: it does not fail the run, and
-          # the summary names it. One that fails twice fails the run. The keychain is compared either way.
+          # A test that fails is run once more. `swift test` exits 1 when any repetition failed, even if the
+          # test passed on the next, so the verdict comes from the event stream (`scripts/test-verdict.sh`):
+          # a test that passed on its second try is flaky and does not fail the run, and a warning and the
+          # summary name it; one that failed both times fails it. The keychain is compared either way.
+          swift test --repeat-until pass --maximum-repetitions 2 --event-stream-output-path "${RUNNER_TEMP}/swift-test-events.jsonl" 2>&1 | tee "${RUNNER_TEMP}/swift-test.log" || true
           tested=0
-          swift test --repeat-until pass --maximum-repetitions 2 2>&1 | tee "${RUNNER_TEMP}/swift-test.log" || tested=$?
-          retried="$(scripts/retried-tests.sh <"${RUNNER_TEMP}/swift-test.log")"
-          if [[ -n "${retried}" ]]; then
-            while IFS= read -r name; do echo "::warning title=Flaky test::${name} failed and was run once more"; done <<<"${retried}"
+          verdict="$(scripts/test-verdict.sh "${RUNNER_TEMP}/swift-test-events.jsonl")" || tested=$?
+          if [[ -n "${verdict}" ]]; then
+            while read -r kind name; do
+              if [[ "${kind}" == flaky ]]; then
+                echo "::warning title=Flaky test::${name} failed, then passed when run once more"
+              else
+                echo "::error title=Test failed::${name}"
+              fi
+            done <<<"${verdict}"
             {
-              echo "### Tests that ran twice"
+              echo "### Tests that failed once or twice"
               echo
-              echo "Each failed once. One that passed the second time is flaky and did not fail this run; fix it."
+              echo "A failed test is run once more. A flaky one passed the second time and did not fail this run; fix it."
               echo
-              while IFS= read -r name; do echo "- \`${name}\`"; done <<<"${retried}"
+              while read -r kind name; do echo "- ${kind}: \`${name}\`"; done <<<"${verdict}"
             } >>"$GITHUB_STEP_SUMMARY"
           fi
           scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-after"
@@ -326,6 +334,7 @@ jobs:
           path: |
             ${{ runner.temp }}/swift-build.log
             ${{ runner.temp }}/swift-test.log
+            ${{ runner.temp }}/swift-test-events.jsonl
           if-no-files-found: ignore
           retention-days: 3
 
