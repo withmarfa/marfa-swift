@@ -13,34 +13,33 @@ struct ServerCleartext {
         "http://localhost:8600", "http://LOCALHOST", "http://127.0.0.1", "http://127.1.2.3:80", "http://127.1",
         "http://[::1]:8600", "https://marfa.example", "https://10.0.0.5", "http://[0:0:0:0:0:0:0:1]",
     ])
-    func theMachineItselfAndHttpsRaiseNoNotice(address: String) throws {
-        let server = try server(address)
-        #expect(!server.isPlainHTTPToAnotherHost)
-        #expect(server.takePlainHTTPNotice() == nil)
+    func theMachineItselfAndHttpsHaveNoPlainHTTPOrigin(address: String) throws {
+        #expect(try server(address).plainHTTPOrigin == nil)
     }
 
     @Test(arguments: [
-        "http://marfa.example", "http://localhost.example", "http://128.0.0.1", "http://0.0.0.0", "http://10.0.0.5",
-        "http://[::2]", "http://[::ffff:10.0.0.5]", "http://[::ffff:127.0.0.1]", "HTTP://Marfa.Example:8600",
+        ("http://marfa.example", "http://marfa.example"),
+        ("http://localhost.example", "http://localhost.example"),
+        ("http://128.0.0.1", "http://128.0.0.1"),
+        ("http://0.0.0.0", "http://0.0.0.0"),
+        ("http://10.0.0.5", "http://10.0.0.5"),
+        ("http://[::2]", "http://[::2]"),
+        ("http://[::ffff:10.0.0.5]", "http://[::ffff:10.0.0.5]"),
+        ("http://[::ffff:127.0.0.1]", "http://[::ffff:127.0.0.1]"),
+        ("HTTP://Marfa.Example:8600", "http://marfa.example:8600"),
     ])
-    func anyOtherPlainHttpAddressIsFlagged(address: String) throws {
-        #expect(try server(address).isPlainHTTPToAnotherHost)
+    func anyOtherPlainHttpAddressNamesItsOrigin(address: String, origin: String) throws {
+        #expect(try server(address).plainHTTPOrigin == origin)
     }
 
-    @Test func theNoticeComesOnceAndNamesOnlyTheOrigin() throws {
-        let name = "marfa-\(UUID().uuidString.lowercased()).example"
-        let first = try server("http://\(name):8600/path?q=1").takePlainHTTPNotice()
-        #expect(first?.origin == "http://\(name):8600")
-        #expect(first?.message.contains("http://\(name):8600") == true)
-        #expect(first?.message.contains("path") == false)
-
-        #expect(try server("http://\(name):8600").takePlainHTTPNotice() == nil, "asked again")
-        #expect(try server("HTTP://\(name.uppercased()):8600/other").takePlainHTTPNotice() == nil, "the same origin")
-        #expect(try server("http://\(name):8601").takePlainHTTPNotice() != nil, "another port is another address")
+    @Test func theOriginNamesOnlySchemeHostAndPort() throws {
+        #expect(try server("http://marfa.example:8600/path?q=1#top").plainHTTPOrigin == "http://marfa.example:8600")
+        #expect(try server("http://marfa.example:80/other").plainHTTPOrigin == "http://marfa.example")
     }
 
-    @Test func theDefaultPortIsNotShown() throws {
-        let name = "marfa-\(UUID().uuidString.lowercased()).example"
-        #expect(try server("http://\(name):80").takePlainHTTPNotice()?.origin == "http://\(name)")
+    @Test func theSameOriginAnswersTheSameEveryTime() throws {
+        let first = try server("http://marfa.example:8600").plainHTTPOrigin
+        #expect(try server("http://marfa.example:8600").plainHTTPOrigin == first, "asked again")
+        #expect(try server("http://marfa.example:8601").plainHTTPOrigin != first, "another port is another origin")
     }
 }
