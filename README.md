@@ -6,357 +6,45 @@
 
 > **Early project.** Marfa is at version 0.0.x. Things will change without notice, and nothing is stable yet.
 
-The Swift SDK for [Marfa](https://github.com/withmarfa/marfa), a home for your personal data that you run yourself. It is the Swift package `Marfa`, and it lets an iOS or macOS app work with a Marfa instance.
+The Swift SDK for [Marfa](https://github.com/withmarfa/marfa), a home for your personal data that you run yourself. It lets an iOS or macOS app work with a Marfa instance.
 
-An app built on it keeps a working copy of the data it needs on the device. The app reads from that copy with or without a connection, queues its writes until it can send them, and follows changes from the instance. The package gives you Swift types, `async` calls, change streams and typed errors over Marfa's Rust core, which does the networking, storage and syncing.
+An app built on it keeps a working copy of its data on the device. The app reads from the copy with or without a connection, queues its writes until it can send them, and follows changes from the instance. The SDK gives Swift types, `async` calls and typed errors over Marfa's Rust core, which does the networking, storage and syncing.
 
-## Requirements
+## Where the SDK stops
 
-- iOS 27 or macOS 27
-- Xcode 27 or later, with Swift 6.4, on a Mac with Apple silicon
+- **Marfa decides what things mean**: an item's name, what a link points to, what a filter matches. The SDK passes on the core's answers, so every app agrees.
+- **The SDK does what every Swift app needs**: keeping the copy in step, retrying, sorting errors, keeping keys and drawing icons.
+- **Your app decides the rest**: its screens, its words and its choices.
 
-The core is built for Apple silicon only. In your app target's build settings, set Excluded Architectures for Any iOS Simulator SDK to `x86_64`, or some simulator builds fail to link.
+## Add it to an app
 
-## Install
+The SDK supports iOS 27 and macOS 27, and builds with Xcode 27 on a Mac with Apple silicon.
 
-In Xcode, choose File > Add Package Dependencies, enter `https://github.com/withmarfa/marfa-swift`, and add the `Marfa` product to your app's target. Use the version of the [latest release](https://github.com/withmarfa/marfa-swift/releases/latest).
-
-In a `Package.swift`, add the package and the product:
-
-```swift
-.package(url: "https://github.com/withmarfa/marfa-swift", exact: "<latest release>"),
-```
+In Xcode, choose **File** > **Add Package Dependencies**, enter `https://github.com/withmarfa/marfa-swift`, and set **Dependency Rule** to **Up to Next Major Version**. In a `Package.swift`:
 
 ```swift
+.package(url: "https://github.com/withmarfa/marfa-swift", from: "<latest release>"),
+// in your target's dependencies:
 .product(name: "Marfa", package: "marfa-swift"),
 ```
 
-Each release includes the core prebuilt, so your app needs no Rust toolchain.
+Replace `<latest release>` with the version of the [latest release](https://github.com/withmarfa/marfa-swift/releases/latest). Each release carries the core already built, so your app needs no Rust toolchain. Read the [release notes](https://github.com/withmarfa/marfa-swift/releases) before you update: any release can change a call.
 
-The package has seven products:
+The SDK's enums are exhaustive. Switch over them without `@unknown default`, so a case a later release adds stops the build at each switch that must handle it.
 
-- `Marfa`: the working copy, sign-in and folders.
-- `MarfaAPI`: a client for the calls only the instance can answer. See [Call the server directly](#call-the-server-directly).
-- `MarfaTypes`: the instance's wire types, generated from its `openapi.json`. `MarfaAPI` includes them.
-- `MarfaTesting`: a working copy for tests and previews. See [Test and preview](#test-and-preview).
-- `MarfaIcons`: draws an item type's icon. See [Draw a type's icon](#draw-a-types-icon).
-- `MarfaBrandIcons`: the brand marks `MarfaIcons` draws for `simple-icons:` icons, as a product of their own so an app that leaves it out ships none. See [Draw brand marks](#draw-brand-marks).
-- `MarfaTelemetry`: sends an app's errors and a fixed set of log events to a PostHog project the app chooses. See [Report errors and events](#report-errors-and-events).
+The core is built for Apple silicon only. Set **Excluded Architectures** for **Any iOS Simulator SDK** to `x86_64` in your app target, or some simulator builds fail to link.
 
-## Example
+## Documentation
 
-This opens a working copy, fills it with the notes on your instance, and prints their titles. You need a running instance and a key that can read `core.note`; the [Quickstart](https://docs.marfa.so/quickstart) makes both.
-
-```swift
-import Marfa
-
-let server = Server(url: serverURL, key: key)
-let copy = try await WorkingCopy.open(store: storeURL, server: server)
-
-_ = try await copy.hydrate(types: ["core.note"], tier: .library)
-
-for note in try await copy.items.list(ListFilters(types: ["core.note"])) {
-    print(note.title ?? "Untitled")
-}
-```
-
-`storeURL` is where the working copy keeps its SQLite file, and `serverURL` is your instance's address. Keep `key` in the keychain between launches with `Keychain.system`; the copy holds it in memory and never writes it to its store.
-
-## Stay in step with the server
-
-`updates()` returns a sequence that keeps the copy following its server for as long as you hold it, and says what to read again. A burst of changes arrives as one update, so an app that reads slowly never falls behind. The first update asks for `.everything`.
-
-```swift
-for await update in copy.updates() {
-    switch update.reread {
-    case .everything:
-        notes = try await copy.items.list(ListFilters(types: ["core.note"]))
-    case .parts(let parts):
-        for id in parts.rows.items { notes[id] = try await copy.items.get(id) }
-        for id in parts.rows.removedItems { notes[id] = nil }
-        if parts.queue { queued = try await copy.queue.all() }
-    }
-    connection = update.connection
-    progress = update.fill?.fraction
-}
-```
-
-`update.connection` says what the copy is doing with its server:
-
-- `.following`: the copy caught up and hears the server's changes as they happen. Only this state means the copy is up to date.
-- `.connecting`: the copy is catching up, or refilling a stale copy.
-- `.offline(error)`: the server could not be reached, or asked the copy to wait, while the copy followed it, caught up or refilled. The copy asks again after 5 seconds, doubling each time up to 5 minutes, and never sooner than a rate limit's `retryAfterSeconds`. After 5 minutes of following, the waits start again from 5 seconds.
-- `.stopped(error)`: the server refused in a way that waiting may not mend. The copy asks again every 5 minutes, or later if the server names a later time. For a reader, it means the watch of the writer's saves ended on a fault: the reader takes the watch again on the `.offline` schedule, returns to `.local`, and asks for `.everything`.
-- `.keyRefused(error)`: the key or sign-in no longer works. The copy asks nothing until `useKey(_:)` gives it another key, and then catches up at once.
-- `.needsHydration(error)`: the copy has no complete hydration to follow from, or the server no longer holds its cursor. A copy that can refill by itself does so and moves on to `.following`; otherwise call `hydrate(types:tier:)`.
-- `.local`: the copy has no server, or opened as a reader.
-- `.closed`: the copy closed, and the sequence ends after this update.
-
-While the copy follows, writes left undelivered by a drain are sent again on the same schedule. Releasing the last sequence stops following the server and cancels any wait. `LiveQuery` holds one sequence and shows its `connection`. `changes()` remains for an app that needs every change one by one.
-
-`update.lastSynced` and `status().lastSynced` say when the copy last finished a pull from its server without an error, by the device's clock. Both are `nil` until the first such pull, and again after a hydration clears it.
-
-## Fill a large library
-
-Use `hydrate(types: ["*"], tier: .all)` for every type except `system.*`. Add a system type explicitly when needed, such as `["*", "system.view"]` for saved views. During a fill, `update.fill` on `updates()` tells `listed` and `expected` as they change, at most twice a second, or compare `status().itemsListed` with `itemsExpected` yourself when both are available; `items` also includes pinned rows and local creates.
-
-Lists and searches return `Rows`, with `.complete`, `.partial` or `.stale` completeness. Read the rows as a collection, or use `.rows` when an API requires an array. Saved-view reads carry completeness too, including `LiveQuery<Rows<ViewGroup>>` for groups.
-
-An interrupted hydration resumes when its slice is unchanged. Its report distinguishes `pages` read by this call from `pagesTotal`, including earlier calls, and says whether it `resumed` or why it `restarted`. When the server's event log no longer holds a copy's cursor, as can happen after a long sleep, `status().hydration` is `.stale`. While an `updates()` sequence or a `changes()` stream is held, the copy refills over its existing rows by itself and its streams carry on. After a call of your own throws `copyExpired`, or a stream is told `.stopped(copyExpired)`, read `status().hydration`: if it is `.stale`, hydrate the same slice again to refill. A copy runs one hydration at a time, so a hydration that starts while the refill runs waits for it, and returns the refill's report when the refill already filled the same slice under the same key. A `catchUp()` made meanwhile also waits, then catches up from where the refill left the copy. The report says `inPlace`. Item edits and creates remain queued through a fill or refill.
-
-An app that keeps a large library in memory reads it whole once, then follows what changed rather than reading it all again. `updates()` keeps the cursor for you and names the changed rows in `parts.rows`, or asks for `.everything` when more than 1,000 changed. To keep the cursor yourself, take one with `changes(since: nil)` before the first full read. After each change that `changes()` reports, call `changes(since:)` with the cursor you kept: reread the items it names with `items.get(_:includingBin:)` and the edges with `edges.get(_:)`, drop the removed ones, then keep the answer's `next`. When the answer is `.everything`, read the whole copy again. When a reread throws `hydrationIncomplete`, keep the earlier cursor and try again after `.refreshed(.hydrated)`. `items.links(in:)` reads the body links of many items in one call.
-
-Set `fileBudget` when opening a copy, or leave it `nil` to keep the store's choice and use the default for a new store. `blobs.cache()` reports held bytes and attachment counts, including why some attachments are not held. `blobs.fetchKept()` fetches those attachments; they stay outside the cache budget. See the [Swift SDK reference](https://docs.marfa.so/swift-sdk) for progress, refill and file-policy details.
-
-## Identify the connected instance
-
-Read the server's public description to display its configured name:
-
-```swift
-let instance = try await server.instanceDescription()
-print(instance.name)
-print(instance.instanceId)
-print(instance.version)
-if let release = instance.release {
-    print(release)
-}
-```
-
-The result also includes `contract` and `features`. The server supplies `Marfa` when no display name is configured, and omits `release` for a build that is not a numbered release.
-
-This call sends an anonymous JSON request through the core, preserves the server URL's path prefix, and needs no working copy or `config.manage` permission. It does not send `server.key` or read the keychain. Connection failures, HTTP refusals, redirects, and malformed descriptions throw `MarfaError`; a failed read does not produce a default description. Reading the description does not establish access to the instance's data or contract compatibility.
-
-## Sign in
-
-An app that people install signs in to their instance instead of asking them for a key. The owner approves the app in the browser, and the package keeps the sign-in in the keychain and renews it when the instance stops accepting its access token.
-
-1. Choose a redirect address whose scheme is a reverse domain name you control, such as `com.example.notes:/signed-in`, and add the scheme to your app's `CFBundleURLTypes`.
-2. Sign in, and open the working copy with the credential:
-
-   ```swift
-   import Marfa
-
-   let authorization = try Authorization(
-       server: serverURL,
-       client: .init(
-           name: "Notes",
-           redirect: URL(string: "com.example.notes:/signed-in"),
-           scopes: ["core.note:read", "core.note:write"]),
-       service: "com.example.notes")
-
-   let credential: Credential
-   if let kept = try authorization.credential() {
-       credential = kept
-   } else {
-       credential = try await authorization.signIn(presentingFrom: window)
-   }
-   let server = try Server(url: serverURL, credential: credential)
-   let copy = try await WorkingCopy.open(store: storeURL, server: server)
-   ```
-
-   In SwiftUI, pass the `webAuthenticationSession` environment value to `signIn(using:)` instead.
-
-An app without a browser, such as one on a TV or a command-line tool, uses `startDeviceSignIn()`: show the person its `userCode` and `verificationURL`, then wait on `credential()` while they approve on another device.
-
-When the instance ends the sign-in, for example because the owner revoked the app, calls throw `MarfaError.signedOut` and the keychain no longer holds it; sign in again and open the copy with the new credential. `signOut()` deletes the sign-in from the keychain and revokes it at the instance.
-
-To share the sign-in with your app's extensions, pass `keychain: Keychain(accessGroup:)` with an access group that every target's entitlements name.
-
-## Call the server directly
-
-Some calls only the instance can answer, such as registering an item type, managing keys and webhooks, or reading the audit log. The `MarfaAPI` product provides `Client`, which sends these calls straight to the instance with the server's key or sign-in. Add it to your app's target next to `Marfa`:
-
-```swift
-import MarfaAPI
-
-let api = Client(server)
-let title = Components.Schemas.FieldDefinition(_type: .string, required: true)
-_ = try await api.register(
-    itemType: .init(fields: .init(additionalProperties: ["title": title]), id: "app.example.entry"))
-```
-
-`Client` has no call that creates, gets, changes or deletes one item or edge, and none for search or events: those go through the working copy, so each item has one path. It offers no bulk changes either. It also leaves out the calls `Server` makes itself: an item's snapshots with `snapshots(ofItem:after:limit:timeout:)`, the server's settings with `config(timeout:)` and `updateConfig(_:expecting:timeout:)`, and a type's icon with `setTypeIcon(_:ofType:expecting:timeout:)`. Each of those throws `MarfaError.network` once its `timeout`, 20 seconds by default, has passed in all, renewing an access token included. Each call needs a connection: on a device that is offline, a call throws `MarfaError.noConnection` and sends nothing. Other failures throw the same `MarfaError` cases the working copy throws. When the instance refuses an expired access token, the client renews it once and sends the call again. It never follows a redirect, and it waits 30 seconds for the instance to send more; pass `Client(_:timeout:)` a longer time for a call such as `runHousekeeping(_:)` that answers only when its work is done.
-
-## Read where an item stands
-
-A type with a `status` field, such as `core.task`, declares the words its items can hold, and puts each word in one of four groups that every type shares: `not_started`, `in_progress`, `completed` and `canceled`. `StatusGroup` names the four, so an app can tell what is open, active or finished without knowing a type's own words. `ItemType.statusWords` lists the words in order, each with its group, and `statusField` names the field. A subtype lists its parent's words first and then the ones it adds.
-
-```swift
-let task = try await copy.catalog.itemType("core.task")
-task.statusWords                          // not_started, in_progress, completed, canceled
-task.statusGroup(of: "completed")         // .completed
-
-let group = try await copy.catalog.statusGroup(of: item)   // read with the item's own type
-let groups = try await copy.catalog.statusGroups(of: items)
-```
-
-`statusGroup(of:)` throws `MarfaError.notFound` for an item whose type the catalog does not hold, as `itemType(_:)` does. `statusGroups(of:)` gives `nil` for that item and reads the rest.
-
-The group is `nil` for an item that holds no status, holds a word its type does not declare, or has a type with no status field. A write that changes the status to a word the type does not declare throws `MarfaError.validation` with the code `invalid_properties`. An edit that leaves the field alone does not.
-
-A listing, a view and a folder select by group with the `status_group` term in a `filter`. This lists the open items of every type that has a status field:
-
-```swift
-let open = try await copy.items.list(
-    ListFilters(filter: "status_group neq \"completed\" AND status_group neq \"canceled\""))
-```
-
-An item in no group matches neither `eq` nor `neq`; `status_group not_exists` selects it. The server refuses a group name that is not one of the four, with `MarfaError.validation`.
-
-`core.event` has a `status` of its own that is not a status field: one of three fixed values, with no groups. `EventStatus` names them. A subtype cannot change them, so `copy.catalog.eventStatus(of: item)` reads the status of an item of `core.event` or of a type that descends from it, such as one a connector declares, and gives `nil` for any other item.
-
-## Edit items and take the answers
-
-An `Edit` names the version it was read at and the properties it sets. Each property given replaces its value and the rest stay. To remove a property, name it in `clearProperties`; every property the edit does not name stays, including one the app cannot read, so a removal needs no `replaceProperties`:
-
-```swift
-guard let note = try await copy.items.get(id) else { return }
-_ = try await copy.items.update(id, Edit(clearProperties: ["due"], baseVersion: note.version))
-```
-
-A name the item lacks is not an error. The copy refuses an edit that sets and clears the same name, clears an empty name, or clears a field the item's type requires, with `MarfaError.validation`, and queues nothing.
-
-Writes wait in `copy.queue` until a drain sends them, and each keeps the server's answer as its `verdict`. To act on the answers, call `queue.takeAnswered()`: it returns the answered writes and clears them in one step, so two callers never both get one answer and none is cleared unread. `forgetAnswered()` clears the same writes without returning them. A refused write that carried content stays in the queue, its `body` readable, until `discard(_:)`.
-
-## Meaning the core computes
-
-The core owns several rules that an app would otherwise copy. The SDK exposes them as calls that need no server.
-
-- `items.displays(of:)` and `items.displays(for:)` give each item's `name` and `preview`, both optional, with no placeholder text.
-- `linkParts(in:)` splits the wiki-links in a text into target, heading, alias and name, with `NSRange` ranges that count UTF-16 units. `items.linkCandidates(of:in:)` says which items a link can name.
-- `edges.check(from:to:type:)` throws the error that `edges.create` would throw for the same draft, and queues nothing. `EdgeType.acyclic` and `EdgeType.flat` describe the type's rules.
-- `FilterExpression` builds, encodes and decodes the `filter` text. `FilterField.operators` lists the operators a field accepts. Pass `try expression.encoded()` as `ListFilters.filter`.
-
-The fake copy answers `edges.check` and judges `edges.create` by the same edge rules. It throws `FakeCopyError.unsupported` for `displays` and `linkCandidates`.
-
-## Draw a type's icon
-
-An item type carries one icon, an [Iconify](https://iconify.design) ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open` for a general icon from [Lucide](https://lucide.dev), or `simple-icons:github` for a brand mark from [Simple Icons](https://simpleicons.org). A bare name such as `book-open` is not an ID. `ItemType.icon` holds the ID the core resolved: the owner's own choice for the type or the nearest type that has one, else the nearest author's. It is `nil` when no type in the chain sets one.
-
-The `MarfaIcons` product draws it:
-
-```swift
-import MarfaIcons
-
-TypeIcon(type)                 // from an ItemType
-TypeIcon(id: type.icon)        // from an ID
-Image(typeIcon: type.icon)     // where a view needs an Image
-```
-
-Apple apps draw SF Symbols, so `TypeIcon` uses the SF Symbol that stands for a `lucide:` ID. For an ID with no good match it draws Lucide's own artwork, shipped in the package as a template image. Both tint with `foregroundStyle`, follow light and dark appearance, and size with the surrounding font. A type with no icon draws a fallback symbol, and so does an ID this version of the package cannot draw: a bare name, an unknown set, an unknown name, or a `simple-icons:` ID in an app that has not added `MarfaBrandIcons`. None of them fails; a server newer than the SDK can send an ID the SDK does not know.
-
-`Server` sets and clears the owner's icon, and answers the icon the server now reads for the type, so your app can draw it at once:
-
-```swift
-let icon = try await server.setTypeIcon("lucide:scale", ofType: "app.example.decision")
-try await server.setTypeIcon(nil, ofType: "app.example.decision")
-```
-
-Either call needs the `schema.write` permission and write on the type, and works on a type Marfa ships as well as your own. The server refuses an ID that is not in a pinned set, a bare name included, with `MarfaError.validation` and the code `invalid_schema`. Clearing a type that has no owner icon succeeds and changes nothing.
-
-A working copy takes the change when its connection to the server reopens, so another device shows it within about two minutes.
-
-### Draw brand marks
-
-The Simple Icons artwork is about 4.8 MB of SVG across 3,467 marks, so it is a product of its own. An app that wants brand marks adds `MarfaBrandIcons` and registers it once at launch, before any icon draws:
-
-```swift
-import MarfaBrandIcons
-
-@main struct NotesApp: App {
-    init() { MarfaBrandIcons.register() }
-    var body: some Scene { /* ... */ }
-}
-```
-
-Registering is how `TypeIcon` finds the artwork without `MarfaIcons` depending on it. A brand mark is a template image, so it tints with `foregroundStyle` like every other icon. An app that never adds the product ships none of the artwork, and a `simple-icons:` ID draws the fallback symbol.
-
-### Where the icons come from
-
-`Sources/MarfaIcons/LucideSymbols.swift` maps each `lucide:` ID to an SF Symbol. It was seeded from [rosetta-icons](https://github.com/arfct/rosetta-icons) and then checked by hand, with the two glyphs side by side; a pair that is close but says something else is left out. `scripts/icons.mjs` reads the icon lists marfa generates at the pinned commit, `icon-set-lucide.json` and `icon-set-simple-icons.json`, and ships the SVG from the `@iconify-json/lucide` and `@iconify-json/simple-icons` releases they name: for every Lucide icon the table leaves out, and for every brand mark. It also writes `LucideIconSet` and `SimpleIconsIconSet`, so the table, the artwork and the lists share one pin. Tests fail when the table names an icon the pinned list lacks, when a symbol does not exist on the SDK, when an icon has neither a symbol nor artwork, when a file of artwork is from another release than its list names, or, with `MARFA_MONOREPO` set to the checkout at the pin, when a list differs from the one marfa generates. Edit the table, then run `scripts/icons.mjs` after `scripts/core.sh`. Licenses are in [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md).
-
-To let a person choose an icon, offer `LucideIconSet.ids`, and `MarfaBrandIcons.ids` when the app links it: the IDs the server accepts at the pinned releases. Draw each with `TypeIcon(id:)`; `Server.setTypeIcon(_:ofType:)` saves the choice.
-
-## Test and preview
-
-The `MarfaTesting` product provides a working copy for tests and SwiftUI previews, without a store, a server, or a call into the Rust core. Add it to test targets. Its module compiles empty in a release build, so nothing from it ships; wrap its uses in `#if DEBUG`. Pass `fake.copy` wherever a view model accepts a `WorkingCopy`:
-
-```swift
-#if DEBUG
-import MarfaTesting
-
-#Preview {
-    let fake = WorkingCopy.fake(items: [note], itemTypes: [noteType])
-    NotesView(model: NotesModel(copy: fake.copy))
-}
-#endif
-```
-
-Use `FakeCopy` to record writes, choose drain verdicts, and send changes on `changes()`. Unsupported calls throw `FakeCopyError.unsupported`. The `FakeCopy` API documentation lists the supported calls.
-
-The fake takes the status words of the types you give it and refuses a write that changes a status to a word the type does not declare, as the real copy does. It does not run a `filter`, `status_group` included, and it does not declare a type with a status field, so both throw `FakeCopyError.unsupported`.
-
-## Handle errors
-
-Every call throws `MarfaError`. Three properties say what an error means, so an app does not need its own list of cases:
-
-- `isOffline`: the server could not be reached, or its answer did not arrive. A write may still have reached the server.
-- `isKeyRefusal`: the key or sign-in no longer works. Ask the person to sign in again, or get a new key. A `forbidden` error is never a key refusal: the key is valid but lacks a permission.
-- `isTransient`: asking again later can clear it. No key refusal is transient, and every offline error is.
-
-A store that another build of Marfa made is refused with `wrongSchema`, which carries the number of writes in it that the server has not taken. To replace such a store with an empty one, open it with `ifRefused: .replace`. The store is replaced only when it holds no unsent writes; otherwise the open throws `wrongSchema` with the count and leaves the store as it is. To give up those writes, show the person the count, then call `WorkingCopy.remove(store:unsent:)` with it and open the store again.
-
-```swift
-let copy = try await WorkingCopy.open(store: storeURL, server: server, ifRefused: .replace)
-```
-
-## Report errors and events
-
-The `MarfaTelemetry` product sends an app's errors, and a fixed set of log events, to a PostHog project. It has no third-party dependency, **no token and no destination of its own**, and does nothing until the app configures it and turns it on, so an app that does not import it carries none of it.
-
-```swift
-import Marfa
-import MarfaTelemetry
-
-Telemetry.shared.configure(
-    Telemetry.Configuration(
-        destination: try Telemetry.Destination(host: posthogHost, projectToken: projectToken),
-        serviceName: "notes",
-        serviceVersion: appVersion))
-Telemetry.shared.isEnabled = reportingIsOn
-
-Telemetry.shared.report(error, during: "drain")
-Telemetry.shared.log("drain_finished", attributes: ["pending": 3, "complete": true])
-
-await Telemetry.shared.flush()  // when the app quits
-```
-
-- **Destination.** An `https` PostHog host and a project token, or an `http` loopback address for a test. The `Telemetry.Destination` initializer throws `ConfigurationError` for anything else, such as an address with a user name.
-- **Errors.** `report(_:during:)` posts one `$exception` event to `<host>/i/v0/e/`, as the `marfa` command line does: no stack frames, no person, no location lookup. A `MarfaError` is described by `MarfaError.fixedText`, a type and a sentence fixed in the source by an exhaustive `switch`, so a new case fails to compile until someone writes its sentence. `report(type:sentence:during:)` does the same for an error of the app's own.
-- **Loops.** A failure that repeats is not reported every time: one exception for each type and operation in 60 seconds, and 30 in an hour in all. Each exception that goes out carries `dropped_since_last`, the number withheld since the previous one.
-- **Logs.** `log(_:level:attributes:)` queues an OTLP/HTTP JSON record for `<host>/i/v1/logs`. Records go out at 50, or after 30 seconds, or on `flush()`, which waits at most 2 seconds. At most 500 wait: the oldest is dropped, and the next batch counts the drops.
-- **Never sent.** Item text, titles, tags, item ids, natural keys, keys or credentials, the instance's identifier or the server's address, file paths, search text, and any `message` or `localizedDescription`. A name, an operation and a sentence are `StaticString`s, and an attribute is a number, a boolean or a `StaticString`, so these cannot be passed by accident.
-- **Switch.** `isEnabled` is off until the app turns it on. Turning it off drops everything queued, stops a send under way and sends nothing more.
-- **Sending.** One ephemeral `URLSession` with no cookies, cache, credentials or redirects, and one attempt for each post, which gives up after 5 seconds without data or 10 seconds in all. It runs away from the main actor. A call never waits for the network.
-
-The [Telemetry guide](https://docs.marfa.so/run/telemetry#what-apps-send) says what Marfa's own apps send and how to turn it off. The product declares the diagnostic data it can send in its own `PrivacyInfo.xcprivacy`.
-
-## Learn more
-
-The documentation is at [docs.marfa.so](https://docs.marfa.so).
-
-- [Swift SDK](https://docs.marfa.so/swift-sdk): the working copy, items, queued writes, change streams, live queries, conflicted copies and folders on a Mac.
+- [Swift SDK](https://docs.marfa.so/swift-sdk): the reference, with the products, the working copy, items, files, the queue, views, folders, sign-in, errors and testing.
 - [Build an app with Swift](https://docs.marfa.so/build/swift-app): a tutorial that builds a SwiftUI app for iPhone and Mac.
 - [Devices](https://docs.marfa.so/devices): how an app keeps a working copy and sends its changes.
-- [Write safely](https://docs.marfa.so/build/write-safely): versions, conflicts and retries.
-- [Sync a folder](https://docs.marfa.so/run/sync-a-folder): keep a directory on your Mac in step with your notes.
-- [API reference](https://docs.marfa.so/api-reference): the HTTP API the SDK is built on.
 
 The server, the core and the contract are in [withmarfa/marfa](https://github.com/withmarfa/marfa).
 
-## Build from source
+## Work on the SDK
 
-To work on the package itself, build its pinned core first, which needs the Rust toolchain and Node.js 22 or later:
+Build the pinned core first. It needs the Rust toolchain and Node.js 22 or later.
 
 ```sh
 scripts/core.sh
@@ -364,7 +52,13 @@ swift build
 swift test
 ```
 
-`Examples/MarfaSample` is a SwiftUI sample app; run `xcodegen generate` in that folder to make its project. [`AGENTS.md`](./AGENTS.md) holds the rules for working in this repository.
+- `scripts/lint.sh` runs the format check.
+- `Examples/MarfaSample` is a SwiftUI sample app. Run `xcodegen generate` in that folder to make its project.
+- [`AGENTS.md`](./AGENTS.md) holds the rules for working in this repository.
+
+### Icons
+
+`Sources/MarfaIcons/LucideSymbols.swift` maps each Lucide icon to an SF Symbol, checked by hand. `scripts/icons.mjs` regenerates the icon lists and the artwork from the icon sets the pinned Marfa release names. Run it after `scripts/core.sh` whenever the table or the pin changes. The icon licenses are in [THIRD-PARTY-NOTICES.md](./THIRD-PARTY-NOTICES.md).
 
 ## License
 
