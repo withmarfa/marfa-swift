@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Reports a scheduled pin bump that failed, which means the package no longer builds against marfa's
-# `main`. The `report-failure` job of .github/workflows/pin-bump.yml runs this.
+# Reports a pin bump that failed, which means the package no longer builds against marfa's
+# newest release. The `report-failure` job of .github/workflows/pin-bump.yml runs this.
 #
 # One issue stays open, titled "Nightly failed: <workflow>", the title withmarfa/marfa's scheduled
 # workflows use. The first failure opens it and each failure after that comments on it, so a
@@ -10,7 +10,7 @@
 # instead of passing with nothing reported. Only the compiler lines are best effort.
 #
 #   GH_TOKEN, GITHUB_REPOSITORY, GITHUB_WORKFLOW, GITHUB_RUN_ID and GITHUB_SHA come from the run.
-#   MARFA_HEAD is the commit of marfa's `main` that the bump built against.
+#   MARFA_RELEASE is the marfa release that the bump built against, as `<tag> (<commit>)`.
 set -euo pipefail
 
 : "${GH_TOKEN:?GH_TOKEN is not set}"
@@ -18,7 +18,7 @@ repo=${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is not set}
 workflow=${GITHUB_WORKFLOW:?GITHUB_WORKFLOW is not set}
 run_id=${GITHUB_RUN_ID:?GITHUB_RUN_ID is not set}
 sha=${GITHUB_SHA:?GITHUB_SHA is not set}
-marfa_head=${MARFA_HEAD:?MARFA_HEAD is not set}
+marfa_release=${MARFA_RELEASE:?MARFA_RELEASE is not set}
 run_url="${GITHUB_SERVER_URL:-https://github.com}/${repo}/actions/runs/${run_id}"
 title="Nightly failed: ${workflow}"
 
@@ -49,9 +49,9 @@ open=$(
 )
 
 if [[ -n "${open}" ]]; then
-  gh issue comment "${open}" --repo "${repo}" --body "The scheduled run failed again: ${run_url}
+  gh issue comment "${open}" --repo "${repo}" --body "The run failed again: ${run_url}
 
-marfa commit: \`${marfa_head}\`
+marfa release: \`${marfa_release}\`
 
 Failed jobs:
 
@@ -71,12 +71,12 @@ trap 'rm -f "${body}"' EXIT
 cat >"${body}" <<EOF2
 ## Summary
 
-The scheduled ${workflow} run failed. Most often the hand-written package no longer compiles against the new core, so no pull request was opened and \`core.pin\` stays where it is.
+The ${workflow} run failed. Most often the hand-written package no longer compiles against the new core, so no pull request was opened and \`core.pin\` stays where it is.
 
 ## Context
 
 - Run: ${run_url}
-- marfa commit it built against: \`${marfa_head}\`
+- marfa release it built against: \`${marfa_release}\`
 - Commit of this repository: \`${sha}\`
 - Failed jobs:
 
@@ -90,7 +90,7 @@ ${errors}
 
 ## Acceptance criteria
 
-- The package builds against the new core and the scheduled run passes, or the run is changed to cope with whatever broke it.
+- The package builds against the new core and the run passes, or the run is changed to cope with whatever broke it.
 
 ## Out of scope
 
@@ -98,7 +98,7 @@ ${errors}
 
 ## Notes
 
-This issue was opened by the workflow. Each later failure of the scheduled run comments here until the issue is closed.
+This issue was opened by the workflow. Each later failure of the run comments here until the issue is closed.
 EOF2
 
 gh issue create --repo "${repo}" --title "${title}" --label needs-triage --body-file "${body}"
