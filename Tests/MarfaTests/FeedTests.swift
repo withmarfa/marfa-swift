@@ -529,15 +529,16 @@ struct ARefill {
         WorkingCopy(holder: CoreHolder(core), hasServer: true, refillPace: pace, refillClock: .init(clock))
     }
 
-    /// Ends each wait the refill asks for, in turn, until `done` holds, and answers the lengths asked.
+    /// Ends each wait held on `clock`, in turn, until `done` holds.
+    ///
+    /// A wait asked for can end without the clock moving: while updates are followed, a fill's progress reading
+    /// waits on the same clock and is canceled when the fill ends. So this waits for a held wait or `done`, never
+    /// for a count of waits asked. Every wait is at most ``Lifecycle/longestWait``, so one advance ends all held.
     static func letWaitsPass(on clock: ManualClock, until done: @autoclosure () -> Bool) async throws {
-        var passed = 0
         while !done() {
-            try await eventually("the refill waits") { clock.requested.count > passed || done() }
+            try await eventually("a wait is held, or it is done") { clock.waiting > 0 || done() }
             guard !done() else { break }
-            try await eventually("the wait is held") { clock.waiting > 0 }
-            passed = clock.requested.count
-            clock.advance(by: .seconds(3600))
+            clock.advance(by: Lifecycle.longestWait)
         }
     }
 
@@ -586,6 +587,25 @@ struct ARefill {
         #expect(core.state.withLock { $0.hydrations.count } == 5)
         #expect(heard.stops.isEmpty)
         #expect(heard.all.filter { $0 == refreshed(.unfinished) }.count == 4)
+        await copy.close()
+    }
+
+    @Test func aRateLimitLongerThanTheLongestRefillWaitIsWaitedOutInFull() async throws {
+        let core = Self.stale()
+        core.state.withLock {
+            $0.hydrateFails = .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 600)
+            $0.hydrateFailsFirst = 1
+        }
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock: clock)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the refill waits") { clock.waiting == 1 }
+        #expect(clock.requested == [.seconds(600)])
+        clock.advance(by: .seconds(599))
+        #expect(core.state.withLock { $0.hydrations.count } == 1)
+        clock.advance(by: .seconds(1))
+        try await eventually("the refill was made") { heard.all.last == refreshed(.hydrated) }
         await copy.close()
     }
 
@@ -762,6 +782,7 @@ struct ARefill {
         let report = try await bounded("the app's hydration") { try await app.value }
         #expect(report.types == ["*"])
         #expect(core.state.withLock { $0.hydrations.count } == 2)
+        try await eventually("both hydrations were told") { heard.all.count >= 2 }
         #expect(heard.stops.isEmpty)
         #expect(heard.all == [refreshed(.hydrated), refreshed(.hydrated)])
         await copy.close()
@@ -794,6 +815,7 @@ struct ARefill {
         try await Task.sleep(for: .milliseconds(100))
         gate.signal()
         _ = try await bounded("the app's hydration") { try await app.value }
+        try await eventually("the refill was told") { !heard.all.isEmpty }
         try await Task.sleep(for: .milliseconds(300))
         #expect(core.state.withLock { $0.hydrations.count } == 1)
         #expect(heard.all == [refreshed(.hydrated)])

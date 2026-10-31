@@ -117,6 +117,10 @@ final class FillingCore: Core, @unchecked Sendable {
 
     override func heldHandle() -> MarfaCore.Handle { .writer }
 
+    override func changesSince(cursor: String?, most: UInt32) throws -> MarfaCore.CopyChanges { everythingChanged() }
+
+    override func status() throws -> MarfaCore.Status { emptyStatus() }
+
     static let item = MarfaCore.Item(
         id: "i", type: "core.task", properties: MarfaCore.JsonObject(members: []), state: .active, tier: .library,
         version: 1, schemaVersion: 1,

@@ -154,6 +154,12 @@ final class FakeCore: Core, @unchecked Sendable {
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
         var catchUps = 0
+        var drains = 0
+        /// While a hydration runs, what `status()` says of its progress.
+        var itemsExpected: UInt64?
+        var itemsListed: UInt64?
+        /// Each item a server event named, in order, which `changesSince` answers from.
+        var changedItems: [String] = []
         var hydrateFails: MarfaCore.MarfaError?
         var hydrateInPlace = false
         var hydration = MarfaCore.Hydration.complete
@@ -256,7 +262,30 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     func change(_ index: Int, _ change: MarfaCore.Change) {
-        state.withLock { $0.places[index].listener }.changed(change: change)
+        let listener = state.withLock { state in
+            if case .applied(_, let itemId?, _, _) = change { state.changedItems.append(itemId) }
+            return state.places[index].listener
+        }
+        listener.changed(change: change)
+    }
+
+    /// Names the items server events named since `cursor`, a count of them, as the core's change log does.
+    override func changesSince(cursor: String?, most: UInt32) throws -> MarfaCore.CopyChanges {
+        let changed = state.withLock { $0.changedItems }
+        let next = String(changed.count)
+        guard let cursor, let start = Int(cursor), start <= changed.count else {
+            return MarfaCore.CopyChanges(
+                cursor: next, everything: true, items: [], removedItems: [], edges: [], removedEdges: [])
+        }
+        var items: [String] = []
+        var seen: Set<String> = []
+        for id in changed[start...] where seen.insert(id).inserted { items.append(id) }
+        guard items.count <= Int(most) else {
+            return MarfaCore.CopyChanges(
+                cursor: next, everything: true, items: [], removedItems: [], edges: [], removedEdges: [])
+        }
+        return MarfaCore.CopyChanges(
+            cursor: next, everything: false, items: items, removedItems: [], edges: [], removedEdges: [])
     }
 
     override func hydrateWith(
@@ -399,7 +428,8 @@ final class FakeCore: Core, @unchecked Sendable {
             serverOrigin: origin, instanceId: instance, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
             sliceEdgeTypes: slice?.edgeTypes ?? [], pinned: [],
             eventCursor: nil,
-            hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: nil, itemsListed: nil, edges: 0,
+            hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
+            itemsListed: state.withLock { $0.itemsListed }, edges: 0,
             catalogVersion: 1,
             fileCache: MarfaCore.FileCache(
                 setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
@@ -435,7 +465,10 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func drain(stop: MarfaCore.Stop?) throws -> MarfaCore.DrainReport {
-        state.withLock { $0.drained }
+        state.withLock { state in
+            state.drains += 1
+            return state.drained
+        }
     }
 
     override func dataVersion() throws -> Int64 {
@@ -492,6 +525,22 @@ final class DropProbe: Sendable {
     func begin() {
         started.withLock { $0 = true }
     }
+}
+
+/// What a core that records no changes answers a copy's updates: read everything, at one cursor.
+func everythingChanged() -> MarfaCore.CopyChanges {
+    MarfaCore.CopyChanges(cursor: "0", everything: true, items: [], removedItems: [], edges: [], removedEdges: [])
+}
+
+/// The status of an empty copy no hydration has filled, for a core that answers nothing else of it.
+func emptyStatus() -> MarfaCore.Status {
+    MarfaCore.Status(
+        serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
+        eventCursor: nil, hydration: .never, items: 0, itemsExpected: nil, itemsListed: 0, edges: 0,
+        catalogVersion: 1,
+        fileCache: MarfaCore.FileCache(
+            setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
+            backupMarkFailure: nil, attachments: nil))
 }
 
 final class FakeSubscription: MarfaCore.Subscription, @unchecked Sendable {

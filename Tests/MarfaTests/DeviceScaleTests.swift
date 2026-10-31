@@ -129,6 +129,10 @@ final class FillingFailureCore: Core, @unchecked Sendable {
 
     override func heldHandle() -> MarfaCore.Handle { .writer }
 
+    override func changesSince(cursor: String?, most: UInt32) throws -> MarfaCore.CopyChanges { everythingChanged() }
+
+    override func status() throws -> MarfaCore.Status { emptyStatus() }
+
     override func list(filters: MarfaCore.ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
         Listing(
             items: [],

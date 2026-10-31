@@ -153,11 +153,13 @@ struct LiveQueries {
 
     @Test(arguments: reloading)
     func aChangeThatCanAlterARowMakesTheQueryReadAgain(change: Marfa.Change) async throws {
-        let (_, copy) = Self.fake()
+        let (core, copy) = Self.fake()
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
         #expect(probe.reads == 1)
+        // The core names the row a change altered in its changes, which the query reads them from.
+        core.state.withLock { $0.changedItems.append("n1") }
         copy.feed.announce(change)
         try await eventually("the change was read") { probe.reads == 2 && !query.isLoading }
         #expect(query.value == "A2")
@@ -189,6 +191,8 @@ struct LiveQueries {
         try await Self.settled(query)
         _ = try await copy.hydrate(types: ["app.test.entry"], tier: .feed)
         try await eventually("the hydration was read") { probe.reads == 2 && !query.isLoading }
+        // The core names each row a catch-up applied in its changes.
+        core.state.withLock { $0.changedItems.append("n1") }
         _ = try await copy.catchUp()
         try await eventually("the catch-up was read") { probe.reads == 3 && !query.isLoading }
         try await bounded("close") { await copy.close() }
@@ -310,11 +314,14 @@ struct LiveQueries {
         probe.hold(1)
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await eventually("the first read began") { probe.reads == 1 }
+        try await eventually("following") { query.connection == .following }
         for _ in 0..<100 { copy.feed.announce(write(.addTag, item: "n1")) }
-        // The stream is in order and `.stopped` changes only `following`, so once it shows
-        // the query has heard all 100 changes before it.
+        // The updates are in order, so once the query shows the connection a later change set, it has heard all 100
+        // changes before it.
         copy.feed.announce(told(.stopped(.network(message: "sentinel"))))
-        try await eventually("the query heard the burst") { query.following == .stopped(.network(message: "sentinel")) }
+        try await eventually("the query heard the burst") {
+            query.connection == .offline(.network(message: "sentinel"))
+        }
         #expect(probe.reads == 1, "\(probe.reads - 1) of 100 changes started a read while one ran")
 
         probe.release(1)
@@ -396,24 +403,25 @@ struct LiveQueries {
 
     // MARK: Following
 
-    @Test func aWatchFailureLeavesTheStreamOpenAndTheRowsFollowLocalWrites() async throws {
+    @Test func aWatchFailureShowsTheCopyOfflineAndTheRowsFollowLocalWrites() async throws {
         let (core, copy) = Self.fake()
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
-        #expect(query.following == .live)
+        try await eventually("following") { query.connection == .following }
+        let reads = probe.reads
 
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
-        try await eventually("the failure is shown") { query.following == .stopped(.network(message: "dropped")) }
+        try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         #expect(query.error == nil, "a follow failure is not a read failure")
-        #expect(probe.reads == 1, "a stopped follow read")
+        #expect(probe.reads == reads, "a follow failure read")
 
         copy.feed.announce(write(.addTag, item: "n1"))
-        try await eventually("a local write is still read") { probe.reads == 2 && !query.isLoading }
-        #expect(query.following == .stopped(.network(message: "dropped")), "a read cleared the follow failure")
+        try await eventually("a local write is still read") { probe.reads == reads + 1 && !query.isLoading }
+        #expect(query.connection == .offline(.network(message: "dropped")), "a read cleared the follow failure")
 
-        core.change(0, MarfaCore.Change.applied(event: "item.updated", itemId: "n1", edgeId: nil, cursor: "8"))
-        try await eventually("a server event shows the follow runs") { query.following == .live }
+        core.change(0, MarfaCore.Change.serverReachable(cursor: "8"))
+        try await eventually("the server reached again shows the follow runs") { query.connection == .following }
         try await bounded("close") { await copy.close() }
     }
 
@@ -422,10 +430,11 @@ struct LiveQueries {
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
-        try await eventually("the failure is shown") { query.following == .stopped(.network(message: "dropped")) }
+        try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         _ = try await copy.hydrate(types: ["app.test.entry"], tier: .feed)
-        try await eventually("the hydration shows the follow runs") { query.following == .live }
+        try await eventually("the hydration shows the follow runs") { query.connection == .following }
         try await bounded("close") { await copy.close() }
     }
 
@@ -434,60 +443,65 @@ struct LiveQueries {
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
-        try await eventually("the failure is shown") { query.following == .stopped(.network(message: "dropped")) }
+        try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         let reads = probe.reads
         copy.feed.announce(told(.refreshed(.unfinished)))
         try await eventually("the unfinished fill was read") { probe.reads > reads && !query.isLoading }
-        #expect(query.following == .stopped(.network(message: "dropped")), "a failed fill cleared the follow failure")
+        #expect(query.connection == .offline(.network(message: "dropped")), "a failed fill cleared the follow failure")
         try await bounded("close") { await copy.close() }
     }
 
-    @Test func aCoreFaultEndsTheStreamAndNothingAsksAgainUntilRefresh() async throws {
-        let (core, copy) = Self.fake()
+    @Test func aCoreFaultShowsTheFollowStoppedUntilItsRetryTakesANewPlace() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true, refillClock: .init(clock))
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
 
         core.fail(0, with: .Store(message: "fault"))
-        try await eventually("the end is shown") { query.following == .ended(.store(message: "fault")) }
-        #expect(core.places.count == 1, "the query asked for a new place by itself")
-        copy.feed.announce(write(.addTag, item: "n1"))
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(probe.reads == 1, "an ended query read")
-
+        try await eventually("the stop is shown") { query.connection == .stopped(.store(message: "fault")) }
+        let reads = probe.reads
         await query.refresh()
-        // The new stream is taken by a task that `refresh` starts and does not wait for.
-        try await eventually("refresh asked for a new stream") { core.places.count == 2 }
-        #expect(query.following == .live)
+        #expect(probe.reads == reads + 1)
+        #expect(query.connection == .stopped(.store(message: "fault")), "a read showed a stopped follow as running")
+
+        try await eventually("a retry waits") { clock.waiting > 0 }
+        clock.advance(by: .seconds(300))
+        try await eventually("following again") { query.connection == .following }
+        #expect(core.places.count == 2, "the retry took no new place in the watch")
         copy.feed.announce(write(.addTag, item: "n1"))
-        try await eventually("the new stream is heard") { probe.reads >= 3 && !query.isLoading }
+        try await eventually("a local write is read again") { probe.reads == reads + 2 && !query.isLoading }
         try await bounded("close") { await copy.close() }
     }
 
-    @Test func aCopyClosedAfterAWatchFailureEndsTheQueryWithNoError() async throws {
+    @Test func aCopyClosedAfterAWatchFailureShowsTheQueryClosed() async throws {
         let (core, copy) = Self.fake()
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
-        try await eventually("the failure is shown") { query.following == .stopped(.network(message: "dropped")) }
+        try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
 
         try await bounded("close") { await copy.close() }
-        try await eventually("the end is shown") { query.following == .ended(nil) }
+        try await eventually("the close is shown") { query.connection == .closed }
         // Left alone, the end stays what the close made it.
         try await Task.sleep(for: .milliseconds(100))
-        #expect(query.following == .ended(nil), "a close after a failure was shown as the failure: \(query.following)")
+        #expect(query.connection == .closed, "a close after a failure was shown as the failure: \(query.connection)")
     }
 
-    @Test func aCopyClosedWhileTheQueryLivesEndsItKeepingItsRows() async throws {
+    @Test func aCopyClosedWhileTheQueryLivesShowsItClosedKeepingItsRows() async throws {
         let copy = try await Self.open()
         let id = try await Self.make(copy)
         let query = LiveQuery(copy, reading: Self.entries)
         try await eventually("the row shows") { query.value.map(\.id) == [id] }
 
         await copy.close()
-        try await eventually("the end is shown") { query.following == .ended(nil) }
+        try await eventually("the close is shown") { query.connection == .closed }
         #expect(query.value.map(\.id) == [id], "closing emptied the rows")
 
         await query.refresh()
@@ -495,7 +509,7 @@ struct LiveQueries {
         } else {
             Issue.record("error: \(String(describing: query.error))")
         }
-        #expect(query.following == .ended(nil))
+        #expect(query.connection == .closed)
         #expect(query.value.map(\.id) == [id])
     }
 
