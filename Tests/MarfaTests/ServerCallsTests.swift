@@ -1,8 +1,8 @@
 import Foundation
+import MarfaTypes
 import Testing
 
 @testable import Marfa
-import MarfaTypes
 
 private let service = "com.withmarfa.marfa-swift.tests"
 private let contract = ["X-Marfa-Contract": String(marfaContractVersion)]

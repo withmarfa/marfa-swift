@@ -7,7 +7,9 @@ import Foundation
 /// A day names no moment, so it reads as the start of that day on the calendar given, and ``hasTime`` is `false`;
 /// an app shows it as a day and writes it back with ``day(_:calendar:)``, never as an instant.
 public struct ItemDate: Hashable, Sendable {
-    /// The moment the value names. A day is its start in the calendar's time zone.
+    /// The moment the value names.
+    ///
+    /// A day is its start in the calendar's time zone.
     public let date: Date
     /// Whether the value names a time, rather than a whole day.
     public let hasTime: Bool
@@ -20,11 +22,14 @@ public struct ItemDate: Hashable, Sendable {
         // Read from the bytes rather than with a pattern, which is far slower than this for a library of items.
         var reader = Reader(text)
         guard let year = reader.digits(4), reader.take("-"), let month = reader.digits(2), reader.take("-"),
-              let dayOfMonth = reader.digits(2) else { return nil }
+            let dayOfMonth = reader.digits(2)
+        else { return nil }
         if reader.atEnd {
             return startOfDay(year, month, dayOfMonth, in: calendar.timeZone).map { ItemDate(date: $0, hasTime: false) }
         }
-        guard reader.take("T"), let hour = reader.digits(2), reader.take(":"), let minute = reader.digits(2) else { return nil }
+        guard reader.take("T"), let hour = reader.digits(2), reader.take(":"), let minute = reader.digits(2) else {
+            return nil
+        }
         var seconds = 0
         var fractional = 0.0
         if reader.take(":") {
@@ -41,7 +46,8 @@ public struct ItemDate: Hashable, Sendable {
         } else {
             let sign = reader.take("-") ? -1 : reader.take("+") ? 1 : 0
             guard sign != 0, let hours = reader.digits(2), reader.take(":"), let minutes = reader.digits(2),
-                  hours <= 23, minutes <= 59 else { return nil }
+                hours <= 23, minutes <= 59
+            else { return nil }
             offset = sign * (hours * 3600 + minutes * 60)
         }
         guard reader.atEnd, let start = utcMidnight(year, month, dayOfMonth), hour <= 23, minute <= 59, seconds <= 59
@@ -63,7 +69,9 @@ public struct ItemDate: Hashable, Sendable {
         var atEnd: Bool { index == bytes.endIndex }
 
         private var digit: UInt8? {
-            guard index < bytes.endIndex, (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(bytes[index]) else { return nil }
+            guard index < bytes.endIndex, (UInt8(ascii: "0")...UInt8(ascii: "9")).contains(bytes[index]) else {
+                return nil
+            }
             return bytes[index] - UInt8(ascii: "0")
         }
 
@@ -109,9 +117,10 @@ public struct ItemDate: Hashable, Sendable {
         return String(whole.dropLast()) + "." + fraction + "Z"
     }
 
+    /// The day's midnight in UTC.
+    ///
     /// The contract's days are the proleptic Gregorian calendar of years 0000 to 9999, which Foundation's Gregorian
     /// calendar is not (it counts the Julian calendar before 1582), so the day is checked and placed by arithmetic.
-    /// The result is that day's midnight in UTC.
     private static func utcMidnight(_ year: Int, _ month: Int, _ day: Int) -> Date? {
         let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
         let lengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]

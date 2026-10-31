@@ -31,10 +31,12 @@ public struct ItemSnapshot: Sendable, Hashable, Identifiable {
     public let createdAt: Date
 }
 
-/// One page of an item's snapshots, newest first.
+/// One page of an item's snapshots, oldest first.
 public struct ItemSnapshotPage: Sendable, Hashable {
     public let snapshots: [ItemSnapshot]
     /// Pass this as `after` to read the next page; `nil` on the last page.
+    ///
+    /// A page can be short, or empty, with more to follow, so stop only when this is `nil`.
     public let next: String?
 }
 
@@ -116,7 +118,7 @@ extension Server {
     /// app waiting.
     public static let defaultTimeout = Duration.seconds(20)
 
-    /// The snapshots of the item `id`, newest first, one page at a time.
+    /// The snapshots of the item `id`, oldest first, one page at a time.
     ///
     /// Pass the previous page's ``ItemSnapshotPage/next`` as `after` for the following page. `limit` is 1 to 200;
     /// the server's default applies when it is `nil`. The server answers an item it cannot read, in the trash or of
@@ -136,7 +138,9 @@ extension Server {
         return ItemSnapshotPage(snapshots: snapshots, next: page.nextCursor)
     }
 
-    /// The server's settings. Needs the `config.manage` permission, else throws ``MarfaError/forbidden(code:message:)``.
+    /// The server's settings.
+    ///
+    /// Needs the `config.manage` permission, else throws ``MarfaError/forbidden(code:message:)``.
     public func config(timeout: Duration = Server.defaultTimeout) async throws(MarfaError) -> InstanceConfig {
         InstanceConfig(try decode(try await send("GET", "/config", timeout: timeout)) as InstanceConfigWire)
     }
@@ -158,8 +162,9 @@ extension Server {
         return InstanceConfig(answer)
     }
 
-    /// Sets the owner's icon for the item type `id`, one Marfa ships included, or removes it with `nil` so the
-    /// author's shows again. Answers the icon the server reads for the type now.
+    /// Sets or, with `nil`, removes the owner's icon for the item type `id`, and answers the icon the type has now.
+    ///
+    /// The type can be one Marfa ships. Removing the owner's icon shows the author's again.
     ///
     /// `icon` is an Iconify ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open`, or `simple-icons:github`
     /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:)`` and the code

@@ -161,7 +161,8 @@ extension Server {
     private func refusal(_ answer: (HTTPURLResponse, Data), write: Bool) async -> MarfaError? {
         let (response, data) = answer
         return await Marfa.refusal(
-            status: UInt16(clamping: response.statusCode), contract: response.value(forHTTPHeaderField: "X-Marfa-Contract"),
+            status: UInt16(clamping: response.statusCode),
+            contract: response.value(forHTTPHeaderField: "X-Marfa-Contract"),
             location: response.value(forHTTPHeaderField: "Location"),
             retryAfter: response.value(forHTTPHeaderField: "Retry-After"), origin: origin, write: write
         ) { String(decoding: data.prefix(64 * 1024), as: UTF8.self) }

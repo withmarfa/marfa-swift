@@ -79,7 +79,8 @@ import Testing
 
     @Test func aPropertyReadsAsADayOrAnInstant() throws {
         let item = item(properties: [
-            "due": .string("2026-11-02"), "starts": .string("2026-11-02T08:00:00Z"), "n": .integer(3), "bad": .string("soon"),
+            "due": .string("2026-11-02"), "starts": .string("2026-11-02T08:00:00Z"), "n": .integer(3),
+            "bad": .string("soon"),
         ])
         let due = try #require(item.date(forProperty: "due", calendar: utc))
         #expect(!due.hasTime)
@@ -106,6 +107,8 @@ import Testing
         #expect(search.occurredBeforeDate == moment)
 
         list.updatedAfter = "2026-10-27"
-        #expect(list.updatedAfterDate == Date(timeIntervalSince1970: 1_793_059_200), "a day bound is the start of the day in UTC")
+        #expect(
+            list.updatedAfterDate == Date(timeIntervalSince1970: 1_793_059_200),
+            "a day bound is the start of the day in UTC")
     }
 }
