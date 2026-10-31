@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// The streams `changes()` hands out.
@@ -24,6 +24,25 @@ final class Feed: Sendable {
         static let standard = RefillPace(first: .seconds(1), most: .seconds(300), settle: .seconds(300))
     }
 
+    /// The time a refill reads and waits by, so a test can drive it.
+    struct RefillClock: Sendable {
+        private let reading: @Sendable () -> Duration
+        private let waiting: @Sendable (Duration) async throws -> Void
+
+        init<C: Clock>(_ clock: C) where C.Duration == Duration {
+            let origin = clock.now
+            reading = { origin.duration(to: clock.now) }
+            waiting = { try await clock.sleep(for: $0) }
+        }
+
+        /// How long the clock has run since this value was made.
+        var now: Duration { reading() }
+
+        func sleep(for duration: Duration) async throws { try await waiting(duration) }
+
+        static let continuous = RefillClock(ContinuousClock())
+    }
+
     private struct Refill {
         var running = false
         /// Streams whose `.stopped` waits on the refill, told only where it cannot be made.
@@ -40,7 +59,8 @@ final class Feed: Sendable {
         var attempts = 0
         /// The wait a rate limit named for the next attempt.
         var retryAfter: Duration = .zero
-        var filledAt: ContinuousClock.Instant?
+        /// The clock's reading when the last refill's fill ended.
+        var filledAt: Duration?
         var task: Task<Void, Never>?
     }
 
@@ -95,6 +115,7 @@ final class Feed: Sendable {
     /// Whether the core has a watch to give: a writer with a server, or a reader.
     private let watched: Bool
     private let refillPace: RefillPace
+    private let clock: RefillClock
     private let instanceAt: InstanceAt
     private let state = Mutex(State())
 
@@ -106,9 +127,10 @@ final class Feed: Sendable {
     }
 
     init(
-        holder: CoreHolder, watched: Bool, refillPace: RefillPace = .standard,
+        holder: CoreHolder, watched: Bool, refillPace: RefillPace = .standard, clock: RefillClock = .continuous,
         instanceAt: @escaping InstanceAt = instanceAt
     ) {
+        self.clock = clock
         self.holder = holder
         self.watched = watched
         self.refillPace = refillPace
@@ -133,6 +155,9 @@ final class Feed: Sendable {
 
     /// Whether the feed was closed, which it is before any of its streams finish.
     var isClosed: Bool { locked { $0.closed } }
+
+    /// Whether a refill is running, which it is until after it has noted when its fill ended.
+    var isRefilling: Bool { locked { $0.refill.running } }
 
     func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
         let (added, joins) = locked { state -> (Bool, Bool) in
@@ -288,7 +313,7 @@ final class Feed: Sendable {
                     if why != "catchup_too_old" { state.refill.vouched = true }
                     guard !state.refill.running else { return false }
                     state.refill.running = true
-                    if let filledAt = state.refill.filledAt, filledAt.duration(to: .now) >= refillPace.settle {
+                    if let filledAt = state.refill.filledAt, clock.now - filledAt >= refillPace.settle {
                         state.refill.attempts = 0
                     }
                     return true
@@ -436,7 +461,7 @@ final class Feed: Sendable {
                 return (delay, owed)
             }
             guard let next else { return }
-            if next.delay > .zero { try? await Task.sleep(for: next.delay) }
+            if next.delay > .zero { try? await clock.sleep(for: next.delay) }
             let failure: MarfaError?
             do {
                 _ = try await takeFill()
@@ -501,7 +526,7 @@ final class Feed: Sendable {
                 throw error
             }
             locked { state in
-                state.refill.filledAt = .now
+                state.refill.filledAt = clock.now
                 state.refill.unfinished = false
             }
             return nil

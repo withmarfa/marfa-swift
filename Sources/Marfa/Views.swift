@@ -1,11 +1,5 @@
 import Foundation
-import MarfaCore
-
-/// What one group of a view holds: its `key` and how many items are in it.
-///
-/// The key is the value the view groups by: a string, number or boolean, a bucket's first date as `YYYY-MM-DD`, an
-/// item id for an edge group, or `null` for the items that have none. An item with two tags is in both tag groups.
-public typealias ViewGroup = MarfaCore.ViewGroup
+package import MarfaCore
 
 /// A `system.view`: a saved list of items, with the order and grouping every app shows them in.
 ///
@@ -34,8 +28,8 @@ public struct SavedView: Sendable, Hashable, Identifiable {
     init(_ core: MarfaCore.ViewRow) throws {
         id = core.id
         version = core.version
-        state = core.state
-        settings = try ViewSettings(core.settings, of: core.id)
+        state = ItemState(core.state)
+        settings = try ViewSettings(JSONObject(core.settings), of: core.id)
     }
 }
 
@@ -247,7 +241,7 @@ extension Items {
     public func views() async throws -> Rows<SavedView> {
         try await holder.run { core in
             let views = try core.listViews()
-            return Rows(try views.views.map(SavedView.init), completeness: views.completeness)
+            return Rows(try views.views.map(SavedView.init), completeness: Completeness(views.completeness))
         }
     }
 
@@ -287,7 +281,7 @@ extension Items {
     public func groups(inView id: String, timeZone: TimeZone? = nil) async throws -> Rows<ViewGroup> {
         try await holder.run { core in
             let groups = try core.viewGroups(id: id, timeZone: timeZone?.identifier)
-            return Rows(groups.groups, completeness: groups.completeness)
+            return Rows(groups.groups.map(ViewGroup.init), completeness: Completeness(groups.completeness))
         }
     }
 }

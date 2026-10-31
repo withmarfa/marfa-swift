@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 
 /// A `system.folder`: the query and defaults that folders on disk follow.
 public struct Folder: Sendable, Hashable, Identifiable {
@@ -12,7 +12,7 @@ public struct Folder: Sendable, Hashable, Identifiable {
     init(_ core: MarfaCore.FolderRow) {
         id = core.id
         version = core.version
-        state = core.state
+        state = ItemState(core.state)
         settings = FolderSettings(core.settings)
     }
 }
@@ -87,13 +87,13 @@ public struct FolderQuery: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderQuery) {
         self.init(
-            types: core.types, tier: core.tier.map(SliceTier.init), states: core.states,
+            types: core.types, tier: core.tier.map(SliceTier.init), states: core.states?.map(ItemState.init),
             filter: core.filter, beneath: core.beneath)
     }
 
     var core: MarfaCore.FolderQuery {
         MarfaCore.FolderQuery(
-            types: types, tier: tier?.core, states: states, filter: filter, beneath: beneath)
+            types: types, tier: tier?.core, states: states?.map(\.core), filter: filter, beneath: beneath)
     }
 }
 
@@ -119,12 +119,13 @@ public struct FolderDefaults: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderDefaults) {
         self.init(
-            type: core.type, tier: core.tier, properties: core.properties,
+            type: core.type, tier: core.tier.map(Tier.init), properties: JSONObject(core.properties),
             tags: core.tags, edges: core.edges)
     }
 
     var core: MarfaCore.FolderDefaults {
-        MarfaCore.FolderDefaults(type: type, tier: tier, properties: properties, tags: tags, edges: edges)
+        MarfaCore.FolderDefaults(
+            type: type, tier: tier?.core, properties: properties.core, tags: tags, edges: edges)
     }
 }
 

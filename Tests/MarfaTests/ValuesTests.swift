@@ -14,6 +14,48 @@ struct Values {
         #expect(fields(Marfa.Status()) == fields(Marfa.Status().core))
     }
 
+    /// A field the core adds with a default compiles on both sides and would be dropped by the conversion.
+    @Test func recordsCarryEveryFieldTheCoreDeclares() {
+        func same<T>(_ value: T, _ core: Any) -> Bool {
+            let mine = Set(Mirror(reflecting: value).children.compactMap(\.label))
+            let theirs = Set(Mirror(reflecting: core).children.compactMap(\.label))
+            if mine != theirs { Issue.record("\(T.self): \(mine.symmetricDifference(theirs).sorted())") }
+            return mine == theirs
+        }
+        let item = Marfa.Item(
+            id: "i", type: "core.note", properties: [:], state: .active, tier: nil, version: 1, schemaVersion: 1,
+            source: "s", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "", tags: [])
+        let edge = Marfa.Edge(
+            id: "e", sourceId: "a", targetId: "b", edgeType: "t", properties: [:], version: 1, createdAt: "",
+            updatedAt: "")
+        let notHeld = Marfa.NotHeldAttachments(reason: .absent, attachments: 1, bytes: 1, unstated: 0)
+        let kept = Marfa.KeptAttachments(
+            held: 0, heldBytes: 0, partialBytes: 0, notHeld: 1, notHeldBytes: 1, notHeldByReason: [notHeld])
+        let cache = Marfa.FileCache(
+            setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
+            backupMarkFailure: nil, attachments: kept)
+        let member = Marfa.JSONMember(key: "k", value: .null)
+        #expect(same(item, item.core))
+        #expect(same(edge, edge.core))
+        #expect(same(Marfa.Draft(type: "core.note"), Marfa.Draft(type: "core.note").core))
+        #expect(same(Marfa.Edit(baseVersion: 1), Marfa.Edit(baseVersion: 1).core))
+        #expect(same(Marfa.ListFilters(), Marfa.ListFilters().core))
+        #expect(same(Marfa.SearchFilters(), Marfa.SearchFilters().core))
+        let hit = Marfa.SearchHit(item: item, score: 1, snippet: "")
+        #expect(same(hit, hit.core))
+        let page = Marfa.BinPage(items: [], nextCursor: nil)
+        #expect(same(page, page.core))
+        let group = Marfa.ViewGroup(key: Marfa.JSONValue.null, count: 0)
+        #expect(same(group, group.core))
+        #expect(same(cache, cache.core))
+        #expect(same(kept, kept.core))
+        #expect(same(notHeld, notHeld.core))
+        let fetch = Marfa.KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil)
+        #expect(same(fetch, fetch.core))
+        #expect(same(member, member.core))
+        #expect(same(Marfa.JSONObject(members: [member]), Marfa.JSONObject(members: [member]).core))
+    }
+
     @Test func jsonRoundTripsThroughItsText() throws {
         let properties: JSONObject = [
             "title": "A note", "count": 3, "ratio": 0.5, "done": false, "none": nil,
@@ -239,9 +281,10 @@ struct OwnValueTypes {
             fileCache: FileCache(
                 setting: .bytes(bytes: 5), budget: 5, held: 3, heldUnreadable: nil, volumeUnreadable: true,
                 backupMarkFailure: "no",
-                attachments: Attachments(
+                attachments: KeptAttachments(
                     held: 1, heldBytes: 2, partialBytes: 3, notHeld: 4, notHeldBytes: 5,
-                    notHeldByReason: [NotHeld(reason: .rateLimited, attachments: 4, bytes: 5, unstated: 1)])))
+                    notHeldByReason: [NotHeldAttachments(reason: .rateLimited, attachments: 4, bytes: 5, unstated: 1)]))
+        )
         #expect(Marfa.Status(status.core) == status)
         let unheld = Marfa.Status(hydration: .never)
         #expect(Marfa.Status(unheld.core).catalogVersion == nil)
@@ -255,7 +298,7 @@ struct CatalogTypes {
     static func field(_ name: String, declaredBy: String, definition: JSONObject) -> MarfaCore.TypeField {
         MarfaCore.TypeField(
             name: name, fieldType: "string", required: true, description: "d", declaredBy: declaredBy,
-            definition: definition)
+            definition: definition.core)
     }
 
     @Test func anItemTypeArrivesWithEachFieldAndWhereItIsDeclared() {

@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 
 /// A working copy holds the key in memory and never writes it to its store.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {

@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// A local copy of a slice of one server, and the queue of writes it holds
@@ -26,12 +26,12 @@ public final class WorkingCopy: Sendable {
 
     init(
         holder: CoreHolder, hasServer: Bool, refillPace: Feed.RefillPace = .standard,
-        instanceAt: @escaping Feed.InstanceAt = Feed.instanceAt
+        refillClock: Feed.RefillClock = .continuous, instanceAt: @escaping Feed.InstanceAt = Feed.instanceAt
     ) {
         self.holder = holder
         feed = Feed(
             holder: holder, watched: hasServer || holder.handle == .reader, refillPace: refillPace,
-            instanceAt: instanceAt)
+            clock: refillClock, instanceAt: instanceAt)
         items = Items(holder: holder, feed: feed)
         edges = Edges(holder: holder, feed: feed)
         tags = Tags(holder: holder, feed: feed)
@@ -222,14 +222,14 @@ public final class WorkingCopy: Sendable {
     /// Offline creates are checked against them before the first hydration.
     /// Hydration registers any the instance lacks and reports refusals.
     public func declareTypes(_ types: [JSONObject]) async throws {
-        try await holder.run { core in try core.declareTypes(types: types) }
+        try await holder.run { core in try core.declareTypes(types: types.map(\.core)) }
         feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
     }
 
     /// Reads the declarations stored in this copy, each with the empty `fields` and the `version` a
     /// registration needs filled in where the app left them out.
     public func declaredTypes() async throws -> [JSONObject] {
-        try await holder.run { core in try core.declaredTypes() }
+        try await holder.run { core in try core.declaredTypes().map(JSONObject.init) }
     }
 
     /// Reads and holds an item whatever the slice says of it.
@@ -238,7 +238,7 @@ public final class WorkingCopy: Sendable {
     /// `trashed`, so the app can offer to restore it. One the server does not
     /// hold throws `notFound` with the code `not_found`.
     public func pin(_ id: String) async throws -> PinReport {
-        let report = PinReport(try await holder.run { core in try core.pin(id: id) })
+        let report = PinReport(try await holder.runBlocking { core in try core.pin(id: id) })
         feed.announce(Change(origin: .refreshed(.pinned), itemId: id, edgeId: nil))
         return report
     }
@@ -287,7 +287,7 @@ public final class WorkingCopy: Sendable {
         -> Rows<SearchHit>
     {
         try await holder.run { core in
-            try core.search(query: query, filters: filters, limit: UInt32(clamping: limit)).answer
+            try core.search(query: query, filters: filters.core, limit: UInt32(clamping: limit)).answer
         }
     }
 
@@ -503,7 +503,7 @@ public struct Items: Sendable {
     /// While a hydration fills the copy the list holds the rows that have arrived, and `completeness` says
     /// `.partial`.
     public func list(_ filters: ListFilters = ListFilters(), sort: Sort? = nil) async throws -> Rows<Item> {
-        try await holder.run { core in try core.list(filters: filters, sort: sort?.core).answer }
+        try await holder.run { core in try core.list(filters: filters.core, sort: sort?.core).answer }
     }
 
     /// `nil` for an item in the bin or not held.
@@ -511,7 +511,7 @@ public struct Items: Sendable {
     /// While a hydration fills the copy, an item not held yet may still arrive, so asking for it throws
     /// `hydrationIncomplete` rather than answering `nil`.
     public func get(_ id: String) async throws -> Item? {
-        try await holder.run { core in try core.get(id: id) }
+        try await holder.run { core in try core.get(id: id).map(Item.init) }
     }
 
     /// The ID of the item a conflicted copy was made from: the item its
@@ -529,7 +529,7 @@ public struct Items: Sendable {
     /// Copies in the bin are left out. Oldest link first. The item itself need
     /// not be held.
     public func conflictedCopies(of id: String) async throws -> [Item] {
-        try await holder.run { core in try core.conflictedCopiesOf(id: id) }
+        try await holder.run { core in try core.conflictedCopiesOf(id: id).map(Item.init) }
     }
 
     /// Read from the held row, with no request.
@@ -538,12 +538,12 @@ public struct Items: Sendable {
     }
 
     public func create(_ draft: Draft) async throws -> QueuedWrite {
-        try await write { core in try core.createItem(draft: draft) }
+        try await write { core in try core.createItem(draft: draft.core) }
     }
 
     /// Refused unless `edit.baseVersion` is the version the copy holds.
     public func update(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
-        try await write { core in try core.updateItem(id: id, edit: edit) }
+        try await write { core in try core.updateItem(id: id, edit: edit.core) }
     }
 
     /// Queues an edit based on a version older than the one the copy holds.
@@ -551,7 +551,7 @@ public struct Items: Sendable {
     /// The server merges it against what was read. An editor that held a row
     /// while the copy caught up saves this way.
     public func updateAsRead(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
-        try await write { core in try core.updateItemAsRead(id: id, edit: edit) }
+        try await write { core in try core.updateItemAsRead(id: id, edit: edit.core) }
     }
 
     /// Moves an item to the bin, and queues the delete.
@@ -577,7 +577,7 @@ public struct Items: Sendable {
     /// queue stay as they were. A `network` failure after the request went
     /// out may follow a purge the server made, which its event then shows.
     public func purge(_ id: String, version: Int64? = nil) async throws {
-        try await holder.run { core in try core.purgeItem(id: id, version: version) }
+        try await holder.runBlocking { core in try core.purgeItem(id: id, version: version) }
         feed.announce(Change(origin: .refreshed(.purged), itemId: id, edgeId: nil))
     }
 
@@ -594,8 +594,8 @@ public struct Items: Sendable {
     /// answers for the bin. Restore an item with
     /// ``restore(_:)`` and destroy it with ``purge(_:version:)``.
     public func bin(type: String? = nil, after cursor: String? = nil, limit: Int = 50) async throws -> BinPage {
-        try await holder.run { core in
-            try core.bin(type: type, cursor: cursor, limit: UInt32(clamping: limit))
+        try await holder.runBlocking { core in
+            BinPage(try core.bin(type: type, cursor: cursor, limit: UInt32(clamping: limit)))
         }
     }
 
@@ -611,7 +611,7 @@ public struct Items: Sendable {
     }
 
     public func transition(_ id: String, to state: ItemState) async throws -> QueuedWrite {
-        try await write { core in try core.transitionItem(id: id, state: state) }
+        try await write { core in try core.transitionItem(id: id, state: state.core) }
     }
 
     /// Queues three writes, each with its own verdict: the upload, a file item
@@ -668,7 +668,7 @@ public struct Items: Sendable {
         QueuedWrite, String
     ) {
         let embed = try core.embedText(id: id, file: attached.item.itemId ?? "")
-        guard let host = try core.get(id: id) else {
+        guard let host = try core.get(id: id).map(Item.init) else {
             throw MarfaError.notFound(code: "item_not_found", message: "\(id) is not a row this copy holds")
         }
         let field = try core.itemType(id: host.type).bodyField ?? "body"
@@ -676,7 +676,7 @@ public struct Items: Sendable {
         let separator = String(
             repeating: "\n", count: body.isEmpty ? 0 : max(0, 2 - body.reversed().prefix(while: \.isNewline).count))
         let edit = Edit(properties: [field: .string(body + separator + embed)], baseVersion: host.version)
-        return (QueuedWrite(try core.updateItem(id: id, edit: edit)), embed)
+        return (QueuedWrite(try core.updateItem(id: id, edit: edit.core)), embed)
     }
 
     /// Each link and each embed of a file in the item's body, in body order, read from the copy alone.
@@ -729,7 +729,7 @@ public struct Edges: Sendable {
     let feed: Feed
 
     public func from(_ id: String) async throws -> [Edge] {
-        try await holder.run { core in try core.edgesFrom(id: id) }
+        try await holder.run { core in try core.edgesFrom(id: id).map(Edge.init) }
     }
 
     /// The edges the copy holds to one item, unsent ones included.
@@ -738,13 +738,13 @@ public struct Edges: Sendable {
     /// edge from an item outside it is held only when its type was hydrated
     /// whole or the copy pinned its source item.
     public func to(_ id: String) async throws -> [Edge] {
-        try await holder.run { core in try core.edgesTo(id: id) }
+        try await holder.run { core in try core.edgesTo(id: id).map(Edge.init) }
     }
 
     /// Every edge of one type the copy holds, unsent ones included, oldest
     /// first: edges going out from held items and edge types hydrated whole.
     public func ofType(_ type: String) async throws -> [Edge] {
-        try await holder.run { core in try core.edgesOfType(edgeType: type) }
+        try await holder.run { core in try core.edgesOfType(edgeType: type).map(Edge.init) }
     }
 
     /// Queues an edge.
@@ -759,7 +759,7 @@ public struct Edges: Sendable {
             try core.createEdge(
                 draft: MarfaCore.EdgeDraft(
                     sourceId: source, targetId: target, edgeType: type,
-                    properties: properties, id: id))
+                    properties: properties.core, id: id))
         }
     }
 
@@ -827,7 +827,7 @@ public struct Extensions: Sendable {
 
     public func write(_ namespace: String, _ body: JSONObject, on id: String) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in
-            try core.writeExtension(id: id, namespace: namespace, body: body)
+            try core.writeExtension(id: id, namespace: namespace, body: body.core)
         }
     }
 
@@ -863,7 +863,7 @@ public struct Blobs: Sendable {
         _ hash: String, isolation: isolated (any Actor)? = #isolation,
         _ body: (URL) async throws -> Result
     ) async throws -> Result {
-        let lease = try await holder.run { core in try core.blob(hash: hash) }
+        let lease = try await holder.runBlocking { core in try core.blob(hash: hash) }
         defer { withExtendedLifetime(lease) {} }
         return try await body(URL(fileURLWithPath: lease.path()))
     }
@@ -878,7 +878,7 @@ public struct Blobs: Sendable {
     /// Read from the copy with no request, as `status().fileCache` is. `attachments` is `nil` from the start of a
     /// hydration until one completes, and where the cache could not be read.
     public func cache() async throws -> FileCache {
-        try await holder.run { core in try core.fileCache() }
+        try await holder.run { core in FileCache(try core.fileCache()) }
     }
 
     /// Chooses how the cache's budget is set, trims the cache to it at once, and returns the bytes the trim took.
@@ -887,7 +887,7 @@ public struct Blobs: Sendable {
     /// stay outside the budget, and a file being read inside ``withFile(_:isolation:_:)`` is never trimmed. Throws
     /// `readingHandle` for a reader.
     public func setBudget(_ budget: FileBudget) async throws -> UInt64 {
-        try await holder.run { core in try core.setFileBudget(budget: budget) }
+        try await holder.run { core in try core.setFileBudget(budget: budget.core) }
     }
 
     /// Trims the cache to its budget now.
@@ -908,7 +908,7 @@ public struct Blobs: Sendable {
     /// Canceling the task stops it and throws `canceled`; the files it had fetched stay. Throws `readingHandle`
     /// for a reader and for a folder's copy, and `noServer` for a copy without a server.
     public func fetchKept() async throws -> KeptFetch {
-        try await holder.runUntilCanceled { core, stop in try core.fetchKept(stop: stop) }
+        try await holder.runUntilCanceled { core, stop in KeptFetch(try core.fetchKept(stop: stop)) }
     }
 }
 
@@ -1023,30 +1023,13 @@ func queued(
     return written
 }
 
+/// Runs blocking work that is not a call into the open core, such as a network request, a keychain read or opening
+/// a store, on ``CoreQueue/blocking``.
+///
+/// It runs even for a canceled task, since what it does, such as releasing the
+/// store or opening it, must not be left half done.
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-    let job = Job(work)
-    return try await withCheckedThrowingContinuation { continuation in
-        DispatchQueue.global(qos: .userInitiated).async {
-            continuation.resume(with: job.run())
-        }
-    }
-}
-
-/// Releases the work before the caller resumes, so nothing it captured still
-/// holds the core, and with it the store, once the call has returned.
-private final class Job<T: Sendable>: Sendable {
-    private let work: Mutex<(@Sendable () throws -> T)?>
-
-    init(_ work: @escaping @Sendable () throws -> T) {
-        self.work = Mutex(work)
-    }
-
-    func run() -> Result<T, any Error> {
-        guard let work = self.work.withLock({ $0.take() }) else {
-            preconditionFailure("a job runs once")
-        }
-        return Result { try translated(work) }
-    }
+    try await CoreQueue.blocking.run(cancelable: false, work)
 }
 
 func translated<T>(_ work: () throws -> T) throws -> T {

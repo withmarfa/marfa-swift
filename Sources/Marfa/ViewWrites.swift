@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 
 /// What a change does to a view's grouping.
 public enum ViewGroupingChange: Sendable, Hashable {
@@ -110,7 +110,7 @@ extension WorkingCopy {
     /// A `network` failure after the request went out may follow a view the server made. Retry with the same
     /// `idempotencyKey`, which answers the first view, rather than creating a second.
     public func createView(_ settings: ViewSettings, idempotencyKey: String? = nil) async throws -> SavedView {
-        let settings = settings.json
+        let settings = settings.json.core
         let row = try await holder.run { core in
             try core.createView(settings: settings, idempotencyKey: idempotencyKey)
         }
@@ -127,7 +127,7 @@ extension WorkingCopy {
     public func changeView(
         _ id: String, _ change: ViewSettingsChange, baseVersion: Int64, idempotencyKey: String? = nil
     ) async throws -> SavedView {
-        let changes = change.json
+        let changes = change.json.core
         let row = try await holder.run { core in
             try core.changeView(id: id, changes: changes, version: baseVersion, idempotencyKey: idempotencyKey)
         }

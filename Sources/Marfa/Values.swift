@@ -1,14 +1,5 @@
 import Foundation
-import MarfaCore
-
-@_exported import struct MarfaCore.BinPage
-@_exported import struct MarfaCore.Draft
-@_exported import struct MarfaCore.Edge
-@_exported import struct MarfaCore.Edit
-@_exported import struct MarfaCore.Item
-@_exported import struct MarfaCore.ListFilters
-@_exported import struct MarfaCore.SearchFilters
-@_exported import struct MarfaCore.SearchHit
+package import MarfaCore
 
 /// Every way the core refuses or fails. `code` is the server's, where the
 /// server answered.
@@ -201,19 +192,6 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     }
 }
 
-/// An item as the copy holds it.
-///
-/// The core's own record, so a field added to it reaches an app with no
-/// change here. `properties` holds the item's properties in the order the
-/// server answers them, and is empty where `unreadableProperties` says the
-/// stored properties could not be read.
-public typealias Item = MarfaCore.Item
-
-/// Whether a read was answered from a whole copy; from one a hydration is still filling, which holds only the rows
-/// that have arrived (`.partial`); or from one the server's event log no longer reaches, which holds the rows it
-/// held then, some since changed or gone on the server, until a hydration has filled it again (`.stale`).
-public typealias Completeness = MarfaCore.Completeness
-
 /// The rows a read of the copy answered, and whether the copy was whole when it answered.
 ///
 /// A list or a search made while a hydration fills the copy answers the rows that have arrived and says
@@ -251,43 +229,11 @@ extension Rows: RandomAccessCollection {
 }
 
 extension MarfaCore.Found {
-    var answer: Rows<SearchHit> { Rows(hits, completeness: completeness) }
+    var answer: Rows<SearchHit> { Rows(hits.map(SearchHit.init), completeness: Completeness(completeness)) }
 }
 
-/// One page of the server's bin.
-public typealias BinPage = MarfaCore.BinPage
-
-/// An edge as the copy holds it.
-public typealias Edge = MarfaCore.Edge
-
-/// A hit of a search, with the item it found.
-public typealias SearchHit = MarfaCore.SearchHit
-
-/// A create, before it is queued.
-///
-/// The tags are queued as writes of their own. See the core's documentation of each field.
-public typealias Draft = MarfaCore.Draft
-
-/// A change to an item, and the version it was read at.
-public typealias Edit = MarfaCore.Edit
-
-/// With `state` unset, a list answers active items only; `allStates` lifts
-/// that, and a named `state` wins over both.
-///
-/// `filter` is an expression in the server's listing grammar. Its `status_group` term selects items by the group of
-/// the word their status field holds, as their own type declares it: `eq` and `neq` take a ``StatusGroup`` raw
-/// value, and `exists` and `not_exists` take none. An item whose type has no status field, or that holds no word or
-/// one its type does not declare, is in no group, so only `not_exists` selects it. The open items of every type
-/// with a status field are `status_group neq "completed" AND status_group neq "canceled"`. Match a type's own word
-/// with `properties.<field> eq`.
-public typealias ListFilters = MarfaCore.ListFilters
-
-/// `state` and `allStates` work as in ``ListFilters``. `type` includes its
-/// subtree, and every tag given must be present.
-public typealias SearchFilters = MarfaCore.SearchFilters
-
-extension MarfaCore.Item: Identifiable {}
-extension MarfaCore.Edge: Identifiable {}
+extension Item: Identifiable {}
+extension Edge: Identifiable {}
 
 /// A change to an edge's properties, a move of one of its ends, or both, and
 /// the version it was read at.
@@ -337,6 +283,6 @@ public struct EdgeEdit: Sendable, Hashable {
             case .target(let id): MarfaCore.EdgeMove(end: .target, to: id)
             case nil: nil
             }
-        return MarfaCore.EdgeEdit(properties: properties, baseVersion: baseVersion, moves: moves)
+        return MarfaCore.EdgeEdit(properties: properties.core, baseVersion: baseVersion, moves: moves)
     }
 }

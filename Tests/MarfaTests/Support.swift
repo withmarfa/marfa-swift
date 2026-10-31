@@ -158,14 +158,14 @@ final class FakeCore: Core, @unchecked Sendable {
         var hydrateInPlace = false
         var hydration = MarfaCore.Hydration.complete
         var edgeWriteFails: MarfaCore.MarfaError?
-        var declarations: [JSONObject] = []
+        var declarations: [MarfaCore.JsonObject] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
         var replacedTypes: [String] = []
         var replacementRefusals: [MarfaCore.UnregisteredType] = []
         var hydrationOptions: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         var slice: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         /// When each hydration began.
-        var hydrations: [ContinuousClock.Instant] = []
+        var hydrations: [[String]] = []
         /// Fails this many hydrations with `hydrateFails` before the rest succeed; `nil` fails them all.
         var hydrateFailsFirst: Int?
         /// Held by the next hydration until signaled, as `gate` holds a drain.
@@ -177,6 +177,9 @@ final class FakeCore: Core, @unchecked Sendable {
         var instanceId: String?
         var serverOrigin: String?
         var pins: Set<String> = []
+        /// Held by every call that goes to the server until signaled, once `holdNetwork()` sets it.
+        var networkGate: DispatchSemaphore?
+        var networkCalls = 0
         var probe: DropProbe?
         var budgets: [MarfaCore.FileBudget] = []
         var trimmed: UInt64 = 0
@@ -273,7 +276,7 @@ final class FakeCore: Core, @unchecked Sendable {
         defer { state.withLock { $0.hydrating = false } }
         let failure = state.withLock { state -> MarfaCore.MarfaError? in
             state.hydrationOptions = (types, tier, edgeTypes)
-            state.hydrations.append(.now)
+            state.hydrations.append(types)
             guard let failure = state.hydrateFails else { return nil }
             guard let first = state.hydrateFailsFirst else { return failure }
             state.hydrateFailsFirst = first - 1
@@ -318,15 +321,48 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
-    override func declareTypes(types: [JSONObject]) {
+    override func declareTypes(types: [MarfaCore.JsonObject]) {
         state.withLock { $0.declarations = types }
     }
 
-    override func declaredTypes() -> [JSONObject] {
+    override func declaredTypes() -> [MarfaCore.JsonObject] {
         state.withLock { $0.declarations }
     }
 
+    private func goToServer() {
+        let gate = state.withLock { state in
+            state.networkCalls += 1
+            return state.networkGate
+        }
+        gate?.wait()
+    }
+
+    /// Makes `pin`, `bin`, `purgeItem` and `blob` wait for a signal, and the last three then fail with `network`.
+    func holdNetwork() -> DispatchSemaphore {
+        let gate = DispatchSemaphore(value: 0)
+        state.withLock { $0.networkGate = gate }
+        return gate
+    }
+
+    var networkCalls: Int { state.withLock { $0.networkCalls } }
+
+    override func bin(type: String?, cursor: String?, limit: UInt32) throws -> MarfaCore.BinPage {
+        goToServer()
+        throw MarfaCore.MarfaError.Network(message: "offline")
+    }
+
+    override func purgeItem(id: String, version: Int64?) throws {
+        goToServer()
+        throw MarfaCore.MarfaError.Network(message: "offline")
+    }
+
+    override func blob(hash: String) throws -> MarfaCore.BlobPath {
+        goToServer()
+        throw MarfaCore.MarfaError.Network(message: "offline")
+    }
+
     override func pin(id: String) throws -> MarfaCore.PinReport {
+        goToServer()
         let added = state.withLock { $0.pins.insert(id).inserted }
         return MarfaCore.PinReport(pinned: true, wasPinned: !added)
     }
@@ -770,5 +806,76 @@ final class OwnServer: Sendable {
         for await code in ended { status = code }
         try #require(status == 0, "\(name) exited \(status)")
         return String(decoding: printed, as: UTF8.self)
+    }
+}
+
+/// A clock that moves only when a test advances it, so a wait the code under test asks for is seen and ended
+/// by the test, not by the machine's speed.
+final class ManualClock: Clock, Sendable {
+    struct Instant: InstantProtocol, Sendable {
+        var offset: Duration
+
+        func advanced(by duration: Duration) -> Instant { Instant(offset: offset + duration) }
+        func duration(to other: Instant) -> Duration { other.offset - offset }
+        static func < (lhs: Instant, rhs: Instant) -> Bool { lhs.offset < rhs.offset }
+    }
+
+    private struct Waiter {
+        let id: Int
+        let deadline: Instant
+        let continuation: CheckedContinuation<Void, any Error>
+    }
+
+    private struct State {
+        var now = Instant(offset: .zero)
+        var nextId = 0
+        var waiters: [Waiter] = []
+        var requested: [Duration] = []
+    }
+
+    private let state = Mutex(State())
+
+    var now: Instant { state.withLock { $0.now } }
+    var minimumResolution: Duration { .zero }
+
+    /// Every wait asked for, in order, as the length asked.
+    var requested: [Duration] { state.withLock { $0.requested } }
+
+    /// The waits not yet ended.
+    var waiting: Int { state.withLock { $0.waiters.count } }
+
+    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+        let id = state.withLock { state -> Int in
+            state.nextId += 1
+            state.requested.append(state.now.duration(to: deadline))
+            return state.nextId
+        }
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                let outcome = state.withLock { state -> Result<Void, any Error>? in
+                    if Task.isCancelled { return .failure(CancellationError()) }
+                    if deadline <= state.now { return .success(()) }
+                    state.waiters.append(Waiter(id: id, deadline: deadline, continuation: continuation))
+                    return nil
+                }
+                if let outcome { continuation.resume(with: outcome) }
+            }
+        } onCancel: {
+            let waiter = state.withLock { state in
+                state.waiters.firstIndex { $0.id == id }.map { state.waiters.remove(at: $0) }
+            }
+            waiter?.continuation.resume(throwing: CancellationError())
+        }
+    }
+
+    /// Moves the clock on and ends the waits it reaches.
+    func advance(by duration: Duration) {
+        let due = state.withLock { state -> [Waiter] in
+            state.now = state.now.advanced(by: duration)
+            let due = state.waiters.filter { $0.deadline <= state.now }
+            state.waiters.removeAll { $0.deadline <= state.now }
+            return due
+        }
+        for waiter in due { waiter.continuation.resume() }
     }
 }

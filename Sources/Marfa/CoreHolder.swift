@@ -1,4 +1,4 @@
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// The one place a working copy and all its parts reach the core, so the copy
@@ -61,9 +61,26 @@ final class CoreHolder: Sendable {
         }
     }
 
-    /// Runs `work` off the caller's thread against the core.
+    /// Runs `work` off the caller's thread against the core, on ``CoreQueue/calls`` at the caller's priority, never below utility.
     func run<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
-        try await background { [self] in try with(work) }
+        try await queued(on: .calls) { [self] in try with(work) }
+    }
+
+    /// Runs `work` as ``run(_:)`` does, on ``CoreQueue/blocking``, for a call that can wait on the server, so a few
+    /// slow transfers never fill the lane that reads and writes use.
+    func runBlocking<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
+        try await queued(on: .blocking) { [self] in try with(work) }
+    }
+
+    /// A canceled call on a copy that is closing or closed reports `closed`, which stays true, rather than `canceled`.
+    private func queued<T: Sendable>(on queue: CoreQueue, _ work: @escaping @Sendable () throws -> T) async throws -> T
+    {
+        do {
+            return try await queue.run(work)
+        } catch MarfaError.canceled(let message) {
+            let closed = state.withLock { $0.closing || $0.phase == .dropping || $0.phase == .released }
+            throw closed ? MarfaError.closed(message: Self.closedMessage) : MarfaError.canceled(message: message)
+        }
     }
 
     func runUntilCanceled<T: Sendable>(
@@ -71,13 +88,7 @@ final class CoreHolder: Sendable {
     ) async throws -> T {
         let stop = stops ? MarfaCore.Stop() : nil
         return try await withTaskCancellationHandler {
-            let alreadyCanceled = Task.isCancelled
-            return try await background { [self] in
-                try with { core in
-                    if alreadyCanceled { throw MarfaError.canceled(message: "the call was canceled") }
-                    return try work(core, stop)
-                }
-            }
+            try await queued(on: .blocking) { [self] in try with { core in try work(core, stop) } }
         } onCancel: {
             stop?.raise()
         }

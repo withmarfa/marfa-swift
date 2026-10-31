@@ -1,29 +1,5 @@
 import Foundation
-import MarfaCore
-
-@_exported import enum MarfaCore.FileBudget
-@_exported import enum MarfaCore.ItemState
-@_exported import struct MarfaCore.KeptFetch
-@_exported import enum MarfaCore.NotHeldReason
-@_exported import enum MarfaCore.Tier
-
-/// The cache of fetched files: its setting, the budget in force and the bytes held, and the attachments kept
-/// outside the budget.
-///
-/// `heldUnreadable` and `volumeUnreadable` say why `held` or `budget` could not be worked out, and
-/// `backupMarkFailure` why the files fetched last could not be kept out of backups.
-public typealias FileCache = MarfaCore.FileCache
-
-/// The files attached to items the copy holds, which stay on the device outside the file budget: how many are held
-/// whole, and how many are not, by reason.
-public typealias KeptAttachments = MarfaCore.Attachments
-
-/// The attachments whose bytes are not held for one reason, with the bytes they state.
-public typealias NotHeldAttachments = MarfaCore.NotHeld
-
-/// The tier an item is in: `library` for lasting material, `feed` for an
-/// incoming stream.
-public typealias Tier = MarfaCore.Tier
+package import MarfaCore
 
 /// The tiers a working copy's slice holds: one ``Tier``, or both.
 ///
@@ -59,9 +35,6 @@ public enum SliceTier: Sendable, Hashable, CaseIterable {
         }
     }
 }
-
-/// Where an item is in its life: `active`, `archived`, `trashed` or `revoked`.
-public typealias ItemState = MarfaCore.ItemState
 
 public enum WriteKind: Sendable, Hashable, CaseIterable {
     case createItem
@@ -509,7 +482,7 @@ public struct QueuedWrite: Sendable, Hashable {
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,
             baseVersion: core.baseVersion, idempotencyKey: core.idempotencyKey, dependsOn: core.dependsOn,
             follows: core.follows, verdict: core.verdict.map(Verdict.init), waiting: core.waiting,
-            body: core.body, answer: core.answer, refusals: core.refusals,
+            body: JSONObject(core.body), answer: core.answer.map(JSONValue.init), refusals: core.refusals,
             environmentalStreak: core.environmentalStreak, lastFailure: core.lastFailure.map(LastFailure.init),
             queuedAt: core.queuedAt, answeredAt: core.answeredAt)
     }
@@ -519,7 +492,7 @@ public struct QueuedWrite: Sendable, Hashable {
             id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
-            body: body, answer: answer, refusals: refusals,
+            body: body.core, answer: answer?.core, refusals: refusals,
             environmentalStreak: environmentalStreak, lastFailure: lastFailure?.core,
             queuedAt: queuedAt, answeredAt: answeredAt)
     }
@@ -825,7 +798,7 @@ public struct Status: Sendable, Hashable {
             sliceEdgeTypes: core.sliceEdgeTypes, pinned: core.pinned, eventCursor: core.eventCursor,
             hydration: Hydration(core.hydration), items: core.items, itemsExpected: core.itemsExpected,
             itemsListed: core.itemsListed, edges: core.edges, catalogVersion: core.catalogVersion,
-            instanceId: core.instanceId, fileCache: core.fileCache)
+            instanceId: core.instanceId, fileCache: FileCache(core.fileCache))
     }
 
     var core: MarfaCore.Status {
@@ -833,7 +806,7 @@ public struct Status: Sendable, Hashable {
             serverOrigin: serverOrigin, instanceId: instanceId, sliceTypes: sliceTypes, sliceTier: sliceTier?.core,
             sliceEdgeTypes: sliceEdgeTypes, pinned: pinned, eventCursor: eventCursor, hydration: hydration.core,
             items: items, itemsExpected: itemsExpected, itemsListed: itemsListed, edges: edges,
-            catalogVersion: catalogVersion, fileCache: fileCache)
+            catalogVersion: catalogVersion, fileCache: fileCache.core)
     }
 }
 
@@ -852,7 +825,7 @@ public struct Attachment: Sendable, Hashable {
     }
 
     var core: MarfaCore.Attachment {
-        MarfaCore.Attachment(mimeType: mimeType, title: title, type: type, tier: tier)
+        MarfaCore.Attachment(mimeType: mimeType, title: title, type: type, tier: tier?.core)
     }
 }
 

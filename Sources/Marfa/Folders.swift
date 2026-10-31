@@ -1,6 +1,6 @@
 #if os(macOS)
 import Foundation
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// The folders on this Mac: directories whose files Marfa keeps in step with a folder's settings on the server.

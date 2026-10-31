@@ -1,4 +1,4 @@
-import MarfaCore
+package import MarfaCore
 
 extension Items {
     /// Each item the copy holds of `ids`, once each, in the order first named, read from one snapshot.
@@ -25,14 +25,14 @@ extension Edges {
     ///
     /// Throws `hydrationIncomplete` until the copy is whole, as every read of edges does.
     public func get(_ id: String) async throws -> Edge? {
-        try await holder.run { core in try core.edge(id: id) }
+        try await holder.run { core in try core.edge(id: id).map(Edge.init) }
     }
 
     /// Each edge the copy holds of `ids`, once each, in the order first named; an ID it doesn't hold is left out.
     ///
     /// Throws `hydrationIncomplete` until the copy is whole, as every read of edges does.
     public func get(_ ids: [String]) async throws -> [Edge] {
-        try await holder.run { core in try core.getEdges(ids: ids) }
+        try await holder.run { core in try core.getEdges(ids: ids).map(Edge.init) }
     }
 }
 

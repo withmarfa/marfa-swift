@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// Renews a credential's access token when the server refuses it, for the core to call from its own threads.

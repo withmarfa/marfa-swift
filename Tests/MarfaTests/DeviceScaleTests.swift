@@ -103,7 +103,7 @@ struct AFillThatEnds {
     @MainActor @Test func aLiveQueryLeavesItsPartialSnapshotWhenTheFillFails() async throws {
         let core = FillingFailureCore()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        let query = LiveQuery(copy, reading: Reading<Rows<Item>>.list())
+        let query = LiveQuery(copy, reading: Reading<Rows<Marfa.Item>>.list())
         await query.refresh()
         #expect(query.value.completeness == .partial)
         core.finish()
@@ -129,8 +129,10 @@ final class FillingFailureCore: Core, @unchecked Sendable {
 
     override func heldHandle() -> MarfaCore.Handle { .writer }
 
-    override func list(filters: ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
-        Listing(items: [], completeness: finished.withLock { $0 } ? .stale : .partial)
+    override func list(filters: MarfaCore.ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
+        Listing(
+            items: [],
+            completeness: finished.withLock { $0 } ? MarfaCore.Completeness.stale : MarfaCore.Completeness.partial)
     }
 
     override func hydrateWith(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], stop: MarfaCore.Stop?)
@@ -168,7 +170,7 @@ struct FileBudgetAndKeptAttachments {
 
         let report = try await copy.blobs.fetchKept()
         #expect(report.fetched == 2 && report.fetchedBytes == 30)
-        #expect(report.attachments == left)
+        #expect(report.attachments == KeptAttachments(left))
         #expect(try await copy.blobs.cache().attachments?.notHeldByReason.map(\.reason) == [.noRoom, .rateLimited])
         #expect(core.state.withLock { $0.keptFetches } == 1)
         await copy.close()
