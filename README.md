@@ -12,9 +12,9 @@ An app built on it keeps a working copy of its data on the device. The app reads
 
 ## Where the SDK stops
 
-- **Marfa decides what things mean**: an item's name, what a link points to, what a filter matches. The SDK passes on the core's answers, so every app agrees.
-- **The SDK does what every Swift app needs**: keeping the copy in step, retrying, sorting errors, keeping keys and drawing icons.
-- **Your app decides the rest**: its screens, its words and its choices.
+- **Marfa decides what things mean**: an item's name and preview, what a link points to, whether an edge is allowed and what a filter matches. The SDK passes on the core's answers, so every app agrees.
+- **The SDK does what every Swift app needs**: keeping the copy in step, retrying with back-off, sorting errors into kinds, replacing a refused copy, keeping keys, reading dates and drawing icons.
+- **Your app decides the rest**: its screens, its words, and choices such as what to call an item with no name.
 
 ## Add it to an app
 
