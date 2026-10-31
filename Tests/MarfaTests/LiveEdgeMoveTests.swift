@@ -121,17 +121,30 @@ extension LiveWorkingCopies {
         }
 
         @Test func aMoveOnlyTheServerCanSeeClosesALoopIsRefusedWithItsCodeAndTheEdgeReturns() async throws {
-            let copy = try await Live.hydrated()
-            let a = try #require(try await copy.items.create(Live.note("loop a \(UUID())")).itemId)
-            let b = try #require(try await copy.items.create(Live.note("loop b \(UUID())")).itemId)
-            let c = try #require(try await copy.items.create(Live.note("loop c \(UUID())")).itemId)
-            let ab = try #require(try await copy.edges.create(from: a, to: b, type: "parent-of").edgeId)
-            _ = try await copy.edges.create(from: b, to: c, type: "parent-of")
-            let setup = try await copy.queue.drain()
+            // The loop runs through a task the notes-only copy does not hold, with its edges.
+            let builder = try await Live.hydrated()
+            func note(_ title: String) async throws -> String {
+                try #require(try await builder.items.create(Live.note("\(title) \(UUID())")).itemId)
+            }
+            let a = try await note("loop a")
+            let b = try await note("loop b")
+            let c = try await note("loop c")
+            let between = try #require(
+                try await builder.items.create(
+                    Draft(type: "core.task", properties: ["title": .string("loop task \(UUID())")], tier: .feed)
+                ).itemId)
+            let ab = try #require(try await builder.edges.create(from: a, to: b, type: "parent-of").edgeId)
+            _ = try await builder.edges.create(from: b, to: between, type: "parent-of")
+            _ = try await builder.edges.create(from: between, to: c, type: "parent-of")
+            let setup = try await builder.queue.drain()
             #expect(setup.verdicts.allSatisfy { $0.verdict == .accepted }, "\(setup.verdicts)")
+            await builder.close()
+
+            let copy = try await Live.hydrated()
+            #expect(try await copy.edges.to(c).isEmpty, "the copy holds the edge into c, so it can see the loop")
             let held = try #require(try await copy.edges.from(a).first)
 
-            // c above b closes the cycle b, c, b, which the copy cannot see from the edge alone.
+            // c above b closes the loop b, task, c, b, which the copy cannot see.
             let move = try #require(
                 try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c))))
             let report = try await copy.queue.drain()
@@ -143,6 +156,34 @@ extension LiveWorkingCopies {
             #expect(refusal.code == "edge_cycle")
             let back = try await copy.edges.to(b).filter { $0.id == ab }
             #expect(back.map(\.sourceId) == [a], "the refused move left the edge at \(back.map(\.sourceId))")
+            await copy.close()
+        }
+
+        @Test func aMoveThatClosesALoopThroughEdgesTheCopyHoldsIsRefusedBeforeItIsSent() async throws {
+            let copy = try await Live.hydrated()
+            let a = try #require(try await copy.items.create(Live.note("held a \(UUID())")).itemId)
+            let b = try #require(try await copy.items.create(Live.note("held b \(UUID())")).itemId)
+            let c = try #require(try await copy.items.create(Live.note("held c \(UUID())")).itemId)
+            let ab = try #require(try await copy.edges.create(from: a, to: b, type: "parent-of").edgeId)
+            _ = try await copy.edges.create(from: b, to: c, type: "parent-of")
+            let setup = try await copy.queue.drain()
+            #expect(setup.verdicts.allSatisfy { $0.verdict == .accepted }, "\(setup.verdicts)")
+            let held = try #require(try await copy.edges.from(a).first)
+            let before = try await copy.queue.all()
+
+            await #expect {
+                _ = try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c)))
+            } throws: { error in
+                if case MarfaError.validation("edge_cycle", _) = error { true } else { false }
+            }
+            await #expect {
+                _ = try await copy.edges.create(from: c, to: a, type: "parent-of")
+            } throws: { error in
+                if case MarfaError.validation("edge_cycle", _) = error { true } else { false }
+            }
+
+            #expect(try await copy.queue.all() == before, "a write the copy refused was queued")
+            #expect(try await copy.edges.to(b).map(\.sourceId) == [a])
             await copy.close()
         }
 
