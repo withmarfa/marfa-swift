@@ -23,7 +23,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         case made(Item, edges: [Edge])
         case edit(
             properties: JsonObject, replacing: Bool, type: String?, tier: Tier?, sourceId: String?, occurredAt: String?)
-        case state(ItemState)
+        case state(ItemState, at: String)
         case tags(TagChange)
         case madeEdge(Edge)
         case editEdge(properties: JsonObject, source: String?, target: String?)
@@ -113,17 +113,14 @@ final class InMemoryCore: CoreProtocol, Sendable {
         let updatedBefore = try filters.updatedBefore.map(Checks.occurred)
         let listed: [Item] = try state.withLock { state in
             let types = state.resolvedItemTypes()
-            let root = try filters.type.flatMap { try Self.root(of: $0) }
+            let roots = try Self.roots(of: filters.types, in: types)
+            let named = try Self.states(of: filters.states, allStates: filters.allStates)
             let beneath = filters.beneath.map { state.reached(from: $0) }
             var found = state.items.values.filter { item in
-                if let root {
-                    guard Self.reaches(item.type, root, in: types) else { return false }
+                if let roots {
+                    guard roots.contains(where: { Self.reaches(item.type, $0, in: types) }) else { return false }
                 }
-                if let state = filters.state {
-                    guard item.state == state else { return false }
-                } else if !filters.allStates {
-                    guard item.state == .active else { return false }
-                }
+                if let named, !named.contains(item.state) { return false }
                 if let tier = filters.tier, item.tier != tier { return false }
                 if let source = filters.source, !item.source.isBytes(source) { return false }
                 if let occurredAfter, item.occurredAt <= occurredAfter { return false }
@@ -133,7 +130,10 @@ final class InMemoryCore: CoreProtocol, Sendable {
                 if let beneath, !beneath.contains(item.id) { return false }
                 return filters.tags.allSatisfy(item.tags.contains)
             }
-            found.sort { Self.precedes($0, $1, by: order) }
+            switch order {
+            case .named(let field, let direction): found.sort { Self.precedes($0, $1, by: (field, direction)) }
+            case .binned(let direction): found.sort { Self.precedes($0, $1, binned: direction) }
+            }
             let offset = Int(filters.offset ?? 0)
             guard offset < found.count else { return [] }
             found.removeFirst(offset)
@@ -177,6 +177,49 @@ final class InMemoryCore: CoreProtocol, Sendable {
         state.withLock { $0.edgesInOrder.filter { $0.edgeType == edgeType } }
     }
 
+    /// The roots a `types` list names, as the core reads one.
+    ///
+    /// Entries are trimmed, blank ones dropped, repeats removed, and `*` refused. A concrete type the copy's catalog does not hold is refused `unknownType`, as the core
+    /// refuses it before it reads anything. `nil` where the list is unset.
+    static func roots(of types: [String]?, in held: [String: ItemType]) throws -> [String]? {
+        guard let types else { return nil }
+        var entries: [String] = []
+        for entry in types.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        where !entry.isEmpty && !entries.contains(entry) {
+            entries.append(entry)
+        }
+        guard !entries.isEmpty else {
+            throw Refuse.validation(
+                "validation_error", "The type filter names no type. Name a type, or leave the filter out.")
+        }
+        guard entries.count <= 10 else {
+            throw Refuse.validation("validation_error", "Too many types in filter (max 10)")
+        }
+        return try entries.map { entry in
+            guard entry != "*" else {
+                throw Refuse.validation("validation_error", "Invalid type identifier: \(entry)")
+            }
+            let root = try root(of: entry) ?? entry
+            guard entry.hasSuffix(".*") || held[entry] != nil else { throw Refuse.unknownTypeInQuery(entry) }
+            return root
+        }
+    }
+
+    /// The states a `states` list names, or `nil` for the active state alone unless `allStates` lifts it.
+    static func states(of states: [ItemState]?, allStates: Bool) throws -> Set<ItemState>? {
+        switch states {
+        case nil: return allStates ? nil : [.active]
+        case []?:
+            throw Refuse.validation(
+                "validation_error", "The state filter names no state. Name a state, or leave the filter out.")
+        case _? where allStates:
+            throw Refuse.validation(
+                "validation_error",
+                "The state filter names states beside every state. Name the states, or ask for every state, not both.")
+        case let named?: return Set(named)
+        }
+    }
+
     static func root(of name: String) throws -> String? {
         guard name != "*" else { return nil }
         guard Declaring.isTypePattern(name) else {
@@ -199,8 +242,9 @@ final class InMemoryCore: CoreProtocol, Sendable {
 
     /// A list's order as the core answers it: the halves a caller left out are the list's own, which beside
     /// `updatedAfter` is the only order it takes.
-    private static func order(_ filters: ListFilters, _ sort: Sort?) throws -> (SortField, SortDirection) {
+    private static func order(_ filters: ListFilters, _ sort: Sort?) throws -> Order {
         let resumed = filters.updatedAfter != nil
+        let binned = !resumed && !filters.allStates && filters.states == [.trashed]
         let chosen = (
             sort?.field ?? (resumed ? .updatedAt : .createdAt), sort?.direction ?? (resumed ? .ascending : .descending)
         )
@@ -215,7 +259,24 @@ final class InMemoryCore: CoreProtocol, Sendable {
             throw Refuse.validation(
                 "validation_error", "updated_after orders by updated_at, ascending; leave out sort and direction")
         }
-        return chosen
+        if binned && sort?.field == nil { return .binned(sort?.direction ?? .descending) }
+        return .named(chosen.0, chosen.1)
+    }
+
+    /// A list's order: by a field, or by when each row went to the bin, which only a list of the bin alone that
+    /// names no field takes.
+    enum Order {
+        case named(SortField, SortDirection)
+        case binned(SortDirection)
+    }
+
+    /// The bin's order: when each row went to the bin, else when it last changed, ties by id in the same direction.
+    static func precedes(_ lhs: Item, _ rhs: Item, binned direction: SortDirection) -> Bool {
+        let left = lhs.trashedAt ?? lhs.updatedAt
+        let right = rhs.trashedAt ?? rhs.updatedAt
+        let ascending = direction == .ascending
+        if left == right { return ascending ? lhs.id < rhs.id : lhs.id > rhs.id }
+        return ascending ? left < right : left > right
     }
 
     static func precedes(_ lhs: Item, _ rhs: Item, by order: (field: SortField, direction: SortDirection))

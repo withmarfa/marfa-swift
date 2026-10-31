@@ -135,9 +135,9 @@ final class FillingFailureCore: Core, @unchecked Sendable {
             completeness: finished.withLock { $0 } ? MarfaCore.Completeness.stale : MarfaCore.Completeness.partial)
     }
 
-    override func hydrateWith(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], stop: MarfaCore.Stop?)
-        throws -> MarfaCore.HydrateReport
-    {
+    override func hydrateWith(
+        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], inPlaceOnly: Bool, stop: MarfaCore.Stop?
+    ) throws -> MarfaCore.HydrateReport {
         throw MarfaCore.MarfaError.Network(message: "the connection dropped")
     }
 }

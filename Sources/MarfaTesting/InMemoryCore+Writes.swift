@@ -56,7 +56,8 @@ extension InMemoryCore {
                 tier: draft.tier ?? .library, version: 0, schemaVersion: 1, source: draft.source ?? "device",
                 sourceId: nil, occurredAt: at, createdAt: at, updatedAt: at,
                 tags: Self.applying(.replace(draft.tags), to: []), captureLatitude: draft.captureLatitude,
-                captureLongitude: draft.captureLongitude, title: nil, body: nil, unreadableProperties: nil)
+                captureLongitude: draft.captureLongitude, trashedAt: draft.state == .trashed ? Minted.now() : nil,
+                title: nil, body: nil, unreadableProperties: nil)
             state.items[id] = Self.derived(made, types: types)
             state.made.insert(id)
             let shown = edges.flatMap { named in
@@ -199,11 +200,12 @@ extension InMemoryCore {
         try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
             let body = JsonObject(members: [JsonMember(key: "version", value: .integer(held.version))])
-            held.state = .trashed
+            let at = Minted.now()
+            held.move(to: .trashed, at: at)
             state.items[id] = held
             return state.append(
                 .deleteItem, item: id, baseVersion: held.version, body: body, dependsOn: state.pendingCreates(of: id),
-                effect: .state(.trashed))
+                effect: .state(.trashed, at: at))
         }
     }
 
@@ -214,11 +216,12 @@ extension InMemoryCore {
             guard var held = state.items[id] else {
                 return state.append(.restoreItem, item: id, body: JsonObject(), dependsOn: [])
             }
-            held.state = .active
+            let at = Minted.now()
+            held.move(to: .active, at: at)
             state.items[id] = held
             return state.append(
                 .restoreItem, item: id, body: JsonObject(), dependsOn: state.pendingCreates(of: id),
-                effect: .state(.active))
+                effect: .state(.active, at: at))
         }
     }
 
@@ -233,12 +236,13 @@ extension InMemoryCore {
                     "a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
                 )
             }
-            held.state = target
+            let at = Minted.now()
+            held.move(to: target, at: at)
             state.items[id] = held
             let body = JsonObject(members: [JsonMember(key: "state", value: .string(target.name))])
             return state.append(
                 .transitionItem, item: id, body: body, dependsOn: state.pendingCreates(of: id),
-                effect: .state(target))
+                effect: .state(target, at: at))
         }
     }
 
@@ -564,9 +568,9 @@ extension InMemoryCore.State {
                 if let occurredAt { row.occurredAt = occurredAt }
                 if taken { row.version += 1 }
                 items[id] = InMemoryCore.derived(row, types: types)
-            case .state(let state):
+            case .state(let state, let at):
                 guard let id = write.itemId, var row = items[id] else { continue }
-                row.state = state
+                row.move(to: state, at: at)
                 items[id] = row
             case .tags(let change):
                 guard let id = write.itemId, var row = items[id] else { continue }
@@ -684,6 +688,19 @@ extension WriteKind {
         case .deleteExtension: "delete_extension"
         case .uploadBlob: "upload_blob"
         }
+    }
+}
+
+extension MarfaCore.Item {
+    /// Moves the row to `state` made at `at`, as the core records it: a move into the bin takes `at` as the time it
+    /// went there, a move out clears it, and a row already in the bin keeps the time it holds.
+    mutating func move(to target: ItemState, at: String) {
+        if target == .trashed {
+            if state != .trashed { trashedAt = at }
+        } else if state == .trashed {
+            trashedAt = nil
+        }
+        state = target
     }
 }
 #endif

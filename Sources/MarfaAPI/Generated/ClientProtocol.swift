@@ -98,7 +98,7 @@ public protocol ClientProtocol: Sendable {
     func getType(_ input: Operations.GetType.Input) async throws -> Operations.GetType.Output
     /// Replace a type
     ///
-    /// Replaces a registered type's whole schema and returns it. A field you leave out is removed, but items keep their values for it. `metadata.types:write` alone can add optional fields and change `label`, `description`, `display_hints` or `version`.
+    /// Replaces a type's whole schema and returns it. A field left out is removed; items keep their values. `metadata.types:write` alone can add optional fields and change labels, descriptions, `plural`, `display_hints` and `version`.
     ///
     /// - Remark: HTTP `PUT /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)`.
@@ -573,7 +573,7 @@ extension ClientProtocol {
     }
     /// Replace a type
     ///
-    /// Replaces a registered type's whole schema and returns it. A field you leave out is removed, but items keep their values for it. `metadata.types:write` alone can add optional fields and change `label`, `description`, `display_hints` or `version`.
+    /// Replaces a type's whole schema and returns it. A field left out is removed; items keep their values. `metadata.types:write` alone can add optional fields and change labels, descriptions, `plural`, `display_hints` and `version`.
     ///
     /// - Remark: HTTP `PUT /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)`.

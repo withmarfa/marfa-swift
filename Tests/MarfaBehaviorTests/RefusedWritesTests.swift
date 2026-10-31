@@ -22,28 +22,41 @@ struct RefusedWrites {
         var edgesOutOfC: [String]
     }
 
-    /// Moves the source of the edge from `a` to `b` onto `c`, which closes the loop b, c, b.
-    ///
-    /// `a` holds `b` and `b` holds `c`, both answered before the move.
-    static func refusedMove(on copy: WorkingCopy) async throws -> Seen {
-        func note(_ title: String) async throws -> String {
+    /// Four items and the `parent-of` edges `a` to `b`, `b` to a task and the task to `c`, all answered.
+    struct Chain {
+        var a: String
+        var b: String
+        var c: String
+        var ab: String
+    }
+
+    /// The loop b, task, c, b runs through a task, which a copy that hydrates only notes does not hold.
+    static func chain(on builder: WorkingCopy) async throws -> Chain {
+        func create(_ type: String, _ title: String) async throws -> String {
             try #require(
-                try await copy.items.create(
-                    Draft(
-                        type: "core.note", properties: ["title": .string("\(title) \(UUID())"), "body": "b"],
-                        tier: .feed)
+                try await builder.items.create(
+                    Draft(type: type, properties: ["title": .string("\(title) \(UUID())")], tier: .feed)
                 ).itemId)
         }
-        let a = try await note("a")
-        let b = try await note("b")
-        let c = try await note("c")
-        let ab = try #require(try await copy.edges.create(from: a, to: b, type: "parent-of").edgeId)
-        _ = try await copy.edges.create(from: b, to: c, type: "parent-of")
-        let setup = try await copy.queue.drain()
+        let a = try await create("core.note", "a")
+        let b = try await create("core.note", "b")
+        let c = try await create("core.note", "c")
+        let between = try await create("core.task", "between")
+        let ab = try #require(try await builder.edges.create(from: a, to: b, type: "parent-of").edgeId)
+        _ = try await builder.edges.create(from: b, to: between, type: "parent-of")
+        _ = try await builder.edges.create(from: between, to: c, type: "parent-of")
+        let setup = try await builder.queue.drain()
         #expect(setup.verdicts.allSatisfy { $0.verdict == .accepted }, "\(setup.verdicts)")
+        return Chain(a: a, b: b, c: c, ab: ab)
+    }
+
+    /// Moves the source of the edge from `a` to `b` onto `c`, which closes the loop that only the chain's
+    /// task connects, so the copy cannot refuse it itself.
+    static func refusedMove(on copy: WorkingCopy, chain: Chain) async throws -> Seen {
+        let (a, b, c, ab) = (chain.a, chain.b, chain.c, chain.ab)
         let held = try #require(try await copy.edges.from(a).first)
         let names = [a: "a", b: "b", c: "c"]
-        func named(_ ids: [String]) -> [String] { ids.map { names[$0] ?? $0 } }
+        func named(_ ids: [String]) -> [String] { ids.compactMap { names[$0] } }
 
         let move = try #require(
             try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c))))
@@ -65,7 +78,7 @@ struct RefusedWrites {
     }
 
     static let afterwards = Seen(
-        shownBeforeTheAnswer: ["the edge"], refusalCode: "edge_cycle", edgesInto: ["b": ["a"], "c": ["b"]],
+        shownBeforeTheAnswer: ["the edge"], refusalCode: "edge_cycle", edgesInto: ["b": ["a"], "c": []],
         edgesOutOfC: [])
 
     @Test(arguments: CopyKind.allCases)
@@ -77,16 +90,21 @@ struct RefusedWrites {
                 try Test.cancel("set MARFA_API_URL and MARFA_API_KEY to run against a server")
                 return
             }
+            let builder = try await WorkingCopy.open(store: temporaryStore(), server: server)
+            _ = try await builder.hydrate(types: ["core.note"], tier: .feed)
+            let chain = try await Self.chain(on: builder)
+            await builder.close()
             let copy = try await WorkingCopy.open(store: temporaryStore(), server: server)
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
-            seen = try await Self.refusedMove(on: copy)
+            seen = try await Self.refusedMove(on: copy, chain: chain)
             await copy.close()
         case .fake:
             let fake = try await CopyKind.makeFake()
             fake.verdict = { write in
                 write.kind == .updateEdge ? .refused(Refusal(reason: "edge_cycle", code: "edge_cycle")) : .accepted
             }
-            seen = try await Self.refusedMove(on: fake.copy)
+            let chain = try await Self.chain(on: fake.copy)
+            seen = try await Self.refusedMove(on: fake.copy, chain: chain)
             await fake.copy.close()
         }
         #expect(seen == Self.afterwards)

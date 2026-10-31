@@ -116,25 +116,15 @@ final class Feed: Sendable {
     private let watched: Bool
     private let refillPace: RefillPace
     private let clock: RefillClock
-    private let instanceAt: InstanceAt
     private let state = Mutex(State())
 
-    /// The instance that answers at a server's address, as its public description names it.
-    typealias InstanceAt = @Sendable (_ origin: String) async throws -> String
-
-    static let instanceAt: InstanceAt = { origin in
-        try await background { try Marfa.translated { try MarfaCore.instanceDescription(url: origin).instanceId } }
-    }
-
     init(
-        holder: CoreHolder, watched: Bool, refillPace: RefillPace = .standard, clock: RefillClock = .continuous,
-        instanceAt: @escaping InstanceAt = instanceAt
+        holder: CoreHolder, watched: Bool, refillPace: RefillPace = .standard, clock: RefillClock = .continuous
     ) {
         self.clock = clock
         self.holder = holder
         self.watched = watched
         self.refillPace = refillPace
-        self.instanceAt = instanceAt
     }
 
     /// Runs `body` under the lock, then tells what it queued to stream
@@ -419,7 +409,8 @@ final class Feed: Sendable {
         do {
             report = try await holder.runUntilCanceled { core, stop in
                 guard admitted() else { throw KeyChanged() }
-                return try core.hydrateWith(types: types, tier: tier, edgeTypes: edgeTypes, stop: stop)
+                return try core.hydrateWith(
+                    types: types, tier: tier, edgeTypes: edgeTypes, inPlaceOnly: byRefill, stop: stop)
             }
         } catch let error as KeyChanged {
             throw error
@@ -504,14 +495,6 @@ final class Feed: Sendable {
             return nil
         case .stale, .inProgress:
             guard let tier = status.sliceTier, locked({ $0.refill.vouched }) else { return reason }
-            guard let origin = status.serverOrigin, let built = status.instanceId else { return reason }
-            // The core fills a copy built under another instance from scratch instead of in place, and a queued
-            // write would then be sent to that instance.
-            guard try await instanceAt(origin) == built else {
-                return .copyExpired(
-                    reason: "instance_changed",
-                    message: "another instance answers at the copy's server; hydrate to replace the copy")
-            }
             do {
                 // A key changed since this attempt began may read under another reach than the one vouched for.
                 _ = try await fill(

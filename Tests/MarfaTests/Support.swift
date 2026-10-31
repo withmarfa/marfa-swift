@@ -166,6 +166,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var slice: (types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String])?
         /// When each hydration began.
         var hydrations: [[String]] = []
+        /// Whether each hydration asked to fill in place only, in order.
+        var hydrationsInPlaceOnly: [Bool] = []
         /// Fails this many hydrations with `hydrateFails` before the rest succeed; `nil` fails them all.
         var hydrateFailsFirst: Int?
         /// Held by the next hydration until signaled, as `gate` holds a drain.
@@ -258,7 +260,7 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func hydrateWith(
-        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], stop: MarfaCore.Stop?
+        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], inPlaceOnly: Bool, stop: MarfaCore.Stop?
     ) throws
         -> MarfaCore.HydrateReport
     {
@@ -277,6 +279,7 @@ final class FakeCore: Core, @unchecked Sendable {
         let failure = state.withLock { state -> MarfaCore.MarfaError? in
             state.hydrationOptions = (types, tier, edgeTypes)
             state.hydrations.append(types)
+            state.hydrationsInPlaceOnly.append(inPlaceOnly)
             guard let failure = state.hydrateFails else { return nil }
             guard let first = state.hydrateFailsFirst else { return failure }
             state.hydrateFailsFirst = first - 1

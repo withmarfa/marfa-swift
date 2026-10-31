@@ -975,9 +975,8 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func attach(id: String, path: String, attachment: Attachment) throws  -> Attached
     
     /**
-     * A page of the server's bin, newest change first, read online and held
-     * nowhere in the copy. Each item's `updated_at` stands for when it went
-     * to the bin. Offline it throws `Network`, and `NoServer` for a copy with
+     * A page of the server's bin, newest binned first, read online and held
+     * nowhere in the copy. Offline it throws `Network`, and `NoServer` for a copy with
      * none.
      */
     func bin(type: String?, cursor: String?, limit: UInt32) throws  -> BinPage
@@ -1004,6 +1003,13 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func bodyLinks(id: String) throws  -> BodyLinks
     
     func catchUp(stop: Stop?) throws  -> CatchUpReport
+    
+    /**
+     * Throws the error `create_edge` would throw for `draft` now, and
+     * queues nothing. Returning is not the server's verdict, which a queued
+     * edge still meets.
+     */
+    func checkEdge(draft: EdgeDraft) throws 
     
     /**
      * The held conflicted copies made from `id` that are outside the bin,
@@ -1156,8 +1162,26 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * A hydration that also holds every edge of `edge_types` the key reads,
      * whichever ends the copy holds. `types` reads as in `hydrate`, so
      * `["*"]` alone is every type but `system.*`.
+     *
+     * With `in_place_only`, it fills only a copy whose cursor aged out, and
+     * only in place: where the instance, the key's reach or the slice has
+     * changed, the server was restored to an earlier point, or the copy is
+     * not stale, it is refused `copy_expired` with the reason
+     * (`instance_changed`, `reach_changed`, `slice_changed`,
+     * `head_past_log` or `not_stale`) before it changes anything, and the
+     * copy, its queue and its files stay as they were. Where the server
+     * refuses the credential or the reach, the stale copy still ends,
+     * keeping its queue, which can also carry `reach_changed`: read
+     * `status().hydration` before offering to keep the copy stale, since a refused
+     * fill leaves a stale copy `stale` and an ended copy is `expired`.
      */
-    func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?) throws  -> HydrateReport
+    func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], inPlaceOnly: Bool, stop: Stop?) throws  -> HydrateReport
+    
+    /**
+     * The name and preview text of each item, in order, by the copy's
+     * catalog alone. An unknown type is named by the fallback fields.
+     */
+    func itemDisplays(items: [ItemDisplayInput]) throws  -> [ItemDisplay]
     
     /**
      * `NotFound` where the catalog holds no such type.
@@ -1170,8 +1194,18 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func itemTypes() throws  -> [ItemType]
     
     /**
-     * Without a `sort` the list is newest created first, or oldest changed
-     * first where `updated_after` is set.
+     * What each of `targets`, the text between a link's brackets as
+     * `link_parts` gives it, could name from the copy alone, in order. With
+     * `item`, each is read as a link in that item's body: `Bound` where
+     * saving it there would make its edge. An item the copy does not hold
+     * throws `NotFound`.
+     */
+    func linkCandidates(item: String?, targets: [String]) throws  -> [LinkCandidates]
+    
+    /**
+     * Without a `sort` the list is newest created first, oldest changed
+     * first where `updated_after` is set, or newest binned first for the bin
+     * alone.
      */
     func list(filters: ListFilters, sort: Sort?) throws  -> Listing
     
@@ -1330,8 +1364,8 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func watch(toldUnreachable: Bool, listener: ChangeListener) throws  -> Subscription
     
     /**
-     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved` or
-     * `failing_alone` out of the queue, and puts the copy back to what the server holds;
+     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved`,
+     * `failing_alone` or `instance_changed` out of the queue, and puts the copy back to what the server holds;
      * each write held for it is refused unsent. Answers whether the row was
      * one a withdraw takes.
      */
@@ -1586,9 +1620,8 @@ open func attach(id: String, path: String, attachment: Attachment)throws  -> Att
 }
     
     /**
-     * A page of the server's bin, newest change first, read online and held
-     * nowhere in the copy. Each item's `updated_at` stands for when it went
-     * to the bin. Offline it throws `Network`, and `NoServer` for a copy with
+     * A page of the server's bin, newest binned first, read online and held
+     * nowhere in the copy. Offline it throws `Network`, and `NoServer` for a copy with
      * none.
      */
 open func bin(type: String?, cursor: String?, limit: UInt32)throws  -> BinPage  {
@@ -1651,6 +1684,19 @@ open func catchUp(stop: Stop?)throws  -> CatchUpReport  {
         FfiConverterOptionTypeStop.lower(stop),$0
     )
 })
+}
+    
+    /**
+     * Throws the error `create_edge` would throw for `draft` now, and
+     * queues nothing. Returning is not the server's verdict, which a queued
+     * edge still meets.
+     */
+open func checkEdge(draft: EdgeDraft)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_check_edge(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeEdgeDraft_lower(draft),$0
+    )
+}
 }
     
     /**
@@ -1977,15 +2023,41 @@ open func hydrate(types: [String], tier: SliceTier, stop: Stop?)throws  -> Hydra
      * A hydration that also holds every edge of `edge_types` the key reads,
      * whichever ends the copy holds. `types` reads as in `hydrate`, so
      * `["*"]` alone is every type but `system.*`.
+     *
+     * With `in_place_only`, it fills only a copy whose cursor aged out, and
+     * only in place: where the instance, the key's reach or the slice has
+     * changed, the server was restored to an earlier point, or the copy is
+     * not stale, it is refused `copy_expired` with the reason
+     * (`instance_changed`, `reach_changed`, `slice_changed`,
+     * `head_past_log` or `not_stale`) before it changes anything, and the
+     * copy, its queue and its files stay as they were. Where the server
+     * refuses the credential or the reach, the stale copy still ends,
+     * keeping its queue, which can also carry `reach_changed`: read
+     * `status().hydration` before offering to keep the copy stale, since a refused
+     * fill leaves a stale copy `stale` and an ended copy is `expired`.
      */
-open func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], stop: Stop?)throws  -> HydrateReport  {
+open func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], inPlaceOnly: Bool = false, stop: Stop?)throws  -> HydrateReport  {
     return try  FfiConverterTypeHydrateReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_hydrate_with(
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(types),
         FfiConverterTypeSliceTier_lower(tier),
         FfiConverterSequenceString.lower(edgeTypes),
+        FfiConverterBool.lower(inPlaceOnly),
         FfiConverterOptionTypeStop.lower(stop),$0
+    )
+})
+}
+    
+    /**
+     * The name and preview text of each item, in order, by the copy's
+     * catalog alone. An unknown type is named by the fallback fields.
+     */
+open func itemDisplays(items: [ItemDisplayInput])throws  -> [ItemDisplay]  {
+    return try  FfiConverterSequenceTypeItemDisplay.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_item_displays(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceTypeItemDisplayInput.lower(items),$0
     )
 })
 }
@@ -2014,8 +2086,26 @@ open func itemTypes()throws  -> [ItemType]  {
 }
     
     /**
-     * Without a `sort` the list is newest created first, or oldest changed
-     * first where `updated_after` is set.
+     * What each of `targets`, the text between a link's brackets as
+     * `link_parts` gives it, could name from the copy alone, in order. With
+     * `item`, each is read as a link in that item's body: `Bound` where
+     * saving it there would make its edge. An item the copy does not hold
+     * throws `NotFound`.
+     */
+open func linkCandidates(item: String?, targets: [String])throws  -> [LinkCandidates]  {
+    return try  FfiConverterSequenceTypeLinkCandidates.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_link_candidates(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionString.lower(item),
+        FfiConverterSequenceString.lower(targets),$0
+    )
+})
+}
+    
+    /**
+     * Without a `sort` the list is newest created first, oldest changed
+     * first where `updated_after` is set, or newest binned first for the bin
+     * alone.
      */
 open func list(filters: ListFilters, sort: Sort?)throws  -> Listing  {
     return try  FfiConverterTypeListing_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2343,8 +2433,8 @@ open func watch(toldUnreachable: Bool, listener: ChangeListener)throws  -> Subsc
 }
     
     /**
-     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved` or
-     * `failing_alone` out of the queue, and puts the copy back to what the server holds;
+     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved`,
+     * `failing_alone` or `instance_changed` out of the queue, and puts the copy back to what the server holds;
      * each write held for it is refused unsent. Answers whether the row was
      * one a withdraw takes.
      */
@@ -5342,6 +5432,15 @@ public struct EdgeType: Equatable, Hashable {
     public var cascadeOnDelete: String
     public var properties: [TypeField]
     public var shipped: Bool
+    /**
+     * Whether the server refuses an edge of this type that closes a cycle
+     * through other edges of the type.
+     */
+    public var acyclic: Bool
+    /**
+     * Whether the server refuses a source its own target constraints admit.
+     */
+    public var flat: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5354,7 +5453,14 @@ public struct EdgeType: Equatable, Hashable {
          */reverseLabel: String, description: String?, cardinality: String, 
         /**
          * The name the edge goes by read from its target.
-         */reverseName: String?, writtenAt: EdgeWrittenAt, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool) {
+         */reverseName: String?, writtenAt: EdgeWrittenAt, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool, 
+        /**
+         * Whether the server refuses an edge of this type that closes a cycle
+         * through other edges of the type.
+         */acyclic: Bool, 
+        /**
+         * Whether the server refuses a source its own target constraints admit.
+         */flat: Bool) {
         self.id = id
         self.label = label
         self.reverseLabel = reverseLabel
@@ -5367,6 +5473,8 @@ public struct EdgeType: Equatable, Hashable {
         self.cascadeOnDelete = cascadeOnDelete
         self.properties = properties
         self.shipped = shipped
+        self.acyclic = acyclic
+        self.flat = flat
     }
 
     
@@ -5396,7 +5504,9 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
                 targetTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
                 cascadeOnDelete: FfiConverterString.read(from: &buf), 
                 properties: FfiConverterSequenceTypeTypeField.read(from: &buf), 
-                shipped: FfiConverterBool.read(from: &buf)
+                shipped: FfiConverterBool.read(from: &buf), 
+                acyclic: FfiConverterBool.read(from: &buf), 
+                flat: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -5413,6 +5523,8 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
         FfiConverterString.write(value.cascadeOnDelete, into: &buf)
         FfiConverterSequenceTypeTypeField.write(value.properties, into: &buf)
         FfiConverterBool.write(value.shipped, into: &buf)
+        FfiConverterBool.write(value.acyclic, into: &buf)
+        FfiConverterBool.write(value.flat, into: &buf)
     }
 }
 
@@ -5831,6 +5943,125 @@ public func FfiConverterTypeFileStatus_lift(_ buf: RustBuffer) throws -> FileSta
 #endif
 public func FfiConverterTypeFileStatus_lower(_ value: FileStatus) -> RustBuffer {
     return FfiConverterTypeFileStatus.lower(value)
+}
+
+
+/**
+ * One condition. `value` is `nil` exactly where the operator takes none.
+ */
+public struct FilterCondition: Equatable, Hashable {
+    public var field: FilterField
+    public var `operator`: FilterOperator
+    public var value: FilterValue?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(field: FilterField, `operator`: FilterOperator, value: FilterValue?) {
+        self.field = field
+        self.`operator` = `operator`
+        self.value = value
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FilterCondition: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterCondition: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterCondition {
+        return
+            try FilterCondition(
+                field: FfiConverterTypeFilterField.read(from: &buf), 
+                operator: FfiConverterTypeFilterOperator.read(from: &buf), 
+                value: FfiConverterOptionTypeFilterValue.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FilterCondition, into buf: inout [UInt8]) {
+        FfiConverterTypeFilterField.write(value.field, into: &buf)
+        FfiConverterTypeFilterOperator.write(value.`operator`, into: &buf)
+        FfiConverterOptionTypeFilterValue.write(value.value, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterCondition_lift(_ buf: RustBuffer) throws -> FilterCondition {
+    return try FfiConverterTypeFilterCondition.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterCondition_lower(_ value: FilterCondition) -> RustBuffer {
+    return FfiConverterTypeFilterCondition.lower(value)
+}
+
+
+/**
+ * The conditions of a filter and the one word that joins them. The grammar
+ * joins every condition with `AND` or every one with `OR`, never both.
+ */
+public struct FilterExpression: Equatable, Hashable {
+    public var join: FilterJoin
+    public var conditions: [FilterCondition]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(join: FilterJoin, conditions: [FilterCondition]) {
+        self.join = join
+        self.conditions = conditions
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FilterExpression: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterExpression: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterExpression {
+        return
+            try FilterExpression(
+                join: FfiConverterTypeFilterJoin.read(from: &buf), 
+                conditions: FfiConverterSequenceTypeFilterCondition.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FilterExpression, into buf: inout [UInt8]) {
+        FfiConverterTypeFilterJoin.write(value.join, into: &buf)
+        FfiConverterSequenceTypeFilterCondition.write(value.conditions, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterExpression_lift(_ buf: RustBuffer) throws -> FilterExpression {
+    return try FfiConverterTypeFilterExpression.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterExpression_lower(_ value: FilterExpression) -> RustBuffer {
+    return FfiConverterTypeFilterExpression.lower(value)
 }
 
 
@@ -7305,6 +7536,11 @@ public struct Item: Equatable, Hashable {
     public var captureLatitude: Double?
     public var captureLongitude: Double?
     /**
+     * When the item went to the bin; none outside it, and for a row an
+     * archive restored to the bin without the time.
+     */
+    public var trashedAt: String?
+    /**
      * The text under the property the type's display hints name as its
      * title, or `title` where they name none; none where that holds no
      * string.
@@ -7334,6 +7570,10 @@ public struct Item: Equatable, Hashable {
         /**
          * Where the item was captured, in degrees, as sent.
          */captureLatitude: Double? = nil, captureLongitude: Double? = nil, 
+        /**
+         * When the item went to the bin; none outside it, and for a row an
+         * archive restored to the bin without the time.
+         */trashedAt: String? = nil, 
         /**
          * The text under the property the type's display hints name as its
          * title, or `title` where they name none; none where that holds no
@@ -7365,6 +7605,7 @@ public struct Item: Equatable, Hashable {
         self.tags = tags
         self.captureLatitude = captureLatitude
         self.captureLongitude = captureLongitude
+        self.trashedAt = trashedAt
         self.title = title
         self.body = body
         self.unreadableProperties = unreadableProperties
@@ -7401,6 +7642,7 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 captureLatitude: FfiConverterOptionDouble.read(from: &buf), 
                 captureLongitude: FfiConverterOptionDouble.read(from: &buf), 
+                trashedAt: FfiConverterOptionString.read(from: &buf), 
                 title: FfiConverterOptionString.read(from: &buf), 
                 body: FfiConverterOptionString.read(from: &buf), 
                 unreadableProperties: FfiConverterOptionString.read(from: &buf)
@@ -7423,6 +7665,7 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterOptionDouble.write(value.captureLatitude, into: &buf)
         FfiConverterOptionDouble.write(value.captureLongitude, into: &buf)
+        FfiConverterOptionString.write(value.trashedAt, into: &buf)
         FfiConverterOptionString.write(value.title, into: &buf)
         FfiConverterOptionString.write(value.body, into: &buf)
         FfiConverterOptionString.write(value.unreadableProperties, into: &buf)
@@ -7446,11 +7689,131 @@ public func FfiConverterTypeItem_lower(_ value: Item) -> RustBuffer {
 
 
 /**
+ * How a device shows an item: its name and a line of preview text, each
+ * none where the item has nothing to show.
+ */
+public struct ItemDisplay: Equatable, Hashable {
+    public var name: String?
+    public var preview: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(name: String?, preview: String?) {
+        self.name = name
+        self.preview = preview
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ItemDisplay: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeItemDisplay: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ItemDisplay {
+        return
+            try ItemDisplay(
+                name: FfiConverterOptionString.read(from: &buf), 
+                preview: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ItemDisplay, into buf: inout [UInt8]) {
+        FfiConverterOptionString.write(value.name, into: &buf)
+        FfiConverterOptionString.write(value.preview, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemDisplay_lift(_ buf: RustBuffer) throws -> ItemDisplay {
+    return try FfiConverterTypeItemDisplay.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemDisplay_lower(_ value: ItemDisplay) -> RustBuffer {
+    return FfiConverterTypeItemDisplay.lower(value)
+}
+
+
+/**
+ * An item to name and preview: its type and properties.
+ */
+public struct ItemDisplayInput: Equatable, Hashable {
+    public var type: String
+    public var properties: JsonObject
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(type: String, properties: JsonObject) {
+        self.type = type
+        self.properties = properties
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ItemDisplayInput: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeItemDisplayInput: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ItemDisplayInput {
+        return
+            try ItemDisplayInput(
+                type: FfiConverterString.read(from: &buf), 
+                properties: FfiConverterTypeJsonObject.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ItemDisplayInput, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.type, into: &buf)
+        FfiConverterTypeJsonObject.write(value.properties, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemDisplayInput_lift(_ buf: RustBuffer) throws -> ItemDisplayInput {
+    return try FfiConverterTypeItemDisplayInput.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemDisplayInput_lower(_ value: ItemDisplayInput) -> RustBuffer {
+    return FfiConverterTypeItemDisplayInput.lower(value)
+}
+
+
+/**
  * An item type as the copy holds it, with the fields it inherits.
  */
 public struct ItemType: Equatable, Hashable {
     public var id: String
     public var label: String?
+    /**
+     * The name an app shows for more than one item of the type, such as
+     * `People`: the type's own, else one made from its label.
+     */
+    public var plural: String
     public var description: String?
     public var parent: String?
     public var version: Int64
@@ -7467,12 +7830,17 @@ public struct ItemType: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, label: String?, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, 
+    public init(id: String, label: String?, 
+        /**
+         * The name an app shows for more than one item of the type, such as
+         * `People`: the type's own, else one made from its label.
+         */plural: String, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, 
         /**
          * The Iconify icon ID, `<set>:<name>`, such as `lucide:book-open`.
          */icon: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
         self.id = id
         self.label = label
+        self.plural = plural
         self.description = description
         self.parent = parent
         self.version = version
@@ -7503,6 +7871,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
             try ItemType(
                 id: FfiConverterString.read(from: &buf), 
                 label: FfiConverterOptionString.read(from: &buf), 
+                plural: FfiConverterString.read(from: &buf), 
                 description: FfiConverterOptionString.read(from: &buf), 
                 parent: FfiConverterOptionString.read(from: &buf), 
                 version: FfiConverterInt64.read(from: &buf), 
@@ -7519,6 +7888,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
     public static func write(_ value: ItemType, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
         FfiConverterOptionString.write(value.label, into: &buf)
+        FfiConverterString.write(value.plural, into: &buf)
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterOptionString.write(value.parent, into: &buf)
         FfiConverterInt64.write(value.version, into: &buf)
@@ -7795,12 +8165,259 @@ public func FfiConverterTypeLastFailure_lower(_ value: LastFailure) -> RustBuffe
 
 
 /**
- * Narrowing for a list. Leaving `state` unset answers the active state, as
- * the server does; `all_states` lifts that, and a named state wins.
+ * The items a link could name, from the copy alone.
+ */
+public struct LinkCandidates: Equatable, Hashable {
+    /**
+     * The link's text between its brackets, as asked.
+     */
+    public var target: String
+    public var state: LinkState
+    /**
+     * The item it names, where `state` is `Bound`.
+     */
+    public var item: String?
+    /**
+     * Every item outside the bin the copy holds that answers to the link's
+     * name, by id, title or file path, without regard to case or Unicode
+     * form; and the bound item.
+     */
+    public var candidates: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The link's text between its brackets, as asked.
+         */target: String, state: LinkState, 
+        /**
+         * The item it names, where `state` is `Bound`.
+         */item: String?, 
+        /**
+         * Every item outside the bin the copy holds that answers to the link's
+         * name, by id, title or file path, without regard to case or Unicode
+         * form; and the bound item.
+         */candidates: [String]) {
+        self.target = target
+        self.state = state
+        self.item = item
+        self.candidates = candidates
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LinkCandidates: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLinkCandidates: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LinkCandidates {
+        return
+            try LinkCandidates(
+                target: FfiConverterString.read(from: &buf), 
+                state: FfiConverterTypeLinkState.read(from: &buf), 
+                item: FfiConverterOptionString.read(from: &buf), 
+                candidates: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LinkCandidates, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.target, into: &buf)
+        FfiConverterTypeLinkState.write(value.state, into: &buf)
+        FfiConverterOptionString.write(value.item, into: &buf)
+        FfiConverterSequenceString.write(value.candidates, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkCandidates_lift(_ buf: RustBuffer) throws -> LinkCandidates {
+    return try FfiConverterTypeLinkCandidates.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkCandidates_lower(_ value: LinkCandidates) -> RustBuffer {
+    return FfiConverterTypeLinkCandidates.lower(value)
+}
+
+
+/**
+ * One part of a link, trimmed, and where it sits in the text.
+ */
+public struct LinkPart: Equatable, Hashable {
+    public var text: String
+    public var start: UInt64
+    public var end: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(text: String, start: UInt64, end: UInt64) {
+        self.text = text
+        self.start = start
+        self.end = end
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LinkPart: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLinkPart: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LinkPart {
+        return
+            try LinkPart(
+                text: FfiConverterString.read(from: &buf), 
+                start: FfiConverterUInt64.read(from: &buf), 
+                end: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LinkPart, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.text, into: &buf)
+        FfiConverterUInt64.write(value.start, into: &buf)
+        FfiConverterUInt64.write(value.end, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkPart_lift(_ buf: RustBuffer) throws -> LinkPart {
+    return try FfiConverterTypeLinkPart.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkPart_lower(_ value: LinkPart) -> RustBuffer {
+    return FfiConverterTypeLinkPart.lower(value)
+}
+
+
+/**
+ * A link in a text, as `link_parts` reads it. Every position is a range of
+ * UTF-16 code units in the text, as `NSString` and TextKit count them.
+ */
+public struct LinkParts: Equatable, Hashable {
+    /**
+     * As it appears in the text, brackets included.
+     */
+    public var text: String
+    public var start: UInt64
+    public var end: UInt64
+    /**
+     * The text between the brackets, trimmed: what the link is bound by and
+     * what `link_candidates` takes.
+     */
+    public var target: String
+    /**
+     * What the link names. Empty for a link to a heading of the same text.
+     */
+    public var name: LinkPart
+    public var heading: LinkPart?
+    public var alias: LinkPart?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * As it appears in the text, brackets included.
+         */text: String, start: UInt64, end: UInt64, 
+        /**
+         * The text between the brackets, trimmed: what the link is bound by and
+         * what `link_candidates` takes.
+         */target: String, 
+        /**
+         * What the link names. Empty for a link to a heading of the same text.
+         */name: LinkPart, heading: LinkPart?, alias: LinkPart?) {
+        self.text = text
+        self.start = start
+        self.end = end
+        self.target = target
+        self.name = name
+        self.heading = heading
+        self.alias = alias
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension LinkParts: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLinkParts: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LinkParts {
+        return
+            try LinkParts(
+                text: FfiConverterString.read(from: &buf), 
+                start: FfiConverterUInt64.read(from: &buf), 
+                end: FfiConverterUInt64.read(from: &buf), 
+                target: FfiConverterString.read(from: &buf), 
+                name: FfiConverterTypeLinkPart.read(from: &buf), 
+                heading: FfiConverterOptionTypeLinkPart.read(from: &buf), 
+                alias: FfiConverterOptionTypeLinkPart.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: LinkParts, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.text, into: &buf)
+        FfiConverterUInt64.write(value.start, into: &buf)
+        FfiConverterUInt64.write(value.end, into: &buf)
+        FfiConverterString.write(value.target, into: &buf)
+        FfiConverterTypeLinkPart.write(value.name, into: &buf)
+        FfiConverterOptionTypeLinkPart.write(value.heading, into: &buf)
+        FfiConverterOptionTypeLinkPart.write(value.alias, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkParts_lift(_ buf: RustBuffer) throws -> LinkParts {
+    return try FfiConverterTypeLinkParts.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkParts_lower(_ value: LinkParts) -> RustBuffer {
+    return FfiConverterTypeLinkParts.lower(value)
+}
+
+
+/**
+ * Narrowing for a list. Leaving `states` unset answers the active state, as
+ * the server does; `all_states` lifts that. An empty `states` or `types` is
+ * refused, as is `states` beside `all_states` and more than ten types.
  */
 public struct ListFilters: Equatable, Hashable {
-    public var type: String?
-    public var state: ItemState?
+    public var types: [String]?
+    public var states: [ItemState]?
     public var allStates: Bool
     public var tier: Tier?
     public var tags: [String]
@@ -7836,7 +8453,7 @@ public struct ListFilters: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil, 
+    public init(types: [String]? = nil, states: [ItemState]? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [], occurredAfter: String? = nil, occurredBefore: String? = nil, 
         /**
          * Only the items stamped with this source.
          */source: String? = nil, 
@@ -7857,8 +8474,8 @@ public struct ListFilters: Equatable, Hashable {
          * An item id: that item and every item it reaches along `parent-of`
          * edges, as far as the copy holds them.
          */beneath: String? = nil, limit: UInt32? = nil, offset: UInt32? = nil) {
-        self.type = type
-        self.state = state
+        self.types = types
+        self.states = states
         self.allStates = allStates
         self.tier = tier
         self.tags = tags
@@ -7889,8 +8506,8 @@ public struct FfiConverterTypeListFilters: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ListFilters {
         return
             try ListFilters(
-                type: FfiConverterOptionString.read(from: &buf), 
-                state: FfiConverterOptionTypeItemState.read(from: &buf), 
+                types: FfiConverterOptionSequenceString.read(from: &buf), 
+                states: FfiConverterOptionSequenceTypeItemState.read(from: &buf), 
                 allStates: FfiConverterBool.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
@@ -7907,8 +8524,8 @@ public struct FfiConverterTypeListFilters: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: ListFilters, into buf: inout [UInt8]) {
-        FfiConverterOptionString.write(value.type, into: &buf)
-        FfiConverterOptionTypeItemState.write(value.state, into: &buf)
+        FfiConverterOptionSequenceString.write(value.types, into: &buf)
+        FfiConverterOptionSequenceTypeItemState.write(value.states, into: &buf)
         FfiConverterBool.write(value.allStates, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
@@ -8812,13 +9429,20 @@ public func FfiConverterTypeRestoredRemoval_lower(_ value: RestoredRemoval) -> R
 
 
 /**
- * Narrowing for a search: the state rule a list takes, a type with its
- * subtree, tags, a listing-grammar expression and `beneath`, each read as
- * the list reads it.
+ * Narrowing for a search: the states and types a list takes, tags, a
+ * listing-grammar expression and `beneath`, each read as the list reads it.
  */
 public struct SearchFilters: Equatable, Hashable {
-    public var type: String?
-    public var state: ItemState?
+    /**
+     * The types to answer, each with its subtree: up to ten. An empty list
+     * is refused.
+     */
+    public var types: [String]?
+    /**
+     * The states to answer; none answers the active state. An empty list
+     * is refused, and so is a list beside `all_states`.
+     */
+    public var states: [ItemState]?
     public var allStates: Bool
     /**
      * One tier; none answers both.
@@ -8847,7 +9471,15 @@ public struct SearchFilters: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String? = nil, state: ItemState? = nil, allStates: Bool = false, 
+    public init(
+        /**
+         * The types to answer, each with its subtree: up to ten. An empty list
+         * is refused.
+         */types: [String]? = nil, 
+        /**
+         * The states to answer; none answers the active state. An empty list
+         * is refused, and so is a list beside `all_states`.
+         */states: [ItemState]? = nil, allStates: Bool = false, 
         /**
          * One tier; none answers both.
          */tier: Tier? = nil, tags: [String] = [], 
@@ -8866,8 +9498,8 @@ public struct SearchFilters: Equatable, Hashable {
          * An item id: that item and every item it reaches along `parent-of`
          * edges, as far as the copy holds them.
          */beneath: String? = nil) {
-        self.type = type
-        self.state = state
+        self.types = types
+        self.states = states
         self.allStates = allStates
         self.tier = tier
         self.tags = tags
@@ -8893,8 +9525,8 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SearchFilters {
         return
             try SearchFilters(
-                type: FfiConverterOptionString.read(from: &buf), 
-                state: FfiConverterOptionTypeItemState.read(from: &buf), 
+                types: FfiConverterOptionSequenceString.read(from: &buf), 
+                states: FfiConverterOptionSequenceTypeItemState.read(from: &buf), 
                 allStates: FfiConverterBool.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
@@ -8906,8 +9538,8 @@ public struct FfiConverterTypeSearchFilters: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: SearchFilters, into buf: inout [UInt8]) {
-        FfiConverterOptionString.write(value.type, into: &buf)
-        FfiConverterOptionTypeItemState.write(value.state, into: &buf)
+        FfiConverterOptionSequenceString.write(value.types, into: &buf)
+        FfiConverterOptionSequenceTypeItemState.write(value.states, into: &buf)
         FfiConverterBool.write(value.allStates, into: &buf)
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
         FfiConverterSequenceString.write(value.tags, into: &buf)
@@ -9422,6 +10054,11 @@ public struct TypeField: Equatable, Hashable {
      */
     public var fieldType: String
     public var required: Bool
+    /**
+     * The name an app shows for the field: the nearest one its type's chain
+     * names, else one made from its name, such as `Due At` for `due_at`.
+     */
+    public var label: String
     public var description: String?
     /**
      * The type that declares it: the type itself, or the nearest one it
@@ -9438,7 +10075,11 @@ public struct TypeField: Equatable, Hashable {
     public init(name: String, 
         /**
          * The field's own type, such as `string` or `thumbnail`.
-         */fieldType: String, required: Bool, description: String?, 
+         */fieldType: String, required: Bool, 
+        /**
+         * The name an app shows for the field: the nearest one its type's chain
+         * names, else one made from its name, such as `Due At` for `due_at`.
+         */label: String, description: String?, 
         /**
          * The type that declares it: the type itself, or the nearest one it
          * inherits the field from.
@@ -9449,6 +10090,7 @@ public struct TypeField: Equatable, Hashable {
         self.name = name
         self.fieldType = fieldType
         self.required = required
+        self.label = label
         self.description = description
         self.declaredBy = declaredBy
         self.definition = definition
@@ -9473,6 +10115,7 @@ public struct FfiConverterTypeTypeField: FfiConverterRustBuffer {
                 name: FfiConverterString.read(from: &buf), 
                 fieldType: FfiConverterString.read(from: &buf), 
                 required: FfiConverterBool.read(from: &buf), 
+                label: FfiConverterString.read(from: &buf), 
                 description: FfiConverterOptionString.read(from: &buf), 
                 declaredBy: FfiConverterString.read(from: &buf), 
                 definition: FfiConverterTypeJsonObject.read(from: &buf)
@@ -9483,6 +10126,7 @@ public struct FfiConverterTypeTypeField: FfiConverterRustBuffer {
         FfiConverterString.write(value.name, into: &buf)
         FfiConverterString.write(value.fieldType, into: &buf)
         FfiConverterBool.write(value.required, into: &buf)
+        FfiConverterString.write(value.label, into: &buf)
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterString.write(value.declaredBy, into: &buf)
         FfiConverterTypeJsonObject.write(value.definition, into: &buf)
@@ -9926,6 +10570,11 @@ public enum BlockedReason: Equatable, Hashable, CaseIterable {
      * answers other writes.
      */
     case failingAlone
+    /**
+     * The write was queued against an instance other than the one the copy
+     * has been built from since, and is sent only once released.
+     */
+    case instanceChanged
 
 
 
@@ -9957,6 +10606,8 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case 5: return .failingAlone
         
+        case 6: return .instanceChanged
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -9983,6 +10634,10 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case .failingAlone:
             writeInt(&buf, Int32(5))
+        
+        
+        case .instanceChanged:
+            writeInt(&buf, Int32(6))
         
         }
     }
@@ -10459,6 +11114,73 @@ public func FfiConverterTypeCompleteness_lower(_ value: Completeness) -> RustBuf
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum EdgeDirection: Equatable, Hashable, CaseIterable {
+    
+    case outbound
+    case backref
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension EdgeDirection: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEdgeDirection: FfiConverterRustBuffer {
+    typealias SwiftType = EdgeDirection
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeDirection {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .outbound
+        
+        case 2: return .backref
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: EdgeDirection, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .outbound:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .backref:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeDirection_lift(_ buf: RustBuffer) throws -> EdgeDirection {
+    return try FfiConverterTypeEdgeDirection.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEdgeDirection_lower(_ value: EdgeDirection) -> RustBuffer {
+    return FfiConverterTypeEdgeDirection.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * One end of an edge.
  */
@@ -10807,6 +11529,397 @@ public func FfiConverterTypeFileState_lift(_ buf: RustBuffer) throws -> FileStat
 #endif
 public func FfiConverterTypeFileState_lower(_ value: FileState) -> RustBuffer {
     return FfiConverterTypeFileState.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum FilterField: Equatable, Hashable {
+    
+    case system(name: SystemField
+    )
+    /**
+     * `properties.<name>`.
+     */
+    case property(name: String
+    )
+    /**
+     * `properties.<field>.<member>`, compared with `eq` only.
+     */
+    case member(field: String, member: String
+    )
+    case tags
+    case statusGroup
+    case edge(edgeType: String, direction: EdgeDirection
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FilterField: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterField: FfiConverterRustBuffer {
+    typealias SwiftType = FilterField
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterField {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .system(name: try FfiConverterTypeSystemField.read(from: &buf)
+        )
+        
+        case 2: return .property(name: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .member(field: try FfiConverterString.read(from: &buf), member: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 4: return .tags
+        
+        case 5: return .statusGroup
+        
+        case 6: return .edge(edgeType: try FfiConverterString.read(from: &buf), direction: try FfiConverterTypeEdgeDirection.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FilterField, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .system(name):
+            writeInt(&buf, Int32(1))
+            FfiConverterTypeSystemField.write(name, into: &buf)
+            
+        
+        case let .property(name):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(name, into: &buf)
+            
+        
+        case let .member(field,member):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(field, into: &buf)
+            FfiConverterString.write(member, into: &buf)
+            
+        
+        case .tags:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .statusGroup:
+            writeInt(&buf, Int32(5))
+        
+        
+        case let .edge(edgeType,direction):
+            writeInt(&buf, Int32(6))
+            FfiConverterString.write(edgeType, into: &buf)
+            FfiConverterTypeEdgeDirection.write(direction, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterField_lift(_ buf: RustBuffer) throws -> FilterField {
+    return try FfiConverterTypeFilterField.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterField_lower(_ value: FilterField) -> RustBuffer {
+    return FfiConverterTypeFilterField.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * `All` joins the conditions with `AND`, `Any` with `OR`.
+ */
+
+public enum FilterJoin: Equatable, Hashable, CaseIterable {
+    
+    case all
+    case any
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FilterJoin: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterJoin: FfiConverterRustBuffer {
+    typealias SwiftType = FilterJoin
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterJoin {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .all
+        
+        case 2: return .any
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FilterJoin, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .all:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .any:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterJoin_lift(_ buf: RustBuffer) throws -> FilterJoin {
+    return try FfiConverterTypeFilterJoin.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterJoin_lower(_ value: FilterJoin) -> RustBuffer {
+    return FfiConverterTypeFilterJoin.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum FilterOperator: Equatable, Hashable, CaseIterable {
+    
+    case eq
+    case neq
+    case gt
+    case gte
+    case lt
+    case lte
+    case contains
+    case startsWith
+    case exists
+    case notExists
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FilterOperator: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterOperator: FfiConverterRustBuffer {
+    typealias SwiftType = FilterOperator
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterOperator {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .eq
+        
+        case 2: return .neq
+        
+        case 3: return .gt
+        
+        case 4: return .gte
+        
+        case 5: return .lt
+        
+        case 6: return .lte
+        
+        case 7: return .contains
+        
+        case 8: return .startsWith
+        
+        case 9: return .exists
+        
+        case 10: return .notExists
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FilterOperator, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .eq:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .neq:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .gt:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .gte:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .lt:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .lte:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .contains:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .startsWith:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .exists:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .notExists:
+            writeInt(&buf, Int32(10))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterOperator_lift(_ buf: RustBuffer) throws -> FilterOperator {
+    return try FfiConverterTypeFilterOperator.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterOperator_lower(_ value: FilterOperator) -> RustBuffer {
+    return FfiConverterTypeFilterOperator.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum FilterValue: Equatable, Hashable {
+    
+    case text(value: String
+    )
+    case number(value: Double
+    )
+    case bool(value: Bool
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension FilterValue: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFilterValue: FfiConverterRustBuffer {
+    typealias SwiftType = FilterValue
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FilterValue {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .text(value: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .number(value: try FfiConverterDouble.read(from: &buf)
+        )
+        
+        case 3: return .bool(value: try FfiConverterBool.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: FilterValue, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .text(value):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(value, into: &buf)
+            
+        
+        case let .number(value):
+            writeInt(&buf, Int32(2))
+            FfiConverterDouble.write(value, into: &buf)
+            
+        
+        case let .bool(value):
+            writeInt(&buf, Int32(3))
+            FfiConverterBool.write(value, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterValue_lift(_ buf: RustBuffer) throws -> FilterValue {
+    return try FfiConverterTypeFilterValue.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFilterValue_lower(_ value: FilterValue) -> RustBuffer {
+    return FfiConverterTypeFilterValue.lower(value)
 }
 
 
@@ -11614,6 +12727,93 @@ public func FfiConverterTypeJsonValue_lift(_ buf: RustBuffer) throws -> JsonValu
 #endif
 public func FfiConverterTypeJsonValue_lower(_ value: JsonValue) -> RustBuffer {
     return FfiConverterTypeJsonValue.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Whether a link names one item.
+ */
+
+public enum LinkState: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * Saving the link in the item's body would make its edge to `item`.
+     */
+    case bound
+    /**
+     * More than one item the copy holds answers to it.
+     */
+    case ambiguous
+    /**
+     * No item, or one the copy cannot tell is the only one, since it holds a
+     * slice: the server's lookup decides.
+     */
+    case unresolved
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension LinkState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeLinkState: FfiConverterRustBuffer {
+    typealias SwiftType = LinkState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LinkState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .bound
+        
+        case 2: return .ambiguous
+        
+        case 3: return .unresolved
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: LinkState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .bound:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .ambiguous:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unresolved:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkState_lift(_ buf: RustBuffer) throws -> LinkState {
+    return try FfiConverterTypeLinkState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeLinkState_lower(_ value: LinkState) -> RustBuffer {
+    return FfiConverterTypeLinkState.lower(value)
 }
 
 
@@ -12722,6 +13922,129 @@ public func FfiConverterTypeStorageCause_lower(_ value: StorageCause) -> RustBuf
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum SystemField: Equatable, Hashable, CaseIterable {
+    
+    case state
+    case type
+    case source
+    case occurredAt
+    case createdAt
+    case updatedAt
+    case tier
+    case version
+    case id
+    case sourceId
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension SystemField: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSystemField: FfiConverterRustBuffer {
+    typealias SwiftType = SystemField
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SystemField {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .state
+        
+        case 2: return .type
+        
+        case 3: return .source
+        
+        case 4: return .occurredAt
+        
+        case 5: return .createdAt
+        
+        case 6: return .updatedAt
+        
+        case 7: return .tier
+        
+        case 8: return .version
+        
+        case 9: return .id
+        
+        case 10: return .sourceId
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: SystemField, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .state:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .type:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .source:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .occurredAt:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .createdAt:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .updatedAt:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .tier:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .version:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .id:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .sourceId:
+            writeInt(&buf, Int32(10))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSystemField_lift(_ buf: RustBuffer) throws -> SystemField {
+    return try FfiConverterTypeSystemField.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSystemField_lower(_ value: SystemField) -> RustBuffer {
+    return FfiConverterTypeSystemField.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * The tier an item is in: `library` for lasting material, `feed` for an
  * incoming stream.
@@ -13535,6 +14858,30 @@ fileprivate struct FfiConverterOptionTypeLastFailure: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeLinkPart: FfiConverterRustBuffer {
+    typealias SwiftType = LinkPart?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeLinkPart.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeLinkPart.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeMissingGrant: FfiConverterRustBuffer {
     typealias SwiftType = MissingGrant?
 
@@ -13719,6 +15066,30 @@ fileprivate struct FfiConverterOptionTypeWaitingFirstSync: FfiConverterRustBuffe
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeWaitingFirstSync.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeFilterValue: FfiConverterRustBuffer {
+    typealias SwiftType = FilterValue?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFilterValue.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFilterValue.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -14190,6 +15561,31 @@ fileprivate struct FfiConverterSequenceTypeFileStatus: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFilterCondition: FfiConverterRustBuffer {
+    typealias SwiftType = [FilterCondition]
+
+    public static func write(_ value: [FilterCondition], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFilterCondition.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FilterCondition] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FilterCondition]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFilterCondition.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFlaggedFile: FfiConverterRustBuffer {
     typealias SwiftType = [FlaggedFile]
 
@@ -14232,6 +15628,56 @@ fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeItemDisplay: FfiConverterRustBuffer {
+    typealias SwiftType = [ItemDisplay]
+
+    public static func write(_ value: [ItemDisplay], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeItemDisplay.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ItemDisplay] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ItemDisplay]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeItemDisplay.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeItemDisplayInput: FfiConverterRustBuffer {
+    typealias SwiftType = [ItemDisplayInput]
+
+    public static func write(_ value: [ItemDisplayInput], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeItemDisplayInput.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ItemDisplayInput] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ItemDisplayInput]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeItemDisplayInput.read(from: &buf))
         }
         return seq
     }
@@ -14307,6 +15753,56 @@ fileprivate struct FfiConverterSequenceTypeJsonObject: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeJsonObject.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeLinkCandidates: FfiConverterRustBuffer {
+    typealias SwiftType = [LinkCandidates]
+
+    public static func write(_ value: [LinkCandidates], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeLinkCandidates.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [LinkCandidates] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [LinkCandidates]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeLinkCandidates.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeLinkParts: FfiConverterRustBuffer {
+    typealias SwiftType = [LinkParts]
+
+    public static func write(_ value: [LinkParts], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeLinkParts.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [LinkParts] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [LinkParts]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeLinkParts.read(from: &buf))
         }
         return seq
     }
@@ -14540,6 +16036,31 @@ fileprivate struct FfiConverterSequenceTypeViewRow: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFilterOperator: FfiConverterRustBuffer {
+    typealias SwiftType = [FilterOperator]
+
+    public static func write(_ value: [FilterOperator], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFilterOperator.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FilterOperator] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FilterOperator]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFilterOperator.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeItemState: FfiConverterRustBuffer {
     typealias SwiftType = [ItemState]
 
@@ -14665,6 +16186,17 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
     }
 }
 /**
+ * Every link in `text` in order, repeats included, split as Marfa reads
+ * it, with each part's place in the text. Needs no store.
+ */
+public func linkParts(text: String) -> [LinkParts]  {
+    return try!  FfiConverterSequenceTypeLinkParts.lift(try! rustCall() {
+    uniffi_marfa_core_ffi_fn_func_link_parts(
+        FfiConverterString.lower(text),$0
+    )
+})
+}
+/**
  * Removes the store at `path`: the store, its log, the bytes it fetched and
  * its writer lock, and nothing else beside it, unlinking a symbolic link at
  * any of those names rather than what it leads to. A store of any schema is
@@ -14687,6 +16219,38 @@ public func removeStore(path: String, unsent: UInt64)throws   {try rustCallWithE
         FfiConverterUInt64.lower(unsent),$0
     )
 }
+}
+/**
+ * The expression a text in the listing grammar holds, refused with the
+ * server's `validation_error` and message where the server refuses it.
+ */
+public func decodeFilter(text: String)throws  -> FilterExpression  {
+    return try  FfiConverterTypeFilterExpression_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_decode_filter(
+        FfiConverterString.lower(text),$0
+    )
+})
+}
+/**
+ * The expression's text in the listing grammar, refused with the server's
+ * `validation_error` where the server would refuse it.
+ */
+public func encodeFilter(expression: FilterExpression)throws  -> String  {
+    return try  FfiConverterString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_encode_filter(
+        FfiConverterTypeFilterExpression_lower(expression),$0
+    )
+})
+}
+/**
+ * The operators the grammar takes on a field.
+ */
+public func filterOperators(field: FilterField) -> [FilterOperator]  {
+    return try!  FfiConverterSequenceTypeFilterOperator.lift(try! rustCall() {
+    uniffi_marfa_core_ffi_fn_func_filter_operators(
+        FfiConverterTypeFilterField_lower(field),$0
+    )
+})
 }
 public func instanceDescription(url: String)throws  -> InstanceDescription  {
     return try  FfiConverterTypeInstanceDescription_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -14711,7 +16275,19 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_func_link_parts() != 21360) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_func_remove_store() != 23704) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_decode_filter() != 57210) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_encode_filter() != 19606) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_filter_operators() != 12489) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_func_instance_description() != 5508) {
@@ -14735,7 +16311,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_attach() != 30567) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_bin() != 51174) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_bin() != 30311) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_blob() != 13524) {
@@ -14748,6 +16324,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_catch_up() != 54493) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_check_edge() != 5659) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_conflicted_copies_of() != 13481) {
@@ -14825,7 +16404,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 41773) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 18467) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 40233) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_item_displays() != 22306) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_item_type() != 51576) {
@@ -14834,7 +16416,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_item_types() != 15133) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 401) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_link_candidates() != 58530) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_list() != 37052) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_original_of_conflicted_copy() != 44658) {
@@ -14903,7 +16488,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_watch() != 793) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 46871) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 48429) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {

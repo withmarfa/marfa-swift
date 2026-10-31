@@ -198,6 +198,11 @@ enum Refuse {
         .Validation(code: code, message: "validation (\(code)): \(message)")
     }
 
+    /// The core's refusal of a concrete type in a list or search that its catalog does not hold.
+    static func unknownTypeInQuery(_ name: String) -> MarfaCore.MarfaError {
+        .UnknownType(message: "Unknown type: \(name)")
+    }
+
     static func unknownType(_ message: String) -> MarfaCore.MarfaError {
         .UnknownType(message: "unknown type: \(message)")
     }

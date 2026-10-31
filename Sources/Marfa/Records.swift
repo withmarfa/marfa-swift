@@ -25,6 +25,8 @@ public struct Item: Sendable, Hashable {
     /// Where the item was captured, in degrees, as sent.
     public var captureLatitude: Double?
     public var captureLongitude: Double?
+    /// When the item went to the bin; none outside it, and for a row an archive restored to the bin without the time.
+    public var trashedAt: String?
     /// The text under the property the type's display hints name as its
     /// title, or `title` where they name none; none where that holds no
     /// string.
@@ -43,7 +45,7 @@ public struct Item: Sendable, Hashable {
         id: String, type: String, properties: JSONObject, state: ItemState, tier: Tier?, version: Int64,
         schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
         updatedAt: String, tags: [String], captureLatitude: Double? = nil, captureLongitude: Double? = nil,
-        title: String? = nil, body: String? = nil, unreadableProperties: String? = nil
+        trashedAt: String? = nil, title: String? = nil, body: String? = nil, unreadableProperties: String? = nil
     ) {
         self.id = id
         self.type = type
@@ -60,6 +62,7 @@ public struct Item: Sendable, Hashable {
         self.tags = tags
         self.captureLatitude = captureLatitude
         self.captureLongitude = captureLongitude
+        self.trashedAt = trashedAt
         self.title = title
         self.body = body
         self.unreadableProperties = unreadableProperties
@@ -81,6 +84,7 @@ public struct Item: Sendable, Hashable {
         tags = core.tags
         captureLatitude = core.captureLatitude
         captureLongitude = core.captureLongitude
+        trashedAt = core.trashedAt
         title = core.title
         body = core.body
         unreadableProperties = core.unreadableProperties
@@ -103,6 +107,7 @@ public struct Item: Sendable, Hashable {
             tags: tags,
             captureLatitude: captureLatitude,
             captureLongitude: captureLongitude,
+            trashedAt: trashedAt,
             title: title,
             body: body,
             unreadableProperties: unreadableProperties
@@ -320,8 +325,9 @@ public struct Edit: Sendable, Hashable {
     }
 }
 
-/// With `state` unset, a list answers active items only; `allStates` lifts
-/// that, and a named `state` wins over both.
+/// With `state` unset, a list answers active items only; `allStates` lifts that.
+///
+/// A named `state` beside `allStates` is refused `validation_error`.
 ///
 /// `filter` is an expression in the server's listing grammar. Its `status_group` term selects items by the group of
 /// the word their status field holds, as their own type declares it: `eq` and `neq` take a ``StatusGroup`` raw
@@ -330,8 +336,10 @@ public struct Edit: Sendable, Hashable {
 /// with a status field are `status_group neq "completed" AND status_group neq "canceled"`. Match a type's own word
 /// with `properties.<field> eq`.
 public struct ListFilters: Sendable, Hashable {
-    public var type: String?
-    public var state: ItemState?
+    /// The core's list of types, each with its subtree; `nil` narrows nothing.
+    package var types: [String]?
+    /// The core's list of states; `nil` is the active state unless `allStates` is set.
+    package var states: [ItemState]?
     public var allStates: Bool
     public var tier: Tier?
     public var tags: [String]
@@ -357,14 +365,26 @@ public struct ListFilters: Sendable, Hashable {
     public var limit: UInt32?
     public var offset: UInt32?
 
+    /// The one type to narrow to, with its subtree; `nil` where none is named or the filter names several.
+    public var type: String? {
+        get { types.flatMap { $0.count == 1 ? $0[0] : nil } }
+        set { types = newValue.map { [$0] } }
+    }
+
+    /// The one state to narrow to; `nil` where none is named or the filter names several.
+    public var state: ItemState? {
+        get { states.flatMap { $0.count == 1 ? $0[0] : nil } }
+        set { states = newValue.map { [$0] } }
+    }
+
     public init(
         type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [],
         occurredAfter: String? = nil, occurredBefore: String? = nil, source: String? = nil, updatedAfter: String? = nil,
         updatedBefore: String? = nil, filter: String? = nil, beneath: String? = nil, limit: UInt32? = nil,
         offset: UInt32? = nil
     ) {
-        self.type = type
-        self.state = state
+        types = type.map { [$0] }
+        states = state.map { [$0] }
         self.allStates = allStates
         self.tier = tier
         self.tags = tags
@@ -380,8 +400,8 @@ public struct ListFilters: Sendable, Hashable {
     }
 
     package init(_ core: MarfaCore.ListFilters) {
-        type = core.type
-        state = core.state.map(ItemState.init)
+        types = core.types
+        states = core.states?.map(ItemState.init)
         allStates = core.allStates
         tier = core.tier.map(Tier.init)
         tags = core.tags
@@ -398,8 +418,8 @@ public struct ListFilters: Sendable, Hashable {
 
     package var core: MarfaCore.ListFilters {
         MarfaCore.ListFilters(
-            type: type,
-            state: state.map(\.core),
+            types: types,
+            states: states?.map(\.core),
             allStates: allStates,
             tier: tier.map(\.core),
             tags: tags,
@@ -419,8 +439,10 @@ public struct ListFilters: Sendable, Hashable {
 /// `state` and `allStates` work as in ``ListFilters``. `type` includes its
 /// subtree, and every tag given must be present.
 public struct SearchFilters: Sendable, Hashable {
-    public var type: String?
-    public var state: ItemState?
+    /// The core's list of types, each with its subtree; `nil` narrows nothing.
+    package var types: [String]?
+    /// The core's list of states; `nil` is the active state unless `allStates` is set.
+    package var states: [ItemState]?
     public var allStates: Bool
     /// One tier; none answers both.
     public var tier: Tier?
@@ -440,12 +462,24 @@ public struct SearchFilters: Sendable, Hashable {
     /// edges, as far as the copy holds them.
     public var beneath: String?
 
+    /// The one type to narrow to, with its subtree; `nil` where none is named or the filter names several.
+    public var type: String? {
+        get { types.flatMap { $0.count == 1 ? $0[0] : nil } }
+        set { types = newValue.map { [$0] } }
+    }
+
+    /// The one state to narrow to; `nil` where none is named or the filter names several.
+    public var state: ItemState? {
+        get { states.flatMap { $0.count == 1 ? $0[0] : nil } }
+        set { states = newValue.map { [$0] } }
+    }
+
     public init(
         type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [],
         occurredAfter: String? = nil, occurredBefore: String? = nil, filter: String? = nil, beneath: String? = nil
     ) {
-        self.type = type
-        self.state = state
+        types = type.map { [$0] }
+        states = state.map { [$0] }
         self.allStates = allStates
         self.tier = tier
         self.tags = tags
@@ -456,8 +490,8 @@ public struct SearchFilters: Sendable, Hashable {
     }
 
     package init(_ core: MarfaCore.SearchFilters) {
-        type = core.type
-        state = core.state.map(ItemState.init)
+        types = core.types
+        states = core.states?.map(ItemState.init)
         allStates = core.allStates
         tier = core.tier.map(Tier.init)
         tags = core.tags
@@ -469,8 +503,8 @@ public struct SearchFilters: Sendable, Hashable {
 
     package var core: MarfaCore.SearchFilters {
         MarfaCore.SearchFilters(
-            type: type,
-            state: state.map(\.core),
+            types: types,
+            states: states?.map(\.core),
             allStates: allStates,
             tier: tier.map(\.core),
             tags: tags,
