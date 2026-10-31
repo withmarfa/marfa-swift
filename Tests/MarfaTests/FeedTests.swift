@@ -529,8 +529,24 @@ struct ARefill {
     }
 
     /// `answering` names the instance the server's public description gives.
-    static func copy(_ core: FakeCore, pace: Feed.RefillPace = pace, answering: String = instance) -> WorkingCopy {
-        WorkingCopy(holder: CoreHolder(core), hasServer: true, refillPace: pace, instanceAt: { _ in answering })
+    static func copy(
+        _ core: FakeCore, pace: Feed.RefillPace = pace, clock: ManualClock = ManualClock(), answering: String = instance
+    ) -> WorkingCopy {
+        WorkingCopy(
+            holder: CoreHolder(core), hasServer: true, refillPace: pace, refillClock: .init(clock),
+            instanceAt: { _ in answering })
+    }
+
+    /// Ends each wait the refill asks for, in turn, until `done` holds, and answers the lengths asked.
+    static func letWaitsPass(on clock: ManualClock, until done: @autoclosure () -> Bool) async throws {
+        var passed = 0
+        while !done() {
+            try await eventually("the refill waits") { clock.requested.count > passed || done() }
+            guard !done() else { break }
+            try await eventually("the wait is held") { clock.waiting > 0 }
+            passed = clock.requested.count
+            clock.advance(by: .seconds(3600))
+        }
     }
 
     /// Holds the next hydration until the returned semaphore is signaled.
@@ -541,11 +557,6 @@ struct ARefill {
     }
 
     static func gated(_ core: FakeCore) -> Bool { core.state.withLock { $0.hydrateGated && $0.hydrating } }
-
-    static func gaps(_ core: FakeCore) -> [Duration] {
-        let began = core.state.withLock { $0.hydrations }
-        return zip(began, began.dropFirst()).map { $0.duration(to: $1) }
-    }
 
     @Test func aStaleCopyIsFilledAgainOverItsSliceAndItsStreamsAreNotStopped() async throws {
         let core = Self.stale()
@@ -567,18 +578,20 @@ struct ARefill {
             $0.hydrateFails = .Network(message: "offline")
             $0.hydrateFailsFirst = 4
         }
-        let copy = Self.copy(core)
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
-        try await eventually("the refill was made in the end", within: 10) {
-            heard.all.last == refreshed(.hydrated)
+        let waits = [100, 200, 400, 400].map(Duration.milliseconds)
+        for (made, wait) in waits.enumerated() {
+            try await eventually("the refill waits before attempt \(made + 2)") { clock.waiting == 1 }
+            #expect(clock.requested == Array(waits.prefix(made + 1)))
+            #expect(core.state.withLock { $0.hydrations.count } == made + 1)
+            clock.advance(by: wait)
         }
-        let gaps = Self.gaps(core)
-        #expect(gaps.count == 4)
-        for (gap, least) in zip(gaps, [100, 200, 400, 400]) {
-            #expect(gap >= .milliseconds(least), "\(gaps)")
-        }
-        #expect(gaps.last.map { $0 < .milliseconds(800) } == true, "the wait grew past its most: \(gaps)")
+        try await eventually("the refill was made in the end") { heard.all.last == refreshed(.hydrated) }
+        #expect(clock.requested == waits)
+        #expect(core.state.withLock { $0.hydrations.count } == 5)
         #expect(heard.stops.isEmpty)
         #expect(heard.all.filter { $0 == refreshed(.unfinished) }.count == 4)
         await copy.close()
@@ -586,21 +599,41 @@ struct ARefill {
 
     @Test func aFollowThatStopsAgainSoonAfterARefillWaitsBeforeTheNext() async throws {
         let core = Self.stale()
-        let copy = Self.copy(core)
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first refill was told") { heard.all.count == 1 }
+        #expect(clock.requested.isEmpty)
         core.state.withLock { $0.hydration = .stale }
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the second refill waits") { clock.waiting == 1 }
+        #expect(heard.all.count == 1)
+        clock.advance(by: .milliseconds(100))
         try await eventually("the second refill was told") { heard.all.count == 2 }
         core.state.withLock { $0.hydration = .stale }
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the third refill waits") { clock.waiting == 1 }
+        #expect(heard.all.count == 2)
+        clock.advance(by: .milliseconds(200))
         try await eventually("the third refill was told") { heard.all.count == 3 }
-        let gaps = Self.gaps(core)
-        #expect(gaps.count == 2)
-        #expect(gaps.first.map { $0 >= .milliseconds(100) } == true, "\(gaps)")
-        #expect(gaps.last.map { $0 >= .milliseconds(200) } == true, "\(gaps)")
+        #expect(clock.requested == [.milliseconds(100), .milliseconds(200)])
         #expect(heard.stops.isEmpty)
+        await copy.close()
+    }
+
+    @Test func aFollowThatRanForTheSettleTimeAfterARefillStartsAgainAtOnce() async throws {
+        let core = Self.stale()
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock: clock)
+        let heard = Heard(copy.changes())
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the first refill was told") { heard.all.count == 1 }
+        clock.advance(by: Self.pace.settle)
+        core.state.withLock { $0.hydration = .stale }
+        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        try await eventually("the second refill was told") { heard.all.count == 2 }
+        #expect(clock.requested.isEmpty)
         await copy.close()
     }
 
@@ -667,12 +700,15 @@ struct ARefill {
             $0.hydrateFails = .Network(message: "offline")
             $0.hydrateFailsFirst = 1
         }
-        let copy = Self.copy(core, pace: .init(first: .seconds(1), most: .seconds(1), settle: .seconds(5)))
+        let clock = ManualClock()
+        let copy = Self.copy(core, pace: .init(first: .seconds(1), most: .seconds(1), settle: .seconds(5)), clock: clock)
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first attempt failed") { heard.all == [refreshed(.unfinished)] }
+        try await eventually("the refill waits") { clock.waiting == 1 }
         try await copy.feed.suspend()
         copy.feed.resume(readsOnly: false)
+        clock.advance(by: .seconds(1))
         try await eventually("the stop reached the app") { heard.stops == [stopped(Self.agedOutTold)] }
         #expect(core.state.withLock { $0.hydrations.count } == 1)
         await copy.close()
@@ -830,7 +866,8 @@ struct ARefill {
             $0.hydrateFailsFirst = 1
         }
         let gate = Self.gate(core)
-        let copy = Self.copy(core)
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill is running") { Self.gated(core) }
@@ -839,7 +876,7 @@ struct ARefill {
         core.change(0, .watchFailed(reason: later, cursor: "5"))
         core.state.withLock { $0.hydration = .expired }
         gate.signal()
-        try await eventually("the stop reached the app") { !heard.stops.isEmpty }
+        try await Self.letWaitsPass(on: clock, until: !heard.stops.isEmpty)
         #expect(
             heard.stops == [
                 stopped(
