@@ -233,6 +233,12 @@ final class Lifecycle: Sendable {
         var epoch = 0
         /// The stream the lifecycle holds or is taking, so no second one is taken beside it.
         var streamClaim: UUID?
+        /// Counts the claimed streams that ended, so a pull can tell whether the stream it found claimed had ended
+        /// before the pull began.
+        var streamsLetGo = 0
+        /// Where the claimed stream ended, its count in `streamsLetGo`; its task may still be reading what the core
+        /// told it before.
+        var claimLetGo: Int?
         var stream: Task<Void, Never>?
         var retry: Task<Void, Never>?
         var drainRetry: Task<Void, Never>?
@@ -272,7 +278,7 @@ final class Lifecycle: Sendable {
             case .fillBegan(let byRefill): self?.fillBegan(byRefill: byRefill)
             case .fillEnded: self?.fillEnded()
             case .refillFailed(let error): self?.refillFailed(error)
-            case .announced(let change): self?.heard(change, run: nil)
+            case .announced(let change): self?.heard(change)
             }
         }
     }
@@ -338,6 +344,7 @@ final class Lifecycle: Sendable {
         state.drainRetry = nil
         state.progress = nil
         state.streamClaim = nil
+        state.claimLetGo = nil
     }
 
     /// The next update for one consumer, read once the lock is let go.
@@ -460,11 +467,31 @@ final class Lifecycle: Sendable {
 
     /// Claims the stream to take, unless one is held or being taken; the claim and the check are one step, so two
     /// successes at once never take two streams.
-    private func claimStream(_ state: inout State) -> UUID? {
-        guard state.streamClaim == nil else { return nil }
+    ///
+    /// A pull that began once the claimed stream had ended, `began` being ``streamsLetGo()`` read before it, takes
+    /// the claim from it: that stream's task may not yet have read the stop the core told it, which would otherwise
+    /// show the copy stopped, with no stream, after the pull succeeded. A pull that began earlier proves nothing of
+    /// the server since that stop.
+    private func claimStream(_ state: inout State, began: Int? = nil) -> UUID? {
+        if state.streamClaim != nil {
+            guard let letGo = state.claimLetGo, let began, letGo <= began else { return nil }
+        }
         let claim = UUID()
         state.streamClaim = claim
+        state.claimLetGo = nil
         return claim
+    }
+
+    /// How many claimed streams have ended, read before a pull begins.
+    func streamsLetGo() -> Int { locked { $0.streamsLetGo } }
+
+    /// The stream of `claim` ended, and its place in the feed with it.
+    private func letGo(_ claim: UUID) {
+        locked { state in
+            guard state.streamClaim == claim, state.claimLetGo == nil else { return }
+            state.streamsLetGo += 1
+            state.claimLetGo = state.streamsLetGo
+        }
     }
 
     /// Holds a stream of the feed under `claim`, so the core follows the server, and hears what the core tells it;
@@ -472,9 +499,13 @@ final class Lifecycle: Sendable {
     @discardableResult
     private func takeStream(_ run: Int, _ claim: UUID) -> Bool {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
-        continuation.onTermination = { [feed] _ in feed.remove(claim) }
+        // Noted before the feed lets the stream go, so a pull that begins once the feed has let it go sees it ended.
+        continuation.onTermination = { [feed, weak self] _ in
+            self?.letGo(claim)
+            feed.remove(claim)
+        }
         let task = Task { [weak self] in
-            for await change in stream { self?.heard(change, run: run) }
+            for await change in stream { self?.heard(change, run: run, claim: claim) }
             self?.streamEnded(claim)
         }
         let taken = locked { state -> Bool in
@@ -506,9 +537,10 @@ final class Lifecycle: Sendable {
     }
 
     private func pull(_ epoch: Int) async {
+        let began = streamsLetGo()
         do {
             _ = try await caughtUp(holder, feed)
-            pulled(epoch: epoch)
+            pulled(epoch: epoch, began: began)
         } catch {
             failed(error, epoch: epoch)
         }
@@ -516,8 +548,8 @@ final class Lifecycle: Sendable {
 
     /// A catch-up or a hydration succeeded, so the core follows the server again.
     ///
-    /// `epoch` is `nil` for the app's own call.
-    func pulled(epoch: Int? = nil) {
+    /// `epoch` is `nil` for the app's own call; `began` is ``streamsLetGo()`` read before the pull began.
+    func pulled(epoch: Int? = nil, began: Int? = nil) {
         let retake = locked { state -> (run: Int, claim: UUID)? in
             guard state.active, !state.closed, !state.keyChanging, epoch == nil || epoch == state.epoch,
                 state.connection != .local
@@ -526,7 +558,7 @@ final class Lifecycle: Sendable {
             state.retry = nil
             set(&state, .following)
             mark(&state) { $0.synced = true }
-            return claimStream(&state).map { (state.run, $0) }
+            return claimStream(&state, began: began).map { (state.run, $0) }
         }
         if let retake { takeStream(retake.run, retake.claim) }
     }
@@ -534,11 +566,14 @@ final class Lifecycle: Sendable {
     /// A catch-up, a hydration or the follow failed with `error`.
     ///
     /// The app's own call (`epoch` is `nil`) changes the connection only for what it proves of the server; any
-    /// other error it throws is the app's to handle.
-    func failed(_ error: any Error, epoch: Int? = nil) {
+    /// other error it throws is the app's to handle. A stop the stream of `claim` told changes nothing once another
+    /// stream is claimed: a pull may have succeeded and taken one since the stop was heard.
+    func failed(_ error: any Error, epoch: Int? = nil, claim: UUID? = nil) {
         let error = error as? MarfaError ?? .store(message: "\(error)")
         locked { state in
-            guard state.active, !state.closed, !state.keyChanging, epoch == nil || epoch == state.epoch else { return }
+            guard state.active, !state.closed, !state.keyChanging, epoch == nil || epoch == state.epoch,
+                claim == nil || state.streamClaim == claim
+            else { return }
             guard follows else {
                 // Only a reader's watch, ended on a fault, fails here; the app's own calls prove nothing of it.
                 guard epoch != nil, reads, Self.failure(error) != .ignored else { return }
@@ -641,13 +676,15 @@ final class Lifecycle: Sendable {
         }
     }
 
-    /// What the core told the lifecycle's stream of `run`, or, with no `run`, what the copy announced.
-    private func heard(_ change: Change, run: Int?) {
+    /// What the core told the lifecycle's stream of `run` under `claim`, or, with neither, what the copy announced.
+    private func heard(_ change: Change, run: Int? = nil, claim: UUID? = nil) {
         var pulled = false
         var failure: MarfaError?
         var drain: Result<DrainReport, MarfaError>?
         let epoch = locked { state -> Int? in
-            guard run == nil || state.run == run, state.active else { return nil }
+            guard run == nil || state.run == run, claim == nil || state.streamClaim == claim, state.active else {
+                return nil
+            }
             switch change.origin {
             case .local, .answered:
                 mark(&state) {
@@ -714,7 +751,7 @@ final class Lifecycle: Sendable {
         }
         guard let epoch else { return }
         if pulled { self.pulled(epoch: epoch) }
-        if let failure { failed(failure, epoch: epoch) }
+        if let failure { failed(failure, epoch: epoch, claim: claim) }
         switch drain {
         case .success(let report): drained(report)
         case .failure(let error): drainFailed(error)

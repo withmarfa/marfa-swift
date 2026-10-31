@@ -238,10 +238,11 @@ public final class WorkingCopy: Sendable {
     public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = [], inPlaceOnly: Bool = false)
         async throws -> HydrateReport
     {
+        let began = lifecycle.streamsLetGo()
         do {
             let report = HydrateReport(
                 try await feed.hydrate(types: types, tier: tier.core, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly))
-            lifecycle.pulled()
+            lifecycle.pulled(began: began)
             return report
         } catch {
             // An in-place hydration refused for the copy it found leaves that copy as it was, so only a refused key
@@ -294,9 +295,10 @@ public final class WorkingCopy: Sendable {
     /// `changes()` stream starts, waits for it and then catches up from the
     /// cursor it left.
     public func catchUp() async throws -> CatchUpReport {
+        let began = lifecycle.streamsLetGo()
         do {
             let report = try await caughtUp(holder, feed)
-            lifecycle.pulled()
+            lifecycle.pulled(began: began)
             return report
         } catch {
             lifecycle.failed(error)
