@@ -810,7 +810,7 @@ public struct Status: Sendable, Hashable {
             hydration: Hydration(core.hydration), items: core.items, itemsExpected: core.itemsExpected,
             itemsListed: core.itemsListed, edges: core.edges, catalogVersion: core.catalogVersion,
             instanceId: core.instanceId, fileCache: FileCache(core.fileCache),
-            lastSynced: core.syncedAt.flatMap(ItemDate.utcInstant))
+            lastSynced: core.syncedAt.flatMap(ItemDate.utcTime))
     }
 
     var core: MarfaCore.Status {

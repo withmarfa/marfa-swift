@@ -31,6 +31,10 @@ struct Values {
 
         core.syncedAt = "not a time"
         #expect(Marfa.Status(core).lastSynced == nil)
+        core.syncedAt = "2026-10-31"
+        #expect(Marfa.Status(core).lastSynced == nil, "a day alone claimed a sync")
+        core.syncedAt = "2026-10-31T09:15:02"
+        #expect(Marfa.Status(core).lastSynced == nil, "a time with no zone claimed a sync")
     }
 
     /// A field the core adds with a default compiles on both sides and would be dropped by the conversion.

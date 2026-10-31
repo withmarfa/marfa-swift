@@ -406,7 +406,10 @@ final class Lifecycle: Sendable {
         }
         var synced: Date??
         if pending.synced {
-            synced = .some(try? await holder.run { core in Status(try core.status()) }.lastSynced)
+            // A failed read keeps the time already told rather than telling the copy never synced.
+            if let status = try? await holder.run({ core in Status(try core.status()) }) {
+                synced = .some(status.lastSynced)
+            }
         }
 
         return locked { state -> Take in
