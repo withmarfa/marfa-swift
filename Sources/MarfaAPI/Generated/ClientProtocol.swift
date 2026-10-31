@@ -12,13 +12,6 @@ public import struct Foundation.Date
 public import MarfaTypes
 /// A type that performs HTTP operations defined by the OpenAPI document.
 public protocol ClientProtocol: Sendable {
-    /// List item versions
-    ///
-    /// Returns a page of the item's version snapshots, oldest first. Marfa thins older snapshots over time, so the history can have gaps.
-    ///
-    /// - Remark: HTTP `GET /items/{id}/versions`.
-    /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)`.
-    func listItemVersions(_ input: Operations.ListItemVersions.Input) async throws -> Operations.ListItemVersions.Output
     /// Get item counts
     ///
     /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
@@ -124,20 +117,6 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `POST /types/normalize`.
     /// - Remark: Generated from `#/paths//types/normalize/post(normalizeType)`.
     func normalizeType(_ input: Operations.NormalizeType.Input) async throws -> Operations.NormalizeType.Output
-    /// Set a type's icon
-    ///
-    /// Sets the owner's icon for a type. Reads answer it in place of the author's, and a subtype with no icon inherits it. Replacing the type keeps it. Needs `schema.write` and write on the type, as replacing it does.
-    ///
-    /// - Remark: HTTP `PUT /types/{id}/icon`.
-    /// - Remark: Generated from `#/paths//types/{id}/icon/put(setTypeIcon)`.
-    func setTypeIcon(_ input: Operations.SetTypeIcon.Input) async throws -> Operations.SetTypeIcon.Output
-    /// Clear a type's icon
-    ///
-    /// Removes the icon the owner set for a type, so reads show the author's again. Clearing a type with no owner icon succeeds and changes nothing.
-    ///
-    /// - Remark: HTTP `DELETE /types/{id}/icon`.
-    /// - Remark: Generated from `#/paths//types/{id}/icon/delete(clearTypeIcon)`.
-    func clearTypeIcon(_ input: Operations.ClearTypeIcon.Input) async throws -> Operations.ClearTypeIcon.Output
     /// List edge types
     ///
     /// Returns every edge type on this instance: those Marfa ships and those registered through `POST /edge-types`. Every credential reads the whole list, whatever its edge map reaches.
@@ -327,20 +306,6 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /overview`.
     /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
     func getOverview(_ input: Operations.GetOverview.Input) async throws -> Operations.GetOverview.Output
-    /// Get the configuration
-    ///
-    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
-    ///
-    /// - Remark: HTTP `GET /config`.
-    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
-    func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output
-    /// Update the configuration
-    ///
-    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
-    ///
-    /// - Remark: HTTP `PATCH /config`.
-    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
-    func updateConfig(_ input: Operations.UpdateConfig.Input) async throws -> Operations.UpdateConfig.Output
     /// Replace the configuration
     ///
     /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. To change only some settings, use `PATCH`. Requires `config.manage`.
@@ -401,23 +366,6 @@ public protocol ClientProtocol: Sendable {
 
 /// Convenience overloads for operation inputs.
 extension ClientProtocol {
-    /// List item versions
-    ///
-    /// Returns a page of the item's version snapshots, oldest first. Marfa thins older snapshots over time, so the history can have gaps.
-    ///
-    /// - Remark: HTTP `GET /items/{id}/versions`.
-    /// - Remark: Generated from `#/paths//items/{id}/versions/get(listItemVersions)`.
-    public func listItemVersions(
-        path: Operations.ListItemVersions.Input.Path,
-        query: Operations.ListItemVersions.Input.Query = .init(),
-        headers: Operations.ListItemVersions.Input.Headers = .init()
-    ) async throws -> Operations.ListItemVersions.Output {
-        try await listItemVersions(Operations.ListItemVersions.Input(
-            path: path,
-            query: query,
-            headers: headers
-        ))
-    }
     /// Get item counts
     ///
     /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
@@ -635,38 +583,6 @@ extension ClientProtocol {
         try await normalizeType(Operations.NormalizeType.Input(
             headers: headers,
             body: body
-        ))
-    }
-    /// Set a type's icon
-    ///
-    /// Sets the owner's icon for a type. Reads answer it in place of the author's, and a subtype with no icon inherits it. Replacing the type keeps it. Needs `schema.write` and write on the type, as replacing it does.
-    ///
-    /// - Remark: HTTP `PUT /types/{id}/icon`.
-    /// - Remark: Generated from `#/paths//types/{id}/icon/put(setTypeIcon)`.
-    public func setTypeIcon(
-        path: Operations.SetTypeIcon.Input.Path,
-        headers: Operations.SetTypeIcon.Input.Headers = .init(),
-        body: Operations.SetTypeIcon.Input.Body
-    ) async throws -> Operations.SetTypeIcon.Output {
-        try await setTypeIcon(Operations.SetTypeIcon.Input(
-            path: path,
-            headers: headers,
-            body: body
-        ))
-    }
-    /// Clear a type's icon
-    ///
-    /// Removes the icon the owner set for a type, so reads show the author's again. Clearing a type with no owner icon succeeds and changes nothing.
-    ///
-    /// - Remark: HTTP `DELETE /types/{id}/icon`.
-    /// - Remark: Generated from `#/paths//types/{id}/icon/delete(clearTypeIcon)`.
-    public func clearTypeIcon(
-        path: Operations.ClearTypeIcon.Input.Path,
-        headers: Operations.ClearTypeIcon.Input.Headers = .init()
-    ) async throws -> Operations.ClearTypeIcon.Output {
-        try await clearTypeIcon(Operations.ClearTypeIcon.Input(
-            path: path,
-            headers: headers
         ))
     }
     /// List edge types
@@ -1029,30 +945,6 @@ extension ClientProtocol {
     /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
     public func getOverview(headers: Operations.GetOverview.Input.Headers = .init()) async throws -> Operations.GetOverview.Output {
         try await getOverview(Operations.GetOverview.Input(headers: headers))
-    }
-    /// Get the configuration
-    ///
-    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
-    ///
-    /// - Remark: HTTP `GET /config`.
-    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
-    public func getConfig(headers: Operations.GetConfig.Input.Headers = .init()) async throws -> Operations.GetConfig.Output {
-        try await getConfig(Operations.GetConfig.Input(headers: headers))
-    }
-    /// Update the configuration
-    ///
-    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
-    ///
-    /// - Remark: HTTP `PATCH /config`.
-    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
-    public func updateConfig(
-        headers: Operations.UpdateConfig.Input.Headers = .init(),
-        body: Operations.UpdateConfig.Input.Body
-    ) async throws -> Operations.UpdateConfig.Output {
-        try await updateConfig(Operations.UpdateConfig.Input(
-            headers: headers,
-            body: body
-        ))
     }
     /// Replace the configuration
     ///
