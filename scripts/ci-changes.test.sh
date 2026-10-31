@@ -2,8 +2,7 @@
 # Pins scripts/ci-changes.sh: which changes run `Build + test`, that the job
 # reads the answer, and that only a readable diff can skip it: a pull
 # request's, or a push's after a commit with a green run. Also pins the last
-# job of ci.yml, `Full CI`, and that a draft stops after the lint without
-# failing.
+# job of ci.yml, `Full CI`, and that a draft starts no Mac job and passes.
 # The workflow expressions below are matched literally, not expanded.
 # shellcheck disable=SC2016
 set -euo pipefail
@@ -62,8 +61,10 @@ runs "an empty change" true
 
 # The job reads the answer, and runs when the classification itself failed.
 workflow="${root}/.github/workflows/ci.yml"
-gate="if: \${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false') }}"
-check "Build + test reads the answer" "$(grep -cF "${gate}" "${workflow}")" 1
+validate_if="$(sed -n '/^  validate:$/,/^    runs-on:/p' "${workflow}")"
+check "Build + test runs when the classification failed, or says it can be affected" \
+  "$(grep -cF "&& (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false')" <<<"${validate_if}")" 1
+check "Build + test is not cancelled into a run" "$(grep -cF '!cancelled()' <<<"${validate_if}")" 1
 check "the classifier is not told whether the pull request is a draft" "$(grep -cF 'DRAFT' "${workflow}")" 0
 check "the classifier runs in CI" "$(grep -cF "run: scripts/ci-changes.sh" "${workflow}")" 1
 check "a push is classified against the commit before it" \
@@ -74,22 +75,22 @@ check "the classifier may read the runs of this workflow" "$(grep -cF '      act
 check "the classifier is handed a token" "$(grep -cF 'GH_TOKEN: ${{ github.token }}' "${workflow}")" 1
 check "the classifier asks about the workflow it is in" "$(grep -cF 'workflows/ci.yml/runs' "${classifier}")" 1
 
-# A draft runs `Build + test` only to the lint, and passes there: a step that
-# exits non-zero for a draft would turn the draft red.
-draft='!github.event.pull_request.draft'
+# A draft starts no Mac job, so no step of `Build + test` needs to skip itself for one. On a pull request
+# the job waits for the Linux lint and starts only when it passed; on a push it runs whatever the lint said.
 job_steps() { awk -v job="$1" '
   $0 ~ "^  " job ":$" { injob = 1; next }
   injob && /^  [A-Za-z0-9_-]+:$/ { injob = 0 }
   injob && /^      - / { n++ }
   injob { print n "\t" $0 }' "${workflow}"; }
-unguarded="$(job_steps validate | awk -F'\t' -v draft="${draft}" '
-  /name: Lint$/ { lint = $1 }
-  lint && $1 > lint { seen[$1] = 1; if (index($0, draft)) guarded[$1] = 1 }
-  END { for (n in seen) if (!(n in guarded)) count++; print count + 0 }')"
-after_lint="$(job_steps validate | awk -F'\t' '/name: Lint$/ { lint = $1 } lint && $1 > lint { seen[$1] = 1 } END { print length(seen) }')"
-check "every step after the lint is skipped for a draft" "${unguarded}" 0
-check "there are steps after the lint to skip" "$([[ "${after_lint}" -gt 10 ]] && echo yes)" yes
+check "Build + test is not started for a draft" "$(grep -cF '!github.event.pull_request.draft' <<<"${validate_if}")" 1
+check "Build + test waits for the Linux lint on a pull request" \
+  "$(grep -cF "&& (github.event_name != 'pull_request' || needs.lint.result == 'success')" <<<"${validate_if}")" 1
+check "Build + test needs the lint" "$(grep -cF 'needs: [changes, lint]' <<<"${validate_if}")" 1
+check "no step of Build + test checks for a draft" "$(job_steps validate | grep -v '^	' | grep -cF 'pull_request.draft')" 0
 check "no step stops a draft with a failure" "$(grep -cF 'Stop a draft' "${workflow}")" 0
+check "the Linux lint runs on Linux, in a container, and leaves out the rule that differs" \
+  "$(sed -n '/^  lint:$/,/^  lint-workflows:$/p' "${workflow}" | grep -cE 'runs-on: ubuntu-latest|container: swift:|scripts/lint.sh --portable')" 3
+check "the Mac job runs every rule" "$(job_steps validate | grep -cF 'run: scripts/lint.sh')" 1
 
 # The last job, `Full CI`, is the required check. It waits for every job, is
 # named Draft CI for a draft so that `Full CI` stays expected, and fails only
@@ -117,14 +118,15 @@ for directory in .codex .githooks .claude; do
 done
 check "CodeQL ignores Markdown on a pull request and on a push" "$(grep -cF -e '- "**/*.md"' "${codeql}")" 2
 
-# The Swift analysis runs on macOS, so it starts only for a change to what the build reads.
+# The Swift analysis runs on macOS, where the runner is scarce, so it runs weekly and by hand: never on a
+# pull request or a push, where it raced `ci.yml` to build the core.
 codeql_swift="${root}/.github/workflows/codeql-swift.yml"
-for path in '"Sources/**"' Package.swift .github/workflows/codeql-swift.yml; do
-  check "CodeQL Swift runs for ${path} on a pull request and on a push" "$(grep -cF -e "- ${path}" "${codeql_swift}")" 2
-done
+check "CodeQL Swift runs weekly" "$(grep -cE '^  schedule:$' "${codeql_swift}")" 1
+check "CodeQL Swift runs by hand" "$(grep -cE '^  workflow_dispatch:' "${codeql_swift}")" 1
+check "CodeQL Swift does not run on a pull request or a push" "$(grep -cE '^  (pull_request|push):' "${codeql_swift}")" 0
 
 # A draft and a ready pull request never share a group, and a push to main is never cancelled.
-for flow in ci codeql codeql-swift; do
+for flow in ci codeql; do
   workflow="${root}/.github/workflows/${flow}.yml"
   check "${flow} separates a draft pull request from a ready one" "$(grep -cF "github.event.pull_request.draft && 'draft' || 'ready'" "${workflow}")" 1
   check "${flow} gives a push its own group" "$(grep -cF "|| github.run_id }}" "${workflow}")" 1
