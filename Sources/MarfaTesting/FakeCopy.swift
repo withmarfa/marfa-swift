@@ -115,8 +115,8 @@ public final class FakeCopy: Sendable {
 
     /// Every write the copy received, in order, with the verdict it holds now.
     ///
-    /// A write stays here after `queue.forgetAnswered()` or `queue.discard(_:)`
-    /// takes it out of the queue.
+    /// A write stays here after `queue.forgetAnswered()`, `queue.takeAnswered()`
+    /// or `queue.discard(_:)` takes it out of the queue.
     public var writes: [Marfa.QueuedWrite] {
         core.writes.map(Marfa.QueuedWrite.init)
     }
