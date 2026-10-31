@@ -85,6 +85,15 @@ extension InMemoryCore {
     func forgetAnsweredIds(ids: [String]) throws -> UInt64 {
         state.withLock { $0.forget(only: Set(ids)) }
     }
+
+    func takeAnswered() throws -> [QueuedWrite] {
+        state.withLock { state in
+            let before = state.entries.filter(\.inQueue).map(\.write)
+            _ = state.forget(only: nil)
+            let left = Set(state.entries.filter(\.inQueue).map(\.write.id))
+            return before.filter { !left.contains($0.id) }
+        }
+    }
 }
 
 extension InMemoryCore.State {
