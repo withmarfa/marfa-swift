@@ -210,8 +210,7 @@ extension WorkingCopy {
 
     /// Replaces each setting `change` names, based on `baseVersion`, sent as `createFolder(_:)` is.
     ///
-    /// A setting changed since `baseVersion` throws `MarfaError.server` with status 409 and the code
-    /// `version_conflict`; a revoked folder throws `MarfaError.validation` with the code `invalid_transition`.
+    /// A setting changed since `baseVersion` throws `MarfaError.versionConflict`; a revoked folder throws `MarfaError.validation` with the code `invalid_transition`.
     public func changeFolder(
         _ id: String, _ change: FolderSettingsChange, baseVersion: Int64, idempotencyKey: String? = nil
     ) async throws -> Folder {

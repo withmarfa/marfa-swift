@@ -202,11 +202,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.changeView(made.id, ViewSettingsChange(title: "Thrice"), baseVersion: 1)
             } throws: { error in
-                if case .server(let status, let code, _) = error as? Marfa.MarfaError {
-                    status == 409 && code == "version_conflict"
-                } else {
-                    false
-                }
+                if case .versionConflict = error as? Marfa.MarfaError { true } else { false }
             }
             let kept = try #require(try await copy.items.view(made.id))
             #expect(kept == merged && kept.settings.title == renamed.settings.title, "the refused change left it")

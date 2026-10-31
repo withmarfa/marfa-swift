@@ -120,6 +120,7 @@ struct Errors {
             .rateLimited(code: "c", message: "m", retryAfterSeconds: 9)
         ),
         (.Server(status: 503, code: "c", message: "m"), .server(status: 503, code: "c", message: "m")),
+        (.Server(status: 409, code: "version_conflict", message: "m"), .versionConflict(message: "m")),
         (.Network(message: "m"), .network(message: "m")),
         (.Unnamed(status: 429, message: "m"), .unnamed(status: 429, message: "m")),
         (.Decoding(message: "m"), .decoding(message: "m")),
@@ -157,10 +158,7 @@ struct Errors {
             .unsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m")
         ),
         (.CopyExpired(reason: "aged_out", message: "m"), .copyExpired(reason: "aged_out", message: "m")),
-        (
-            .CopyExpired(reason: "instance_changed", message: "m"),
-            .copyExpired(reason: "instance_changed", message: "m")
-        ),
+        (.CopyExpired(reason: "instance_changed", message: "m"), .instanceChanged(message: "m")),
         (.StreamIncomplete(reason: "r", message: "m"), .streamIncomplete(reason: "r", message: "m")),
         (.WrongServer(expected: "a", got: "b", message: "m"), .wrongServer(expected: "a", got: "b", message: "m")),
         (.BytesAbsent(hash: "h", reason: "r", message: "m"), .bytesAbsent(hash: "h", reason: "r", message: "m")),

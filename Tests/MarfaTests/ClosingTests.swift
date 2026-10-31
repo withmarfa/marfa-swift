@@ -355,9 +355,16 @@ struct ChangingTheKey {
             do {
                 _ = try await copy.status()
                 return false
-            } catch Marfa.MarfaError.invalid {
+            } catch let error as Marfa.MarfaError {
+                guard case .keyChanging = error else { throw error }
+                #expect(error.isTransient)
                 return true
             }
+        }
+        await #expect {
+            try await copy.holder.replace(key: "again")
+        } throws: { error in
+            if case .keyChanging? = error as? Marfa.MarfaError { true } else { false }
         }
         gate.signal()
         try await bounded("replace") { try await changing.value }

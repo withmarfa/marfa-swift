@@ -1,27 +1,54 @@
 import Foundation
 internal import MarfaCore
 
-/// Every way the core refuses or fails. `code` is the server's, where the
-/// server answered.
+/// Every way the working copy refuses or fails. `code` is the server's refusal code, where the server answered.
+///
+/// Three properties say what an error means for an app, so that it needs no list of cases of its own:
+///
+/// - ``isOffline``: the server could not be reached, so nothing was sent.
+/// - ``isKeyRefusal``: the key or sign-in no longer works. Asking again cannot clear it; the person signs in
+///   again or the app gets a new key. It is `true` for `unauthorized`, `signedOut`, and a `copyExpired` or
+///   `streamIncomplete` whose reason is `credential_ended`. It is never `true` for `forbidden`: the server answers
+///   a revoked or expired key with 401, and every 403 means the key is valid but lacks a permission.
+/// - ``isTransient``: asking again later can clear it, with nothing changed. It is the rule the core's own
+///   follow waits out, with `noConnection` and `keyChanging` added. No error is both a key refusal and transient,
+///   and every offline error is transient.
 public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
+    /// The server has no such row, route or name (404).
     case notFound(code: String, message: String)
+    /// The server does not accept the key or token (401). A revoked or expired key gets this refusal.
     case unauthorized(code: String, message: String)
+    /// The key is valid but lacks the permission the call needs (403), such as `type_not_permitted`.
     case forbidden(code: String, message: String)
+    /// The server refused the values sent (400 or 422).
     case validation(code: String, message: String)
+    /// The copy's type catalog holds no type of the name given.
     case unknownType(message: String)
+    /// The server asks the client to slow down (429), for `retryAfterSeconds` where it says.
     case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?)
+    /// Another answer from the server, with its status and code. A status of 500 or more, or 408, is transient.
     case server(status: UInt16, code: String, message: String)
+    /// Reading or writing a local file failed.
     case io(message: String)
+    /// The request did not reach the server, or its answer did not come back in time.
     case network(message: String)
     /// A response from something in front of the server, without its contract.
     case unnamed(status: UInt16, message: String)
+    /// An answer or a stored value could not be read.
     case decoding(message: String)
+    /// The store could not be opened, read or written.
     case store(message: String)
+    /// The device has no room left to write the store.
     case storageFull(message: String)
+    /// The keychain no longer holds a sign-in for `origin`, or the server ended it; sign in again.
     case signedOut(origin: String, message: String)
+    /// The keychain cannot be used.
     case noKeychain(message: String)
+    /// The server answered with a redirect, which is not followed, so the key goes nowhere else.
     case redirected(origin: String, status: UInt16, location: String?, message: String)
+    /// The call needs a server, and the copy was opened without one.
     case noServer(message: String)
+    /// The copy holds no position in the server's events; hydrate first.
     case noCursor(message: String)
     /// A read by id asked for a row this copy does not hold while a hydration is still filling it, so the row may
     /// yet arrive. Reads that list or search answer the rows that have arrived and say `.partial` instead. An edge
@@ -32,19 +59,24 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The store at `path` has a shape this build cannot read. `unsent`
     /// names the writes another build can still send, where the queue is readable.
     case wrongSchema(path: String, reason: String, unsent: UInt64?, message: String)
+    /// Another process, or another open copy in this one, holds the store's writer role, so this copy may only
+    /// read.
     case readingHandle(message: String)
     /// ``WorkingCopy/remove(store:unsent:)`` found a store whose unsent writes are not the number the caller
     /// agreed to lose, and left it as it was. `unsent` is the store's own count, `nil` where it cannot be read,
     /// and such a store is never removed; `agreed` is the number passed. Show the person `unsent` and ask again.
     case unsentDiffers(path: String, unsent: UInt64?, agreed: UInt64, message: String)
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
-    /// is an open string, such as `reach_changed`, `instance_changed` or `catchup_too_old`. A stale copy
+    /// is an open string, such as `reach_changed`, `credential_ended` or `catchup_too_old`; another instance at
+    /// the server's address is ``instanceChanged(message:)`` instead. A stale copy
     /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
     /// The catch-up that first detects an aged-out cursor gives a descriptive reason; read `status().hydration`
     /// to distinguish `.stale` from other expired copies. A held `changes()` stream fills a stale copy again by
     /// itself when its follow finds the cursor aged out, and is told this error where it does not.
     case copyExpired(reason: String, message: String)
+    /// The server ended the event stream early, for `reason`, such as `credential_ended`.
     case streamIncomplete(reason: String, message: String)
+    /// The store or file belongs to the server `expected`, not to `got`.
     case wrongServer(expected: String, got: String, message: String)
     /// The item is whole and its bytes are not here, nor can they be fetched.
     case bytesAbsent(hash: String, reason: String, message: String)
@@ -57,16 +89,60 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// under its idempotency key once the app speaks the server's contract.
     /// `status` is nil when the failure carries no HTTP status.
     case contractMismatch(served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String)
+    /// The caller canceled the call before it finished.
     case canceled(message: String)
     /// A folder's first sync waits for the person to confirm it, so the call that would write or send for it
     /// was refused.
     case firstSyncWaiting(message: String)
+    /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
+    /// The call came while ``WorkingCopy/useKey(_:)`` replaced the copy's key, and was not made. Ask again once
+    /// the change is done.
+    case keyChanging(message: String)
+    /// The server refused a write made against a version of the row that is no longer current (409
+    /// `version_conflict`). Read the row again and decide what to write.
+    case versionConflict(message: String)
+    /// Another Marfa instance answers at the server's address (409 `instance_changed`), so the copy needs a
+    /// hydration from it. Its queue is kept.
+    case instanceChanged(message: String)
     /// The working copy was closed, or failed to reopen its store with a new
     /// key; it is gone for good, and the app opens the store again.
     case closed(message: String)
     /// A call that needs the server found the device offline, so nothing was sent.
     case noConnection(message: String)
+
+    /// The server could not be reached, so nothing was sent.
+    public var isOffline: Bool {
+        switch self {
+        case .network, .noConnection: true
+        default: false
+        }
+    }
+
+    /// The key or sign-in no longer works, and asking again cannot clear it.
+    ///
+    /// `forbidden` is never a key refusal: the server answers a revoked or expired key with 401, and every 403
+    /// means the key is valid but lacks a permission.
+    public var isKeyRefusal: Bool {
+        switch self {
+        case .unauthorized, .signedOut: true
+        case .copyExpired(let reason, _), .streamIncomplete(let reason, _): reason == "credential_ended"
+        default: false
+        }
+    }
+
+    /// Asking again later can clear it, with nothing changed: the rule the core's own follow waits out
+    /// (`CoreError::is_environmental`), with `noConnection` and `keyChanging` added.
+    ///
+    /// An ``unnamed(status:message:)`` answer is transient whatever its status, since a gateway's 401 is not the
+    /// server's word on the key.
+    public var isTransient: Bool {
+        switch self {
+        case .network, .noConnection, .io, .storageFull, .rateLimited, .unnamed, .keyChanging: true
+        case .server(let status, _, _): status >= 500 || status == 408
+        default: false
+        }
+    }
 
     /// Fit to show a person.
     public var message: String {
@@ -83,8 +159,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
-            .invalid(let message),
-            .closed(let message), .noConnection(let message):
+            .invalid(let message), .keyChanging(let message), .versionConflict(let message),
+            .instanceChanged(let message), .closed(let message), .noConnection(let message):
             message
         }
     }
@@ -136,6 +212,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
+        case .versionConflict(let message): core = .Server(status: 409, code: "version_conflict", message: message)
+        case .instanceChanged(let message): core = .CopyExpired(reason: "instance_changed", message: message)
+        case .keyChanging: return "key_changing"
         case .closed: return "closed"
         case .noConnection: return "no_connection"
         }
@@ -153,6 +232,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .UnknownType(let message): self = .unknownType(message: message)
         case .RateLimited(let code, let message, let retryAfterSeconds):
             self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
+        case .Server(409, "version_conflict", let message): self = .versionConflict(message: message)
+        case .Server(409, "instance_changed", let message): self = .instanceChanged(message: message)
         case .Server(let status, let code, let message): self = .server(status: status, code: code, message: message)
         case .Io(let message): self = .io(message: message)
         case .Network(let message): self = .network(message: message)
@@ -173,8 +254,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .ReadingHandle(let message): self = .readingHandle(message: message)
         case .UnsentDiffers(let path, let unsent, let agreed, let message):
             self = .unsentDiffers(path: path, unsent: unsent, agreed: agreed, message: message)
-        case .CopyExpired(let reason, let message):
-            self = .copyExpired(reason: reason, message: message)
+        case .CopyExpired("instance_changed", let message): self = .instanceChanged(message: message)
+        case .CopyExpired(let reason, let message): self = .copyExpired(reason: reason, message: message)
         case .StreamIncomplete(let reason, let message): self = .streamIncomplete(reason: reason, message: message)
         case .WrongServer(let expected, let got, let message):
             self = .wrongServer(expected: expected, got: got, message: message)

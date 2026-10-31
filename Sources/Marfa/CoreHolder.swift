@@ -132,13 +132,13 @@ final class CoreHolder: Sendable {
     /// again with `key` and holds that.
     ///
     /// From the start until the new core is held, every call throws
-    /// `invalid`. When the store cannot be opened again the holder is closed,
+    /// `keyChanging`. When the store cannot be opened again the holder is closed,
     /// and a `close()` that arrived meanwhile closes it: this throws `closed`.
     func replace(key: String) async throws {
         try state.withLock { state in
             switch state.phase {
             case .dropping, .released: throw MarfaError.closed(message: Self.closedMessage)
-            case .replacing: throw MarfaError.invalid(message: Self.replacingMessage)
+            case .replacing: throw MarfaError.keyChanging(message: Self.replacingMessage)
             case .open:
                 if state.closing { throw MarfaError.closed(message: Self.closedMessage) }
                 if reopen == nil { throw Self.noKey }
@@ -190,7 +190,7 @@ final class CoreHolder: Sendable {
             case .replacing:
                 throw state.closing
                     ? MarfaError.closed(message: Self.closedMessage)
-                    : MarfaError.invalid(message: Self.replacingMessage)
+                    : MarfaError.keyChanging(message: Self.replacingMessage)
             case .open:
                 guard !state.closing, let core = state.core else {
                     throw MarfaError.closed(message: Self.closedMessage)

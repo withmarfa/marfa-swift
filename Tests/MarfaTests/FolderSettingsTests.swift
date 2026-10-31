@@ -95,11 +95,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.changeFolder(made.id, FolderSettingsChange(title: "Thrice"), baseVersion: 1)
             } throws: { error in
-                if case .server(let status, let code, _) = error as? MarfaError {
-                    status == 409 && code == "version_conflict"
-                } else {
-                    false
-                }
+                if case .versionConflict = error as? MarfaError { true } else { false }
             }
             #expect(
                 try await copy.items.folder(made.id)?.settings.title == "Twice", "the refused change left it as it was")

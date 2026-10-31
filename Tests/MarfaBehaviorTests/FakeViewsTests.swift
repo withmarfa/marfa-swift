@@ -89,8 +89,7 @@ struct FakeViews {
         await #expect {
             try await copy.changeView(made.id, ViewSettingsChange(title: "Lost"), baseVersion: 1)
         } throws: { error in
-            guard case .server(let status, let code, _)? = error as? MarfaError else { return false }
-            return status == 409 && code == "version_conflict"
+            if case .versionConflict? = error as? MarfaError { true } else { false }
         }
         #expect(try await copy.items.view(made.id)?.settings.title == "Renamed")
 

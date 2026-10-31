@@ -1,4 +1,5 @@
 import Foundation
+import SQLite3
 import Testing
 
 @testable import Marfa
@@ -57,6 +58,12 @@ struct ServerCatalogUnreachable {
 
 @Suite(.timeLimit(.minutes(1)))
 struct ReplacedRefusedCopy {
+    private static let refusingSQL = """
+        PRAGMA writable_schema = ON;
+        UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
+          WHERE type = 'table' AND name = 'queue';
+        """
+
     /// A store whose queue table is not the shape this build reads, with the bytes of one file held beside it.
     static func refusedStore() async throws -> (store: URL, hash: String) {
         let store = temporaryStore()
@@ -65,26 +72,39 @@ struct ReplacedRefusedCopy {
         let hash = try #require(put.blob)
         #expect(try await copy.blobs.isHeld(hash))
         await copy.close()
-        try OlderStore.execute(
-            store,
-            """
-            DELETE FROM queue;
-            PRAGMA writable_schema = ON;
-            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
-              WHERE type = 'table' AND name = 'queue';
-            """)
+        try OlderStore.execute(store, "DELETE FROM queue;\n" + refusingSQL)
         return (store, hash)
+    }
+
+    /// A refused store that holds one write the server has not taken.
+    private static func refusedStoreWithAnUnsentWrite() async throws -> URL {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store)
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+        await copy.close()
+        try OlderStore.execute(store, refusingSQL)
+        return store
+    }
+
+    private static func isWrongSchema(_ error: any Error, unsent: UInt64?) -> Bool {
+        if case .wrongSchema(_, _, let count, _)? = error as? MarfaError { count == unsent } else { false }
+    }
+
+    @Test func aRefusedStoreIsKeptUnlessTheAppAsksForItToBeReplaced() async throws {
+        let (store, _) = try await Self.refusedStore()
+        await #expect {
+            _ = try await WorkingCopy.open(store: store)
+        } throws: { Self.isWrongSchema($0, unsent: 0) }
+        await #expect {
+            _ = try await WorkingCopy.open(store: store, ifRefused: .keep)
+        } throws: { Self.isWrongSchema($0, unsent: 0) }
     }
 
     @Test func aRefusedStoreIsRebuiltEmptyAndKeepsItsFiles() async throws {
         let (store, hash) = try await Self.refusedStore()
-        await #expect {
-            _ = try await WorkingCopy.open(store: store)
-        } throws: { error in
-            if case .wrongSchema? = error as? MarfaError { true } else { false }
-        }
 
-        let copy = try await WorkingCopy.replaceRefused(store: store)
+        let copy = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(copy.handle == .writer)
         #expect(try await copy.blobs.isHeld(hash), "the files the old store kept are gone")
         #expect(try await copy.items.list(ListFilters(type: "core.note")).isEmpty)
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "writes again"]))
@@ -96,7 +116,7 @@ struct ReplacedRefusedCopy {
 
     @Test func aBudgetGivenWhenReplacingIsInForceAndKept() async throws {
         let (store, _) = try await Self.refusedStore()
-        let copy = try await WorkingCopy.replaceRefused(store: store, fileBudget: .bytes(bytes: 4_096))
+        let copy = try await WorkingCopy.open(store: store, fileBudget: .bytes(bytes: 4_096), ifRefused: .replace)
         #expect(try await copy.blobs.cache().setting == .bytes(bytes: 4_096))
         await copy.close()
         let reopened = try await WorkingCopy.open(store: store)
@@ -108,16 +128,9 @@ struct ReplacedRefusedCopy {
         let store = temporaryStore()
         let first = try await WorkingCopy.open(store: store, fileBudget: .bytes(bytes: 8_192))
         await first.close()
-        try OlderStore.execute(
-            store,
-            """
-            DELETE FROM queue;
-            PRAGMA writable_schema = ON;
-            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
-              WHERE type = 'table' AND name = 'queue';
-            """)
+        try OlderStore.execute(store, "DELETE FROM queue;\n" + Self.refusingSQL)
 
-        let copy = try await WorkingCopy.replaceRefused(store: store)
+        let copy = try await WorkingCopy.open(store: store, ifRefused: .replace)
         #expect(try await copy.blobs.cache().setting == .bytes(bytes: 8_192))
         await copy.close()
     }
@@ -144,43 +157,145 @@ struct ReplacedRefusedCopy {
         await copy.close()
     }
 
-    @Test func aStoreThatOpensAsItIsIsLeftAlone() async throws {
+    @Test func aStoreThatOpensAsItIsIsNotReplaced() async throws {
         let store = temporaryStore()
         let copy = try await WorkingCopy.open(store: store)
         let created = try await copy.items.create(Draft(type: "core.note", properties: ["body": "kept"]))
         let id = try #require(created.itemId)
         await copy.close()
 
-        await #expect {
-            _ = try await WorkingCopy.replaceRefused(store: store)
-        } throws: { error in
-            if case .invalid? = error as? MarfaError { true } else { false }
-        }
-        let reopened = try await WorkingCopy.open(store: store)
+        let reopened = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(reopened.handle == .writer)
         #expect(try await reopened.items.get(id) != nil)
+        #expect(try await reopened.queue.all().count == 1)
         await reopened.close()
     }
 
-    @Test func aRefusedStoreThatHoldsAnUnsentWriteIsLeftAlone() async throws {
+    @Test func aNewPathIsMadeAsOpenMakesIt() async throws {
         let store = temporaryStore()
-        let copy = try await WorkingCopy.open(store: store)
-        _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+        let copy = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(copy.handle == .writer)
+        #expect(FileManager.default.fileExists(atPath: store.path))
         await copy.close()
-        try OlderStore.execute(
-            store,
-            """
-            PRAGMA writable_schema = ON;
-            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
-              WHERE type = 'table' AND name = 'queue';
-            """)
+    }
+
+    @Test func aRefusedStoreThatHoldsAnUnsentWriteIsLeftAloneWithItsCount() async throws {
+        let store = try await Self.refusedStoreWithAnUnsentWrite()
 
         await #expect {
-            _ = try await WorkingCopy.replaceRefused(store: store)
-        } throws: { error in
-            if case .wrongSchema(_, _, let unsent, _)? = error as? MarfaError { unsent == 1 } else { false }
-        }
+            _ = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        } throws: { Self.isWrongSchema($0, unsent: 1) }
         #expect(try OlderStore.count(store, "SELECT COUNT(*) FROM queue") == 1)
+
+        // The way on, once the person has agreed to lose the write they were shown.
+        try await WorkingCopy.remove(store: store, unsent: 1)
+        let fresh = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(try await fresh.queue.all().isEmpty)
+        await fresh.close()
     }
+
+    @Test func aRefusedStoreAnotherProcessWritesIsLeftAlone() async throws {
+        let (store, hash) = try await Self.refusedStore()
+        let lock = try HeldWriterLock(store)
+
+        await #expect {
+            _ = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        } throws: { error in
+            if case .readingHandle? = error as? MarfaError { true } else { false }
+        }
+        lock.release()
+        await #expect {
+            _ = try await WorkingCopy.open(store: store)
+        } throws: { Self.isWrongSchema($0, unsent: 0) }
+
+        // Without the other writer, the same call replaces it, so the refusal above came from the lock.
+        let copy = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(try await copy.blobs.isHeld(hash))
+        await copy.close()
+    }
+
+    @Test func aSecondOpenerOfAStoreThatOpensIsAReaderAndReplacesNothing() async throws {
+        let store = temporaryStore()
+        let writer = try await WorkingCopy.open(store: store)
+        let created = try await writer.items.create(Draft(type: "core.note", properties: ["body": "kept"]))
+        let id = try #require(created.itemId)
+
+        let reader = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(reader.handle == .reader)
+        #expect(try await reader.items.get(id) != nil)
+        await reader.close()
+        #expect(try await writer.queue.all().count == 1)
+        await writer.close()
+    }
+
+    @Test func aRefusedStoreWhoseLockCannotBeWrittenIsLeftAlone() async throws {
+        let (store, _) = try await Self.refusedStore()
+        let lock = URL(filePath: store.path + ".writer-lock")
+        try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: lock.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: lock.path) }
+
+        await #expect {
+            _ = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        } throws: { error in
+            if case .store? = error as? MarfaError { true } else { false }
+        }
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: lock.path)
+        await #expect {
+            _ = try await WorkingCopy.open(store: store)
+        } throws: { Self.isWrongSchema($0, unsent: 0) }
+    }
+
+    /// A store another server's copy made opens, and keeps its writes; the first call that reaches the server says
+    /// it is the wrong one, before anything is sent.
+    @Test func aStoreFromAnotherServerOpensAndItsFirstServerCallSaysSo() async throws {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store)
+        let created = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+        let id = try #require(created.itemId)
+        await copy.close()
+        try OlderStore.execute(
+            store, "INSERT OR REPLACE INTO meta (key, value) VALUES ('server_origin', 'http://127.0.0.1:2');")
+
+        let server = Server(url: URL(string: "http://127.0.0.1:1")!, key: "unused")
+        let moved = try await WorkingCopy.open(store: store, server: server, ifRefused: .replace)
+        #expect(try await moved.items.get(id) != nil)
+        await #expect {
+            _ = try await moved.hydrate(types: ["core.note"], tier: .library)
+        } throws: { error in
+            if case .wrongServer? = error as? MarfaError { true } else { false }
+        }
+        #expect(try await moved.queue.all().count == 1)
+        await moved.close()
+    }
+}
+
+/// The writer lock of a store, held by another process.
+///
+/// The core links its own SQLite, and POSIX locks are per process, so a lock taken in this process would not
+/// stop it.
+private final class HeldWriterLock {
+    private let process = Process()
+    private let input = Pipe()
+
+    init(_ store: URL) throws {
+        let output = Pipe()
+        process.executableURL = URL(filePath: "/usr/bin/sqlite3")
+        process.arguments = [store.path + ".writer-lock"]
+        process.standardInput = input
+        process.standardOutput = output
+        try process.run()
+        input.fileHandleForWriting.write(Data("BEGIN EXCLUSIVE;\n.print held\n".utf8))
+        let said = output.fileHandleForReading.availableData
+        try #require(String(decoding: said, as: UTF8.self).contains("held"))
+    }
+
+    func release() {
+        guard process.isRunning else { return }
+        try? input.fileHandleForWriting.close()
+        process.waitUntilExit()
+    }
+
+    deinit { release() }
 }
 
 @Suite(.timeLimit(.minutes(1)))

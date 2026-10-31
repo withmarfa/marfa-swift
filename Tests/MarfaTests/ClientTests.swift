@@ -136,6 +136,18 @@ struct ClientTests {
         #expect(target.requests.isEmpty)
     }
 
+    @Test func aConflictAndAnotherInstanceArriveAsTheWorkingCopyNamesThem() async {
+        let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
+            (refused(409, "version_conflict"), .versionConflict(message: "scripted version_conflict")),
+            (refused(409, "instance_changed"), .instanceChanged(message: "scripted instance_changed")),
+            (refused(409, "conflict"), .server(status: 409, code: "conflict", message: "scripted conflict")),
+        ]
+        for (reply, expected) in answers {
+            let scripted = ScriptedAuthServer { _ in reply }
+            #expect(await failure { try await client(scripted).listTags() } == expected)
+        }
+    }
+
     @Test func untidyRefusalsAreReadAsTheWorkingCopyReadsThem() async {
         let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
             (

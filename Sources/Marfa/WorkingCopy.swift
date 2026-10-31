@@ -51,6 +51,15 @@ public final class WorkingCopy: Sendable {
         feed.announce(change)
     }
 
+    /// What ``open(store:server:fileBudget:ifRefused:)`` does with a store another build of the core made.
+    public enum IfRefused: Sendable, Hashable {
+        /// Throws `wrongSchema` and leaves the store as it is.
+        case keep
+        /// Replaces the store with an empty one of this build's shape when it holds no write the server has not
+        /// taken, and throws `wrongSchema` with that count otherwise.
+        case replace
+    }
+
     /// Opens the store at `store`, making it when absent.
     ///
     /// A new store reads and queues writes before its first hydration. A store
@@ -64,44 +73,66 @@ public final class WorkingCopy: Sendable {
     /// Throws `MarfaError.store` when the store's lock file exists but cannot
     /// be opened for writing, rather than opening a copy that holds a lock it
     /// cannot keep. Throws `SignInError.notSignedIn` for a server made from a
-    /// credential whose sign-in the keychain no longer holds. Throws
-    /// `MarfaError.wrongSchema` for a store another build of the core made,
-    /// and leaves the store as it is: its `unsent` counts the writes the
-    /// server has not taken, which only that build can send.
+    /// credential whose sign-in the keychain no longer holds.
+    ///
+    /// A store another build of the core made is refused with `MarfaError.wrongSchema`, whose `unsent` counts the
+    /// writes the server has not taken, which only that build can send. With `ifRefused` left at `.keep`, the
+    /// store is left as it is. With `.replace`, a refused store that holds no such write is replaced by an empty
+    /// one of this build's shape and opened. A store that opens as it is, or a path with none, is opened as with
+    /// `.keep`. Unsent writes are never given up: a refused store that holds any, or whose count cannot be read,
+    /// is left as it is and the open throws `wrongSchema` with the count. To give them up, show the person the
+    /// count, call ``remove(store:unsent:)`` with it, and open again. `.replace` also leaves the store as it is and
+    /// throws `readingHandle` while another process writes it.
+    ///
+    /// A replacement keeps the files the copy downloaded, because they are kept by content and not by the store,
+    /// and the file budget the old store recorded. What only the old store held does not stay: pins, the position
+    /// in the server's events and the declared types. Hydrate the new copy as you would a new one.
+    ///
+    /// A store another server's copy made opens, and keeps its writes. The open does not ask the server, so the
+    /// first call that does, such as ``hydrate(types:tier:edgeTypes:)``, throws `wrongServer` before it sends
+    /// anything. To start again on this server, read `queue` for what would be lost, close the copy, and call
+    /// ``remove(store:unsent:)``.
     ///
     /// `fileBudget` chooses the budget of the cache of fetched files, as ``Blobs/setBudget(_:)`` does, trimming to
     /// it before this returns; left `nil`, the copy keeps the choice its store holds, which is the default
     /// budget for a new store. A second opener of a store is a reader and cannot set it: opening with a
-    /// `fileBudget` then throws `readingHandle`, and the store is released.
-    public static func open(store: URL, server: Server? = nil, fileBudget: FileBudget? = nil) async throws
-        -> WorkingCopy
-    {
-        try await opened(store: store, server: server, fileBudget: fileBudget, replacing: false)
-    }
-
-    /// Replaces a store that ``open(store:server:fileBudget:)`` refuses with `wrongSchema` by an empty one of this
-    /// build's shape, and opens it, taking its arguments as `open` does.
-    ///
-    /// The files the copy downloaded stay, because they are kept by content and not by the store. What only the
-    /// old store held does not: pins, the position in the server's events and the declared types. The file
-    /// budget the old store recorded stays, as it does for any reopened store; `fileBudget` sets a new one. Read
-    /// what matters before replacing, and hydrate the new copy as you would a new one.
-    ///
-    /// Leaves the store as it is and throws `wrongSchema`, with its `unsent` count, while it holds a write the
-    /// server has not taken, and `readingHandle` while another process writes it. Throws `invalid` for a store
-    /// that opens as it is, or a path that holds none. Throws `store` when `fileBudget` cannot be set once the store
-    /// is replaced; the error says so, the copy is closed, and the new store is in place, so open it again and
-    /// call ``Blobs/setBudget(_:)``.
-    public static func replaceRefused(store: URL, server: Server? = nil, fileBudget: FileBudget? = nil) async throws
-        -> WorkingCopy
-    {
-        try await opened(store: store, server: server, fileBudget: fileBudget, replacing: true)
+    /// `fileBudget` then throws `readingHandle`, and the store is released. When the budget cannot be set once a
+    /// refused store is replaced, this throws `store`, saying so, with the copy closed and the new store in place:
+    /// open it again and call ``Blobs/setBudget(_:)``.
+    public static func open(
+        store: URL, server: Server? = nil, fileBudget: FileBudget? = nil, ifRefused: IfRefused = .keep
+    ) async throws -> WorkingCopy {
+        let path = store.path
+        let url = server?.url.absoluteString
+        let credential = server?.credential
+        let (core, replaced) = try await background { () throws -> (Core, Bool) in
+            let renewer = credential.map(TokenRenewer.init)
+            let key = try server?.openingToken()
+            do {
+                return (try Core.open(path: path, url: url, key: key, renewer: renewer), false)
+            } catch MarfaCore.MarfaError.WrongSchema(_, _, unsent: 0, _) where ifRefused == .replace {
+                // The core counts again under the writer lock, so a write queued since is never replaced.
+                return (try Core.replaceRefused(path: path, url: url, key: key, renewer: renewer), true)
+            }
+        }
+        let copy: WorkingCopy
+        if let url {
+            // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
+            let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
+                try Core.open(path: path, url: url, key: key)
+            }
+            copy = WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
+        } else {
+            copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        }
+        try await copy.applyingOpeningBudget(fileBudget, replaced: replaced)
+        return copy
     }
 
     /// Removes the store at `store`.
     ///
     /// It removes the store, its log, the files it fetched and its writer lock, and nothing else beside it. A store
-    /// of any schema goes, including one ``open(store:server:fileBudget:)`` refuses with `wrongSchema`. A symbolic
+    /// of any schema goes, including one ``open(store:server:fileBudget:ifRefused:)`` refuses with `wrongSchema`. A symbolic
     /// link at one of those names is unlinked, never what it leads to.
     ///
     /// `unsent` is the number of writes the server has not taken that the person agreed to lose: the count they
@@ -120,38 +151,6 @@ public final class WorkingCopy: Sendable {
     public static func remove(store: URL, unsent: UInt64) async throws {
         let path = store.path
         try await background { try removeStore(path: path, unsent: unsent) }
-    }
-
-    private static func opened(store: URL, server: Server?, fileBudget: FileBudget?, replacing: Bool) async throws
-        -> WorkingCopy
-    {
-        let path = store.path
-        let copy: WorkingCopy
-        if let server {
-            let url = server.url.absoluteString
-            let credential = server.credential
-            let core = try await background {
-                let renewer = credential.map(TokenRenewer.init)
-                let key = try server.openingToken()
-                return replacing
-                    ? try Core.replaceRefused(path: path, url: url, key: key, renewer: renewer)
-                    : try Core.open(path: path, url: url, key: key, renewer: renewer)
-            }
-            // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
-            let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
-                try Core.open(path: path, url: url, key: key)
-            }
-            copy = WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
-        } else {
-            let core = try await background {
-                replacing
-                    ? try Core.replaceRefused(path: path, url: nil, key: nil)
-                    : try Core.open(path: path, url: nil, key: nil)
-            }
-            copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        }
-        try await copy.applyingOpeningBudget(fileBudget, replaced: replacing)
-        return copy
     }
 
     /// Sets the budget the app opened the copy with.
@@ -337,8 +336,8 @@ public final class WorkingCopy: Sendable {
     ///
     /// Otherwise every stream is told `.stopped`: when the follow stops with
     /// any other error, when the server refuses the refill, when the core
-    /// refuses to fill in place (`copyExpired` with the reason
-    /// `instance_changed` for another instance at the copy's server,
+    /// refuses to fill in place (`instanceChanged` for another instance at the
+    /// copy's server, `copyExpired` with the reason
     /// `reach_changed` for a reach other than the one the copy was built under, `slice_changed`,
     /// `head_past_log` for a server restored to an earlier point, or
     /// `not_stale` for a copy that is not waiting to be filled again), and
@@ -570,8 +569,7 @@ public struct Items: Sendable {
     /// Never queued: it needs the server, and the key needs `items.purge` and
     /// write on the item's type. It is sent at `version`, the version the
     /// person was shown, such as a ``BinPage`` item's, or else the version the
-    /// copy holds, so an item changed elsewhere since throws `server` with
-    /// status 409 and `version_conflict`.
+    /// copy holds, so an item changed elsewhere since throws `versionConflict`.
     ///
     /// Refused before anything is sent: an item the copy does not hold, with
     /// no `version`, throws `notFound` with the code `not_held`; one the copy

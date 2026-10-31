@@ -238,6 +238,20 @@ Use `FakeCopy` to record writes, choose drain verdicts, and send changes on `cha
 
 The fake takes the status words of the types you give it and refuses a write that changes a status to a word the type does not declare, as the real copy does. It does not run a `filter`, `status_group` included, and it does not declare a type with a status field, so both throw `FakeCopyError.unsupported`.
 
+## Handle errors
+
+Every call throws `MarfaError`. Three properties say what an error means, so an app does not need its own list of cases:
+
+- `isOffline`: the server could not be reached, so nothing was sent.
+- `isKeyRefusal`: the key or sign-in no longer works. Ask the person to sign in again, or get a new key. A `forbidden` error is never a key refusal: the key is valid but lacks a permission.
+- `isTransient`: asking again later can clear it. No key refusal is transient, and every offline error is.
+
+A store that another build of Marfa made is refused with `wrongSchema`, which carries the number of writes in it that the server has not taken. To replace such a store with an empty one, open it with `ifRefused: .replace`. The store is replaced only when it holds no unsent writes; otherwise the open throws `wrongSchema` with the count and leaves the store as it is. To give up those writes, show the person the count, then call `WorkingCopy.remove(store:unsent:)` with it and open the store again.
+
+```swift
+let copy = try await WorkingCopy.open(store: storeURL, server: server, ifRefused: .replace)
+```
+
 ## Report errors and events
 
 The `MarfaTelemetry` product sends an app's errors, and a fixed set of log events, to a PostHog project. It has no third-party dependency, **no token and no destination of its own**, and does nothing until the app configures it and turns it on, so an app that does not import it carries none of it.
