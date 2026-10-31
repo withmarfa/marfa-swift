@@ -28,6 +28,15 @@ extension InMemoryCore {
             try Checks.statusWord(kept, of: type, call: "items.create")
             let properties = Self.inAnswerOrder(kept, of: type, in: types)
             let id = draft.id ?? Minted.id()
+            for named in edges {
+                for target in named.targets {
+                    try Self.refuseUnwritable(
+                        Proposed(
+                            edgeType: named.type, source: .made(id: id, type: draft.type), targetId: target,
+                            replacing: nil),
+                        in: state)
+                }
+            }
             var body = JsonObject(members: [
                 JsonMember(key: "id", value: .string(id)), JsonMember(key: "type", value: .string(draft.type)),
                 JsonMember(key: "properties", value: .object(properties)),
@@ -115,6 +124,7 @@ extension InMemoryCore {
                     "the update to \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
                 )
             }
+            if let type = edit.type { try Self.refuseRetypeBreakingEdges(of: id, to: type, in: state) }
             var body = JsonObject(members: [
                 JsonMember(key: "properties", value: .object(edit.properties)),
                 JsonMember(key: "version", value: .integer(base)),
@@ -345,6 +355,11 @@ extension InMemoryCore {
                     )
                 }
                 try Self.refuseSelfLoop(source ?? held.sourceId, target ?? held.targetId)
+                try Self.refuseUnwritable(
+                    Proposed(
+                        edgeType: held.edgeType, source: .held(source ?? held.sourceId),
+                        targetId: target ?? held.targetId, replacing: id),
+                    in: state)
             }
             try Properties.keptAsWritten(edit.properties)
             guard !edit.properties.members.isEmpty || source != nil || target != nil else { return nil }

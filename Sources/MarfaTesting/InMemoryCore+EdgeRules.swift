@@ -26,7 +26,29 @@ extension InMemoryCore {
                 "\(draft.sourceId) is not a row this copy holds, and \(draft.edgeType) is not an edge type its slice holds whole, so the copy cannot hold an edge from it"
             )
         }
-        try refuseUnwritable(draft, in: state)
+        try refuseUnwritable(
+            Proposed(edgeType: draft.edgeType, source: .held(draft.sourceId), targetId: draft.targetId, replacing: nil),
+            in: state)
+    }
+
+    /// The edge the core's `Proposed` describes: where its source is an item being made, only its type is known.
+    struct Proposed {
+        enum Source {
+            case held(String)
+            case made(id: String, type: String)
+
+            var id: String {
+                switch self {
+                case .held(let id), .made(let id, _): id
+                }
+            }
+        }
+
+        var edgeType: String
+        var source: Source
+        var targetId: String
+        /// The edge an update moves an end of, which the cycle walk leaves out.
+        var replacing: String?
     }
 
     private struct Lineage {
@@ -69,8 +91,8 @@ extension InMemoryCore {
 
     /// An end in the bin, an end of a type the edge type does not admit, a source a flat edge type does not take,
     /// then a cycle.
-    private static func refuseUnwritable(_ draft: EdgeDraft, in state: State) throws {
-        guard let edgeType = state.edgeTypes[draft.edgeType] else { return }
+    static func refuseUnwritable(_ edge: Proposed, in state: State) throws {
+        guard let edgeType = state.edgeTypes[edge.edgeType] else { return }
         func end(_ name: String, _ id: String) throws -> String? {
             guard let item = state.items[id] else { return nil }
             if item.state == .trashed {
@@ -78,43 +100,75 @@ extension InMemoryCore {
             }
             return item.type
         }
-        let sourceType = try end("source", draft.sourceId)
-        let targetType = try end("target", draft.targetId)
+        let sourceType: String?
+        switch edge.source {
+        case .made(_, let type): sourceType = type
+        case .held(let id): sourceType = try end("source", id)
+        }
+        let targetType = try end("target", edge.targetId)
         let types = state.resolvedItemTypes()
         if let sourceType, let lineage = lineage(of: sourceType, in: types),
             lineage.admitted(by: edgeType.sourceTypeConstraints) == false
         {
-            throw Refuse.validation(
-                "edge_constraint_violation", "Edge \"\(draft.edgeType)\" does not allow source type \"\(sourceType)\"")
+            throw refusedEnd(edge.edgeType, "source", sourceType)
         }
         if let targetType, let lineage = lineage(of: targetType, in: types),
             lineage.admitted(by: edgeType.targetTypeConstraints) == false
         {
-            throw Refuse.validation(
-                "edge_constraint_violation", "Edge \"\(draft.edgeType)\" does not allow target type \"\(targetType)\"")
+            throw refusedEnd(edge.edgeType, "target", targetType)
         }
         if edgeType.flat, let sourceType, let lineage = lineage(of: sourceType, in: types),
             lineage.admitted(by: edgeType.targetTypeConstraints) == true
         {
-            throw Refuse.validation(
-                "edge_constraint_violation",
-                "Edge \"\(draft.edgeType)\" does not take a source its target constraints admit; use \"parent-of\" for hierarchy"
-            )
+            throw refusedNesting(edge.edgeType)
         }
-        if edgeType.acyclic, state.reaches(from: draft.targetId, to: draft.sourceId, through: draft.edgeType) {
-            throw Refuse.validation("edge_cycle", "Edge \"\(draft.edgeType)\" would close a cycle")
+        if edgeType.acyclic,
+            state.reaches(from: edge.targetId, to: edge.source.id, through: edge.edgeType, leaving: edge.replacing)
+        {
+            throw Refuse.validation("edge_cycle", "Edge \"\(edge.edgeType)\" would close a cycle")
+        }
+    }
+
+    private static func refusedEnd(_ edgeType: String, _ end: String, _ type: String) -> Error {
+        Refuse.validation("edge_constraint_violation", "Edge \"\(edgeType)\" does not allow \(end) type \"\(type)\"")
+    }
+
+    private static func refusedNesting(_ edgeType: String) -> Error {
+        Refuse.validation(
+            "edge_constraint_violation",
+            "Edge \"\(edgeType)\" does not take a source its target constraints admit; use \"parent-of\" for hierarchy"
+        )
+    }
+
+    /// What the core refuses when `items.update` gives an item a type: each edge it holds, oldest first, whose end
+    /// the new type no longer fits.
+    static func refuseRetypeBreakingEdges(of id: String, to type: String, in state: State) throws {
+        guard let lineage = lineage(of: type, in: state.resolvedItemTypes()) else { return }
+        for edge in state.edgesInOrder
+        where (edge.sourceId == id || edge.targetId == id) && edge.sourceId != edge.targetId {
+            guard let edgeType = state.edgeTypes[edge.edgeType] else { continue }
+            let from = edge.sourceId == id
+            if from, lineage.admitted(by: edgeType.sourceTypeConstraints) == false {
+                throw refusedEnd(edge.edgeType, "source", type)
+            }
+            if from, edgeType.flat, lineage.admitted(by: edgeType.targetTypeConstraints) == true {
+                throw refusedNesting(edge.edgeType)
+            }
+            if !from, lineage.admitted(by: edgeType.targetTypeConstraints) == false {
+                throw refusedEnd(edge.edgeType, "target", type)
+            }
         }
     }
 }
 
 extension InMemoryCore.State {
     /// Whether `target` reaches `source` through the held edges of one type, those waiting to be sent among them.
-    func reaches(from start: String, to goal: String, through edgeType: String) -> Bool {
+    func reaches(from start: String, to goal: String, through edgeType: String, leaving replaced: String? = nil) -> Bool {
         var seen: Set<String> = [start]
         var frontier = [start]
         while let at = frontier.popLast() {
             if at == goal { return true }
-            for edge in edges.values where edge.edgeType == edgeType && edge.sourceId == at {
+            for edge in edges.values where edge.edgeType == edgeType && edge.sourceId == at && edge.id != replaced {
                 if seen.insert(edge.targetId).inserted { frontier.append(edge.targetId) }
             }
         }

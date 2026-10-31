@@ -84,10 +84,11 @@ import Synchronization
 ///   real copy refuses one: a delete of an item it holds at version 0 with no
 ///   create unanswered.
 /// - It knows only the types it was given and the ones the app declares, not
-///   Marfa's built-in catalog. `edges.create` and `edges.check` refuse an edge as the core does, from the types it
-///   holds: an end the edge type does not admit, nesting under a flat edge type, an end in the bin and a cycle
-///   through held edges. An edge that `items.create(edges:)` makes, an end that `edges.update` moves and a type that
-///   `items.update` changes are not checked against an edge type's constraints.
+///   Marfa's built-in catalog. `edges.create`, `edges.check`,
+///   `items.create(edges:)`, `edges.update` moving an end and `items.update` changing an item's type refuse as the
+///   core does, from the types it holds, with the core's code and message: an end the edge type does not admit,
+///   nesting under a flat edge type, an end in the bin and a cycle through held edges (an edge an update moves is
+///   left out of that walk). A retype is refused when an edge the item holds would no longer fit its new type.
 /// - A search finds an item again once it is restored from the bin, as the contract says. A real copy does not
 ///   until it reads the row again (withmarfa/marfa#2526).
 ///
