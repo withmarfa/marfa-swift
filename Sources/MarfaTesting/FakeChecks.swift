@@ -80,6 +80,8 @@ enum Checks {
                 }
             case "enum":
                 try enumValue(member.value, of: field, call: call)
+            case "array":
+                try list(member.value, of: field, call: call)
             default:
                 if !agrees(member.value, with: field.fieldType) {
                     throw FakeCopyError.unsupported(call: "\(call) with a \(field.fieldType) field")
@@ -92,7 +94,13 @@ enum Checks {
     ///
     /// A list the fake cannot quote as the core does, and an enum that lists none, throw `unsupported`.
     private static func enumValue(_ value: JsonValue, of field: TypeField, call: String) throws {
-        guard let listed = Properties.value(field.definition, "enum_values"), case .array(let entries) = listed,
+        if let message = try enumMessage(value, definition: field.definition, call: call) {
+            throw Refuse.validation("invalid_properties", "\(field.name): \(message)")
+        }
+    }
+
+    private static func enumMessage(_ value: JsonValue, definition: JsonObject, call: String) throws -> String? {
+        guard let listed = Properties.value(definition, "enum_values"), case .array(let entries) = listed,
             !entries.isEmpty
         else { throw FakeCopyError.unsupported(call: "\(call) with an enum field that lists no values") }
         let values = entries.compactMap { entry -> String? in
@@ -102,12 +110,83 @@ enum Checks {
         guard values.count == entries.count else {
             throw FakeCopyError.unsupported(call: "\(call) with an enum field whose values need escaping")
         }
-        guard case .string(let text) = value else {
-            throw Refuse.validation("invalid_properties", "\(field.name): Expected string")
+        guard case .string(let text) = value else { return "Expected string" }
+        if values.contains(where: { $0.isBytes(text) }) { return nil }
+        return "Must be one of \(values.map { "\"\($0)\"" }.joined(separator: ", "))"
+    }
+
+    /// The most items a list holds when its field names no `maxItems`.
+    private static let itemsPerList = 10_000
+
+    /// A list against the field that declares it.
+    ///
+    /// Entries are judged only for a list of objects whose members are strings, enums, booleans, integers or
+    /// numbers with no constraint beyond the core's defaults; any other list kind, member kind or constraint
+    /// throws `unsupported`.
+    private static func list(_ value: JsonValue, of field: TypeField, call: String) throws {
+        guard case .array(let entries) = value else {
+            throw Refuse.validation("invalid_properties", "\(field.name): Expected array")
         }
-        if !values.contains(where: { $0.isBytes(text) }) {
-            let quoted = values.map { "\"\($0)\"" }.joined(separator: ", ")
-            throw Refuse.validation("invalid_properties", "\(field.name): Must be one of \(quoted)")
+        if entries.count > itemsPerList {
+            throw Refuse.validation("invalid_properties", "\(field.name): Must contain at most \(itemsPerList) items")
+        }
+        let kind = Properties.string(field.definition, "items_type")
+        let members = Properties.value(field.definition, "items_fields")
+        if kind == nil && members == nil { return }
+        guard kind == "object", case .object(let declared)? = members else {
+            throw FakeCopyError.unsupported(call: "\(call) with a \(field.name) list of \(kind ?? "entries")")
+        }
+        for (index, entry) in entries.enumerated() {
+            if let message = try entryMessage(entry, declared: declared, call: call) {
+                throw Refuse.validation("invalid_properties", "\(field.name): Item \(index): \(message)")
+            }
+        }
+    }
+
+    /// Why one entry is not one the members allow, in the order the core finds it.
+    private static func entryMessage(_ entry: JsonValue, declared: JsonObject, call: String) throws -> String? {
+        guard case .object(let held) = entry else { return "Expected object" }
+        if held.members.isEmpty { return "Must have at least one member" }
+        if let stray = held.members.first(where: { held in !declared.members.contains { $0.key.isBytes(held.key) } }) {
+            return "\(stray.key): Is not a member of the entry"
+        }
+        for member in declared.members {
+            guard case .object(let definition) = member.value, let kind = Properties.string(definition, "type") else {
+                throw FakeCopyError.unsupported(call: "\(call) with a list member the fake cannot read")
+            }
+            guard let value = Properties.value(held, member.key) else {
+                if case .bool(true)? = Properties.value(definition, "required") { return "\(member.key): Required" }
+                continue
+            }
+            let allowed = plain.union(extra[kind] ?? [])
+            guard value != .null, ["string", "enum", "boolean", "integer", "number"].contains(kind),
+                definition.members.allSatisfy({ allowed.contains($0.key) })
+            else { throw FakeCopyError.unsupported(call: "\(call) with a \(kind) member in a list entry") }
+            if let message = try memberMessage(value, kind: kind, definition: definition, call: call) {
+                return "\(member.key): \(message)"
+            }
+        }
+        return nil
+    }
+
+    private static func memberMessage(
+        _ value: JsonValue, kind: String, definition: JsonObject, call: String
+    ) throws -> String? {
+        switch (kind, value) {
+        case ("string", .string(let text)):
+            if text.utf16.count > 100_000 { return "Must contain at most 100000 UTF-16 code units" }
+            return text.unicodeScalars.contains("\0") ? "Must not contain a null byte (U+0000)" : nil
+        case ("string", _): return "Expected string"
+        case ("enum", _): return try enumMessage(value, definition: definition, call: call)
+        case ("boolean", .bool): return nil
+        case ("boolean", _): return "Expected boolean"
+        case ("number", .integer), ("number", .number): return nil
+        case ("number", _): return "Expected number"
+        case ("integer", .integer(let number)):
+            return abs(number) <= 9_007_199_254_740_991 ? nil : "Expected safe integer"
+        case ("integer", .number(let number)):
+            return number.rounded() == number && abs(number) <= 9_007_199_254_740_991 ? nil : "Expected safe integer"
+        default: return "Expected safe integer"
         }
     }
 
@@ -168,7 +247,9 @@ enum Checks {
     private static let plain: Set<String> = ["type", "label", "description", "required", "searchable"]
 
     /// What a field of a kind may hold besides what every field does, which the fake judges.
-    private static let extra: [String: Set<String>] = ["status": ["status_values"], "enum": ["enum_values"]]
+    private static let extra: [String: Set<String>] = [
+        "status": ["status_values"], "enum": ["enum_values"], "array": ["items_type", "items_fields"],
+    ]
 
     private static func agrees(_ value: JsonValue, with kind: String) -> Bool {
         switch (kind, value) {
