@@ -55,9 +55,8 @@ struct SearchOffline {
         #expect(Set(held.titled(try await held.copy.search("zebr"))) == ["Zebra crossing", "Field notes", "Plain"])
         #expect(Set(held.titled(try await held.copy.search("runn"))) == ["Runner"])
         #expect(Set(held.titled(try await held.copy.search("ZEBRA CROSS"))) == ["Zebra crossing"])
-        #expect(try await held.copy.search("ran five miles").map(\.snippet) == [
-            "<mark>ran</mark> <mark>five</mark> <mark>miles</mark> before it was light"
-        ])
+        let excerpts = try await held.copy.search("ran five miles").map(\.snippet)
+        #expect(excerpts == ["<mark>ran</mark> <mark>five</mark> <mark>miles</mark> before it was light"])
         await held.copy.close()
     }
 
@@ -99,9 +98,8 @@ struct SearchOffline {
     func anExcerptIsEscapedHTMLWithOnlyMarksAsMarkup(kind: CopyKind) async throws {
         let held = try await Self.open(kind)
         let found = try await held.copy.search("twice")
-        #expect(found.map(\.snippet) == [
-            "he said &quot;quiet landscape&quot; <mark>twice</mark> &lt;b&gt;&amp; more&lt;/b&gt;"
-        ])
+        let escaped = "he said &quot;quiet landscape&quot; <mark>twice</mark> &lt;b&gt;&amp; more&lt;/b&gt;"
+        #expect(found.map(\.snippet) == [escaped])
         await held.copy.close()
     }
 
@@ -165,8 +163,15 @@ struct SearchOffline {
         let made = try await copy.items.create(
             Draft(
                 type: "app.test.entry",
-                properties: ["title": "T", "note": "visible wombat", "secret": "hidden quokka", "count": 7,
-                             "undeclared": "stray numbat"]))
+                properties: [
+                    "title": "T",
+                    "note": "visible wombat",
+                    "secret": "hidden quokka",
+                    "count": 7,
+                    "undeclared": "stray numbat",
+                ]
+            )
+        )
         let id = try #require(made.itemId)
         #expect(try await copy.search("wombat").map(\.item.id) == [id])
         #expect(try await copy.search("quokka").isEmpty)

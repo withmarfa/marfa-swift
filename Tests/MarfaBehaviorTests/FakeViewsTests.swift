@@ -314,10 +314,13 @@ struct FakeViews {
         #expect(try await copy.search("e", inView: notes.id).isEmpty)
         #expect(try await copy.search("b", inView: notes.id, limit: 0).isEmpty)
         #expect(try await copy.search("b", inView: notes.id).completeness == .complete)
-        await #expect(performing: { _ = try await copy.search("a", inView: "absent") }, throws: { error in
-            guard case .notFound(let code, _)? = error as? MarfaError else { return false }
-            return code == "not_held"
-        })
+        await #expect(
+            performing: { _ = try await copy.search("a", inView: "absent") },
+            throws: { error in
+                guard case .notFound(let code, _)? = error as? MarfaError else { return false }
+                return code == "not_held"
+            }
+        )
     }
 }
 #endif

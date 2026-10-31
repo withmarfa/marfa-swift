@@ -57,7 +57,9 @@ extension InMemoryCore {
     ) throws -> Found {
         guard let expression = expression(of: query) else { return Found(hits: [], completeness: .complete) }
         let database = try FullTextIndex()
-        let held = state.items.values.filter { $0.state != .trashed }.sorted { $0.id.utf8.lexicographicallyPrecedes($1.id.utf8) }
+        let held = state.items.values
+            .filter { $0.state != .trashed }
+            .sorted { $0.id.utf8.lexicographicallyPrecedes($1.id.utf8) }
         try database.fill(held, allowed: allowed) { columns(of: $0, type: types[$0.type]) }
         let hits = try database.rank(expression, open: markOpen, close: markClose, limit: Int64(limit))
         return Found(
@@ -129,7 +131,9 @@ extension InMemoryCore {
         (scalar.properties.isWhitespace && scalar.value != 0x85) || scalar.value == 0xFEFF
     }
 
-    /// The excerpt FTS5 cut, as HTML whose only markup is `<mark>` around matches. The text may hold the marker
+    /// The excerpt FTS5 cut, as HTML.
+    ///
+    /// The only markup is `<mark>` around matches. The text may hold the marker
     /// characters itself, so each opens only a closed mark and closes only an open one.
     private static func html(_ excerpt: String) -> String {
         var html = ""
@@ -160,9 +164,8 @@ private final class FullTextIndex {
     private var database: OpaquePointer?
 
     init() throws {
-        guard sqlite3_open_v2(":memory:", &database, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil)
-            == SQLITE_OK
-        else {
+        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE
+        guard sqlite3_open_v2(":memory:", &database, flags, nil) == SQLITE_OK else {
             sqlite3_close(database)
             throw FakeCopyError.unsupported(call: "search (no in-memory SQLite)")
         }
@@ -185,7 +188,9 @@ private final class FullTextIndex {
     func fill(_ items: [Item], allowed: Set<String>, columns: (Item) -> [String]) throws {
         try run("BEGIN")
         let insert = try Statement(
-            database, "INSERT INTO items_fts (rowid, title, body, description, name, extra, tags) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            database,
+            "INSERT INTO items_fts (rowid, title, body, description, name, extra, tags) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        )
         let named = try Statement(database, "INSERT INTO items (seq, id) VALUES (?, ?)")
         let permit = try Statement(database, "INSERT INTO allowed (seq) VALUES (?)")
         for (at, item) in items.enumerated() {
@@ -241,7 +246,9 @@ private final class Statement {
 
     struct Row {
         let statement: OpaquePointer?
-        func text(_ column: Int32) -> String { sqlite3_column_text(statement, column).map { String(cString: $0) } ?? "" }
+        func text(_ column: Int32) -> String {
+            sqlite3_column_text(statement, column).map { String(cString: $0) } ?? ""
+        }
         func real(_ column: Int32) -> Double { sqlite3_column_double(statement, column) }
     }
 
