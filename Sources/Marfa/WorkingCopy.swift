@@ -763,18 +763,40 @@ public struct Edges: Sendable {
 
     /// Queues an edge.
     ///
+    /// Refuses, before it queues anything, an edge the server would refuse for what the copy holds, as ``check(from:to:type:properties:id:)``
+    /// describes, with the server's code.
+    ///
     /// Throws `hydrationIncomplete` until the copy is whole, as ``update(_:_:)`` and ``delete(_:)`` do: a fill under
     /// way, or a stale copy's refill, leaves the edges it has not yet read unknown.
     public func create(
         from source: String, to target: String, type: String, properties: JSONObject = [:],
         id: String? = nil
     ) async throws -> QueuedWrite {
-        try await write { core in
-            try core.createEdge(
-                draft: MarfaCore.EdgeDraft(
-                    sourceId: source, targetId: target, edgeType: type,
-                    properties: properties.core, id: id))
-        }
+        let draft = Self.draft(from: source, to: target, type: type, properties: properties, id: id)
+        return try await write { core in try core.createEdge(draft: draft) }
+    }
+
+    /// Throws what ``create(from:to:type:properties:id:)`` would throw for the same arguments now, and queues nothing.
+    ///
+    /// It judges the edge from the catalog, items and edges the copy holds, makes no request and needs no server:
+    /// an end of a type the edge type does not admit, nesting under a flat edge type, an end in the bin, and a cycle
+    /// through edges the copy holds all throw `validation` or `notFound` with the server's code. Returning is not the
+    /// server's verdict. Where the copy does not hold what decides a refusal, such as a cycle through edges outside
+    /// its slice, the check returns and the server judges the queued edge.
+    ///
+    /// Throws `hydrationIncomplete` until the copy is whole, as ``create(from:to:type:properties:id:)`` does.
+    public func check(
+        from source: String, to target: String, type: String, properties: JSONObject = [:], id: String? = nil
+    ) async throws {
+        let draft = Self.draft(from: source, to: target, type: type, properties: properties, id: id)
+        try await holder.run { core in try core.checkEdge(draft: draft) }
+    }
+
+    private static func draft(
+        from source: String, to target: String, type: String, properties: JSONObject, id: String?
+    ) -> MarfaCore.EdgeDraft {
+        MarfaCore.EdgeDraft(
+            sourceId: source, targetId: target, edgeType: type, properties: properties.core, id: id)
     }
 
     /// Changes an edge's properties, moves one of its ends, or both, in one queued write.

@@ -31,7 +31,10 @@ struct RefusedWrites {
     }
 
     /// The loop b, task, c, b runs through a task, which a copy that hydrates only notes does not hold.
-    static func chain(on builder: WorkingCopy) async throws -> Chain {
+    ///
+    /// The fake holds every row, so it would refuse the move itself, as the core refuses a loop it holds. It is
+    /// given no edge through the task, so that it too sees nothing wrong and the verdict chooser refuses.
+    static func chain(on builder: WorkingCopy, throughTheTask: Bool = true) async throws -> Chain {
         func create(_ type: String, _ title: String) async throws -> String {
             try #require(
                 try await builder.items.create(
@@ -43,8 +46,10 @@ struct RefusedWrites {
         let c = try await create("core.note", "c")
         let between = try await create("core.task", "between")
         let ab = try #require(try await builder.edges.create(from: a, to: b, type: "parent-of").edgeId)
-        _ = try await builder.edges.create(from: b, to: between, type: "parent-of")
-        _ = try await builder.edges.create(from: between, to: c, type: "parent-of")
+        if throughTheTask {
+            _ = try await builder.edges.create(from: b, to: between, type: "parent-of")
+            _ = try await builder.edges.create(from: between, to: c, type: "parent-of")
+        }
         let setup = try await builder.queue.drain()
         #expect(setup.verdicts.allSatisfy { $0.verdict == .accepted }, "\(setup.verdicts)")
         return Chain(a: a, b: b, c: c, ab: ab)
@@ -103,7 +108,7 @@ struct RefusedWrites {
             fake.verdict = { write in
                 write.kind == .updateEdge ? .refused(Refusal(reason: "edge_cycle", code: "edge_cycle")) : .accepted
             }
-            let chain = try await Self.chain(on: fake.copy)
+            let chain = try await Self.chain(on: fake.copy, throughTheTask: false)
             seen = try await Self.refusedMove(on: fake.copy, chain: chain)
             await fake.copy.close()
         }

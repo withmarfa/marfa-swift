@@ -171,6 +171,17 @@ An item in no group matches neither `eq` nor `neq`; `status_group not_exists` se
 
 `core.event` has a `status` of its own that is not a status field: one of three fixed values, with no groups. `EventStatus` names them. A subtype cannot change them, so `copy.catalog.eventStatus(of: item)` reads the status of an item of `core.event` or of a type that descends from it, such as one a connector declares, and gives `nil` for any other item.
 
+## Meaning the core computes
+
+The core owns several rules that an app would otherwise copy. The SDK exposes them as calls that need no server.
+
+- `items.displays(of:)` and `items.displays(for:)` give each item's `name` and `preview`, both optional, with no placeholder text.
+- `linkParts(in:)` splits the wiki-links in a text into target, heading, alias and name, with `NSRange` ranges that count UTF-16 units. `items.linkCandidates(of:in:)` says which items a link can name.
+- `edges.check(from:to:type:)` throws the error that `edges.create` would throw for the same draft, and queues nothing. `EdgeType.acyclic` and `EdgeType.flat` describe the type's rules.
+- `FilterExpression` builds, encodes and decodes the `filter` text. `FilterField.operators` lists the operators a field accepts. Pass `try expression.encoded()` as `ListFilters.filter`.
+
+The fake copy answers `edges.check` and judges `edges.create` by the same edge rules. It throws `FakeCopyError.unsupported` for `displays` and `linkCandidates`.
+
 ## Draw a type's icon
 
 An item type carries one icon, an [Iconify](https://iconify.design) ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open` for a general icon from [Lucide](https://lucide.dev), or `simple-icons:github` for a brand mark from [Simple Icons](https://simpleicons.org). A bare name such as `book-open` is not an ID. `ItemType.icon` holds the ID the core resolved: the owner's own choice for the type or the nearest type that has one, else the nearest author's. It is `nil` when no type in the chain sets one.

@@ -28,6 +28,15 @@ extension InMemoryCore {
             try Checks.statusWord(kept, of: type, call: "items.create")
             let properties = Self.inAnswerOrder(kept, of: type, in: types)
             let id = draft.id ?? Minted.id()
+            for named in edges {
+                for target in named.targets {
+                    try Self.refuseUnwritable(
+                        Proposed(
+                            edgeType: named.type, source: .made(id: id, type: draft.type), targetId: target,
+                            replacing: nil),
+                        in: state)
+                }
+            }
             var body = JsonObject(members: [
                 JsonMember(key: "id", value: .string(id)), JsonMember(key: "type", value: .string(draft.type)),
                 JsonMember(key: "properties", value: .object(properties)),
@@ -115,6 +124,7 @@ extension InMemoryCore {
                     "the update to \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
                 )
             }
+            if let type = edit.type { try Self.refuseRetypeBreakingEdges(of: id, to: type, in: state) }
             var body = JsonObject(members: [
                 JsonMember(key: "properties", value: .object(edit.properties)),
                 JsonMember(key: "version", value: .integer(base)),
@@ -301,16 +311,7 @@ extension InMemoryCore {
     func createEdge(draft: EdgeDraft) throws -> QueuedWrite {
         try Properties.cross(draft.properties)
         return try state.withLock { state in
-            if let id = draft.id, !Minted.isID(id) {
-                throw Refuse.validation("invalid_id", "Invalid id: \"\(id)\" is not a UUIDv7 in lowercase")
-            }
-            try Self.refuseSelfLoop(draft.sourceId, draft.targetId)
-            try Properties.keptAsWritten(draft.properties)
-            guard state.items[draft.sourceId] != nil else {
-                throw Refuse.invalid(
-                    "\(draft.sourceId) is not a row this copy holds, and \(draft.edgeType) is not an edge type its slice holds whole, so the copy cannot hold an edge from it"
-                )
-            }
+            try Self.refuseUnqueueable(draft, in: state)
             let id = draft.id ?? Minted.id()
             let body = JsonObject(members: [
                 .init(key: "id", value: .string(id)), .init(key: "source_id", value: .string(draft.sourceId)),
@@ -354,6 +355,11 @@ extension InMemoryCore {
                     )
                 }
                 try Self.refuseSelfLoop(source ?? held.sourceId, target ?? held.targetId)
+                try Self.refuseUnwritable(
+                    Proposed(
+                        edgeType: held.edgeType, source: .held(source ?? held.sourceId),
+                        targetId: target ?? held.targetId, replacing: id),
+                    in: state)
             }
             try Properties.keptAsWritten(edit.properties)
             guard !edit.properties.members.isEmpty || source != nil || target != nil else { return nil }
@@ -400,7 +406,7 @@ extension InMemoryCore {
         }
     }
 
-    private static func refuseSelfLoop(_ source: String, _ target: String) throws {
+    static func refuseSelfLoop(_ source: String, _ target: String) throws {
         guard source != target else {
             throw Refuse.validation("edge_cycle", "an edge from \(source) to itself closes a cycle")
         }

@@ -61,10 +61,6 @@ extension InMemoryCore {
         preconditionFailure("the package never follows a core directly; MarfaTesting has no follow")
     }
 
-    func checkEdge(draft: EdgeDraft) throws {
-        throw FakeCopyError.unsupported(call: "edges.check")
-    }
-
     func itemDisplays(items: [ItemDisplayInput]) throws -> [ItemDisplay] {
         try unsupported("items.displays")
     }

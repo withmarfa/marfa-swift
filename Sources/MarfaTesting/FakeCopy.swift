@@ -35,7 +35,7 @@ import Synchronization
 ///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`
 ///   and `clearOccurredAt`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
 ///   `items.restore(_:)`, `items.transition(_:to:)`, `tags`, `metadata`,
-///   `extensions`, `edges.create`, `edges.update(_:_:)`, `edges.delete(_:)` and
+///   `extensions`, `edges.create`, `edges.check(from:to:type:)`, `edges.update(_:_:)`, `edges.delete(_:)` and
 ///   `declareTypes(_:)`.
 /// - Views: `createView`, `changeView`, `deleteView`, `items.views()`, `items.view(_:)`,
 ///   `items.list(inView:limit:offset:)` and `items.groups(inView:timeZone:)`, over the views it is given
@@ -84,8 +84,11 @@ import Synchronization
 ///   real copy refuses one: a delete of an item it holds at version 0 with no
 ///   create unanswered.
 /// - It knows only the types it was given and the ones the app declares, not
-///   Marfa's built-in catalog, and it does not check an edge type's
-///   constraints.
+///   Marfa's built-in catalog. `edges.create`, `edges.check`,
+///   `items.create(edges:)`, `edges.update` moving an end and `items.update` changing an item's type refuse as the
+///   core does, from the types it holds, with the core's code and message: an end the edge type does not admit,
+///   nesting under a flat edge type, an end in the bin and a cycle through held edges (an edge an update moves is
+///   left out of that walk). A retype is refused when an edge the item holds would no longer fit its new type.
 /// - A search finds an item again once it is restored from the bin, as the contract says. A real copy does not
 ///   until it reads the row again (withmarfa/marfa#2526).
 ///
