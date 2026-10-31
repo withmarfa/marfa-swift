@@ -85,7 +85,7 @@ for await update in copy.updates() {
 
 - `.following`: the copy caught up and hears the server's changes as they happen. Only this state means the copy is up to date.
 - `.connecting`: the copy is catching up, or refilling a stale copy.
-- `.offline(error)`: the server could not be reached, or asked the copy to wait, during a catch-up or a refill. The copy asks again after 5 seconds, doubling each time up to 5 minutes, and never sooner than a rate limit's `retryAfterSeconds`. After 5 minutes of following, the waits start again from 5 seconds.
+- `.offline(error)`: the server could not be reached, or asked the copy to wait, while the copy followed it, caught up or refilled. The copy asks again after 5 seconds, doubling each time up to 5 minutes, and never sooner than a rate limit's `retryAfterSeconds`. After 5 minutes of following, the waits start again from 5 seconds.
 - `.stopped(error)`: the server refused in a way that waiting may not mend. The copy asks again every 5 minutes, or later if the server names a later time. For a reader, it means the watch of the writer's saves ended on a fault: the reader takes the watch again on the `.offline` schedule, returns to `.local`, and asks for `.everything`.
 - `.keyRefused(error)`: the key or sign-in no longer works. The copy asks nothing until `useKey(_:)` gives it another key, and then catches up at once.
 - `.needsHydration(error)`: the copy has no complete hydration to follow from, or the server no longer holds its cursor. A copy that can refill by itself does so and moves on to `.following`; otherwise call `hydrate(types:tier:)`.
