@@ -360,6 +360,60 @@ struct LiveRestart {
         try await own.end()
     }
 
+    @Test func theBinIsListedOfflineFromWhatTheDeviceAndTheServerBinnedAndLosesWhatWasPurged() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            let store = Live.store()
+            let copy = try await WorkingCopy.open(store: store, server: own.server)
+            _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+            let kept = try #require(try await copy.items.create(Self.note("kept")).itemId)
+            let byDevice = try #require(try await copy.items.create(Self.note("binned here")).itemId)
+            let byServer = try #require(try await copy.items.create(Self.note("binned there")).itemId)
+            let purged = try #require(try await copy.items.create(Self.note("purged there")).itemId)
+            _ = try await copy.queue.drain()
+
+            _ = try await copy.items.delete(byDevice)
+            _ = try await copy.queue.drain()
+            try await Task.sleep(for: .milliseconds(20))
+            _ = try await Self.send(own, "DELETE", "items/\(byServer)")
+            try await Task.sleep(for: .milliseconds(20))
+            _ = try await Self.send(own, "DELETE", "items/\(purged)")
+            _ = try await copy.catchUp()
+
+            try await own.stop()
+            let bin = try await copy.items.list(ListFilters(states: [.trashed]))
+            #expect(Set(bin.map(\.id)) == [byDevice, byServer, purged], "all three, with the server away")
+            #expect(bin.allSatisfy { $0.state == .trashed })
+            #expect(bin.first { $0.id == byDevice }?.trashedAt != nil)
+            let binnedAt = bin.map { $0.trashedAt ?? $0.updatedAt }
+            #expect(binnedAt == binnedAt.sorted(by: >), "newest binned first: \(binnedAt)")
+            #expect(try await copy.items.list().map(\.id) == [kept])
+            let byUpdate = try await copy.items.list(
+                ListFilters(states: [.trashed]), sort: Sort(field: .updatedAt, direction: .descending))
+            #expect(byUpdate.map(\.updatedAt) == byUpdate.map(\.updatedAt).sorted(by: >))
+            #expect(Set(byUpdate.map(\.id)) == Set(bin.map(\.id)))
+            try await own.start()
+
+            // The purge happens while the copy is closed, so it hears of it only on the next catch-up.
+            await copy.close()
+            _ = try await Self.send(own, "POST", "items/\(purged)/purge")
+            let reopened = try await WorkingCopy.open(store: store, server: own.server)
+            #expect(
+                Set(try await reopened.items.list(ListFilters(states: [.trashed])).map(\.id))
+                    == [purged, byServer, byDevice],
+                "the copy has not heard of the purge yet")
+            _ = try await reopened.catchUp()
+            #expect(
+                Set(try await reopened.items.list(ListFilters(states: [.trashed])).map(\.id)) == [byServer, byDevice])
+            #expect(try await reopened.items.list(ListFilters(allStates: true)).count == 3)
+            await reopened.close()
+        } catch {
+            try? await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
     @Test func aPurgeAndTheBinAreRefusedOfflineAndChangeNothing() async throws {
         let own = try await OwnServer.boot()
         do {
@@ -374,7 +428,7 @@ struct LiveRestart {
             _ = try await URLSession.shared.data(for: trash)
             _ = try await copy.catchUp()
             #expect(
-                try await copy.items.list(ListFilters(state: .trashed)).contains { $0.id == id },
+                try await copy.items.list(ListFilters(states: [.trashed])).contains { $0.id == id },
                 "the copy did not hold the trashed item")
             try await own.stop()
             let queued = try await copy.queue.all().count
@@ -383,7 +437,7 @@ struct LiveRestart {
             } throws: { error in
                 if case MarfaError.network = error { true } else { false }
             }
-            #expect(try await copy.items.list(ListFilters(state: .trashed)).contains { $0.id == id })
+            #expect(try await copy.items.list(ListFilters(states: [.trashed])).contains { $0.id == id })
             #expect(try await copy.queue.all().count == queued)
             await #expect {
                 _ = try await copy.items.bin()

@@ -336,10 +336,16 @@ public struct Edit: Sendable, Hashable {
 /// with a status field are `status_group neq "completed" AND status_group neq "canceled"`. Match a type's own word
 /// with `properties.<field> eq`.
 public struct ListFilters: Sendable, Hashable {
-    /// The core's list of types, each with its subtree; `nil` narrows nothing.
-    package var types: [String]?
-    /// The core's list of states; `nil` is the active state unless `allStates` is set.
-    package var states: [ItemState]?
+    /// The types to answer, each with its subtree: up to ten. `nil` narrows nothing.
+    ///
+    /// An empty set, more than ten types, or a type the copy does not hold is refused, as `unknownType` or
+    /// `validation_error`.
+    public var types: Set<String>?
+    /// The states to answer. `nil` is the active state alone, unless `allStates` is set.
+    ///
+    /// An empty set is refused `validation_error`, and so is a set beside `allStates`. A search never matches
+    /// the bin, even where the set names it.
+    public var states: Set<ItemState>?
     public var allStates: Bool
     public var tier: Tier?
     public var tags: [String]
@@ -365,26 +371,15 @@ public struct ListFilters: Sendable, Hashable {
     public var limit: UInt32?
     public var offset: UInt32?
 
-    /// The one type to narrow to, with its subtree; `nil` where none is named or the filter names several.
-    public var type: String? {
-        get { types.flatMap { $0.count == 1 ? $0[0] : nil } }
-        set { types = newValue.map { [$0] } }
-    }
-
-    /// The one state to narrow to; `nil` where none is named or the filter names several.
-    public var state: ItemState? {
-        get { states.flatMap { $0.count == 1 ? $0[0] : nil } }
-        set { states = newValue.map { [$0] } }
-    }
-
     public init(
-        type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [],
+        types: Set<String>? = nil, states: Set<ItemState>? = nil, allStates: Bool = false, tier: Tier? = nil,
+        tags: [String] = [],
         occurredAfter: String? = nil, occurredBefore: String? = nil, source: String? = nil, updatedAfter: String? = nil,
         updatedBefore: String? = nil, filter: String? = nil, beneath: String? = nil, limit: UInt32? = nil,
         offset: UInt32? = nil
     ) {
-        types = type.map { [$0] }
-        states = state.map { [$0] }
+        self.types = types
+        self.states = states
         self.allStates = allStates
         self.tier = tier
         self.tags = tags
@@ -400,8 +395,8 @@ public struct ListFilters: Sendable, Hashable {
     }
 
     package init(_ core: MarfaCore.ListFilters) {
-        types = core.types
-        states = core.states?.map(ItemState.init)
+        types = core.types.map(Set.init)
+        states = core.states.map { Set($0.map(ItemState.init)) }
         allStates = core.allStates
         tier = core.tier.map(Tier.init)
         tags = core.tags
@@ -418,8 +413,8 @@ public struct ListFilters: Sendable, Hashable {
 
     package var core: MarfaCore.ListFilters {
         MarfaCore.ListFilters(
-            types: types,
-            states: states?.map(\.core),
+            types: types?.sorted(),
+            states: states.map { held in ItemState.allCases.filter(held.contains).map(\.core) },
             allStates: allStates,
             tier: tier.map(\.core),
             tags: tags,
@@ -436,13 +431,21 @@ public struct ListFilters: Sendable, Hashable {
     }
 }
 
-/// `state` and `allStates` work as in ``ListFilters``. `type` includes its
+/// A search narrowed by type, state, tag and time.
+///
+/// `states` and `allStates` work as in ``ListFilters``. Each of `types` includes its
 /// subtree, and every tag given must be present.
 public struct SearchFilters: Sendable, Hashable {
-    /// The core's list of types, each with its subtree; `nil` narrows nothing.
-    package var types: [String]?
-    /// The core's list of states; `nil` is the active state unless `allStates` is set.
-    package var states: [ItemState]?
+    /// The types to answer, each with its subtree: up to ten. `nil` narrows nothing.
+    ///
+    /// An empty set, more than ten types, or a type the copy does not hold is refused, as `unknownType` or
+    /// `validation_error`.
+    public var types: Set<String>?
+    /// The states to answer. `nil` is the active state alone, unless `allStates` is set.
+    ///
+    /// An empty set is refused `validation_error`, and so is a set beside `allStates`. A search never matches
+    /// the bin, even where the set names it.
+    public var states: Set<ItemState>?
     public var allStates: Bool
     /// One tier; none answers both.
     public var tier: Tier?
@@ -462,24 +465,13 @@ public struct SearchFilters: Sendable, Hashable {
     /// edges, as far as the copy holds them.
     public var beneath: String?
 
-    /// The one type to narrow to, with its subtree; `nil` where none is named or the filter names several.
-    public var type: String? {
-        get { types.flatMap { $0.count == 1 ? $0[0] : nil } }
-        set { types = newValue.map { [$0] } }
-    }
-
-    /// The one state to narrow to; `nil` where none is named or the filter names several.
-    public var state: ItemState? {
-        get { states.flatMap { $0.count == 1 ? $0[0] : nil } }
-        set { states = newValue.map { [$0] } }
-    }
-
     public init(
-        type: String? = nil, state: ItemState? = nil, allStates: Bool = false, tier: Tier? = nil, tags: [String] = [],
+        types: Set<String>? = nil, states: Set<ItemState>? = nil, allStates: Bool = false, tier: Tier? = nil,
+        tags: [String] = [],
         occurredAfter: String? = nil, occurredBefore: String? = nil, filter: String? = nil, beneath: String? = nil
     ) {
-        types = type.map { [$0] }
-        states = state.map { [$0] }
+        self.types = types
+        self.states = states
         self.allStates = allStates
         self.tier = tier
         self.tags = tags
@@ -490,8 +482,8 @@ public struct SearchFilters: Sendable, Hashable {
     }
 
     package init(_ core: MarfaCore.SearchFilters) {
-        types = core.types
-        states = core.states?.map(ItemState.init)
+        types = core.types.map(Set.init)
+        states = core.states.map { Set($0.map(ItemState.init)) }
         allStates = core.allStates
         tier = core.tier.map(Tier.init)
         tags = core.tags
@@ -503,8 +495,8 @@ public struct SearchFilters: Sendable, Hashable {
 
     package var core: MarfaCore.SearchFilters {
         MarfaCore.SearchFilters(
-            types: types,
-            states: states?.map(\.core),
+            types: types?.sorted(),
+            states: states.map { held in ItemState.allCases.filter(held.contains).map(\.core) },
             allStates: allStates,
             tier: tier.map(\.core),
             tags: tags,

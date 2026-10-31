@@ -124,12 +124,12 @@ struct SearchOffline {
 
         #expect(Set(held.titled(try await held.copy.search("zebra"))) == ["Plain"])
         #expect(
-            Set(held.titled(try await held.copy.search("zebra", filters: SearchFilters(state: .archived))))
+            Set(held.titled(try await held.copy.search("zebra", filters: SearchFilters(states: [.archived]))))
                 == ["Zebra crossing"])
         #expect(
             Set(held.titled(try await held.copy.search("zebra", filters: SearchFilters(allStates: true))))
                 == ["Zebra crossing", "Plain"])
-        #expect(try await held.copy.search("zebra", filters: SearchFilters(state: .trashed)).isEmpty)
+        #expect(try await held.copy.search("zebra", filters: SearchFilters(states: [.trashed])).isEmpty)
 
         await held.copy.close()
     }
@@ -140,9 +140,9 @@ struct SearchOffline {
         let tagged = try await held.copy.search("zebra", filters: SearchFilters(tags: ["zebras"]))
         #expect(Set(held.titled(tagged)) == ["Plain"])
         #expect(try await held.copy.search("zebra", filters: SearchFilters(tags: ["zebras", "absent"])).isEmpty)
-        let typed = try await held.copy.search("zebra", filters: SearchFilters(type: "core.note"))
+        let typed = try await held.copy.search("zebra", filters: SearchFilters(types: ["core.note"]))
         #expect(typed.count == 3)
-        #expect(try await held.copy.search("zebra", filters: SearchFilters(type: "core.task")).isEmpty)
+        #expect(try await held.copy.search("zebra", filters: SearchFilters(types: ["core.task"])).isEmpty)
         #expect(try await held.copy.search("zebra", filters: SearchFilters(tier: .feed)).isEmpty)
         #expect(try await held.copy.search("zebra", filters: SearchFilters(tier: .library)).count == 3)
         await held.copy.close()

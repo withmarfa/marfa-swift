@@ -216,9 +216,9 @@ extension LiveWorkingCopies {
             let report = try await copy.queue.drain()
             let verdicts = report.verdicts.filter { [created.id, tagged.id, twin.id].contains($0.id) }.map(\.verdict)
             #expect(verdicts == [.accepted, .accepted, .accepted])
-            let both = try await copy.search(title, filters: SearchFilters(type: "core.note"))
+            let both = try await copy.search(title, filters: SearchFilters(types: ["core.note"]))
             #expect(both.count == 2)
-            let found = try await copy.search(title, filters: SearchFilters(type: "core.note", tags: ["favorite"]))
+            let found = try await copy.search(title, filters: SearchFilters(types: ["core.note"], tags: ["favorite"]))
             #expect(found.map(\.item.id) == [created.itemId])
         }
 
@@ -626,7 +626,7 @@ extension LiveWorkingCopies {
             #expect(try await copy.search(word).count == 3)
             #expect(try await copy.search(word, limit: 2).count == 2)
 
-            let filters = ListFilters(type: "core.note", tags: [tag])
+            let filters = ListFilters(types: ["core.note"], tags: [tag])
             let ascending = try await copy.items.list(filters, sort: Sort(field: .occurredAt, direction: .ascending))
             #expect(ascending.map(\.id) == ids)
             let descending = try await copy.items.list(filters, sort: Sort(field: .occurredAt, direction: .descending))

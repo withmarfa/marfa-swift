@@ -57,14 +57,12 @@ struct Values {
     }
 
     @Test func aFilterCarriesEveryTypeAndStateTheCoreNames() {
-        var list = Marfa.ListFilters(type: "core.note", state: .archived)
+        var list = Marfa.ListFilters(types: ["core.note"], states: [.archived])
         #expect(list.types == ["core.note"] && list.states == [.archived])
-        #expect(list.type == "core.note" && list.state == .archived)
         list.types = ["core.note", "core.task"]
         list.states = [.active, .archived]
         #expect(Marfa.ListFilters(list.core) == list)
-        #expect(list.core.types == ["core.note", "core.task"] && list.core.states == [.active, .archived])
-        #expect(list.type == nil && list.state == nil, "several are not one")
+        #expect(list.core.types == ["core.note", "core.task"] && list.core.states == [.active, .archived], "in a fixed order")
         var search = Marfa.SearchFilters()
         search.types = ["core.note", "core.task"]
         #expect(Marfa.SearchFilters(search.core) == search)

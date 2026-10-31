@@ -108,7 +108,7 @@ extension LiveWorkingCopies {
                 let item = try #require(try await copy.items.get(itemId))
                 #expect(try await copy.catalog.statusGroup(of: item) == .inProgress)
                 let open = try await copy.items.list(
-                    ListFilters(type: type, filter: "status_group eq \"in_progress\""))
+                    ListFilters(types: [type], filter: "status_group eq \"in_progress\""))
                 #expect(open.map(\.id) == [item.id])
                 await copy.close()
                 _ = try await request("DELETE", "keys/\(minted.id)")

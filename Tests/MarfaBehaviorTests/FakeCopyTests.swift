@@ -736,7 +736,7 @@ final class NotesModel {
     }
 
     func load() async {
-        titles = (try? await copy.items.list(ListFilters(type: "core.note")))?.compactMap(\.title) ?? []
+        titles = (try? await copy.items.list(ListFilters(types: ["core.note"])))?.compactMap(\.title) ?? []
     }
 
     func add(title: String) async {

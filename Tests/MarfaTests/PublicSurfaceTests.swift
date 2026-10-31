@@ -38,14 +38,14 @@ import Testing
 
     @MainActor @Test func anAppReadsThroughAQueryAndOwnsItsReadings() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
-        let notes = LiveQuery(copy, reading: .list(ListFilters(type: "core.note"), sort: nil))
+        let notes = LiveQuery(copy, reading: .list(ListFilters(types: ["core.note"]), sort: nil))
         let queued = LiveQuery(copy, reading: Reading(placeholder: 0) { try await $0.queue.all().count })
         #expect(notes.copy === copy && notes.value.isEmpty && notes.isLoading && notes.error == nil)
         #expect(notes.following == .live)
         #expect(
             Set([Following.live, .stopped(.network(message: "away")), .ended(nil), .ended(.closed(message: "m"))]).count
                 == 4)
-        notes.reading = .search("marmalade", filters: SearchFilters(type: "core.note"), limit: 5)
+        notes.reading = .search("marmalade", filters: SearchFilters(types: ["core.note"]), limit: 5)
         await notes.refresh()
         await queued.refresh()
         #expect(queued.value == 0)
@@ -55,12 +55,12 @@ import Testing
     /// The labels in the order the package has always taken them, since a call
     /// that names them in another order does not compile.
     @Test func theRecordsTheCoreDefinesTakeTheirLabelsInTheOrderTheyAlwaysDid() {
-        let search = SearchFilters(type: "core.note", state: .archived)
-        #expect(search.type == "core.note" && search.state == .archived)
-        let everywhere = SearchFilters(type: "core.note", allStates: true, tags: ["a"], filter: "x", beneath: "r")
+        let search = SearchFilters(types: ["core.note"], states: [.archived])
+        #expect(search.types == ["core.note"] && search.states == [.archived])
+        let everywhere = SearchFilters(types: ["core.note"], allStates: true, tags: ["a"], filter: "x", beneath: "r")
         #expect(everywhere.allStates && everywhere.tags == ["a"] && everywhere.beneath == "r")
         let list = ListFilters(
-            type: "core.note", state: .active, allStates: false, tier: .feed, tags: ["a"], occurredAfter: "a",
+            types: ["core.note"], states: [.active], allStates: false, tier: .feed, tags: ["a"], occurredAfter: "a",
             occurredBefore: "b", filter: "f", beneath: "r", limit: 5, offset: 1)
         #expect(list.limit == 5 && list.offset == 1 && list.tier == .feed)
         let draft = Draft(
@@ -130,8 +130,8 @@ import Testing
         #expect(MarfaError.closed(message: "m").code() == "closed")
         #expect(MarfaError.noConnection(message: "m").code() == "no_connection")
         #expect(PinReport(pinned: true, wasPinned: false).pinned)
-        #expect(ListFilters(state: .archived, tier: .feed).state == .archived)
-        #expect(SearchFilters(state: .trashed).state == .trashed)
+        #expect(ListFilters(states: [.archived], tier: .feed).states == [.archived])
+        #expect(SearchFilters(states: [.trashed]).states == [.trashed])
         #expect(Draft(type: "core.note", tier: .library).tier == .library)
         let field = TypeField(name: "title", type: "string", declaredBy: "core.note")
         #expect(ItemType(id: "core.note", fields: [field]).fields.map(\.id) == ["title"])
