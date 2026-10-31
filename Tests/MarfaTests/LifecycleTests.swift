@@ -315,6 +315,29 @@ struct ALifecycle {
         await copy.close()
     }
 
+    @Test func catchUpsThatSucceedAtOnceAfterAFaultTakeOneStreamThatTheLastConsumerLetsGo() async throws {
+        for round in 0..<60 {
+            let core = FakeCore.writer()
+            let copy = Self.copy(core, ManualClock())
+            let updates = Updates(copy.updates())
+            try await eventually("following") { updates.connection == .following }
+            core.fail(0, with: .Io(message: "disk"))
+            try await eventually("the stream was let go") { copy.feed.count == 0 }
+
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<8 { group.addTask { _ = try? await copy.catchUp() } }
+            }
+            try await eventually("one stream is held", within: 5) { copy.feed.count == 1 }
+            #expect(updates.connection == .following, "round \(round)")
+
+            updates.cancel()
+            try await eventually("round \(round): the last consumer let the stream go", within: 5) {
+                copy.feed.count == 0
+            }
+            await copy.close()
+        }
+    }
+
     @Test func aSecondActivationNeverTellsThePreviousRunsConnection() async throws {
         let core = FakeCore.writer()
         let clock = ManualClock()

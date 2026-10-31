@@ -231,7 +231,8 @@ final class Lifecycle: Sendable {
         var run = 0
         /// Moves with `run` and with every key change, so a pull or a wait begun before either is ignored.
         var epoch = 0
-        var streamHeld = false
+        /// The stream the lifecycle holds or is taking, so no second one is taken beside it.
+        var streamClaim: UUID?
         var stream: Task<Void, Never>?
         var retry: Task<Void, Never>?
         var drainRetry: Task<Void, Never>?
@@ -290,7 +291,7 @@ final class Lifecycle: Sendable {
         let id = UUID()
         continuation.onTermination = { [weak self] _ in self?.leave(id) }
         let follows = self.follows
-        let starts = locked { state -> (run: Int, epoch: Int)? in
+        let starts = locked { state -> (run: Int, epoch: Int, claim: UUID?)? in
             state.consumers[id] = Consumer(signal: continuation, pending: Pending(everything: true))
             state.signals.append(continuation)
             guard !state.closed, !state.active else { return nil }
@@ -303,9 +304,9 @@ final class Lifecycle: Sendable {
             state.followingSince = nil
             state.connection = follows ? .connecting : .local
             if state.fills > 0 { startProgress(&state) }
-            return (state.run, state.epoch)
+            return (state.run, state.epoch, claimStream(&state))
         }
-        if let starts { start(run: starts.run, epoch: starts.epoch) }
+        if let starts { start(run: starts.run, epoch: starts.epoch, claim: starts.claim) }
         return CopyUpdates(lifecycle: self, id: id, signals: signals)
     }
 
@@ -326,7 +327,7 @@ final class Lifecycle: Sendable {
         state.retry = nil
         state.drainRetry = nil
         state.progress = nil
-        state.streamHeld = false
+        state.streamClaim = nil
     }
 
     /// The next update for one consumer, read once the lock is let go.
@@ -435,8 +436,8 @@ final class Lifecycle: Sendable {
 
     // MARK: Running
 
-    private func start(run: Int, epoch: Int) {
-        takeStream(run)
+    private func start(run: Int, epoch: Int, claim: UUID?) {
+        if let claim { takeStream(run, claim) }
         guard follows else { return }
         Task { [weak self] in await self?.begin(epoch) }
     }
@@ -447,22 +448,28 @@ final class Lifecycle: Sendable {
     /// A reader watches the writer's saves through its stream.
     private var reads: Bool { holder.handle == .reader }
 
-    /// Holds a stream of the feed, so the core follows the server, and hears what the core tells it; says whether
-    /// the core gave the stream a place, or will once a key change ends.
+    /// Claims the stream to take, unless one is held or being taken; the claim and the check are one step, so two
+    /// successes at once never take two streams.
+    private func claimStream(_ state: inout State) -> UUID? {
+        guard state.streamClaim == nil else { return nil }
+        let claim = UUID()
+        state.streamClaim = claim
+        return claim
+    }
+
+    /// Holds a stream of the feed under `claim`, so the core follows the server, and hears what the core tells it;
+    /// says whether the core gave the stream a place, or will once a key change ends.
     @discardableResult
-    private func takeStream(_ run: Int) -> Bool {
+    private func takeStream(_ run: Int, _ claim: UUID) -> Bool {
         let (stream, continuation) = AsyncStream<Change>.makeStream()
-        let token = UUID()
-        continuation.onTermination = { [feed] _ in feed.remove(token) }
+        continuation.onTermination = { [feed] _ in feed.remove(claim) }
         let task = Task { [weak self] in
             for await change in stream { self?.heard(change, run: run) }
-            self?.streamEnded(run: run)
+            self?.streamEnded(claim)
         }
         let taken = locked { state -> Bool in
-            guard state.active, state.run == run else { return false }
-            if let old = state.stream { state.canceled.append(old) }
+            guard state.active, state.run == run, state.streamClaim == claim else { return false }
             state.stream = task
-            state.streamHeld = true
             return true
         }
         guard taken else {
@@ -470,7 +477,7 @@ final class Lifecycle: Sendable {
             continuation.finish()
             return false
         }
-        return feed.add(continuation, as: token, announced: false) != nil && feed.holds(token)
+        return feed.add(continuation, as: claim, announced: false) != nil && feed.holds(claim)
     }
 
     /// The first step of a run: a copy that holds a completed hydration is caught up, which says whether the
@@ -501,7 +508,7 @@ final class Lifecycle: Sendable {
     ///
     /// `epoch` is `nil` for the app's own call.
     func pulled(epoch: Int? = nil) {
-        let retake = locked { state -> Int? in
+        let retake = locked { state -> (run: Int, claim: UUID)? in
             guard state.active, !state.closed, !state.keyChanging, epoch == nil || epoch == state.epoch,
                 state.connection != .local
             else { return nil }
@@ -509,9 +516,9 @@ final class Lifecycle: Sendable {
             state.retry = nil
             set(&state, .following)
             mark(&state) { $0.synced = true }
-            return state.streamHeld ? nil : state.run
+            return claimStream(&state).map { (state.run, $0) }
         }
-        if let retake { takeStream(retake) }
+        if let retake { takeStream(retake.run, retake.claim) }
     }
 
     /// A catch-up, a hydration or the follow failed with `error`.
@@ -594,9 +601,9 @@ final class Lifecycle: Sendable {
         let (run, epoch) = (state.run, state.epoch)
         state.retry = Task { [weak self, clock] in
             do { try await clock.sleep(for: wait) } catch { return }
-            guard let self, self.claimRetry(epoch), self.takeStream(run) else { return }
+            guard let self, let claim = self.claimRetake(epoch), self.takeStream(run, claim) else { return }
             self.locked { state in
-                guard state.active, state.run == run, state.streamHeld else { return }
+                guard state.active, state.run == run, state.streamClaim == claim else { return }
                 state.followingSince = clock.now
                 set(&state, .local)
                 // A save made while no stream was held went unseen.
@@ -612,6 +619,15 @@ final class Lifecycle: Sendable {
             guard state.epoch == epoch, state.active, !state.closed else { return false }
             state.retry = nil
             return true
+        }
+    }
+
+    /// ``claimRetry(_:)`` for a reader's retake, which also claims the stream it takes.
+    private func claimRetake(_ epoch: Int) -> UUID? {
+        locked { state in
+            guard state.epoch == epoch, state.active, !state.closed else { return nil }
+            state.retry = nil
+            return claimStream(&state)
         }
     }
 
@@ -709,12 +725,12 @@ final class Lifecycle: Sendable {
     ///
     /// The copy closed, or the core ended it on a fault after telling it `.stopped`, which scheduled a catch-up
     /// that takes a stream again when it succeeds, or, for a reader, a wait before it takes one again. A stream ended
-    /// with no reason told is taken again the same way.
-    private func streamEnded(run: Int) {
+    /// with no reason told is taken again the same way. A stream that is no longer the one claimed changes nothing.
+    private func streamEnded(_ claim: UUID) {
         locked { state in
-            guard state.run == run else { return }
+            guard state.streamClaim == claim else { return }
             state.stream = nil
-            state.streamHeld = false
+            state.streamClaim = nil
             guard state.active, !state.closed, !state.keyChanging, state.retry == nil else { return }
             guard follows else {
                 if reads { scheduleRetake(&state, after: backoff(&state, retryAfter: .zero)) }
