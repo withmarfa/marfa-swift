@@ -69,14 +69,18 @@ struct ALifecycle {
 
     @Test func aCopyThatReachesItsServerIsFollowingOnceItsFirstCatchUpSucceeds() async throws {
         let core = FakeCore.writer()
+        core.state.withLock { $0.pullsAt = "2026-10-31T09:15:02.123Z" }
         let copy = Self.copy(core, ManualClock())
         let updates = Updates(copy.updates())
         try await eventually("following") { updates.connection == .following }
         #expect(updates.all.first?.reread == .everything)
         #expect(Self.catchUps(core) == 1)
-        // The core does not record when it last heard from the server yet.
-        #expect(updates.all.last?.lastSynced == nil)
-        #expect(try await copy.status().lastSynced == nil)
+        // The time the core records for the pull reaches both the update and the status.
+        @Sendable func isTheSync(_ date: Date?) -> Bool {
+            date.map { abs($0.timeIntervalSince1970 - 1_793_438_102.123) < 0.000_5 } ?? false
+        }
+        try await eventually("the sync time") { isTheSync(updates.all.last?.lastSynced) }
+        #expect(isTheSync(try await copy.status().lastSynced))
         await copy.close()
     }
 

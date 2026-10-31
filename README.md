@@ -94,7 +94,7 @@ for await update in copy.updates() {
 
 While the copy follows, writes left undelivered by a drain are sent again on the same schedule. Releasing the last sequence stops following the server and cancels any wait. `LiveQuery` holds one sequence and shows its `connection`. `changes()` remains for an app that needs every change one by one.
 
-`update.lastSynced` and `status().lastSynced` say when the copy last heard from its server. Both are `nil` until the core records that time.
+`update.lastSynced` and `status().lastSynced` say when the copy last finished a pull from its server without an error, by the device's clock. Both are `nil` until the first such pull, and again after a hydration clears it.
 
 ## Fill a large library
 
@@ -204,6 +204,19 @@ let open = try await copy.items.list(
 An item in no group matches neither `eq` nor `neq`; `status_group not_exists` selects it. The server refuses a group name that is not one of the four, with `MarfaError.validation`.
 
 `core.event` has a `status` of its own that is not a status field: one of three fixed values, with no groups. `EventStatus` names them. A subtype cannot change them, so `copy.catalog.eventStatus(of: item)` reads the status of an item of `core.event` or of a type that descends from it, such as one a connector declares, and gives `nil` for any other item.
+
+## Edit items and take the answers
+
+An `Edit` names the version it was read at and the properties it sets. Each property given replaces its value and the rest stay. To remove a property, name it in `clearProperties`; every property the edit does not name stays, including one the app cannot read, so a removal needs no `replaceProperties`:
+
+```swift
+guard let note = try await copy.items.get(id) else { return }
+_ = try await copy.items.update(id, Edit(clearProperties: ["due"], baseVersion: note.version))
+```
+
+A name the item lacks is not an error. The copy refuses an edit that sets and clears the same name, clears an empty name, or clears a field the item's type requires, with `MarfaError.validation`, and queues nothing.
+
+Writes wait in `copy.queue` until a drain sends them, and each keeps the server's answer as its `verdict`. To act on the answers, call `queue.takeAnswered()`: it returns the answered writes and clears them in one step, so two callers never both get one answer and none is cleared unread. `forgetAnswered()` clears the same writes without returning them. A refused write that carried content stays in the queue, its `body` readable, until `discard(_:)`.
 
 ## Meaning the core computes
 

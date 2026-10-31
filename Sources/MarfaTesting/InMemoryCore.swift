@@ -22,7 +22,8 @@ final class InMemoryCore: CoreProtocol, Sendable {
         /// A create, with the row as it was made and no tags: each tag is its own write.
         case made(Item, edges: [Edge])
         case edit(
-            properties: JsonObject, replacing: Bool, type: String?, tier: Tier?, sourceId: String?, occurredAt: String?)
+            properties: JsonObject, replacing: Bool, cleared: [String], type: String?, tier: Tier?, sourceId: String?,
+            occurredAt: String?)
         case state(ItemState, at: String)
         case tags(TagChange)
         case madeEdge(Edge)
@@ -91,7 +92,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
                     $0.utf8.lexicographicallyPrecedes($1.utf8)
                 }, eventCursor: nil,
                 hydration: .never, items: UInt64(state.items.count), itemsExpected: nil, itemsListed: nil,
-                edges: UInt64(state.edges.count), catalogVersion: nil,
+                edges: UInt64(state.edges.count), catalogVersion: nil, syncedAt: nil,
                 fileCache: FileCache(
                     setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
                     backupMarkFailure: nil, attachments: nil))

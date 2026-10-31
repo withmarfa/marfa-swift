@@ -79,4 +79,9 @@ extension ItemDate {
     static func utcInstant(_ text: String) -> Date? {
         parse(text, calendar: utc)?.date
     }
+
+    /// The instant a value with a time names, or nil for a day alone.
+    static func utcTime(_ text: String) -> Date? {
+        parse(text, calendar: utc).flatMap { $0.hasTime ? $0.date : nil }
+    }
 }

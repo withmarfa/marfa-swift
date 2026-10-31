@@ -113,11 +113,12 @@ enum Properties {
     /// An edit's properties laid over the held ones: a null names a property
     /// the server drops, so it changes nothing.
     static func merged(
-        _ held: JsonObject, with edit: JsonObject, replacing: Bool, dropping: Bool = true
+        _ held: JsonObject, with edit: JsonObject, replacing: Bool, clearing cleared: [String] = [],
+        dropping: Bool = true
     ) -> JsonObject {
         let given = dropping ? edit.members.filter { $0.value != .null } : edit.members
         guard !replacing else { return served(JsonObject(members: given)) }
-        var members = held.members
+        var members = held.members.filter { member in !cleared.contains { $0.isBytes(member.key) } }
         for member in given {
             if let at = members.firstIndex(where: { $0.key.utf8.elementsEqual(member.key.utf8) }) {
                 members[at] = member

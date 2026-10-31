@@ -32,8 +32,8 @@ import Synchronization
 ///   on Apple platforms). A `filter` throws ``FakeCopyError/unsupported(call:)``. The copy is never filling,
 ///   so `completeness` is always `.complete`.
 /// - Writes: `items.create(_:)` without `sourceId`, including `state`, a
-///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`
-///   and `clearOccurredAt`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
+///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`,
+///   `clearOccurredAt` and `clearProperties`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
 ///   `items.restore(_:)`, `items.transition(_:to:)`, `tags`, `metadata`,
 ///   `extensions`, `edges.create`, `edges.check(from:to:type:)`, `edges.update(_:_:)`, `edges.delete(_:)` and
 ///   `declareTypes(_:)`.
@@ -44,7 +44,8 @@ import Synchronization
 ///   grouping or searching that view throws ``FakeCopyError/unsupported(call:)``. A view's
 ///   `query.types` is not checked against the types the fake holds.
 /// - The queue: `queue.all()`, `queue.drain()`, `queue.withdraw(_:)`,
-///   `queue.discard(_:)` and `queue.forgetAnswered()`, with or without `ids`.
+///   `queue.discard(_:)`, `queue.forgetAnswered()`, with or without `ids`, and
+///   `queue.takeAnswered()`.
 /// - `changes()`, which tells the app's own writes, and the changes ``send(_:)``
 ///   puts on it.
 ///
@@ -114,8 +115,8 @@ public final class FakeCopy: Sendable {
 
     /// Every write the copy received, in order, with the verdict it holds now.
     ///
-    /// A write stays here after `queue.forgetAnswered()` or `queue.discard(_:)`
-    /// takes it out of the queue.
+    /// A write stays here after `queue.forgetAnswered()`, `queue.takeAnswered()`
+    /// or `queue.discard(_:)` takes it out of the queue.
     public var writes: [Marfa.QueuedWrite] {
         core.writes.map(Marfa.QueuedWrite.init)
     }

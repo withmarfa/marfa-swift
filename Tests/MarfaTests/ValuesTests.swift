@@ -11,7 +11,30 @@ struct Values {
             Set(Mirror(reflecting: value).children.compactMap(\.label))
         }
         #expect(fields(Marfa.DrainReport()) == fields(Marfa.DrainReport().core))
-        #expect(fields(Marfa.Status()).subtracting(["lastSynced"]) == fields(Marfa.Status().core))
+        // `lastSynced` is the core's `syncedAt`, read as a `Date`.
+        #expect(
+            fields(Marfa.Status()) == fields(Marfa.Status().core).subtracting(["syncedAt"]).union(["lastSynced"]))
+    }
+
+    @Test func aStatusCarriesWhenTheCopyLastSyncedBothWays() throws {
+        let stamp = "2026-10-31T09:15:02.123Z"
+        var core = Marfa.Status().core
+        #expect(core.syncedAt == nil)
+        #expect(Marfa.Status(core).lastSynced == nil)
+
+        core.syncedAt = stamp
+        let status = Marfa.Status(core)
+        let synced = try #require(status.lastSynced)
+        #expect(abs(synced.timeIntervalSince1970 - 1_793_438_102.123) < 0.000_5)
+        #expect(status.core.syncedAt == stamp)
+        #expect(Marfa.Status(status.core) == status)
+
+        core.syncedAt = "not a time"
+        #expect(Marfa.Status(core).lastSynced == nil)
+        core.syncedAt = "2026-10-31"
+        #expect(Marfa.Status(core).lastSynced == nil, "a day alone claimed a sync")
+        core.syncedAt = "2026-10-31T09:15:02"
+        #expect(Marfa.Status(core).lastSynced == nil, "a time with no zone claimed a sync")
     }
 
     /// A field the core adds with a default compiles on both sides and would be dropped by the conversion.
