@@ -163,7 +163,8 @@ extension InMemoryCore {
 
 extension InMemoryCore.State {
     /// Whether `target` reaches `source` through the held edges of one type, those waiting to be sent among them.
-    func reaches(from start: String, to goal: String, through edgeType: String, leaving replaced: String? = nil) -> Bool {
+    func reaches(from start: String, to goal: String, through edgeType: String, leaving replaced: String? = nil) -> Bool
+    {
         var seen: Set<String> = [start]
         var frontier = [start]
         while let at = frontier.popLast() {

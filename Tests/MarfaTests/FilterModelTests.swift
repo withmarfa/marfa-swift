@@ -52,7 +52,8 @@ struct FilterModel {
             return FilterExpression(
                 conditions: [
                     FilterCondition(
-                        field: .property("t"), operator: .eq, value: .text(String(repeating: "x", count: units - overhead)))
+                        field: .property("t"), operator: .eq,
+                        value: .text(String(repeating: "x", count: units - overhead)))
                 ])
         }
         #expect(try expression(units: 2_048).encoded().utf16.count == 2_048)
@@ -71,7 +72,9 @@ struct FilterModel {
     }
 
     @Test func aFilterTheServerRefusesIsNotDecoded() {
-        #expect { try FilterExpression(decoding: "not a filter ((") } throws: { refusal($0)?.code == "validation_error" }
+        #expect { try FilterExpression(decoding: "not a filter ((") } throws: {
+            refusal($0)?.code == "validation_error"
+        }
     }
 
     @Test func aFieldListsTheOperatorsTheGrammarTakesOnIt() {

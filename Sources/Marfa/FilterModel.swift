@@ -77,7 +77,9 @@ public struct FilterCondition: Sendable, Hashable {
     }
 
     init(_ core: MarfaCore.FilterCondition) {
-        self.init(field: FilterField(core.field), operator: FilterOperator(core.operator), value: core.value.map(FilterValue.init))
+        self.init(
+            field: FilterField(core.field), operator: FilterOperator(core.operator),
+            value: core.value.map(FilterValue.init))
     }
 
     var core: MarfaCore.FilterCondition {

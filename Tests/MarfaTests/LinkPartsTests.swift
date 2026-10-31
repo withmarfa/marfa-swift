@@ -26,7 +26,10 @@ struct LinkPartsOffline {
         let text = "👩‍👩‍👧 and 🎉 [[Café]]"
         let link = try #require(linkParts(in: text).first)
         #expect(link.range.location == (text as NSString).range(of: "[[").location)
-        #expect(link.range.location != text.distance(from: text.startIndex, to: try #require(text.firstRange(of: "[["))?.lowerBound ?? text.startIndex))
+        #expect(
+            link.range.location
+                != text.distance(
+                    from: text.startIndex, to: try #require(text.firstRange(of: "[["))?.lowerBound ?? text.startIndex))
         #expect(slice(text, link.range) == "[[Café]]")
         #expect(slice(text, link.name.range) == "Café")
         let range = try #require(Range(link.range, in: text))
@@ -48,7 +51,8 @@ struct LinkPartsOffline {
     @Test func candidatesSayWhatEachTargetCouldName() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         func note(_ title: String) async throws -> String {
-            try #require(try await copy.items.create(Draft(type: "core.note", properties: ["title": .string(title)])).itemId)
+            try #require(
+                try await copy.items.create(Draft(type: "core.note", properties: ["title": .string(title)])).itemId)
         }
         let plan = try await note("Plan")
         let first = try await note("Twin")
@@ -68,7 +72,9 @@ struct LinkPartsOffline {
             try await copy.items.create(Draft(type: "core.note", properties: ["title": "Other"])).itemId)
         let host = try #require(
             try await copy.items.create(
-                Draft(type: "core.note", properties: ["title": "Host", "body": .string("See [[\(other)]] and [[Nothing]].")])
+                Draft(
+                    type: "core.note",
+                    properties: ["title": "Host", "body": .string("See [[\(other)]] and [[Nothing]].")])
             ).itemId)
         let found = try await copy.items.linkCandidates(of: [other, "Nothing"], in: host)
         #expect(found.map(\.target) == [other, "Nothing"])

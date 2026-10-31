@@ -28,11 +28,12 @@ struct EdgeChecksOffline {
         }
     }
 
-    /// A message without the "validation (code): " that the error text puts in front, and without item ids.
+    /// The message without its leading "validation (code): " and with item ids replaced.
     static func normalised(_ message: String) -> String {
         message.replacingOccurrences(of: "^[A-Za-z ]+ \\([a-z_]+\\): ", with: "", options: .regularExpression)
             .replacingOccurrences(
-            of: "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", with: "<id>", options: .regularExpression)
+                of: "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", with: "<id>",
+                options: .regularExpression)
     }
 
     static func noFolder(_ type: String) -> String {
@@ -51,7 +52,8 @@ struct EdgeChecksOffline {
         let checked = await code { try await copy.edges.check(from: source, to: target, type: type) }
         #expect(try await copy.queue.all().count == before, "the check queued a write")
         let created = await code { _ = try await copy.edges.create(from: source, to: target, type: type) }
-        #expect(checked == created, "check said \(String(describing: checked)), create said \(String(describing: created))")
+        #expect(
+            checked == created, "check said \(String(describing: checked)), create said \(String(describing: created))")
         return checked
     }
 
@@ -81,8 +83,12 @@ struct EdgeChecksOffline {
         let source = try await Self.item("core.note", in: copy)
         let binned = try await Self.item("core.note", in: copy)
         _ = try await copy.items.delete(binned)
-        #expect(try await Self.refusal(copy, from: source, to: binned, type: "references") == "item_not_found: Edge target item not found: <id>")
-        #expect(try await Self.refusal(copy, from: binned, to: source, type: "references") == "item_not_found: Edge source item not found: <id>")
+        #expect(
+            try await Self.refusal(copy, from: source, to: binned, type: "references")
+                == "item_not_found: Edge target item not found: <id>")
+        #expect(
+            try await Self.refusal(copy, from: binned, to: source, type: "references")
+                == "item_not_found: Edge source item not found: <id>")
         await copy.close()
     }
 
@@ -139,25 +145,40 @@ struct EdgeChecksOffline {
         _ = try await copy.items.delete(binned)
         let title: JSONObject = ["title": .string("made")]
         let nested = try await Self.refusal(
-            of: { _ = try await copy.items.create(Draft(type: "core.collection", properties: title, edges: ["in-collection": [outer]])) },
+            of: {
+                _ = try await copy.items.create(
+                    Draft(type: "core.collection", properties: title, edges: ["in-collection": [outer]]))
+            },
             queued: copy)
         #expect(nested.0 == Self.nesting)
         #expect(nested.1 == 0, "a refused create queued a write")
         let notAFolder = try await Self.refusal(
-            of: { _ = try await copy.items.create(Draft(type: "core.note", properties: title, edges: ["in-folder": [outer]])) },
+            of: {
+                _ = try await copy.items.create(
+                    Draft(type: "core.note", properties: title, edges: ["in-folder": [outer]]))
+            },
             queued: copy)
         #expect(notAFolder.0 == Self.noFolder("core.collection"))
         let inBin = try await Self.refusal(
-            of: { _ = try await copy.items.create(Draft(type: "core.note", properties: title, edges: ["references": [binned]])) },
+            of: {
+                _ = try await copy.items.create(
+                    Draft(type: "core.note", properties: title, edges: ["references": [binned]]))
+            },
             queued: copy)
         #expect(inBin.0 == "item_not_found: Edge target item not found: <id>")
         let own = "0190f3a0-0000-7000-8000-0000000000aa"
         let loop = try await Self.refusal(
-            of: { _ = try await copy.items.create(Draft(type: "core.note", properties: title, id: own, edges: ["parent-of": [own]])) },
+            of: {
+                _ = try await copy.items.create(
+                    Draft(type: "core.note", properties: title, id: own, edges: ["parent-of": [own]]))
+            },
             queued: copy)
         #expect(loop.0 == Self.selfLoop)
         let fine = try await Self.refusal(
-            of: { _ = try await copy.items.create(Draft(type: "core.note", properties: title, edges: ["in-collection": [outer]])) },
+            of: {
+                _ = try await copy.items.create(
+                    Draft(type: "core.note", properties: title, edges: ["in-collection": [outer]]))
+            },
             queued: copy)
         #expect(fine.0 == nil)
         #expect(fine.1 == 1)
@@ -188,7 +209,9 @@ struct EdgeChecksOffline {
         let member = try #require(try await copy.edges.create(from: note, to: outer, type: "in-collection").edgeId)
         let memberHeld = try #require(try await copy.edges.get(member))
         let cardinality = try await Self.refusal(
-            of: { _ = try await copy.edges.update(member, EdgeEdit(baseVersion: memberHeld.version, move: .source(inner))) },
+            of: {
+                _ = try await copy.edges.update(member, EdgeEdit(baseVersion: memberHeld.version, move: .source(inner)))
+            },
             queued: copy)
         #expect(
             cardinality.0
@@ -200,7 +223,10 @@ struct EdgeChecksOffline {
         let spare = try await Self.item("core.note", in: copy)
         let spareHeld = try #require(try await copy.edges.get(binnedHeld))
         let inBin = try await Self.refusal(
-            of: { _ = try await copy.edges.update(binnedHeld, EdgeEdit(baseVersion: spareHeld.version, move: .source(spare))) },
+            of: {
+                _ = try await copy.edges.update(
+                    binnedHeld, EdgeEdit(baseVersion: spareHeld.version, move: .source(spare)))
+            },
             queued: copy)
         #expect(inBin.0 == "item_not_found: Edge target item not found: <id>")
         await copy.close()
@@ -222,7 +248,8 @@ struct EdgeChecksOffline {
         let asNote = try await Self.refusal(
             of: { _ = try await copy.items.update(outer, Edit(baseVersion: outerHeld.version, type: "core.note")) },
             queued: copy)
-        #expect(asNote.0 == "edge_constraint_violation: Edge \"in-collection\" does not allow target type \"core.note\"")
+        #expect(
+            asNote.0 == "edge_constraint_violation: Edge \"in-collection\" does not allow target type \"core.note\"")
         #expect(asNote.1 == 0)
         let held = try #require(try await copy.items.get(outer))
         #expect(held.type == "core.collection")

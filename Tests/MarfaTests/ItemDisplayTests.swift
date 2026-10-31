@@ -37,7 +37,8 @@ struct ItemDisplays {
             ItemDisplayInput(type: "app.log.daily", properties: ["heading": "Monday", "story": "It rained."]),
             ItemDisplayInput(type: "core.note", properties: ["title": "Second"]),
         ])
-        #expect(shown == [ItemDisplay(name: "Monday", preview: "It rained."), ItemDisplay(name: "Second", preview: nil)])
+        #expect(
+            shown == [ItemDisplay(name: "Monday", preview: "It rained."), ItemDisplay(name: "Second", preview: nil)])
         await copy.close()
     }
 
