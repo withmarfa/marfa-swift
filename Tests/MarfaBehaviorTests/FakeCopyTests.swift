@@ -95,7 +95,6 @@ struct FakeCopyBehavior {
             ("catchUp", { _ = try await copy.catchUp() }),
             ("pin", { _ = try await copy.pin(id) }),
             ("unpin", { _ = try await copy.unpin(id) }),
-            ("search", { _ = try await copy.search("seed") }),
             ("items.bin", { _ = try await copy.items.bin() }),
             ("items.purge", { try await copy.items.purge(id) }),
             ("items.thumbnail", { _ = try await copy.items.thumbnail(id) }),
@@ -116,7 +115,7 @@ struct FakeCopyBehavior {
             ("items.list(filter:)", { _ = try await copy.items.list(ListFilters(filter: "x")) }),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
-            ("search(inView:)", { _ = try await copy.search("x", inView: id) }),
+            ("search(filter:)", { _ = try await copy.search("seed", filters: SearchFilters(filter: "x")) }),
         ]
         for (call, make) in calls {
             await #expect(performing: { try await make() }, throws: refusedAsUnsupported(call))

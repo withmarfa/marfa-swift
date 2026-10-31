@@ -25,6 +25,12 @@ import Synchronization
 ///   `edges.from(_:)`, `edges.to(_:)`, `edges.ofType(_:)`, the four reads of
 ///   `catalog`, `catalog.fromServer()`, which throws `noServer` as a copy
 ///   without a server does, `declaredTypes()` and `status()`.
+/// - Search: `search(_:filters:limit:)` and `search(_:inView:limit:)`, answered by SQLite's FTS5 with the
+///   `porter unicode61` tokenizer, `bm25` ranking and `snippet` excerpts the core's index uses, so the hits,
+///   their order, scores and excerpts are the core's. Each search indexes the rows outside the bin afresh in
+///   an in-memory database, which costs a pass over the rows and needs a SQLite built with FTS5 (the system's
+///   on Apple platforms). A `filter` throws ``FakeCopyError/unsupported(call:)``. The copy is never filling,
+///   so `completeness` is always `.complete`.
 /// - Writes: `items.create(_:)` without `sourceId`, including `state`, a
 ///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`
 ///   and `clearOccurredAt`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
@@ -34,8 +40,8 @@ import Synchronization
 /// - Views: `createView`, `changeView`, `deleteView`, `items.views()`, `items.view(_:)`,
 ///   `items.list(inView:limit:offset:)` and `items.groups(inView:timeZone:)`, over the views it is given
 ///   or makes. A view write goes straight through, never into the queue, and a change based on an older version
-///   merges or throws `version_conflict` as the server does. A view's `filter` is stored but not judged: listing
-///   or grouping that view throws ``FakeCopyError/unsupported(call:)``, as does `search(_:inView:)`. A view's
+///   merges or throws `version_conflict` as the server does. A view's `filter` is stored but not judged: listing,
+///   grouping or searching that view throws ``FakeCopyError/unsupported(call:)``. A view's
 ///   `query.types` is not checked against the types the fake holds.
 /// - The queue: `queue.all()`, `queue.drain()`, `queue.withdraw(_:)`,
 ///   `queue.discard(_:)` and `queue.forgetAnswered()`, with or without `ids`.
@@ -80,6 +86,8 @@ import Synchronization
 /// - It knows only the types it was given and the ones the app declares, not
 ///   Marfa's built-in catalog, and it does not check an edge type's
 ///   constraints.
+/// - A search finds an item again once it is restored from the bin, as the contract says. A real copy does not
+///   until it reads the row again (withmarfa/marfa#2526).
 ///
 /// The module compiles only in a debug build, so a release build holds none of it.
 public final class FakeCopy: Sendable {
