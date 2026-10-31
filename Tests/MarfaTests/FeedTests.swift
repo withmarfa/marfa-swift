@@ -643,7 +643,7 @@ struct ARefill {
         // the address, a changed reach or slice, a server restored to an earlier point or a copy not waiting.
         (
             .stale, .CopyExpired(reason: "instance_changed", message: "another instance answers"),
-            .copyExpired(reason: "instance_changed", message: "another instance answers")
+            .instanceChanged(message: "another instance answers")
         ),
         (
             .stale, .CopyExpired(reason: "reach_changed", message: "the reach changed"),

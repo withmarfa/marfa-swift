@@ -40,7 +40,7 @@ import Synchronization
 /// - Views: `createView`, `changeView`, `deleteView`, `items.views()`, `items.view(_:)`,
 ///   `items.list(inView:limit:offset:)` and `items.groups(inView:timeZone:)`, over the views it is given
 ///   or makes. A view write goes straight through, never into the queue, and a change based on an older version
-///   merges or throws `version_conflict` as the server does. A view's `filter` is stored but not judged: listing,
+///   merges or throws `versionConflict` as the server does. A view's `filter` is stored but not judged: listing,
 ///   grouping or searching that view throws ``FakeCopyError/unsupported(call:)``. A view's
 ///   `query.types` is not checked against the types the fake holds.
 /// - The queue: `queue.all()`, `queue.drain()`, `queue.withdraw(_:)`,

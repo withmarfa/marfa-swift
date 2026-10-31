@@ -296,7 +296,7 @@ final class Feed: Sendable {
             case .serverReachable: stream.unreachable = false
             case .watchFailed(let reason, _):
                 // An aged-out cursor expires the copy as well, so which it was is read from the store.
-                if case .copyExpired(let why, _) = MarfaError(reason) {
+                if case .CopyExpired(let why, _) = reason {
                     state.refill.waiting.insert(token)
                     state.refill.reason = MarfaError(reason)
                     // The core refuses a copy that was stale already with this reason, asking the server nothing.
@@ -458,7 +458,7 @@ final class Feed: Sendable {
                 _ = try await takeFill()
                 defer { releaseFill() }
                 failure = try await refillOnce()
-            } catch let error as MarfaError where Self.mendsItself(error) {
+            } catch let error as MarfaError where error.isTransient {
                 locked { state in
                     state.refill.waiting.formUnion(next.owed)
                     if case .rateLimited(_, _, let seconds?) = error { state.refill.retryAfter = .seconds(seconds) }
@@ -504,7 +504,7 @@ final class Feed: Sendable {
                     })
             } catch is KeyChanged {
                 return reason
-            } catch let error as MarfaError where Self.mendsItself(error) {
+            } catch let error as MarfaError where error.isTransient {
                 locked { $0.refill.unfinished = true }
                 throw error
             }
@@ -515,15 +515,6 @@ final class Feed: Sendable {
             return nil
         default:
             return reason
-        }
-    }
-
-    /// The failures the core's own follow waits out, `CoreError::is_environmental`.
-    private static func mendsItself(_ error: MarfaError) -> Bool {
-        switch error {
-        case .network, .io, .storageFull, .rateLimited, .unnamed: true
-        case .server(let status, _, _): status >= 500 || status == 408
-        default: false
         }
     }
 

@@ -108,6 +108,16 @@ extension MarfaError {
             FixedErrorText(type: "first_sync_waiting", sentence: "a folder's first sync waits for confirmation")
         case .invalid:
             FixedErrorText(type: "invalid", sentence: "a value was not accepted")
+        case .keyChanging:
+            FixedErrorText(type: "key_changing", sentence: "the call came while the working copy changed its key")
+        case .versionConflict:
+            FixedErrorText(
+                type: "server", sentence: "the write was made against a version that is no longer current",
+                serverCode: "version_conflict")
+        case .instanceChanged:
+            FixedErrorText(
+                type: "copy_expired", sentence: "another instance answers at the server's address",
+                serverCode: "instance_changed")
         case .closed:
             FixedErrorText(type: "closed", sentence: "the working copy was closed")
         case .noConnection:

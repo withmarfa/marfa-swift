@@ -111,6 +111,8 @@ func refusal(_ answer: (HTTPResponse, HTTPBody?), origin: String, write: Bool) a
     case 401: return .unauthorized(code: code, message: shown)
     case 403: return .forbidden(code: code, message: shown)
     case 404: return .notFound(code: code, message: shown)
+    case 409 where code == "version_conflict": return .versionConflict(message: shown)
+    case 409 where code == "instance_changed": return .instanceChanged(message: shown)
     case 429:
         return .rateLimited(
             code: code, message: shown,
