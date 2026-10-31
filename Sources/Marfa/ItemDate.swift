@@ -17,7 +17,8 @@ public struct ItemDate: Hashable, Sendable {
     /// Reads a value as Marfa writes it, or nil where it is not one of the contract's forms or names a day or time
     /// the calendar does not have.
     ///
-    /// A value with a time and no zone is refused, as the server refuses it.
+    /// A value with a time and no zone is refused, as the server refuses it. A day the time zone skipped whole, such
+    /// as 30 December 2011 in Samoa, reads as a moment outside that day, so `day(_:calendar:)` does not give it back.
     public static func parse(_ text: String, calendar: Calendar = .current) -> ItemDate? {
         // Read from the bytes rather than with a pattern, which is far slower than this for a library of items.
         var reader = Reader(text)
