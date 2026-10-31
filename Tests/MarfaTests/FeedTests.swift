@@ -629,6 +629,8 @@ struct ARefill {
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first refill was told") { heard.all.count == 1 }
+        // The refill tells the streams before it notes when the fill ended.
+        try await eventually("the first refill ended") { !copy.feed.isRefilling }
         clock.advance(by: Self.pace.settle)
         core.state.withLock { $0.hydration = .stale }
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))

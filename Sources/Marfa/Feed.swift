@@ -156,6 +156,9 @@ final class Feed: Sendable {
     /// Whether the feed was closed, which it is before any of its streams finish.
     var isClosed: Bool { locked { $0.closed } }
 
+    /// Whether a refill is running, which it is until after it has noted when its fill ended.
+    var isRefilling: Bool { locked { $0.refill.running } }
+
     func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID()) -> UUID? {
         let (added, joins) = locked { state -> (Bool, Bool) in
             guard !state.closed else { return (false, false) }
