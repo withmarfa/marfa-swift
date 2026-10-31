@@ -43,7 +43,7 @@ extension LiveWorkingCopies {
             let status = try await copy.status()
             #expect(status.hydration == .complete)
             #expect(status.sliceTypes == ["*"])
-            let listed = try await copy.items.list(ListFilters(type: "core.note"))
+            let listed = try await copy.items.list(ListFilters(types: ["core.note"]))
             #expect(listed.completeness == .complete)
             #expect(listed.contains { $0.id == note })
 

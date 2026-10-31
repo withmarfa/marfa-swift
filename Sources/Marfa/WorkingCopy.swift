@@ -221,10 +221,22 @@ public final class WorkingCopy: Sendable {
     /// the same key and the copy is still whole, the call returns that hydration's report instead of filling the
     /// copy again. A hydration also waits for a `catchUp()` that is running.
     ///
+    /// With `inPlaceOnly`, the call fills the copy only in place, and never removes a row, an edge or a file. Where
+    /// the hydration would not be a refill, or would clear the copy, it throws before it changes anything:
+    /// `instanceChanged` for a copy built from another instance, and otherwise `copyExpired` with the reason
+    /// `not_stale` for any other copy that is not stale, `reach_changed` for another reach, `slice_changed` for
+    /// other types, tier or edge types, and `head_past_log` for a server restored behind the copy. The copy, its
+    /// queue and its hydration state stay as they were, so an app can ask the person whether to hydrate afresh or
+    /// to keep the copy stale. A server that refuses the credential or the reach of a stale copy ends it all the same, and
+    /// `status().hydration` tells the two apart: `.stale` is a copy kept, `.expired` a copy ended.
+    ///
     /// The call announces `.refreshed(.hydrated)` when it completes, and `.refreshed(.unfinished)` when it fails or
     /// is canceled, because the rows it wrote stay.
-    public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = []) async throws -> HydrateReport {
-        HydrateReport(try await feed.hydrate(types: types, tier: tier.core, edgeTypes: edgeTypes))
+    public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = [], inPlaceOnly: Bool = false)
+        async throws -> HydrateReport
+    {
+        HydrateReport(
+            try await feed.hydrate(types: types, tier: tier.core, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly))
     }
 
     /// Replaces the app's declared types, each a type definition.

@@ -36,7 +36,7 @@ struct ItemsOffline {
         let empty = try await copy.items.list()
         #expect(empty.isEmpty && empty.completeness == .complete)
         let id = try await Self.note("held", in: copy)
-        let listed = try await copy.items.list(ListFilters(type: "core.note"))
+        let listed = try await copy.items.list(ListFilters(types: ["core.note"]))
         #expect(listed.map(\.id) == [id])
         #expect(listed.completeness == .complete)
         await copy.close()
@@ -180,14 +180,14 @@ struct ItemsOffline {
             }
         }
         await #expect(
-            performing: { _ = try await copy.items.list(ListFilters(type: "app.nope.type")) },
+            performing: { _ = try await copy.items.list(ListFilters(types: ["app.nope.type"])) },
             throws: unknown("app.nope.type"))
         await #expect(
-            performing: { _ = try await copy.search("held", filters: SearchFilters(type: "app.nope.type")) },
+            performing: { _ = try await copy.search("held", filters: SearchFilters(types: ["app.nope.type"])) },
             throws: unknown("app.nope.type"))
-        #expect(try await copy.items.list(ListFilters(type: "app.nope.*")).isEmpty)
-        #expect(try await copy.search("held", filters: SearchFilters(type: "app.nope.*")).isEmpty)
-        #expect(try await copy.items.list(ListFilters(type: "core.note")).count == 1)
+        #expect(try await copy.items.list(ListFilters(types: ["app.nope.*"])).isEmpty)
+        #expect(try await copy.search("held", filters: SearchFilters(types: ["app.nope.*"])).isEmpty)
+        #expect(try await copy.items.list(ListFilters(types: ["core.note"])).count == 1)
         await copy.close()
     }
 
@@ -200,26 +200,27 @@ struct ItemsOffline {
             try await copy.items.create(
                 Draft(type: "core.note", properties: ["title": "third", "body": "b"], state: .trashed)
             ).itemId)
-        #expect(try await copy.items.list(ListFilters(state: .trashed)).first?.trashedAt != nil)
-        #expect(try await copy.items.list(ListFilters(state: .active)).allSatisfy { $0.trashedAt == nil })
+        #expect(try await copy.items.list(ListFilters(states: [.trashed])).first?.trashedAt != nil)
+        #expect(try await copy.items.list(ListFilters(states: [.active])).allSatisfy { $0.trashedAt == nil })
 
         // Sent to the bin in the reverse of the order they were made.
         _ = try await copy.items.delete(second)
         try await Task.sleep(for: .milliseconds(20))
         _ = try await copy.items.transition(first, to: .trashed)
-        let binned = try await copy.items.list(ListFilters(state: .trashed))
+        let binned = try await copy.items.list(ListFilters(states: [.trashed]))
         #expect(binned.map(\.id) == [first, second, third])
         #expect(binned.allSatisfy { $0.trashedAt != nil })
-        let byCreation = try await copy.items.list(ListFilters(state: .trashed), sort: Sort(field: .createdAt))
+        let byCreation = try await copy.items.list(ListFilters(states: [.trashed]), sort: Sort(field: .createdAt))
         #expect(byCreation.map(\.id) == [third, second, first])
-        let oldest = try await copy.items.list(ListFilters(state: .trashed), sort: Sort(direction: .ascending))
+        let oldest = try await copy.items.list(ListFilters(states: [.trashed]), sort: Sort(direction: .ascending))
         #expect(oldest.map(\.id) == [third, second, first])
 
         // A row already in the bin keeps its time; one that leaves it loses the time.
         let before = try #require(
-            try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == second }?.trashedAt)
+            try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == second }?.trashedAt)
         _ = try await copy.items.transition(second, to: .trashed)
-        #expect(try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == second }?.trashedAt == before)
+        #expect(
+            try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == second }?.trashedAt == before)
         _ = try await copy.items.restore(second)
         #expect(try await copy.items.get(second)?.trashedAt == nil)
         #expect(try await copy.items.list(ListFilters(allStates: true)).first { $0.id == second }?.trashedAt == nil)
@@ -255,7 +256,7 @@ struct ItemsOffline {
         #expect(write.kind == .transitionItem && write.body == ["state": "archived"])
         #expect(try await copy.items.get(archived)?.state == .archived)
         #expect(try await copy.items.list().map(\.id) == [kept])
-        #expect(try await copy.items.list(ListFilters(state: .archived)).map(\.id) == [archived])
+        #expect(try await copy.items.list(ListFilters(states: [.archived])).map(\.id) == [archived])
         #expect(Set(try await copy.items.list(ListFilters(allStates: true)).map(\.id)) == [kept, archived])
         await copy.close()
     }
@@ -316,10 +317,10 @@ struct ItemsOffline {
         #expect(try await copy.items.list(sort: ascending).map(\.id) == [first, second, third, memo, task])
         #expect(try await copy.items.list().map(\.id) == [task, memo, third, second, first])
         #expect(
-            try await copy.items.list(ListFilters(type: "core.note"), sort: ascending).map(\.id) == [
+            try await copy.items.list(ListFilters(types: ["core.note"]), sort: ascending).map(\.id) == [
                 first, second, third, memo,
             ])
-        #expect(try await copy.items.list(ListFilters(type: "core.task"), sort: ascending).map(\.id) == [task])
+        #expect(try await copy.items.list(ListFilters(types: ["core.task"]), sort: ascending).map(\.id) == [task])
         #expect(try await copy.items.list(ListFilters(), sort: ascending).count == 5)
         var several = ListFilters()
         several.types = ["core.task", "core.note"]
@@ -340,17 +341,17 @@ struct ItemsOffline {
             try await copy.items.list(ListFilters(limit: 2, offset: 1), sort: ascending).map(\.id) == [second, third])
         #expect(try await copy.items.list(ListFilters(offset: 9), sort: ascending).isEmpty)
         await #expect {
-            _ = try await copy.items.list(ListFilters(type: "Not A Type"))
+            _ = try await copy.items.list(ListFilters(types: ["Not A Type"]))
         } throws: { error in
             if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
         }
         await #expect {
-            _ = try await copy.items.list(ListFilters(type: "*"))
+            _ = try await copy.items.list(ListFilters(types: ["*"]))
         } throws: { error in
             if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
         }
         await #expect {
-            _ = try await copy.items.list(ListFilters(state: .archived, allStates: true))
+            _ = try await copy.items.list(ListFilters(states: [.archived], allStates: true))
         } throws: { error in
             if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
         }

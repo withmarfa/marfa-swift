@@ -106,7 +106,7 @@ struct ReplacedRefusedCopy {
         let copy = try await WorkingCopy.open(store: store, ifRefused: .replace)
         #expect(copy.handle == .writer)
         #expect(try await copy.blobs.isHeld(hash), "the files the old store kept are gone")
-        #expect(try await copy.items.list(ListFilters(type: "core.note")).isEmpty)
+        #expect(try await copy.items.list(ListFilters(types: ["core.note"])).isEmpty)
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "writes again"]))
         await copy.close()
         let reopened = try await WorkingCopy.open(store: store)
@@ -354,7 +354,7 @@ struct RemovedCopy {
 
         #expect(!FileManager.default.fileExists(atPath: store.path))
         let fresh = try await WorkingCopy.open(store: store)
-        #expect(try await fresh.items.list(ListFilters(type: "core.note")).isEmpty)
+        #expect(try await fresh.items.list(ListFilters(types: ["core.note"])).isEmpty)
         await fresh.close()
     }
 

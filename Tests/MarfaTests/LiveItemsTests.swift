@@ -134,9 +134,9 @@ extension LiveWorkingCopies {
             #expect(shownEvent.body == "Daily", "an event's body was read from somewhere other than its description")
             let shownSession = try #require(try await copy.items.get(held))
             #expect(shownSession.body == "said", "a subtype's own body field lost to its parent's")
-            let listed = try await copy.items.list(ListFilters(type: session))
+            let listed = try await copy.items.list(ListFilters(types: [session]))
             #expect(listed.map(\.body) == ["said"])
-            let found = try await copy.search("session", filters: SearchFilters(type: session))
+            let found = try await copy.search("session", filters: SearchFilters(types: [session]))
             #expect(found.first?.item.title == "A session")
             await copy.close()
         }

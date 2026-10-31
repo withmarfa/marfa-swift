@@ -68,7 +68,7 @@ struct LiveQueries {
         try #require(try await copy.items.create(Draft(type: "app.test.entry", properties: properties)).itemId)
     }
 
-    static let entries = Reading<Rows<Marfa.Item>>.list(Marfa.ListFilters(type: "app.test.entry"))
+    static let entries = Reading<Rows<Marfa.Item>>.list(Marfa.ListFilters(types: ["app.test.entry"]))
 
     /// Once its first read has ended, so a change told next is one the query has a stream for.
     static func settled<Value>(_ query: LiveQuery<Value>) async throws {
@@ -229,10 +229,11 @@ struct LiveQueries {
         let copy = try await Self.open()
         _ = try await Self.make(copy, ["title": "a"])
         let second = try await Self.make(copy, ["title": "b"])
-        let limited = LiveQuery(copy, reading: .list(ListFilters(type: "app.test.entry", limit: 1)))
+        let limited = LiveQuery(copy, reading: .list(ListFilters(types: ["app.test.entry"], limit: 1)))
         let oldestFirst = LiveQuery(
             copy,
-            reading: .list(ListFilters(type: "app.test.entry"), sort: Sort(field: .createdAt, direction: .ascending)))
+            reading: .list(ListFilters(types: ["app.test.entry"]), sort: Sort(field: .createdAt, direction: .ascending))
+        )
         try await eventually("both read") { limited.value.count == 1 && oldestFirst.value.count == 2 }
         #expect(oldestFirst.value.last?.id == second)
         await copy.close()

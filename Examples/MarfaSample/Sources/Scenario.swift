@@ -51,7 +51,7 @@ enum Scenario {
                 _ = try await copy.items.attach(to: firstId, file: file)
                 // The first edit does not move the held version while it is
                 // unanswered, so both are based on the same one.
-                let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
+                let notes = try await copy.items.list(ListFilters(types: ["core.note"], tier: .feed))
                 guard let kept = notes.first(where: { $0.title == "Sample kept" }) else {
                     expect(false, "the note sent online is not held")
                     break
@@ -87,7 +87,7 @@ enum Scenario {
                 expect(report.verdicts.count == 10, "the drain sent \(report.verdicts.count) writes, not 10")
                 expect(report.held == 0, "the drain held \(report.held) write(s) back")
                 expect(report.verdicts.allSatisfy { $0.verdict == .accepted }, "a write was not accepted")
-                let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
+                let notes = try await copy.items.list(ListFilters(types: ["core.note"], tier: .feed))
                 print("notes: \(notes.map { "\($0.title ?? "-") v\($0.version)" })")
                 guard let first = notes.first(where: { $0.title == "Sample first, edited" }),
                     let second = notes.first(where: { $0.title == "Sample second" })
@@ -115,7 +115,7 @@ enum Scenario {
                 try await makeElsewhere(title, configuration: configuration)
                 let report = try await copy.catchUp()
                 print("caught up: applied \(report.applied)")
-                let notes = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
+                let notes = try await copy.items.list(ListFilters(types: ["core.note"], tier: .feed))
                 expect(notes.contains { $0.title == title }, "the change made elsewhere did not arrive")
                 try await checkLive(live, in: copy, expect)
 
@@ -133,7 +133,7 @@ enum Scenario {
 
     @MainActor
     static func following(_ copy: WorkingCopy) -> LiveQuery<Rows<Item>> {
-        LiveQuery(copy, reading: .list(ListFilters(type: "core.note", tier: .feed)))
+        LiveQuery(copy, reading: .list(ListFilters(types: ["core.note"], tier: .feed)))
     }
 
     /// The query shows what the copy holds, after writes, hydrations, drains and
@@ -141,7 +141,7 @@ enum Scenario {
     static func checkLive(
         _ live: LiveQuery<Rows<Item>>, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
-        let held = try await copy.items.list(ListFilters(type: "core.note", tier: .feed))
+        let held = try await copy.items.list(ListFilters(types: ["core.note"], tier: .feed))
         var shown: Rows<Item> = []
         for _ in 0..<250 {
             shown = await live.value
@@ -157,7 +157,7 @@ enum Scenario {
     static func checkAttachment(
         on note: Item, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
-        let files = try await copy.items.list(ListFilters(type: "core.file"))
+        let files = try await copy.items.list(ListFilters(types: ["core.file"]))
         guard let file = files.first(where: { $0.title == "sample-attachment.txt" }),
             let hash = file.properties["blob_ref"]?.string
         else {
@@ -174,8 +174,9 @@ enum Scenario {
     static func checkSearch(
         first: String, kept: String, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
-        let notes = try await copy.search("offline", filters: SearchFilters(type: "core.note"))
-        let favorites = try await copy.search("offline", filters: SearchFilters(type: "core.note", tags: ["favorite"]))
+        let notes = try await copy.search("offline", filters: SearchFilters(types: ["core.note"]))
+        let favorites = try await copy.search(
+            "offline", filters: SearchFilters(types: ["core.note"], tags: ["favorite"]))
         let titles = { (hits: Rows<SearchHit>) in hits.map { $0.item.title ?? "-" } }
         print("searched for offline: \(titles(notes)), narrowed to favorites: \(titles(favorites))")
         expect(Set([first, kept]).isSubset(of: Set(notes.map(\.item.id))), "a search of the notes did not find both")

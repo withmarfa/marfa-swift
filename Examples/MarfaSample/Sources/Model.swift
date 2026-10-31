@@ -31,8 +31,8 @@ final class Model {
 
     private var noteReading: Reading<Rows<Item>> {
         searchText.isEmpty
-            ? .list(ListFilters(type: "core.note", tier: .feed))
-            : .search(searchText, filters: SearchFilters(type: "core.note"))
+            ? .list(ListFilters(types: ["core.note"], tier: .feed))
+            : .search(searchText, filters: SearchFilters(types: ["core.note"]))
     }
 
     /// Whether the notes stopped following the copy, so they need a refresh to start again.
