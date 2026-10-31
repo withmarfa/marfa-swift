@@ -10,7 +10,7 @@ public struct Item: Sendable, Hashable {
     public var type: String
     /// The item's properties, in the order the server answers them.
     ///
-    /// Empty where `unreadable_properties` is set.
+    /// Empty where `unreadableProperties` is set.
     public var properties: JSONObject
     public var state: ItemState
     public var tier: Tier?
@@ -116,7 +116,7 @@ public struct Edge: Sendable, Hashable {
     public var sourceId: String
     public var targetId: String
     public var edgeType: String
-    /// Empty where `unreadable_properties` is set.
+    /// Empty where `unreadableProperties` is set.
     public var properties: JSONObject
     public var version: Int64
     public var createdAt: String
@@ -256,13 +256,13 @@ public struct Draft: Sendable, Hashable {
 public struct Edit: Sendable, Hashable {
     /// Whole field values; a device never merges inside a field.
     ///
-    /// Unless `replace_properties` is set, each property given replaces its value and the rest stay, and a `null`
+    /// Unless `replaceProperties` is set, each property given replaces its value and the rest stay, and a `null`
     /// clears nothing: the server drops it, and so does the copy, so the property keeps its value.
     public var properties: JSONObject
     /// The properties are the item's whole properties: one left out is cleared.
     ///
-    /// Sent at a version older than the one the copy holds, through `update_item_as_read`, it is merged as a merge
-    /// is.
+    /// Sent at a version older than the one the copy holds, through ``Items/updateAsRead(_:_:)``, it is merged as a
+    /// merge is.
     public var replaceProperties: Bool
     /// The version the change was made against.
     public var baseVersion: Int64
@@ -278,7 +278,7 @@ public struct Edit: Sendable, Hashable {
     public var occurredAt: String?
     /// Gives the item no time of its own again, so it is its creation time.
     ///
-    /// Refused beside `occurred_at`.
+    /// Refused beside `occurredAt`.
     public var clearOccurredAt: Bool
 
     public init(
