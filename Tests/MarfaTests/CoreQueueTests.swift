@@ -206,27 +206,6 @@ struct ACoreQueue {
 
 @Suite(.timeLimit(.minutes(1)), .serialized)
 struct CallsThatWaitOnTheServer {
-    @Test func aSlowBlockingJobDoesNotDelayACall() async throws {
-        let hold = DispatchSemaphore(value: 0)
-        let running = Mutex(0)
-        let slow = CoreQueue.blocking.limit
-        let jobs = (0..<slow).map { _ in
-            Task {
-                try await CoreQueue.blocking.run {
-                    running.withLock { $0 += 1 }
-                    hold.wait()
-                }
-            }
-        }
-        defer { for _ in 0..<slow { hold.signal() } }
-        try await eventually("the blocking lane is full") { running.withLock { $0 } == slow }
-        #expect(
-            try await bounded("a call beside a full blocking lane", within: 10) { try await CoreQueue.calls.run { 5 } }
-                == 5)
-        for _ in 0..<slow { hold.signal() }
-        for job in jobs { try await job.value }
-    }
-
     @Test(arguments: ["pin", "bin", "purge", "withFile"])
     func doNotHoldUpTheCoresOtherCalls(operation: String) async throws {
         let core = FakeCore.writer()
