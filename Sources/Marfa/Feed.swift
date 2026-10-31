@@ -24,7 +24,7 @@ final class Feed: Sendable {
         static let standard = RefillPace(first: .seconds(1), most: .seconds(300), settle: .seconds(300))
     }
 
-    /// The time a refill reads and waits by, so a test can drive it.
+    /// The time a refill and the copy's lifecycle read and wait by, so a test can drive them.
     struct RefillClock: Sendable {
         private let reading: @Sendable () -> Duration
         private let waiting: @Sendable (Duration) async throws -> Void
@@ -97,6 +97,8 @@ final class Feed: Sendable {
         var fillWaiters: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)] = []
         /// The hydration that held the turn last, where it completed.
         var lastFill: Fill?
+        /// Told as each hydration begins and ends, and whether a refill runs it.
+        var fillObserver: (@Sendable (_ began: Bool, _ byRefill: Bool) -> Void)?
     }
 
     private struct Fill {
@@ -162,6 +164,10 @@ final class Feed: Sendable {
         }
         if joins { join(token) }
         return token
+    }
+
+    func observeFills(_ observer: @escaping @Sendable (_ began: Bool, _ byRefill: Bool) -> Void) {
+        locked { $0.fillObserver = observer }
     }
 
     func remove(_ token: UUID) {
@@ -400,11 +406,13 @@ final class Feed: Sendable {
         types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], byRefill: Bool, inPlaceOnly: Bool,
         admitted: @escaping @Sendable () -> Bool = { true }
     ) async throws -> MarfaCore.HydrateReport {
-        let suspensions = locked { state in
+        let (suspensions, observer) = locked { state in
             state.lastFill = nil
             if !byRefill { state.refill.unfinished = false }
-            return state.suspensions
+            return (state.suspensions, state.fillObserver)
         }
+        observer?(true, byRefill)
+        defer { observer?(false, byRefill) }
         let report: MarfaCore.HydrateReport
         do {
             report = try await holder.runUntilCanceled { core, stop in

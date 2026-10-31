@@ -11,7 +11,7 @@ struct Values {
             Set(Mirror(reflecting: value).children.compactMap(\.label))
         }
         #expect(fields(Marfa.DrainReport()) == fields(Marfa.DrainReport().core))
-        #expect(fields(Marfa.Status()) == fields(Marfa.Status().core))
+        #expect(fields(Marfa.Status()).subtracting(["lastSynced"]) == fields(Marfa.Status().core))
     }
 
     /// A field the core adds with a default compiles on both sides and would be dropped by the conversion.

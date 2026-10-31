@@ -772,6 +772,9 @@ public struct Status: Sendable, Hashable {
     public var catalogVersion: UInt64?
     /// The cache of fetched files: its setting, the budget in force and the bytes held.
     public var fileCache: FileCache
+    /// When the copy last heard from its server; `nil` where the core has recorded no time, which the core this
+    /// package is built against does not yet do.
+    public var lastSynced: Date?
 
     public init(
         serverOrigin: String? = nil, sliceTypes: [String] = [], sliceTier: SliceTier? = nil,
@@ -780,7 +783,8 @@ public struct Status: Sendable, Hashable {
         edges: UInt64 = 0, catalogVersion: UInt64? = nil, instanceId: String? = nil,
         fileCache: FileCache = FileCache(
             setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
-            backupMarkFailure: nil, attachments: nil)
+            backupMarkFailure: nil, attachments: nil),
+        lastSynced: Date? = nil
     ) {
         self.serverOrigin = serverOrigin
         self.instanceId = instanceId
@@ -796,6 +800,7 @@ public struct Status: Sendable, Hashable {
         self.edges = edges
         self.catalogVersion = catalogVersion
         self.fileCache = fileCache
+        self.lastSynced = lastSynced
     }
 
     init(_ core: MarfaCore.Status) {

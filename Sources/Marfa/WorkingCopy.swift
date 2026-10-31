@@ -7,13 +7,15 @@ import Synchronization
 ///
 /// The app decides when to hydrate, catch up, drain and `forgetAnswered()`;
 /// only a held `changes()` stream drains on its own, once when its server is
-/// back and once after a drain left a write undelivered. Every call that can
+/// back and once after a drain left a write undelivered, and a held `updates()`
+/// sequence also catches up and drains again to keep its follow going. Every call that can
 /// wait on the store or the network runs off the caller's thread, except a
 /// reader's `changes()`, which reads the store before it returns and so can
 /// wait behind the copy's other reads.
 public final class WorkingCopy: Sendable {
     let holder: CoreHolder
     let feed: Feed
+    let lifecycle: Lifecycle
 
     public let items: Items
     public let edges: Edges
@@ -26,19 +28,20 @@ public final class WorkingCopy: Sendable {
 
     init(
         holder: CoreHolder, hasServer: Bool, refillPace: Feed.RefillPace = .standard,
-        refillClock: Feed.RefillClock = .continuous
+        syncPace: Lifecycle.Pace = .standard, refillClock: Feed.RefillClock = .continuous
     ) {
         self.holder = holder
         feed = Feed(
             holder: holder, watched: hasServer || holder.handle == .reader, refillPace: refillPace,
             clock: refillClock)
+        lifecycle = Lifecycle(holder: holder, feed: feed, hasServer: hasServer, pace: syncPace, clock: refillClock)
         items = Items(holder: holder, feed: feed)
         edges = Edges(holder: holder, feed: feed)
         tags = Tags(holder: holder, feed: feed)
         metadata = Metadata(holder: holder, feed: feed)
         extensions = Extensions(holder: holder, feed: feed)
         blobs = Blobs(holder: holder, feed: feed)
-        queue = Queue(holder: holder, feed: feed)
+        queue = Queue(holder: holder, feed: feed, lifecycle: lifecycle)
         catalog = Catalog(holder: holder)
     }
 
@@ -235,8 +238,20 @@ public final class WorkingCopy: Sendable {
     public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = [], inPlaceOnly: Bool = false)
         async throws -> HydrateReport
     {
-        HydrateReport(
-            try await feed.hydrate(types: types, tier: tier.core, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly))
+        do {
+            let report = HydrateReport(
+                try await feed.hydrate(types: types, tier: tier.core, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly))
+            lifecycle.pulled()
+            return report
+        } catch {
+            // An in-place hydration refused for the copy it found leaves that copy as it was, so only a refused key
+            // or a failure that may mend says anything about the follow.
+            if let refusal = error as? MarfaError, inPlaceOnly, !refusal.isKeyRefusal, !refusal.isTransient {
+                throw error
+            }
+            lifecycle.failed(error)
+            throw error
+        }
     }
 
     /// Replaces the app's declared types, each a type definition.
@@ -279,26 +294,14 @@ public final class WorkingCopy: Sendable {
     /// `changes()` stream starts, waits for it and then catches up from the
     /// cursor it left.
     public func catchUp() async throws -> CatchUpReport {
-        // The core commits a new catalog before it applies anything, so a
-        // catch-up that then fails has still changed it, and says so.
-        let (caughtUp, catalogChanged) = try await feed.catchUp {
-            try await holder.runUntilCanceled { core, stop in
-                do {
-                    let report = try core.catchUp(stop: stop)
-                    return (Result<CatchUpReport, MarfaError>.success(CatchUpReport(report)), report.catalogChanged)
-                } catch MarfaCore.CatchUpError.Failed(let error, let catalogChanged) {
-                    return (.failure(MarfaError(error)), catalogChanged)
-                }
-            }
+        do {
+            let report = try await caughtUp(holder, feed)
+            lifecycle.pulled()
+            return report
+        } catch {
+            lifecycle.failed(error)
+            throw error
         }
-        if catalogChanged {
-            feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
-        }
-        let report = try caughtUp.get()
-        if report.applied > 0 {
-            feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
-        }
-        return report
     }
 
     /// Full-text search over indexed fields and tags, best match first.
@@ -314,6 +317,9 @@ public final class WorkingCopy: Sendable {
     }
 
     /// What changes in the copy while the stream is held, to read again by.
+    ///
+    /// Each change arrives as it happens, uncoalesced, and a stream that stops stays stopped. For an app that shows
+    /// the copy, ``updates()`` coalesces these changes and keeps the follow going.
     ///
     /// A server event the copy applied arrives as `.server`, naming the
     /// event's type and the item or edge it was about. A catch-up or a held
@@ -386,7 +392,43 @@ public final class WorkingCopy: Sendable {
         return stream
     }
 
-    /// Ends every stream `changes()` handed out, stops what feeds them, and
+    /// What to read again as the copy changes, and what the copy is doing with its server, for as long as the
+    /// sequence is held.
+    ///
+    /// The first update asks to read everything and says the copy's ``CopyConnection``. Each later one names what
+    /// changed since the one before: rows by ID, the queue, the views, the type catalog, or everything. Updates are
+    /// coalesced: however many changes arrive while the app reads, at most one update waits, holding all of them, and
+    /// more than 1,000 changed items or edges are delivered as ``Reread/everything``. An update can also carry no
+    /// reread, when only its `connection`, `fill` or `lastSynced` changed. Iterate the sequence once; ask again for
+    /// another consumer.
+    ///
+    /// While any sequence is held, a writer with a server follows the server's events, as a held ``changes()``
+    /// stream makes it, and keeps the follow going:
+    ///
+    /// - It catches up as the first sequence begins, and says `.following` only once the server has answered: a
+    ///   catch-up or a hydration that succeeded, or, while the copy is `.offline` or `.connecting`, a server event.
+    /// - A failure that may mend itself, such as the network or a server error, is `.offline`. The core retries the
+    ///   follow itself; a catch-up this sequence made that failed is made again after 5 seconds, then further apart,
+    ///   doubling up to 5 minutes apart, and never sooner than a rate limit's `retryAfterSeconds` asks. A follow that
+    ///   ran 5 minutes since it last failed starts again from 5 seconds.
+    /// - A follow the core stopped with any other error is `.stopped`, and a catch-up is tried every 5 minutes, since
+    ///   the server may change. A server event does not make it `.following`; the catch-up that succeeds does. When
+    ///   the core's own fault ended the follow, the sequence hears nothing, local writes included, until that
+    ///   catch-up succeeds and the follow starts again.
+    /// - A key the server refused is `.keyRefused`, and nothing is tried until ``useKey(_:)``, which catches up at
+    ///   once with the new key.
+    /// - A copy that must be hydrated first is `.needsHydration`, and nothing is tried until a hydration completes.
+    /// - A drain, the app's or the follow's, that left writes undelivered while the copy follows is made again after
+    ///   the same waits, honoring the report's `retryAfterSeconds`. The app still drains after its own writes.
+    ///
+    /// While a hydration runs, each update carries its `fill`, read every half second, and asks to read everything
+    /// as rows arrive. Releasing every sequence stops the follow and every retry. ``close()`` ends each sequence
+    /// with an update whose connection is `.closed`; a sequence asked for after it delivers that update alone.
+    public func updates() -> CopyUpdates {
+        lifecycle.updates()
+    }
+
+    /// Ends every stream `changes()` and every sequence `updates()` handed out, stops what feeds them, and
     /// releases the store, so another opener of it can take the writer role
     /// once this returns.
     ///
@@ -397,6 +439,7 @@ public final class WorkingCopy: Sendable {
     /// closed copy does nothing, and a second `close()` made while the first is
     /// running returns only once the store is released.
     public func close() async {
+        lifecycle.close()
         await feed.close()
         await holder.close()
     }
@@ -422,15 +465,26 @@ public final class WorkingCopy: Sendable {
     /// ended.
     public func useKey(_ key: String) async throws {
         try holder.checkKeyCanChange()
-        try await feed.suspend()
+        lifecycle.keyWillChange()
+        do {
+            try await feed.suspend()
+        } catch {
+            lifecycle.keyChanged()
+            throw error
+        }
         do {
             try await holder.replace(key: key)
         } catch {
-            if holder.isClosed { await feed.close() }
+            if holder.isClosed {
+                lifecycle.close()
+                await feed.close()
+            }
             feed.resume(readsOnly: false)
+            lifecycle.keyChanged()
             throw error
         }
         feed.resume(readsOnly: holder.handle == .reader)
+        lifecycle.keyChanged()
     }
 }
 
@@ -963,6 +1017,7 @@ public struct Blobs: Sendable {
 public struct Queue: Sendable {
     let holder: CoreHolder
     let feed: Feed
+    let lifecycle: Lifecycle
 
     public func all() async throws -> [QueuedWrite] {
         try await holder.run { core in try core.queue().map(QueuedWrite.init) }
@@ -974,9 +1029,14 @@ public struct Queue: Sendable {
     /// and once after a drain left a write undelivered; otherwise nothing
     /// drains on its own.
     public func drain() async throws -> DrainReport {
-        let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
-        for change in report.changes() { feed.announce(change) }
-        return report
+        do {
+            let report = try await drainQueue(holder, feed)
+            lifecycle.drained(report)
+            return report
+        } catch {
+            lifecycle.drainFailed(error)
+            throw error
+        }
     }
 
     /// Queues a blocked or dead write to go again, under a fresh key, on the
@@ -1058,6 +1118,38 @@ public struct Queue: Sendable {
         guard cleared else { return }
         feed.announce(Change(origin: .refreshed(.forgotten), itemId: nil, edgeId: nil))
     }
+}
+
+/// Reads the type catalog again, then applies every event since the last hydration or catch-up, and tells every
+/// held stream what changed.
+func caughtUp(_ holder: CoreHolder, _ feed: Feed) async throws -> CatchUpReport {
+    // The core commits a new catalog before it applies anything, so a
+    // catch-up that then fails has still changed it, and says so.
+    let (caughtUp, catalogChanged) = try await feed.catchUp {
+        try await holder.runUntilCanceled { core, stop in
+            do {
+                let report = try core.catchUp(stop: stop)
+                return (Result<CatchUpReport, MarfaError>.success(CatchUpReport(report)), report.catalogChanged)
+            } catch MarfaCore.CatchUpError.Failed(let error, let catalogChanged) {
+                return (.failure(MarfaError(error)), catalogChanged)
+            }
+        }
+    }
+    if catalogChanged {
+        feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+    }
+    let report = try caughtUp.get()
+    if report.applied > 0 {
+        feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+    }
+    return report
+}
+
+/// Sends what the queue holds once, and tells every held stream what the drain answered.
+func drainQueue(_ holder: CoreHolder, _ feed: Feed) async throws -> DrainReport {
+    let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
+    for change in report.changes() { feed.announce(change) }
+    return report
 }
 
 /// Queues one write and tells every held stream of it.

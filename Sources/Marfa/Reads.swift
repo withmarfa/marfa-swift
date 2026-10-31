@@ -54,16 +54,7 @@ extension WorkingCopy {
     /// answer names: a read refused `hydrationIncomplete` meanwhile is made again from that cursor once the copy is
     /// whole, which ``changes()`` tells as `.refreshed(.hydrated)`.
     public func changes(since cursor: ChangeCursor?, most: Int = 1_000) async throws -> CopyChanges {
-        let changes = try await holder.run { core in
-            try core.changesSince(cursor: cursor?.rawValue, most: UInt32(clamping: most))
-        }
-        let next = ChangeCursor(rawValue: changes.cursor)
-        if changes.everything { return .everything(next: next) }
-        return .named(
-            ChangedRows(
-                items: changes.items, removedItems: changes.removedItems, edges: changes.edges,
-                removedEdges: changes.removedEdges),
-            next: next)
+        try await CopyChanges.read(holder, since: cursor, most: most)
     }
 }
 
@@ -94,6 +85,19 @@ public enum CopyChanges: Sendable, Hashable {
         switch self {
         case .everything(let next), .named(_, let next): next
         }
+    }
+
+    static func read(_ holder: CoreHolder, since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
+        let changes = try await holder.run { core in
+            try core.changesSince(cursor: cursor?.rawValue, most: UInt32(clamping: most))
+        }
+        let next = ChangeCursor(rawValue: changes.cursor)
+        if changes.everything { return .everything(next: next) }
+        return .named(
+            ChangedRows(
+                items: changes.items, removedItems: changes.removedItems, edges: changes.edges,
+                removedEdges: changes.removedEdges),
+            next: next)
     }
 }
 

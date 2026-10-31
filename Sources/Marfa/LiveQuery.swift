@@ -66,34 +66,16 @@ extension Reading where Value == [QueuedWrite] {
     }
 }
 
-/// Whether a ``LiveQuery`` still hears its copy.
-public enum Following: Sendable, Hashable {
-    /// The query reads again on each change the copy tells.
-    case live
-    /// The copy's follow of the server failed with this error and the stream is
-    /// still open: local writes still refresh the query.
-    ///
-    /// It returns to `live` on a server event, or a hydration or a catch-up
-    /// that tells the stream a change. A catch-up that applies nothing tells
-    /// nothing, so this can outlast the failure it names.
-    case stopped(MarfaError)
-    /// The stream finished, so the query no longer refreshes by itself.
-    ///
-    /// The error is `nil` when the copy is closed by the time the query sees
-    /// the end, whatever came before, and otherwise the fault the core ended
-    /// the stream on. ``LiveQuery/refresh()`` asks for a new stream.
-    case ended(MarfaError?)
-}
-
 /// Rows, or one item, read from a working copy and read again whenever the copy
 /// changes, for a view to show.
 ///
 /// Reading a property in a SwiftUI view's `body` is all a view does to stay
-/// current. The query opens one `changes()` stream of its copy and reads again
-/// after each change that can alter a read, including a local write made
-/// offline. A burst of changes causes the read in flight and at most one more,
-/// and the result of a read made obsolete by a newer one is dropped. Releasing
-/// the query ends its stream.
+/// current. The query holds one ``WorkingCopy/updates()`` sequence of its copy and
+/// reads again after each update that names something to read again, including a
+/// local write made offline. A burst of changes causes the read in flight and at
+/// most one more, and the result of a read made obsolete by a newer one is
+/// dropped. Releasing the query releases its sequence, and with the copy's last
+/// sequence the follow of its server.
 ///
 /// Create it on the main actor with the copy it reads; it reads that copy for
 /// life, so a view for another copy makes another query. Assign ``reading``
@@ -131,10 +113,10 @@ public final class LiveQuery<Value: Sendable & Equatable> {
     /// change reads again.
     public private(set) var error: (any Error)?
 
-    /// Whether the query still hears its copy.
+    /// What the copy is doing with its server, as the latest update said.
     ///
-    /// It says nothing of a failed read; see ``error``.
-    public private(set) var following = Following.live
+    /// It says nothing of a failed read; see ``error``. It is `.connecting` until the first update arrives.
+    public private(set) var connection = CopyConnection.connecting
 
     @ObservationIgnored private var schedule = ReadSchedule()
     @ObservationIgnored private var waiting: [CheckedContinuation<Void, Never>] = []
@@ -149,60 +131,27 @@ public final class LiveQuery<Value: Sendable & Equatable> {
     }
 
     /// Reads now, and returns after a read that began after this call.
-    ///
-    /// For a query whose ``following`` is `ended` it also asks the copy for a
-    /// new stream, which is the app's decision: the core ends a stream on a fault so
-    /// that nothing asks again by itself.
     public func refresh() async {
-        if case .ended = following { follow() }
         changed()
         guard schedule.running else { return }
         await withCheckedContinuation { waiting.append($0) }
     }
 
-    /// Takes a stream and then reads, so a change in between is in the read or told by the stream.
+    /// Holds a sequence of updates, whose first update asks for the first read.
     private func follow() {
-        let copy = copy
-        following = .live
+        let updates = copy.updates()
         let task = Task { @concurrent [weak self] in
-            guard !Task.isCancelled else { return }
-            // A reader's `changes()` reads the store before it returns.
-            let stream = copy.changes()
-            await self?.changed()
-            for await change in stream {
+            for await update in updates {
                 guard let query = self else { return }
-                await query.heard(change)
+                await query.heard(update)
             }
-            guard !Task.isCancelled else { return }
-            await self?.streamFinished()
         }
         tasks.replaceFollow(task)
     }
 
-    private func heard(_ change: Change) {
-        switch change.origin {
-        case .serverUnreachable, .serverReachable:
-            return
-        case .stopped(let reason):
-            following = .stopped(reason)
-            return
-        case .server, .refreshed(.hydrated), .refreshed(.caughtUp):
-            if case .stopped = following { following = .live }
-        default:
-            break
-        }
-        changed()
-    }
-
-    private func streamFinished() {
-        // The feed is closed before a close finishes its streams, so a stream
-        // the core ended on a fault is told apart from one a close ended.
-        if !copy.feed.isClosed, case .stopped(let reason) = following {
-            following = .ended(reason)
-        } else {
-            following = .ended(nil)
-        }
-        finishWaiting()
+    private func heard(_ update: CopyUpdate) {
+        if connection != update.connection { connection = update.connection }
+        if !update.reread.isEmpty { changed() }
     }
 
     private func changed() {
@@ -300,8 +249,8 @@ struct ReadSchedule {
 /// main actor state, can cancel them.
 ///
 /// The tasks hold the query weakly and this not at all, or a task would keep the
-/// query alive and `deinit` would never run. Cancelling the stream's task ends
-/// its iteration, which takes the stream's place in the core's watch.
+/// query alive and `deinit` would never run. Cancelling the follow's task ends
+/// its iteration, which releases its sequence of updates.
 private final class Tasks: Sendable {
     private let held = Mutex<(follow: Task<Void, Never>?, read: Task<Void, Never>?)>((nil, nil))
 

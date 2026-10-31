@@ -55,22 +55,56 @@ let copy = try await WorkingCopy.open(store: storeURL, server: server)
 
 _ = try await copy.hydrate(types: ["core.note"], tier: .library)
 
-for note in try await copy.items.list(ListFilters(type: "core.note")) {
+for note in try await copy.items.list(ListFilters(types: ["core.note"])) {
     print(note.title ?? "Untitled")
 }
 ```
 
 `storeURL` is where the working copy keeps its SQLite file, and `serverURL` is your instance's address. Keep `key` in the keychain between launches with `Keychain.system`; the copy holds it in memory and never writes it to its store.
 
+## Stay in step with the server
+
+`updates()` returns a sequence that keeps the copy following its server for as long as you hold it, and says what to read again. A burst of changes arrives as one update, so an app that reads slowly never falls behind. The first update asks for `.everything`.
+
+```swift
+for await update in copy.updates() {
+    switch update.reread {
+    case .everything:
+        notes = try await copy.items.list(ListFilters(types: ["core.note"]))
+    case .parts(let parts):
+        for id in parts.rows.items { notes[id] = try await copy.items.get(id) }
+        for id in parts.rows.removedItems { notes[id] = nil }
+        if parts.queue { queued = try await copy.queue.all() }
+    }
+    connection = update.connection
+    progress = update.fill?.fraction
+}
+```
+
+`update.connection` says what the copy is doing with its server:
+
+- `.following`: the copy caught up and hears the server's changes as they happen. Only this state means the copy is up to date.
+- `.connecting`: the copy is catching up.
+- `.offline(error)`: the server could not be reached, or asked the copy to wait. The copy asks again after 5 seconds, doubling each time up to 5 minutes, and never sooner than a rate limit's `retryAfterSeconds`. After 5 minutes of following, the waits start again from 5 seconds.
+- `.stopped(error)`: the server refused in a way that waiting may not mend. The copy asks again every 5 minutes, or later if the server names a later time.
+- `.keyRefused(error)`: the key or sign-in no longer works. The copy asks nothing until `useKey(_:)` gives it another key, and then catches up at once.
+- `.needsHydration(error)`: the copy has no complete hydration to follow from, or the server no longer holds its cursor. A copy that can refill by itself does so and moves on to `.following`; otherwise call `hydrate(types:tier:)`.
+- `.local`: the copy has no server, or opened as a reader.
+- `.closed`: the copy closed, and the sequence ends after this update.
+
+While the copy follows, writes left undelivered by a drain are sent again on the same schedule. Releasing the last sequence stops following the server and cancels any wait. `LiveQuery` holds one sequence and shows its `connection`. `changes()` remains for an app that needs every change one by one.
+
+`update.lastSynced` and `status().lastSynced` say when the copy last heard from its server. Both are `nil` until the core records that time.
+
 ## Fill a large library
 
-Use `hydrate(types: ["*"], tier: .all)` for every type except `system.*`. Add a system type explicitly when needed, such as `["*", "system.view"]` for saved views. During a fill, compare `status().itemsListed` with `itemsExpected` when both are available; `items` also includes pinned rows and local creates.
+Use `hydrate(types: ["*"], tier: .all)` for every type except `system.*`. Add a system type explicitly when needed, such as `["*", "system.view"]` for saved views. During a fill, `update.fill` on `updates()` tells `itemsListed` and `itemsExpected` as they change, at most twice a second, or compare `status().itemsListed` with `itemsExpected` yourself when both are available; `items` also includes pinned rows and local creates.
 
 Lists and searches return `Rows`, with `.complete`, `.partial` or `.stale` completeness. Read the rows as a collection, or use `.rows` when an API requires an array. Saved-view reads carry completeness too, including `LiveQuery<Rows<ViewGroup>>` for groups.
 
-An interrupted hydration resumes when its slice is unchanged. Its report distinguishes `pages` read by this call from `pagesTotal`, including earlier calls, and says whether it `resumed` or why it `restarted`. When the server's event log no longer holds a copy's cursor, as can happen after a long sleep, `status().hydration` is `.stale`. While a `changes()` stream is held, the copy refills over its existing rows by itself and its streams carry on. After a call of your own throws `copyExpired`, or a stream is told `.stopped(copyExpired)`, read `status().hydration`: if it is `.stale`, hydrate the same slice again to refill. A copy runs one hydration at a time, so a hydration that starts while the refill runs waits for it, and returns the refill's report when the refill already filled the same slice under the same key. A `catchUp()` made meanwhile also waits, then catches up from where the refill left the copy. The report says `inPlace`. Item edits and creates remain queued through a fill or refill.
+An interrupted hydration resumes when its slice is unchanged. Its report distinguishes `pages` read by this call from `pagesTotal`, including earlier calls, and says whether it `resumed` or why it `restarted`. When the server's event log no longer holds a copy's cursor, as can happen after a long sleep, `status().hydration` is `.stale`. While an `updates()` sequence or a `changes()` stream is held, the copy refills over its existing rows by itself and its streams carry on. After a call of your own throws `copyExpired`, or a stream is told `.stopped(copyExpired)`, read `status().hydration`: if it is `.stale`, hydrate the same slice again to refill. A copy runs one hydration at a time, so a hydration that starts while the refill runs waits for it, and returns the refill's report when the refill already filled the same slice under the same key. A `catchUp()` made meanwhile also waits, then catches up from where the refill left the copy. The report says `inPlace`. Item edits and creates remain queued through a fill or refill.
 
-An app that keeps a large library in memory reads it whole once, then follows what changed rather than reading it all again. Take a cursor with `changes(since: nil)` before the first full read. After each change that `changes()` reports, call `changes(since:)` with the cursor you kept: reread the items it names with `items.get(_:includingBin:)` and the edges with `edges.get(_:)`, drop the removed ones, then keep the answer's `next`. When the answer is `.everything`, read the whole copy again. When a reread throws `hydrationIncomplete`, keep the earlier cursor and try again after `.refreshed(.hydrated)`. `items.links(in:)` reads the body links of many items in one call.
+An app that keeps a large library in memory reads it whole once, then follows what changed rather than reading it all again. `updates()` keeps the cursor for you and names the changed rows in `parts.rows`, or asks for `.everything` when more than 1,000 changed. To keep the cursor yourself, take one with `changes(since: nil)` before the first full read. After each change that `changes()` reports, call `changes(since:)` with the cursor you kept: reread the items it names with `items.get(_:includingBin:)` and the edges with `edges.get(_:)`, drop the removed ones, then keep the answer's `next`. When the answer is `.everything`, read the whole copy again. When a reread throws `hydrationIncomplete`, keep the earlier cursor and try again after `.refreshed(.hydrated)`. `items.links(in:)` reads the body links of many items in one call.
 
 Set `fileBudget` when opening a copy, or leave it `nil` to keep the store's choice and use the default for a new store. `blobs.cache()` reports held bytes and attachment counts, including why some attachments are not held. `blobs.fetchKept()` fetches those attachments; they stay outside the cache budget. See the [Swift SDK reference](https://docs.marfa.so/swift-sdk) for progress, refill and file-policy details.
 

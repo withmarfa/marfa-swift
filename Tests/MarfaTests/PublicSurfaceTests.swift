@@ -41,10 +41,17 @@ import Testing
         let notes = LiveQuery(copy, reading: .list(ListFilters(types: ["core.note"]), sort: nil))
         let queued = LiveQuery(copy, reading: Reading(placeholder: 0) { try await $0.queue.all().count })
         #expect(notes.copy === copy && notes.value.isEmpty && notes.isLoading && notes.error == nil)
-        #expect(notes.following == .live)
-        #expect(
-            Set([Following.live, .stopped(.network(message: "away")), .ended(nil), .ended(.closed(message: "m"))]).count
-                == 4)
+        #expect(notes.connection == .connecting)
+        let states: [CopyConnection] = [
+            .local, .needsHydration(nil), .connecting, .following, .offline(.network(message: "away")),
+            .stopped(.network(message: "away")), .keyRefused(.unauthorized(code: "c", message: "m")), .closed,
+        ]
+        #expect(Set(states).count == 8 && states.filter(\.isFollowing) == [.following])
+        let update = CopyUpdate(
+            reread: .parts(Reread.Parts(rows: ChangedRows(items: ["a"]), queue: true)), connection: .following,
+            fill: FillProgress(listed: 1, expected: 4), lastSynced: nil)
+        #expect(!update.reread.isEmpty && update.fill?.fraction == 0.25)
+        let _: CopyUpdates = copy.updates()
         notes.reading = .search("marmalade", filters: SearchFilters(types: ["core.note"]), limit: 5)
         await notes.refresh()
         await queued.refresh()

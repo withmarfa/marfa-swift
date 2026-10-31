@@ -35,30 +35,25 @@ final class Model {
             : .search(searchText, filters: SearchFilters(types: ["core.note"]))
     }
 
-    /// Whether the notes stopped following the copy, so they need a refresh to start again.
-    var hasEnded: Bool {
-        if case .ended = notes?.following { return true }
-        return false
-    }
-
-    /// What the bottom of the window says: a failure the queries met, else the last thing done.
+    /// What the bottom of the window says: what keeps the copy from its server, a failure the queries met, else the
+    /// last thing done.
     var status: String {
-        switch notes?.following {
+        switch notes?.connection {
+        case .offline(let error):
+            return "offline, trying again: \(error.message)"
         case .stopped(let error):
-            return "no longer following the server: \(error.message)"
-        case .ended(let error):
-            let why = error.map { ": \($0.message)" } ?? ""
-            return "the notes no longer update\(why). Refresh to start again."
-        case .live, nil:
+            return "the server refused to follow, trying again later: \(error.message)"
+        case .keyRefused(let error):
+            return "the server refused the key: \(error.message)"
+        case .needsHydration:
+            return "waiting for a hydration"
+        case .closed:
+            return "closed"
+        case .local, .connecting, .following, nil:
             break
         }
         if let failure = notes?.error ?? queued?.error { return failure.localizedDescription }
         return message
-    }
-
-    func refresh() async {
-        await notes?.refresh()
-        await queued?.refresh()
     }
 
     func hydrate() async {
