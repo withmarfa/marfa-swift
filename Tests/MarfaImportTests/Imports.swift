@@ -18,6 +18,8 @@ public func checkImports() {
         id: "edge", sourceId: item.id, targetId: "other", edgeType: "parent-of",
         properties: [:], version: 1, createdAt: "", updatedAt: "")
     precondition(edge.sourceId == item.id)
+    func identity<Row: Identifiable>(_ row: Row) -> Row.ID { row.id }
+    precondition(identity(item) == "note" && identity(edge) == "edge")
     let hit = SearchHit(item: item, score: 1, snippet: "Note")
     precondition(hit.item.id == item.id && hit.score == 1)
     let draft = Draft(type: item.type, properties: properties, tier: tier)

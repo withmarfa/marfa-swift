@@ -232,8 +232,8 @@ extension MarfaCore.Found {
     var answer: Rows<SearchHit> { Rows(hits.map(SearchHit.init), completeness: Completeness(completeness)) }
 }
 
-extension MarfaCore.Item: Identifiable {}
-extension MarfaCore.Edge: Identifiable {}
+extension Item: Identifiable {}
+extension Edge: Identifiable {}
 
 /// A change to an edge's properties, a move of one of its ends, or both, and
 /// the version it was read at.
