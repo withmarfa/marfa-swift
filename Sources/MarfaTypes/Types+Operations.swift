@@ -4459,6 +4459,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/properties`.
                     public var properties: Operations.UpdateItem.Input.Body.JsonPayload.PropertiesPayload?
+                    /// Properties to remove from the item. Every other property stays as it is. Naming one the item doesn't have isn't an error. A name can't also be in `properties`.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/clear_properties`.
+                    public var clearProperties: [Swift.String]?
                     /// The item's type. It must match the item's current type unless `retype` is `true`.
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/PATCH/requestBody/json/type`.
@@ -4532,6 +4536,7 @@ public enum Operations {
                     ///
                     /// - Parameters:
                     ///   - properties: The properties to write. They lay over the item's properties, or become all of them when `properties_mode` is `replace`. As in `POST /items`, strict mode refuses an undeclared property, and a whole number whose digits a 64-bit float doesn't keep is refused.
+                    ///   - clearProperties: Properties to remove from the item. Every other property stays as it is. Naming one the item doesn't have isn't an error. A name can't also be in `properties`.
                     ///   - _type: The item's type. It must match the item's current type unless `retype` is `true`.
                     ///   - propertiesMode: How `properties` applies. `merge` (the default) lays them over the item's properties. `replace` takes them as the whole set, so a property you leave out is cleared.
                     ///   - retype: `true` moves the item to `type`. You need write on both types, and the properties the item ends up with must fit the new type. Naming the item's current type changes nothing.
@@ -4543,6 +4548,7 @@ public enum Operations {
                     ///   - edges: Edge types to replace, each mapped to the item IDs it should now point to. An edge to an ID you still list stays as it is, with its properties. An empty list removes every edge of that type. Types you don't name are untouched. A new edge made this way carries no properties, so an edge type that requires one refuses the write.
                     public init(
                         properties: Operations.UpdateItem.Input.Body.JsonPayload.PropertiesPayload? = nil,
+                        clearProperties: [Swift.String]? = nil,
                         _type: Swift.String? = nil,
                         propertiesMode: Operations.UpdateItem.Input.Body.JsonPayload.PropertiesModePayload? = nil,
                         retype: Swift.Bool? = nil,
@@ -4554,6 +4560,7 @@ public enum Operations {
                         edges: Operations.UpdateItem.Input.Body.JsonPayload.EdgesPayload? = nil
                     ) {
                         self.properties = properties
+                        self.clearProperties = clearProperties
                         self._type = _type
                         self.propertiesMode = propertiesMode
                         self.retype = retype
@@ -4566,6 +4573,7 @@ public enum Operations {
                     }
                     public enum CodingKeys: String, CodingKey {
                         case properties
+                        case clearProperties = "clear_properties"
                         case _type = "type"
                         case propertiesMode = "properties_mode"
                         case retype
@@ -4581,6 +4589,10 @@ public enum Operations {
                         self.properties = try container.decodeIfPresent(
                             Operations.UpdateItem.Input.Body.JsonPayload.PropertiesPayload.self,
                             forKey: .properties
+                        )
+                        self.clearProperties = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .clearProperties
                         )
                         self._type = try container.decodeIfPresent(
                             Swift.String.self,
@@ -4620,6 +4632,7 @@ public enum Operations {
                         )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "properties",
+                            "clear_properties",
                             "type",
                             "properties_mode",
                             "retype",

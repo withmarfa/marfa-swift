@@ -1294,6 +1294,14 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func status() throws  -> Status
     
     /**
+     * Clears what `forget_answered` clears and returns each write it took,
+     * as `queue` showed it, in one step: two callers taking at once never
+     * both get one answer, and none is cleared unreturned. A refused write
+     * that carried content stays until it is discarded.
+     */
+    func takeAnswered() throws  -> [QueuedWrite]
+    
+    /**
      * The thumbnail an item carries, from the copy with no request; none
      * where its type declares none or it carries none. An item the copy does
      * not hold throws `NotFound` with the code `not_held`, and a held value
@@ -2297,6 +2305,20 @@ open func setFileBudget(budget: FileBudget)throws  -> UInt64  {
 open func status()throws  -> Status  {
     return try  FfiConverterTypeStatus_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_status(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Clears what `forget_answered` clears and returns each write it took,
+     * as `queue` showed it, in one step: two callers taking at once never
+     * both get one answer, and none is cleared unreturned. A refused write
+     * that carried content stays until it is discarded.
+     */
+open func takeAnswered()throws  -> [QueuedWrite]  {
+    return try  FfiConverterSequenceTypeQueuedWrite.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_take_answered(
             self.uniffiCloneHandle(),$0
     )
 })
@@ -5556,7 +5578,8 @@ public struct Edit: Equatable, Hashable {
      * Whole field values; a device never merges inside a field. Unless
      * `replace_properties` is set, each property given replaces its value and
      * the rest stay, and a `null` clears nothing: the server drops it, and
-     * so does the copy, so the property keeps its value.
+     * so does the copy, so the property keeps its value. To remove a
+     * property, name it in `clear_properties`.
      */
     public var properties: JsonObject
     /**
@@ -5565,6 +5588,14 @@ public struct Edit: Equatable, Hashable {
      * `update_item_as_read`, it is merged as a merge is.
      */
     public var replaceProperties: Bool
+    /**
+     * Properties to remove from the item. Every other property stays as the
+     * row holds it, one the app cannot read included, so a removal needs no
+     * `replace_properties`. A name the item lacks is not an error; one also
+     * in `properties`, or a field the type requires, is refused before
+     * anything is queued.
+     */
+    public var clearProperties: [String]
     /**
      * The version the change was made against.
      */
@@ -5599,13 +5630,21 @@ public struct Edit: Equatable, Hashable {
          * Whole field values; a device never merges inside a field. Unless
          * `replace_properties` is set, each property given replaces its value and
          * the rest stay, and a `null` clears nothing: the server drops it, and
-         * so does the copy, so the property keeps its value.
+         * so does the copy, so the property keeps its value. To remove a
+         * property, name it in `clear_properties`.
          */properties: JsonObject = JsonObject(), 
         /**
          * The properties are the item's whole properties: one left out is
          * cleared. Sent at a version older than the one the copy holds, through
          * `update_item_as_read`, it is merged as a merge is.
          */replaceProperties: Bool = false, 
+        /**
+         * Properties to remove from the item. Every other property stays as the
+         * row holds it, one the app cannot read included, so a removal needs no
+         * `replace_properties`. A name the item lacks is not an error; one also
+         * in `properties`, or a field the type requires, is refused before
+         * anything is queued.
+         */clearProperties: [String] = [], 
         /**
          * The version the change was made against.
          */baseVersion: Int64, 
@@ -5628,6 +5667,7 @@ public struct Edit: Equatable, Hashable {
          */clearOccurredAt: Bool = false) {
         self.properties = properties
         self.replaceProperties = replaceProperties
+        self.clearProperties = clearProperties
         self.baseVersion = baseVersion
         self.sourceId = sourceId
         self.type = type
@@ -5654,6 +5694,7 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
             try Edit(
                 properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 replaceProperties: FfiConverterBool.read(from: &buf), 
+                clearProperties: FfiConverterSequenceString.read(from: &buf), 
                 baseVersion: FfiConverterInt64.read(from: &buf), 
                 sourceId: FfiConverterOptionString.read(from: &buf), 
                 type: FfiConverterOptionString.read(from: &buf), 
@@ -5666,6 +5707,7 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
     public static func write(_ value: Edit, into buf: inout [UInt8]) {
         FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterBool.write(value.replaceProperties, into: &buf)
+        FfiConverterSequenceString.write(value.clearProperties, into: &buf)
         FfiConverterInt64.write(value.baseVersion, into: &buf)
         FfiConverterOptionString.write(value.sourceId, into: &buf)
         FfiConverterOptionString.write(value.type, into: &buf)
@@ -9884,6 +9926,12 @@ public struct Status: Equatable, Hashable {
      * never held one.
      */
     public var catalogVersion: UInt64?
+    /**
+     * When the copy last finished a pull from the server without error, an
+     * RFC 3339 UTC timestamp; none where it has not since the store was made
+     * or a hydration last cleared it.
+     */
+    public var syncedAt: String?
     public var fileCache: FileCache
 
     // Default memberwise initializers are never public by default, so we
@@ -9903,7 +9951,12 @@ public struct Status: Equatable, Hashable {
         /**
          * Moves each time a refresh changes the catalog; none where the copy has
          * never held one.
-         */catalogVersion: UInt64?, fileCache: FileCache) {
+         */catalogVersion: UInt64?, 
+        /**
+         * When the copy last finished a pull from the server without error, an
+         * RFC 3339 UTC timestamp; none where it has not since the store was made
+         * or a hydration last cleared it.
+         */syncedAt: String?, fileCache: FileCache) {
         self.serverOrigin = serverOrigin
         self.instanceId = instanceId
         self.sliceTypes = sliceTypes
@@ -9917,6 +9970,7 @@ public struct Status: Equatable, Hashable {
         self.itemsListed = itemsListed
         self.edges = edges
         self.catalogVersion = catalogVersion
+        self.syncedAt = syncedAt
         self.fileCache = fileCache
     }
 
@@ -9949,6 +10003,7 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
                 itemsListed: FfiConverterOptionUInt64.read(from: &buf), 
                 edges: FfiConverterUInt64.read(from: &buf), 
                 catalogVersion: FfiConverterOptionUInt64.read(from: &buf), 
+                syncedAt: FfiConverterOptionString.read(from: &buf), 
                 fileCache: FfiConverterTypeFileCache.read(from: &buf)
         )
     }
@@ -9967,6 +10022,7 @@ public struct FfiConverterTypeStatus: FfiConverterRustBuffer {
         FfiConverterOptionUInt64.write(value.itemsListed, into: &buf)
         FfiConverterUInt64.write(value.edges, into: &buf)
         FfiConverterOptionUInt64.write(value.catalogVersion, into: &buf)
+        FfiConverterOptionString.write(value.syncedAt, into: &buf)
         FfiConverterTypeFileCache.write(value.fileCache, into: &buf)
     }
 }
@@ -16462,6 +16518,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_status() != 27928) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_take_answered() != 53004) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_thumbnail() != 9618) {

@@ -430,7 +430,7 @@ final class FakeCore: Core, @unchecked Sendable {
             eventCursor: nil,
             hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
             itemsListed: state.withLock { $0.itemsListed }, edges: 0,
-            catalogVersion: 1,
+            catalogVersion: 1, syncedAt: nil,
             fileCache: MarfaCore.FileCache(
                 setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
                 backupMarkFailure: nil, attachments: nil))
