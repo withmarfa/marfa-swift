@@ -529,15 +529,16 @@ struct ARefill {
         WorkingCopy(holder: CoreHolder(core), hasServer: true, refillPace: pace, refillClock: .init(clock))
     }
 
-    /// Ends each wait the refill asks for, in turn, until `done` holds, and answers the lengths asked.
+    /// Ends each wait held on `clock`, in turn, until `done` holds.
+    ///
+    /// A wait asked for can end without the clock moving: while updates are followed, a fill's progress reading
+    /// waits on the same clock and is canceled when the fill ends. So this waits for a held wait or `done`, never
+    /// for a count of waits asked. Every wait is at most ``Lifecycle/longestWait``, so one advance ends all held.
     static func letWaitsPass(on clock: ManualClock, until done: @autoclosure () -> Bool) async throws {
-        var passed = 0
         while !done() {
-            try await eventually("the refill waits") { clock.requested.count > passed || done() }
+            try await eventually("a wait is held, or it is done") { clock.waiting > 0 || done() }
             guard !done() else { break }
-            try await eventually("the wait is held") { clock.waiting > 0 }
-            passed = clock.requested.count
-            clock.advance(by: .seconds(3600))
+            clock.advance(by: Lifecycle.longestWait)
         }
     }
 
