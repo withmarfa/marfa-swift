@@ -1054,9 +1054,9 @@ func translated<T>(_ work: () throws -> T) throws -> T {
     }
 }
 
-private extension MarfaCore.MarfaError {
+extension MarfaCore.MarfaError {
     /// The refusals `Core.replaceRefused` gives when another opener replaced the store between the two calls.
-    var isLostReplacementRace: Bool {
+    fileprivate var isLostReplacementRace: Bool {
         switch self {
         case .ReadingHandle, .Invalid: true
         default: false
