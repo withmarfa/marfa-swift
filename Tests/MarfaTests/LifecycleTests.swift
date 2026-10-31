@@ -340,27 +340,31 @@ struct ALifecycle {
 
     @Test func aSecondActivationNeverTellsThePreviousRunsConnection() async throws {
         let core = FakeCore.writer()
-        let clock = ManualClock()
-        let copy = Self.copy(core, clock)
+        let copy = Self.copy(core, ManualClock())
         let first = Updates(copy.updates())
         try await eventually("following") { first.connection == .following }
         first.cancel()
         try await eventually("the follow was let go") { copy.feed.count == 0 }
-        core.state.withLock { $0.catchUpFails = Self.offline }
 
-        for round in 0..<200 {
-            let told = await withTaskGroup(of: CopyConnection?.self) { group in
-                for _ in 0..<2 {
-                    group.addTask {
-                        var updates = copy.updates().makeAsyncIterator()
-                        return await updates.next()?.connection
-                    }
-                }
-                return await group.reduce(into: [CopyConnection?]()) { $0.append($1) }
+        let reached = Mutex(false)
+        let release = DispatchSemaphore(value: 0)
+        copy.lifecycle.started.withLock {
+            $0 = {
+                reached.withLock { $0 = true }
+                release.wait()
             }
-            #expect(!told.contains(.following), "round \(round)")
-            try await eventually("the follow was let go") { copy.feed.count == 0 }
         }
+        let starting = Mutex<CopyUpdates?>(nil)
+        DispatchQueue.global().async { starting.withLock { $0 = copy.updates() } }
+        try await eventually("the run was held before its first step") { reached.withLock { $0 } }
+        copy.lifecycle.started.withLock { $0 = nil }
+
+        // A consumer that joins while the run has begun but not yet taken its first step.
+        var joined = copy.updates().makeAsyncIterator()
+        let told = await joined.next()?.connection
+        release.signal()
+        #expect(told == .connecting)
+        try await eventually("the starting consumer was handed its updates") { starting.withLock { $0 } != nil }
         await copy.close()
     }
 

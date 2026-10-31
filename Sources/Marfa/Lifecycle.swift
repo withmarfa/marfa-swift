@@ -256,6 +256,11 @@ final class Lifecycle: Sendable {
     private let clock: Feed.RefillClock
     private let state = Mutex(State())
 
+    #if DEBUG
+    /// Runs after a consumer starts a run and before the run's first step, so a test can hold that moment.
+    let started = Mutex<(@Sendable () -> Void)?>(nil)
+    #endif
+
     init(holder: CoreHolder, feed: Feed, hasServer: Bool, pace: Pace, clock: Feed.RefillClock) {
         self.holder = holder
         self.feed = feed
@@ -306,7 +311,12 @@ final class Lifecycle: Sendable {
             if state.fills > 0 { startProgress(&state) }
             return (state.run, state.epoch, claimStream(&state))
         }
-        if let starts { start(run: starts.run, epoch: starts.epoch, claim: starts.claim) }
+        if let starts {
+            #if DEBUG
+            started.withLock { $0 }?()
+            #endif
+            start(run: starts.run, epoch: starts.epoch, claim: starts.claim)
+        }
         return CopyUpdates(lifecycle: self, id: id, signals: signals)
     }
 
