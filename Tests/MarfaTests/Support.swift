@@ -158,6 +158,9 @@ final class FakeCore: Core, @unchecked Sendable {
         /// While a hydration runs, what `status()` says of its progress.
         var itemsExpected: UInt64?
         var itemsListed: UInt64?
+        /// What `status()` says of when the copy last synced; a catch-up that succeeds sets it to `pullsAt`.
+        var syncedAt: String?
+        var pullsAt: String?
         /// Each item a server event named, in order, which `changesSince` answers from.
         var changedItems: [String] = []
         var hydrateFails: MarfaCore.MarfaError?
@@ -416,6 +419,7 @@ final class FakeCore: Core, @unchecked Sendable {
             if let failure = state.catchUpFails {
                 throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: state.catchUpChangesCatalog)
             }
+            if let pullsAt = state.pullsAt { state.syncedAt = pullsAt }
             var report = state.caughtUp
             report.catalogChanged = state.catchUpChangesCatalog
             return report
@@ -430,7 +434,7 @@ final class FakeCore: Core, @unchecked Sendable {
             eventCursor: nil,
             hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
             itemsListed: state.withLock { $0.itemsListed }, edges: 0,
-            catalogVersion: 1, syncedAt: nil,
+            catalogVersion: 1, syncedAt: state.withLock { $0.syncedAt },
             fileCache: MarfaCore.FileCache(
                 setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
                 backupMarkFailure: nil, attachments: nil))
@@ -537,7 +541,7 @@ func emptyStatus() -> MarfaCore.Status {
     MarfaCore.Status(
         serverOrigin: nil, instanceId: nil, sliceTypes: [], sliceTier: nil, sliceEdgeTypes: [], pinned: [],
         eventCursor: nil, hydration: .never, items: 0, itemsExpected: nil, itemsListed: 0, edges: 0,
-        catalogVersion: 1,
+        catalogVersion: 1, syncedAt: nil,
         fileCache: MarfaCore.FileCache(
             setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
             backupMarkFailure: nil, attachments: nil))

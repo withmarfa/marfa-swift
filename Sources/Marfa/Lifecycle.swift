@@ -106,7 +106,7 @@ public struct CopyUpdate: Sendable, Hashable {
     public var connection: CopyConnection
     /// How far a hydration has got while one runs, and `nil` otherwise.
     public var fill: FillProgress?
-    /// When the copy last heard from its server, as ``Status/lastSynced`` says.
+    /// When the copy last finished a pull from its server, as ``Status/lastSynced`` says.
     public var lastSynced: Date?
 
     public init(reread: Reread, connection: CopyConnection, fill: FillProgress? = nil, lastSynced: Date? = nil) {
