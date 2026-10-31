@@ -39,6 +39,30 @@ struct KeychainKeyStoreBehavior {
         }
     }
 
+    @Test func oneServerWrittenSeveralWaysIsOneAccount() throws {
+        try inIsolatedKeychain { keychain, _ in
+            let store = KeychainKeyStore(keychain: keychain, service: service)
+            let host = try #require(address.host())
+            try store.save("mk_a", for: address)
+            for spelling in ["https://\(host)/", "HTTPS://\(host.uppercased())", "https://\(host):443//"] {
+                #expect(try store.key(for: #require(URL(string: spelling))) == "mk_a", "\(spelling)")
+            }
+            try store.delete(for: #require(URL(string: "https://\(host.uppercased())/")))
+            #expect(try store.key(for: address) == nil)
+        }
+    }
+
+    @Test(arguments: [
+        ("https://a.example", "https://a.example"), ("https://a.example/", "https://a.example"),
+        ("HTTPS://A.Example", "https://a.example"), ("https://a.example:443", "https://a.example"),
+        ("http://a.example:80/", "http://a.example"), ("http://a.example:443", "http://a.example:443"),
+        ("https://a.example:8443/marfa/", "https://a.example:8443/marfa"),
+        ("https://a.example/Marfa", "https://a.example/Marfa"),
+    ])
+    func theAccountIsTheAddressWrittenOneWay(address: String, account: String) throws {
+        #expect(KeychainKeyStore.account(for: try #require(URL(string: address))) == account)
+    }
+
     @Test func twoServicesKeepTheirOwnKeys() throws {
         try inIsolatedKeychain { keychain, _ in
             let installed = KeychainKeyStore(keychain: keychain, service: "\(service).installed")

@@ -13,40 +13,44 @@ public final class MemoryKeyStore: KeyStore {
         public init() {}
     }
 
+    /// Keyed by ``KeyStore/account(for:)``, as a ``KeychainKeyStore`` is.
     private struct State {
-        var keys: [URL: String]
-        var unreadable: Set<URL> = []
+        var keys: [String: String]
+        var unreadable: Set<String> = []
     }
 
     private let state: Mutex<State>
 
     public init(_ keys: [URL: String] = [:]) {
-        state = Mutex(State(keys: keys))
+        state = Mutex(State(keys: Dictionary(keys.map { (Self.account(for: $0), $1) }) { $1 }))
     }
 
     /// Makes reading the key for `address` throw ``Unreadable`` until the key is saved again or deleted.
     public func makeUnreadable(_ address: URL) {
-        state.withLock { _ = $0.unreadable.insert(address) }
+        state.withLock { _ = $0.unreadable.insert(Self.account(for: address)) }
     }
 
     public func save(_ key: String, for address: URL) {
+        let account = Self.account(for: address)
         state.withLock {
-            $0.keys[address] = key
-            $0.unreadable.remove(address)
+            $0.keys[account] = key
+            $0.unreadable.remove(account)
         }
     }
 
     public func key(for address: URL) throws -> String? {
-        try state.withLock {
-            guard !$0.unreadable.contains(address) else { throw Unreadable() }
-            return $0.keys[address]
+        let account = Self.account(for: address)
+        return try state.withLock {
+            guard !$0.unreadable.contains(account) else { throw Unreadable() }
+            return $0.keys[account]
         }
     }
 
     public func delete(for address: URL) {
+        let account = Self.account(for: address)
         state.withLock {
-            $0.keys.removeValue(forKey: address)
-            $0.unreadable.remove(address)
+            $0.keys.removeValue(forKey: account)
+            $0.unreadable.remove(account)
         }
     }
 }

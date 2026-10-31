@@ -6,6 +6,10 @@ import Foundation
 /// key for the address, which asks the person to connect, and throws when it holds one it cannot read, which
 /// asks nothing of them: a locked keychain or a refused prompt is not a lost key, and an app that treated it as one
 /// would ask for a key the person still has.
+///
+/// A store keeps one key for each server, and one server can be written several ways: addresses that differ only
+/// in the case of the scheme or host, in naming the scheme's default port, or in a trailing `/`, are one server,
+/// as ``account(for:)`` writes it.
 public protocol KeyStore: Sendable {
     /// Keeps `key` for the server at `address`, replacing the one kept.
     func save(_ key: String, for address: URL) throws
@@ -17,7 +21,28 @@ public protocol KeyStore: Sendable {
     func delete(for address: URL) throws
 }
 
-/// The keys of an app, as generic passwords in a ``Keychain``, one account for each server address.
+extension KeyStore {
+    /// The address of a server written one way, which a store keeps its key under: the scheme and host in lowercase,
+    /// no port where it is the scheme's default, and no trailing `/`.
+    public static func account(for address: URL) -> String {
+        guard var parts = URLComponents(url: address, resolvingAgainstBaseURL: true) else {
+            return address.absoluteString
+        }
+        parts.scheme = parts.scheme?.lowercased()
+        parts.percentEncodedHost = parts.percentEncodedHost?.lowercased()
+        switch (parts.scheme, parts.port) {
+        case ("http", 80), ("https", 443): parts.port = nil
+        default: break
+        }
+        var path = parts.percentEncodedPath
+        while path.hasSuffix("/") { path.removeLast() }
+        parts.percentEncodedPath = path
+        return parts.string ?? address.absoluteString
+    }
+}
+
+/// The keys of an app, as generic passwords in a ``Keychain``, one account for each server, named by
+/// ``KeyStore/account(for:)``.
 public struct KeychainKeyStore: KeyStore {
     /// The service the keys are kept under: the app's bundle identifier followed by `.marfa-key`.
     ///
@@ -32,11 +57,6 @@ public struct KeychainKeyStore: KeyStore {
     public init(keychain: Keychain = .system, service: String = KeychainKeyStore.defaultService) {
         self.keychain = keychain
         self.service = service
-    }
-
-    /// One server is one account, so a key saved for one address is never read for another.
-    static func account(for address: URL) -> String {
-        address.absoluteString
     }
 
     public func save(_ key: String, for address: URL) throws {

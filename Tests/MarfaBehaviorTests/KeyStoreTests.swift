@@ -34,6 +34,15 @@ import Testing
         #expect(try store.key(for: home) == "mk_c", "saving a key again makes it readable")
     }
 
+    @Test func oneServerWrittenSeveralWaysIsOneAddress() throws {
+        let store = MemoryKeyStore([URL(string: "HTTPS://Marfa.example:443/")!: "mk_a"])
+        #expect(try store.key(for: home) == "mk_a")
+        store.makeUnreadable(URL(string: "https://marfa.example/")!)
+        #expect(throws: MemoryKeyStore.Unreadable.self) { try store.key(for: home) }
+        store.delete(for: URL(string: "https://MARFA.example")!)
+        #expect(try store.key(for: home) == nil)
+    }
+
     @Test func itWorksAsAnyKeyStore() throws {
         let store: any KeyStore = MemoryKeyStore()
         try store.save("mk_a", for: home)
