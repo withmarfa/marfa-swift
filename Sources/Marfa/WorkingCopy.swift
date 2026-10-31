@@ -113,7 +113,17 @@ public final class WorkingCopy: Sendable {
                 return (try Core.open(path: path, url: url, key: key, renewer: renewer), false)
             } catch MarfaCore.MarfaError.WrongSchema(_, _, unsent: 0, _) where ifRefused == .replace {
                 // The core counts again under the writer lock, so a write queued since is never replaced.
-                return (try Core.replaceRefused(path: path, url: url, key: key, renewer: renewer), true)
+                do {
+                    return (try Core.replaceRefused(path: path, url: url, key: key, renewer: renewer), true)
+                } catch let refusal as MarfaCore.MarfaError where refusal.isLostReplacementRace {
+                    // Another process replaced the store first and holds, or has since released, a healthy one.
+                    // Opening never deletes, so the second opener gets a reading handle or the copy as it is.
+                    do {
+                        return (try Core.open(path: path, url: url, key: key, renewer: renewer), false)
+                    } catch {
+                        throw refusal
+                    }
+                }
             }
         }
         let copy: WorkingCopy
@@ -1041,5 +1051,15 @@ func translated<T>(_ work: () throws -> T) throws -> T {
         return try work()
     } catch let error as MarfaCore.MarfaError {
         throw MarfaError(error)
+    }
+}
+
+private extension MarfaCore.MarfaError {
+    /// The refusals `Core.replaceRefused` gives when another opener replaced the store between the two calls.
+    var isLostReplacementRace: Bool {
+        switch self {
+        case .ReadingHandle, .Invalid: true
+        default: false
+        }
     }
 }

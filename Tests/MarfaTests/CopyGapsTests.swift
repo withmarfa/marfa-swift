@@ -214,6 +214,42 @@ struct ReplacedRefusedCopy {
         await copy.close()
     }
 
+    @Test func aSecondReplacingOpenerOfAStoreAlreadyReplacedGetsItAsItIs() async throws {
+        let (store, hash) = try await Self.refusedStore()
+        let first = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(first.handle == .writer)
+
+        let second = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(second.handle == .reader)
+        #expect(try await second.blobs.isHeld(hash))
+        await second.close()
+        await first.close()
+
+        let third = try await WorkingCopy.open(store: store, ifRefused: .replace)
+        #expect(third.handle == .writer)
+        await third.close()
+    }
+
+    /// With no queue table to count, the core refuses a store for its schema version and reports `unsent` as `nil`.
+    @Test func aRefusedStoreWhoseUnsentCountCannotBeReadIsNotReplaced() async throws {
+        let (store, _) = try await Self.refusedStore()
+        try OlderStore.execute(
+            store,
+            """
+            DROP TABLE queue;
+            UPDATE meta SET value = '999' WHERE key = 'schema_version';
+            """)
+
+        for ifRefused in [WorkingCopy.IfRefused.keep, .replace] {
+            await #expect {
+                _ = try await WorkingCopy.open(store: store, ifRefused: ifRefused)
+            } throws: { error in
+                if case .wrongSchema(_, _, let count, _)? = error as? MarfaError { count == nil } else { false }
+            }
+        }
+        #expect(try OlderStore.count(store, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'meta'") == 1)
+    }
+
     @Test func aSecondOpenerOfAStoreThatOpensIsAReaderAndReplacesNothing() async throws {
         let store = temporaryStore()
         let writer = try await WorkingCopy.open(store: store)
