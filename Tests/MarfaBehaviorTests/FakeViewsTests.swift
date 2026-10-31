@@ -296,7 +296,31 @@ struct FakeViews {
             performing: { _ = try await copy.items.groups(inView: filtered.id) },
             throws: refused("items.groups(inView:) with a filter"))
         await #expect(
-            performing: { _ = try await copy.search("a", inView: filtered.id) }, throws: refused("search(inView:)"))
+            performing: { _ = try await copy.search("a", inView: filtered.id) },
+            throws: refused("search(inView:) with a filter"))
+    }
+
+    @Test func aSearchInAViewFindsOnlyWhatTheViewListsAndRanksAmongEveryRow() async throws {
+        let copy = Self.fake().copy
+        let notes = try await copy.createView(ViewSettings(title: "n", query: ViewQuery(types: ["core.note"])))
+        let tasks = try await copy.createView(ViewSettings(title: "t", query: ViewQuery(types: ["core.task"])))
+        let tagged = try await copy.createView(ViewSettings(title: "x", query: ViewQuery(beneath: Self.a.id)))
+        // a and b are active notes, c is archived, which a view lists by default; d is a feed note.
+        #expect(Set(try await copy.search("b", inView: notes.id).compactMap(\.item.title)) == ["b"])
+        #expect(try await copy.search("t", inView: tasks.id).compactMap(\.item.title) == ["t"])
+        #expect(try await copy.search("t", inView: notes.id).isEmpty)
+        #expect(Set(try await copy.search("c", inView: tagged.id).compactMap(\.item.title)) == ["c"])
+        #expect(try await copy.search("d", inView: tagged.id).isEmpty)
+        #expect(try await copy.search("e", inView: notes.id).isEmpty)
+        #expect(try await copy.search("b", inView: notes.id, limit: 0).isEmpty)
+        #expect(try await copy.search("b", inView: notes.id).completeness == .complete)
+        await #expect(
+            performing: { _ = try await copy.search("a", inView: "absent") },
+            throws: { error in
+                guard case .notFound(let code, _)? = error as? MarfaError else { return false }
+                return code == "not_held"
+            }
+        )
     }
 }
 #endif

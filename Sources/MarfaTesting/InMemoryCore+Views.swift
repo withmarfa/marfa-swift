@@ -265,13 +265,9 @@ extension InMemoryCore {
         }
     }
 
-    func searchInView(query: String, id: String, limit: UInt32) throws -> Found {
-        throw FakeCopyError.unsupported(call: "search(inView:)")
-    }
-
     // MARK: Scope
 
-    private static func scope(_ id: String, in state: State, call: String) throws -> (ViewRow, [Item]) {
+    static func scope(_ id: String, in state: State, call: String) throws -> (ViewRow, [Item]) {
         guard let held = state.items[id], held.state != .trashed else {
             throw Refuse.notFound(
                 "not_held", "view \(id) is not held in this working copy: pin it or hydrate with \(viewType)")

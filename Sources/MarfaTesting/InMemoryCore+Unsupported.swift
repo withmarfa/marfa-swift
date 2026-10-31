@@ -93,10 +93,6 @@ extension InMemoryCore {
         try unsupported("queue.release(reason:)")
     }
 
-    func search(query: String, filters: SearchFilters, limit: UInt32) throws -> Found {
-        try unsupported("search")
-    }
-
     func thumbnail(id: String) throws -> Thumbnail? {
         try unsupported("items.thumbnail")
     }
