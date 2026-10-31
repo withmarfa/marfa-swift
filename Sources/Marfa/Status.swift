@@ -1,5 +1,5 @@
 import Foundation
-package import MarfaCore
+internal import MarfaCore
 
 /// Where an item stands, as every type with a status field puts it: one of four groups that are the same for every
 /// type, so an app can tell what is open, active or finished without knowing a type's own words.

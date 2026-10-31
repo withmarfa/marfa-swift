@@ -1,5 +1,5 @@
 import Foundation
-package import MarfaCore
+internal import MarfaCore
 
 /// A `system.view`: a saved list of items, with the order and grouping every app shows them in.
 ///

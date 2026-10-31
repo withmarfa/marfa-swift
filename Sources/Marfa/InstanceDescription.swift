@@ -1,5 +1,5 @@
 import Foundation
-package import MarfaCore
+internal import MarfaCore
 
 /// The public description of the instance currently answering at a server's address.
 public struct InstanceDescription: Sendable, Hashable {

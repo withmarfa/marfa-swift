@@ -1,5 +1,5 @@
 import Foundation
-package import MarfaCore
+internal import MarfaCore
 
 /// The item type and edge type definitions the copy holds, custom types included.
 ///

@@ -1,5 +1,3 @@
-package import MarfaCore
-
 /// A strict RFC 8259 reader that keeps object key order.
 ///
 /// It nests with an explicit stack rather than recursion, so hostile nesting

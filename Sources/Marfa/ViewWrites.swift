@@ -1,5 +1,4 @@
 import Foundation
-package import MarfaCore
 
 /// What a change does to a view's grouping.
 public enum ViewGroupingChange: Sendable, Hashable {
