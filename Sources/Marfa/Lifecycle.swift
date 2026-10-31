@@ -844,7 +844,7 @@ final class Lifecycle: Sendable {
                         guard state.run == run, state.active, state.fills > 0 else { return false }
                         guard progress != state.fill else { return true }
                         // The rows arrive page by page, and a read while the copy fills answers those that have.
-                        let arrived = progress.listed != state.fill?.listed
+                        let arrived = progress.listed != (state.fill?.listed ?? 0)
                         state.fill = progress
                         mark(&state) { if arrived { $0.everything = true } }
                         return true

@@ -412,7 +412,13 @@ final class Feed: Sendable {
             return (state.suspensions, state.fillObserver)
         }
         observer?(true, byRefill)
-        defer { observer?(false, byRefill) }
+        // The fill ends before its outcome is told, so no progress read after the outcome asks for the rows again.
+        var ended = false
+        let end = {
+            if !ended { observer?(false, byRefill) }
+            ended = true
+        }
+        defer { end() }
         let report: MarfaCore.HydrateReport
         do {
             report = try await holder.runUntilCanceled { core, stop in
@@ -426,6 +432,7 @@ final class Feed: Sendable {
             // A key change reopening the store refuses the lease before `admitted` is asked.
             throw KeyChanged()
         } catch {
+            end()
             announce(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
             throw error
         }
@@ -433,6 +440,7 @@ final class Feed: Sendable {
             $0.lastFill = Fill(
                 types: types, tier: tier, edgeTypes: edgeTypes, report: report, suspensions: suspensions)
         }
+        end()
         announce(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         return report
     }

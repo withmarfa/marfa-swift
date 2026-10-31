@@ -363,4 +363,28 @@ struct ALifecycle {
         try await eventually("the progress is cleared") { updates.all.last?.fill == nil }
         await copy.close()
     }
+
+    @Test func aHydrationIsToldToReadEverythingOnceWhenNoRowArrivedWhileItRan() async throws {
+        let core = FakeCore.writer()
+        let gate = DispatchSemaphore(value: 0)
+        core.state.withLock {
+            $0.hydrateGate = gate
+            $0.itemsExpected = 10
+        }
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock)
+        let updates = Updates(copy.updates())
+        try await eventually("following") { updates.connection == .following }
+        let before = updates.all.count
+
+        let hydrating = Task { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+        try await eventually("the progress is told") { updates.all.last?.fill == FillProgress(listed: 0, expected: 10) }
+        gate.signal()
+        _ = try await hydrating.value
+        try await eventually("the progress is cleared") { updates.all.last?.fill == nil }
+        try await eventually("the hydration is told") { updates.all[before...].contains { $0.reread == .everything } }
+        #expect(updates.all[before...].filter { $0.reread == .everything }.count == 1)
+        #expect(updates.all.last?.reread == .everything)
+        await copy.close()
+    }
 }
