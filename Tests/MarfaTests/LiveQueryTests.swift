@@ -314,6 +314,7 @@ struct LiveQueries {
         probe.hold(1)
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await eventually("the first read began") { probe.reads == 1 }
+        try await eventually("following") { query.connection == .following }
         for _ in 0..<100 { copy.feed.announce(write(.addTag, item: "n1")) }
         // The updates are in order, so once the query shows the connection a later change set, it has heard all 100
         // changes before it.
@@ -429,6 +430,7 @@ struct LiveQueries {
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         _ = try await copy.hydrate(types: ["app.test.entry"], tier: .feed)
@@ -441,6 +443,7 @@ struct LiveQueries {
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         let reads = probe.reads
@@ -480,6 +483,7 @@ struct LiveQueries {
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
+        try await eventually("following") { query.connection == .following }
         core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
 

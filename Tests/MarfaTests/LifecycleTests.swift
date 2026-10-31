@@ -328,7 +328,9 @@ struct ALifecycle {
                 for _ in 0..<8 { group.addTask { _ = try? await copy.catchUp() } }
             }
             try await eventually("one stream is held", within: 5) { copy.feed.count == 1 }
-            #expect(updates.connection == .following, "round \(round)")
+            // The stop may be heard first, showing the copy offline; the updates show a later success only once
+            // read, and with the clock held, nothing but these catch-ups can show it following again.
+            try await eventually("round \(round): following", within: 5) { updates.connection == .following }
 
             updates.cancel()
             try await eventually("round \(round): the last consumer let the stream go", within: 5) {

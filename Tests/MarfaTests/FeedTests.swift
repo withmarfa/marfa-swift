@@ -782,6 +782,7 @@ struct ARefill {
         let report = try await bounded("the app's hydration") { try await app.value }
         #expect(report.types == ["*"])
         #expect(core.state.withLock { $0.hydrations.count } == 2)
+        try await eventually("both hydrations were told") { heard.all.count >= 2 }
         #expect(heard.stops.isEmpty)
         #expect(heard.all == [refreshed(.hydrated), refreshed(.hydrated)])
         await copy.close()
@@ -814,6 +815,7 @@ struct ARefill {
         try await Task.sleep(for: .milliseconds(100))
         gate.signal()
         _ = try await bounded("the app's hydration") { try await app.value }
+        try await eventually("the refill was told") { !heard.all.isEmpty }
         try await Task.sleep(for: .milliseconds(300))
         #expect(core.state.withLock { $0.hydrations.count } == 1)
         #expect(heard.all == [refreshed(.hydrated)])
