@@ -4,7 +4,7 @@ import Foundation
 /// (`types/datetime-value`): a calendar day, `YYYY-MM-DD`, or a day followed by `T`, a time of `HH:MM`, `HH:MM:SS`
 /// or `HH:MM:SS` with a fraction, and `Z` or a `±HH:MM` offset.
 ///
-/// A day names no moment, so it reads as the start of that day on the calendar given, and ``hasTime`` is `false`;
+/// A day names no moment, so it reads as the start of that day in the calendar's time zone, and ``hasTime`` is `false`;
 /// an app shows it as a day and writes it back with ``day(_:calendar:)``, never as an instant.
 public struct ItemDate: Hashable, Sendable {
     /// The moment the value names.
@@ -100,21 +100,39 @@ public struct ItemDate: Hashable, Sendable {
         }
     }
 
-    /// The value for the day a picked date falls on in the person's calendar.
+    /// The value for the day a picked date falls on in the calendar's time zone.
+    ///
+    /// The value is always a Gregorian day, as the contract's are, whatever calendar the person uses; only the
+    /// calendar's time zone decides which day the date falls on.
     public static func day(_ date: Date, calendar: Calendar = .current) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+        let local = date.timeIntervalSince1970 + TimeInterval(calendar.timeZone.secondsFromGMT(for: date))
+        let (year, month, day) = civil(Int64((local / 86_400).rounded(.down)))
+        return String(format: "%04lld-%02lld-%02lld", year, month, day)
     }
 
     /// The value for an instant, in UTC and to the millisecond, as the server and the core write one.
     public static func instant(_ date: Date) -> String {
-        // The format cuts the fraction, so a Date held as .12299999 would read .122: the milliseconds are rounded here
-        // and written from the whole-second part and the milliseconds.
         let milliseconds = Int64((date.timeIntervalSince1970 * 1000).rounded())
-        let seconds = Date(timeIntervalSince1970: Double(milliseconds.floorDiv(1000)))
-        let whole = seconds.formatted(Date.ISO8601FormatStyle())
-        let fraction = String(format: "%03d", Int(milliseconds - milliseconds.floorDiv(1000) * 1000))
-        return String(whole.dropLast()) + "." + fraction + "Z"
+        let seconds = milliseconds.floorDiv(1000)
+        let days = seconds.floorDiv(86_400)
+        let (year, month, day) = civil(days)
+        let time = seconds - days * 86_400
+        return String(
+            format: "%04lld-%02lld-%02lldT%02lld:%02lld:%02lld.%03lldZ", year, month, day, time / 3600, time / 60 % 60,
+            time % 60, milliseconds - seconds * 1000)
+    }
+
+    /// The proleptic Gregorian day that is `days` after 1970-01-01, the reverse of ``utcMidnight(_:_:_:)``.
+    private static func civil(_ days: Int64) -> (year: Int64, month: Int64, day: Int64) {
+        let shifted = days + 719_468
+        let era = shifted.floorDiv(146_097)
+        let dayOfEra = shifted - era * 146_097
+        let yearOfEra = (dayOfEra - dayOfEra / 1460 + dayOfEra / 36_524 - dayOfEra / 146_096) / 365
+        let dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+        let monthFromMarch = (5 * dayOfYear + 2) / 153
+        let day = dayOfYear - (153 * monthFromMarch + 2) / 5 + 1
+        let month = monthFromMarch < 10 ? monthFromMarch + 3 : monthFromMarch - 9
+        return (yearOfEra + era * 400 + (month <= 2 ? 1 : 0), month, day)
     }
 
     /// The day's midnight in UTC.
@@ -134,11 +152,17 @@ public struct ItemDate: Hashable, Sendable {
         return Date(timeIntervalSince1970: TimeInterval((era * 146_097 + dayOfEra - 719_468) * 86_400))
     }
 
-    /// The start of a day on the calendar's clock.
+    /// The start of a day on the clock of `zone`.
+    ///
+    /// Where the clocks go forward at midnight the day has no 00:00 and starts at the first time it does have, which
+    /// the calendar finds from the day's noon.
     private static func startOfDay(_ year: Int, _ month: Int, _ day: Int, in zone: TimeZone) -> Date? {
         guard let midnight = utcMidnight(year, month, day) else { return nil }
-        let guess = midnight.addingTimeInterval(-TimeInterval(zone.secondsFromGMT(for: midnight)))
-        return midnight.addingTimeInterval(-TimeInterval(zone.secondsFromGMT(for: guess)))
+        let utcNoon = midnight.addingTimeInterval(12 * 3600)
+        let noon = utcNoon.addingTimeInterval(-TimeInterval(zone.secondsFromGMT(for: utcNoon)))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        return calendar.startOfDay(for: noon)
     }
 }
 

@@ -58,6 +58,39 @@ import Testing
         #expect(abs(back.timeIntervalSince(instant)) < 0.0005, "round trip to the millisecond")
     }
 
+    /// Days on which the clocks go forward at midnight, so the day starts at 01:00, with that start in UTC.
+    @Test(arguments: [
+        ("America/Santiago", "2026-09-06", "2026-09-06T04:00:00.000Z"),
+        ("America/Havana", "2026-03-08", "2026-03-08T05:00:00.000Z"),
+        ("America/Asuncion", "2024-10-06", "2024-10-06T04:00:00.000Z"),
+    ])
+    func aDayStartsWhenItsFirstHourDoesWhereTheClocksSkipMidnight(zone: String, day: String, start: String) throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: zone))
+        let parsed = try #require(ItemDate.parse(day, calendar: calendar))
+        #expect(ItemDate.instant(parsed.date) == start)
+        #expect(ItemDate.day(parsed.date, calendar: calendar) == day, "the day reads back as itself")
+    }
+
+    @Test(arguments: [Calendar.Identifier.buddhist, .japanese, .hebrew, .islamicUmmAlQura])
+    func aDayIsWrittenOnTheGregorianCalendarWhateverThePersonUses(identifier: Calendar.Identifier) {
+        var calendar = Calendar(identifier: identifier)
+        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let instant = Date(timeIntervalSince1970: 1_793_109_600)
+        #expect(ItemDate.day(instant, calendar: calendar) == "2026-10-27")
+        #expect(ItemDate.day(instant.addingTimeInterval(10 * 3600), calendar: calendar) == "2026-10-28")
+    }
+
+    @Test func datesBefore1582AreWrittenOnTheProlepticGregorianCalendarTheyAreReadOn() throws {
+        for text in ["1500-01-01T00:00:00.000Z", "0001-03-01T12:34:56.789Z", "1582-10-04T23:59:59.999Z"] {
+            let parsed = try #require(ItemDate.parse(text))
+            #expect(ItemDate.instant(parsed.date) == text)
+        }
+        let day = try #require(ItemDate.parse("1500-01-01", calendar: utc))
+        #expect(ItemDate.day(day.date, calendar: utc) == "1500-01-01")
+        #expect(ItemDate.day(day.date.addingTimeInterval(-1), calendar: utc) == "1499-12-31")
+    }
+
     private func item(
         properties: JSONObject = [:], created: String = "2026-10-27T14:00:00.000Z", trashed: String? = nil
     ) -> Item {
