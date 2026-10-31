@@ -403,14 +403,23 @@ test("the client keeps what an app's credential calls on the server and a workin
       "/connectors": { post: operation("registerConnector", ["Connectors"]) },
       "/owner": { get: operation("getOwner", ["Owner"], [{ ownerSession: [] }]) },
       "/": { get: operation("getInstance", ["Instance"], []) },
+      "/config": {
+        get: operation("getConfig", ["Instance"]),
+        put: operation("replaceConfig", ["Instance"]),
+        patch: operation("updateConfig", ["Instance"]),
+      },
+      "/types/{id}/icon": {
+        put: operation("setTypeIcon", ["Types"]),
+        delete: operation("clearTypeIcon", ["Types"]),
+      },
       "/blobs": { post: operation("uploadBlob", ["Blobs"]) },
       "/blobs/stores": { get: operation("listBlobStores", ["Blobs"]) },
       "/new": { get: operation("aNewServerOperation", ["Something new"]) },
     },
   };
   assert.deepEqual(clientOperations(input), [
-    "aNewServerOperation", "cancelBulkActionJob", "getBulkActionJob", "listBlobStores", "listItemVersions",
-    "registerType",
+    "aNewServerOperation", "cancelBulkActionJob", "getBulkActionJob", "listBlobStores", "registerType",
+    "replaceConfig",
   ]);
 });
 
@@ -421,8 +430,11 @@ test("the committed client makes what the rule keeps from the pinned document", 
   const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
   // The wire types describe every operation, so each absence below is the client's own.
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
-  for (const kept of ["registerType", "setTypeIcon", "clearTypeIcon", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "listItemVersions"]) assert.ok(client.has(kept), kept);
-  for (const left of ["createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance"]) {
+  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "replaceConfig"]) assert.ok(client.has(kept), kept);
+  for (const left of [
+    "createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance", "listItemVersions", "getConfig",
+    "updateConfig", "setTypeIcon", "clearTypeIcon",
+  ]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);
   }

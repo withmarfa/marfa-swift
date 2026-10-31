@@ -29,13 +29,13 @@ struct Sender: Sendable {
             return try await universal.send(
                 input: input, forOperation: operationID, serializer: serializer, deserializer: deserializer)
         } catch let error as ClientError {
-            if let known = failure(error.underlyingError, origin: origin) { throw known }
+            if let known = connectionFailure(error.underlyingError, origin: origin) { throw known }
             if error.response == nil {
                 throw .invalid(message: "the request to \(origin) could not be made: \(error.causeDescription)")
             }
             throw .decoding(message: "\(origin) answered \(operationID) in a form this build cannot read")
         } catch {
-            throw failure(error, origin: origin) ?? .invalid(message: "\(operationID) failed: \(error)")
+            throw connectionFailure(error, origin: origin) ?? .invalid(message: "\(operationID) failed: \(error)")
         }
     }
 }

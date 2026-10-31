@@ -120,8 +120,9 @@ extension WorkingCopy {
     /// Replaces each setting `change` names, based on `baseVersion`, sent as ``createView(_:idempotencyKey:)`` is.
     ///
     /// The server merges a change to settings nobody else changed since `baseVersion`. A setting changed since then
-    /// throws `MarfaError.versionConflict`, and the copy keeps the view it held. A revoked view throws `MarfaError.validation` with the code `invalid_transition`, and a view the
-    /// server does not have throws `MarfaError.notFound` with the code `item_not_found`.
+    /// throws `MarfaError.versionConflict`, and the copy keeps the view it held. A revoked view throws
+    /// `MarfaError.validation` with the code `invalid_transition`, and a view the server does not have throws
+    /// `MarfaError.notFound` with the code `item_not_found`.
     public func changeView(
         _ id: String, _ change: ViewSettingsChange, baseVersion: Int64, idempotencyKey: String? = nil
     ) async throws -> SavedView {

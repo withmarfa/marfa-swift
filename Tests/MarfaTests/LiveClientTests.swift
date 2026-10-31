@@ -83,17 +83,18 @@ extension LiveWorkingCopies {
             }
             #expect(try await stored() == "lucide:folder", "the author's icon shows before the owner chooses")
 
-            let set = try await api.set(icon: "lucide:book-open", forType: id)
-            #expect(set.value1.displayHints?.icon == "lucide:book-open")
+            let server = try #require(Live.server)
+            let set = try await server.setTypeIcon("lucide:book-open", ofType: id)
+            #expect(set == "lucide:book-open")
             #expect(try await stored() == "lucide:book-open", "a read of the type shows the owner's icon")
 
-            let brand = try await api.set(icon: "simple-icons:github", forType: id)
-            #expect(brand.value1.displayHints?.icon == "simple-icons:github", "a brand mark is an accepted icon")
-            _ = try await api.set(icon: "lucide:book-open", forType: id)
+            let brand = try await server.setTypeIcon("simple-icons:github", ofType: id)
+            #expect(brand == "simple-icons:github", "a brand mark is an accepted icon")
+            try await server.setTypeIcon("lucide:book-open", ofType: id)
 
             for refusedID in ["lucide:no-such-icon", "book-open", "no-such-set:github"] {
                 let refused = await #expect(throws: MarfaError.self) {
-                    try await api.set(icon: refusedID, forType: id)
+                    try await server.setTypeIcon(refusedID, ofType: id)
                 }
                 guard case .validation(let code, _)? = refused else {
                     Issue.record("expected a validation refusal for \(refusedID), got \(String(describing: refused))")
@@ -103,11 +104,11 @@ extension LiveWorkingCopies {
                 #expect(try await stored() == "lucide:book-open", "a refused ID changes nothing")
             }
 
-            let cleared = try await api.clearIcon(ofType: id)
-            #expect(cleared.value1.displayHints?.icon == "lucide:folder")
+            let cleared = try await server.setTypeIcon(nil, ofType: id)
+            #expect(cleared == "lucide:folder")
             #expect(try await stored() == "lucide:folder", "clearing brings the author's icon back")
             #expect(
-                try await api.clearIcon(ofType: id).value1.displayHints?.icon == "lucide:folder",
+                try await server.setTypeIcon(nil, ofType: id) == "lucide:folder",
                 "clearing twice is fine")
 
             try await api.delete(itemType: id)

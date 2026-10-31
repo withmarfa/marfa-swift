@@ -254,7 +254,6 @@ const copyTags = new Set([
 ]);
 // What the server answers from those areas and a copy does not hold.
 const serverOnly = new Set([
-  "listItemVersions",
   "getItemStats",
   "listOccurrences",
   "getItemMetadata",
@@ -268,6 +267,8 @@ const serverOnly = new Set([
 const bulkWrites = new Set(["applyBulkAction"]);
 // A copy uploads a blob's bytes and fetches them itself.
 const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
+// `Server` in the Marfa module makes these itself, so an app has one way to call each.
+const serverCalls = new Set(["listItemVersions", "getConfig", "updateConfig", "setTypeIcon", "clearTypeIcon"]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 
 function* operations(document) {
@@ -276,8 +277,8 @@ function* operations(document) {
       if (item[method]?.operationId) yield { path, method, operation: item[method] };
 }
 
-// The operations the client makes: those an app's key or access token may call, less a connector's and what
-// a working copy does.
+// The operations the client makes: those an app's key or access token may call, less a connector's, what
+// a working copy does and what `Server` calls.
 export function clientOperations(document) {
   const kept = [];
   for (const { operation } of operations(document)) {
@@ -288,6 +289,7 @@ export function clientOperations(document) {
     if (tags.some((tag) => copyTags.has(tag)) && !serverOnly.has(operation.operationId)) continue;
     if (bulkWrites.has(operation.operationId)) continue;
     if (copyBlobs.has(operation.operationId)) continue;
+    if (serverCalls.has(operation.operationId)) continue;
     kept.push(operation.operationId);
   }
   return kept.sort();
@@ -363,8 +365,9 @@ function publish(output, destination) {
 const clientSummary = `/// The server's own operations, for what only the server can do.
 ///
 /// Make one with \`Client(_:)\` from a \`Server\`. A working copy answers items, edges, search, folders and
-/// views, offline; this client calls the server for the rest, such as registering a type, reading an item's
-/// versions or managing keys, and needs a connection for each call. Every call throws \`MarfaError\`.
+/// views, offline, and \`Server\` reads an item's versions, reads and updates the server's settings and sets a
+/// type's icon; this client calls the server for the rest, such as registering a type or managing keys, and needs
+/// a connection for each call. Every call throws \`MarfaError\`.
 `;
 
 export function generate(binary, source, destination, clientDestination) {

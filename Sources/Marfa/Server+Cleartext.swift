@@ -1,46 +1,16 @@
 import Foundation
-import Synchronization
-
-/// What an app tells a person whose key is about to travel over plain http to another host.
-///
-/// The package shows nothing itself. An app shows `title` and `message` in its own alert, once.
-public struct PlainHTTPNotice: Sendable, Hashable, Identifiable {
-    /// The scheme, host and port the key is sent to, and nothing else of the address.
-    public let origin: String
-
-    public var id: String { origin }
-
-    public var title: String { "This connection is not encrypted" }
-
-    public var message: String {
-        "Your key is sent to \(origin) over plain http, so anyone on the network can read it. "
-            + "Use an https address unless this network is private and you meant this."
-    }
-}
 
 extension Server {
-    /// Whether the address is plain http on a host other than this machine, so a key sent to it can be read on
-    /// the way.
+    /// The origin of the address when it is plain http to a host other than this machine, so a key sent to it can
+    /// be read on the way, and `nil` for `https` and for the machine itself.
     ///
-    /// The rule is the command line's. `https`, `localhost`, any address in `127.0.0.0/8` and `::1` are not; every
-    /// other host name and address is, including an IPv4-mapped IPv6 address such as `::ffff:127.0.0.1`.
-    public var isPlainHTTPToAnotherHost: Bool {
-        plainHTTPOrigin != nil
-    }
-
-    /// The notice for this address the first time any server with the same origin asks in this process, and `nil`
-    /// every time after, for `https`, and for the machine itself.
+    /// The origin is the scheme, host and port, as the command line names it in its warning, and nothing else of
+    /// the address. An app that warns a person shows it, once for each origin if it chooses: the package holds no
+    /// state and writes no words.
     ///
-    /// Call it where the app first opens a copy or signs in on the server, and show what it returns.
-    public func takePlainHTTPNotice() -> PlainHTTPNotice? {
-        guard let origin = plainHTTPOrigin, Self.noticed.withLock({ $0.insert(origin).inserted }) else { return nil }
-        return PlainHTTPNotice(origin: origin)
-    }
-
-    private static let noticed = Mutex<Set<String>>([])
-
-    /// The origin of a plain http address on another host, as the command line names it in its warning.
-    private var plainHTTPOrigin: String? {
+    /// The rule is the command line's. `https`, `localhost`, any address in `127.0.0.0/8` and `::1` have none; every
+    /// other host name and address does, including an IPv4-mapped IPv6 address such as `::ffff:127.0.0.1`.
+    public var plainHTTPOrigin: String? {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
             components.scheme?.lowercased() == "http", var host = components.host?.lowercased(), !host.isEmpty
         else { return nil }

@@ -49,6 +49,18 @@ struct SearchOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func theExcerptReadsAsRunsWithTheMatchMarkedAndTheTextUnescaped(kind: CopyKind) async throws {
+        let held = try await Self.open(kind)
+        let hit = try #require(try await held.copy.search("quiet landscape").first)
+        #expect(hit.snippet.contains("&lt;b&gt;"), "the snippet stays the HTML the copy wrote")
+        let runs = hit.excerpt.runs
+        #expect(runs.filter(\.isMatch).map(\.text).joined(separator: "|").lowercased().contains("quiet"))
+        #expect(hit.excerpt.text.contains("<b>& more</b>"), "escapes read as the characters")
+        #expect(!hit.excerpt.text.contains("<mark>"))
+        await held.copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func aWordIsMatchedByItsStemAndTheLastWordAsAPrefix(kind: CopyKind) async throws {
         let held = try await Self.open(kind)
         #expect(Set(held.titled(try await held.copy.search("run"))) == ["Morning run", "Runner"])
