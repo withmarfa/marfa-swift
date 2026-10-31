@@ -187,11 +187,11 @@ Image(typeIcon: type.icon)     // where a view needs an Image
 
 Apple apps draw SF Symbols, so `TypeIcon` uses the SF Symbol that stands for a `lucide:` ID. For an ID with no good match it draws Lucide's own artwork, shipped in the package as a template image. Both tint with `foregroundStyle`, follow light and dark appearance, and size with the surrounding font. A type with no icon draws a fallback symbol, and so does an ID this version of the package cannot draw: a bare name, an unknown set, an unknown name, or a `simple-icons:` ID in an app that has not added `MarfaBrandIcons`. None of them fails; a server newer than the SDK can send an ID the SDK does not know.
 
-`MarfaAPI` sets and clears the owner's icon, and answers the type as the server now reads it, so your app can draw the new icon at once:
+`Server` sets and clears the owner's icon, and answers the icon the server now reads for the type, so your app can draw it at once:
 
 ```swift
-let type = try await api.set(icon: "lucide:scale", forType: "app.example.decision")
-_ = try await api.clearIcon(ofType: "app.example.decision")
+let icon = try await server.setTypeIcon("lucide:scale", ofType: "app.example.decision")
+try await server.setTypeIcon(nil, ofType: "app.example.decision")
 ```
 
 Either call needs the `schema.write` permission and write on the type, and works on a type Marfa ships as well as your own. The server refuses an ID that is not in a pinned set, a bare name included, with `MarfaError.validation` and the code `invalid_schema`. Clearing a type that has no owner icon succeeds and changes nothing.
@@ -217,7 +217,7 @@ Registering is how `TypeIcon` finds the artwork without `MarfaIcons` depending o
 
 `Sources/MarfaIcons/LucideSymbols.swift` maps each `lucide:` ID to an SF Symbol. It was seeded from [rosetta-icons](https://github.com/arfct/rosetta-icons) and then checked by hand, with the two glyphs side by side; a pair that is close but says something else is left out. `scripts/icons.mjs` reads the icon lists marfa generates at the pinned commit, `icon-set-lucide.json` and `icon-set-simple-icons.json`, and ships the SVG from the `@iconify-json/lucide` and `@iconify-json/simple-icons` releases they name: for every Lucide icon the table leaves out, and for every brand mark. It also writes `LucideIconSet` and `SimpleIconsIconSet`, so the table, the artwork and the lists share one pin. Tests fail when the table names an icon the pinned list lacks, when a symbol does not exist on the SDK, when an icon has neither a symbol nor artwork, when a file of artwork is from another release than its list names, or, with `MARFA_MONOREPO` set to the checkout at the pin, when a list differs from the one marfa generates. Edit the table, then run `scripts/icons.mjs` after `scripts/core.sh`. Licenses are in [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md).
 
-To let a person choose an icon, offer `LucideIconSet.ids`, and `MarfaBrandIcons.ids` when the app links it: the IDs the server accepts at the pinned releases. Draw each with `TypeIcon(id:)`; `Client.set(icon:forType:)` saves the choice.
+To let a person choose an icon, offer `LucideIconSet.ids`, and `MarfaBrandIcons.ids` when the app links it: the IDs the server accepts at the pinned releases. Draw each with `TypeIcon(id:)`; `Server.setTypeIcon(_:ofType:)` saves the choice.
 
 ## Test and preview
 
