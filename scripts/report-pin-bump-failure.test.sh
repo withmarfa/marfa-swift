@@ -40,7 +40,7 @@ chmod +x "${bin}/gh"
 run() {
   : >"${bin}/log"
   (PATH="${bin}:${PATH}" FAKE_GH_LOG="${bin}/log" GH_TOKEN=x GITHUB_REPOSITORY=example/repository \
-    GITHUB_WORKFLOW="Bump the core pin" GITHUB_RUN_ID=42 GITHUB_SHA=abc MARFA_HEAD=def "$@" "${report}" >/dev/null 2>&1) &&
+    GITHUB_WORKFLOW="Bump the core pin" GITHUB_RUN_ID=42 GITHUB_SHA=abc MARFA_RELEASE='v1.2.3 (def)' "$@" "${report}" >/dev/null 2>&1) &&
     echo ok || echo failed
 }
 title="Nightly failed: Bump the core pin"
@@ -56,6 +56,6 @@ check "an issue of another title is not the one" "$(run env FAKE_TITLE=Something
 check "it opens its own" "$(grep -cF 'issue create' "${bin}/log")" 1
 check "an issue that cannot be opened fails the report" "$(run env FAKE_TITLE=none FAKE_OPEN=0 "FAKE_FAIL=issue create")" failed
 check "a comment that cannot be made fails the report" "$(run env "FAKE_TITLE=${title}" FAKE_OPEN=7 "FAKE_FAIL=issue comment")" failed
-check "a missing marfa commit fails the report" "$(run env -u MARFA_HEAD FAKE_TITLE=none)" failed
+check "a missing marfa release fails the report" "$(run env -u MARFA_RELEASE FAKE_TITLE=none)" failed
 
 exit "${failed}"
