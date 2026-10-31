@@ -301,16 +301,7 @@ extension InMemoryCore {
     func createEdge(draft: EdgeDraft) throws -> QueuedWrite {
         try Properties.cross(draft.properties)
         return try state.withLock { state in
-            if let id = draft.id, !Minted.isID(id) {
-                throw Refuse.validation("invalid_id", "Invalid id: \"\(id)\" is not a UUIDv7 in lowercase")
-            }
-            try Self.refuseSelfLoop(draft.sourceId, draft.targetId)
-            try Properties.keptAsWritten(draft.properties)
-            guard state.items[draft.sourceId] != nil else {
-                throw Refuse.invalid(
-                    "\(draft.sourceId) is not a row this copy holds, and \(draft.edgeType) is not an edge type its slice holds whole, so the copy cannot hold an edge from it"
-                )
-            }
+            try Self.refuseUnqueueable(draft, in: state)
             let id = draft.id ?? Minted.id()
             let body = JsonObject(members: [
                 .init(key: "id", value: .string(id)), .init(key: "source_id", value: .string(draft.sourceId)),
@@ -400,7 +391,7 @@ extension InMemoryCore {
         }
     }
 
-    private static func refuseSelfLoop(_ source: String, _ target: String) throws {
+    static func refuseSelfLoop(_ source: String, _ target: String) throws {
         guard source != target else {
             throw Refuse.validation("edge_cycle", "an edge from \(source) to itself closes a cycle")
         }
