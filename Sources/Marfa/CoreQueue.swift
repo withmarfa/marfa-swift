@@ -144,8 +144,8 @@ final class CoreQueue: Sendable {
     }
 
     private func dispatch(_ job: Pending) {
-        // `enforceQoS`: a block otherwise takes the lower of its queue's class and the class of the thread that
-        // submitted it, which would run the job below the floor, or at a finished job's class.
+        // `enforceQoS`: a block submitted from a thread of a higher class, such as a finished job's, otherwise runs at
+        // that class instead of its own.
         let item = DispatchWorkItem(
             qos: DispatchQoS(qosClass: Self.qos(job.priority), relativePriority: 0), flags: .enforceQoS
         ) {
