@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 import Observation
 import Synchronization
 

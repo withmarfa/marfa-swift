@@ -26,7 +26,7 @@ struct ReadBench {
         }
         print("seeded \(count) notes in \(ContinuousClock.now - seeding)")
 
-        let filters = ListFilters(allStates: true)
+        let filters = Marfa.ListFilters(allStates: true)
         let listed = try await copy.items.list(filters)
         #expect(listed.count == count)
         let list = try await Self.timed { _ = try await copy.items.list(filters) }
@@ -34,7 +34,7 @@ struct ReadBench {
         let packed = Listing(items: listed.rows, completeness: listed.completeness)
         let decode = try await Self.timed { _ = try packed.answer }
 
-        let ids = listed.prefix(1_000).map(\.id)
+        let ids = listed.rows.prefix(1_000).map(\.id)
         let batch = try await Self.timed { _ = try await copy.items.get(ids) }
         let links = try await Self.timed { _ = try await copy.items.links(in: ids) }
 

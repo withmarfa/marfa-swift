@@ -19,7 +19,7 @@ import Testing
 
     private func read(_ settings: JSONObject = Self.settings) throws -> SavedView {
         try SavedView(
-            MarfaCore.ViewRow(id: "view", version: 4, state: .active, settings: settings))
+            MarfaCore.ViewRow(id: "view", version: 4, state: .active, settings: settings.core))
     }
 
     @Test func aViewKeepsItsQuerySortAndGroup() throws {
@@ -117,19 +117,20 @@ final class FillingCore: Core, @unchecked Sendable {
 
     override func heldHandle() -> MarfaCore.Handle { .writer }
 
-    static let item = Item(
-        id: "i", type: "core.task", properties: [:], state: .active, tier: .library, version: 1, schemaVersion: 1,
+    static let item = MarfaCore.Item(
+        id: "i", type: "core.task", properties: MarfaCore.JsonObject(members: []), state: .active, tier: .library,
+        version: 1, schemaVersion: 1,
         source: "test", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "", tags: [])
 
-    override func list(filters: ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
+    override func list(filters: MarfaCore.ListFilters, sort: MarfaCore.Sort?) throws -> MarfaCore.Listing {
         Listing(items: [Self.item], completeness: completeness)
     }
 
-    override func search(query: String, filters: SearchFilters, limit: UInt32) throws -> MarfaCore.Found {
-        Found(hits: [SearchHit(item: Self.item, score: 1, snippet: "")], completeness: completeness)
+    override func search(query: String, filters: MarfaCore.SearchFilters, limit: UInt32) throws -> MarfaCore.Found {
+        Found(hits: [MarfaCore.SearchHit(item: Self.item, score: 1, snippet: "")], completeness: completeness)
     }
 
-    override func get(id: String) throws -> Item? {
+    override func get(id: String) throws -> MarfaCore.Item? {
         if id == Self.item.id { return Self.item }
         if completeness == .partial { throw MarfaCore.MarfaError.HydrationIncomplete(message: "still filling") }
         return nil
@@ -138,9 +139,9 @@ final class FillingCore: Core, @unchecked Sendable {
     override func listViews() throws -> MarfaCore.Views {
         Views(
             views: [
-                ViewRow(
+                MarfaCore.ViewRow(
                     id: "v", version: 1, state: .active,
-                    settings: ["title": "t"])
+                    settings: MarfaCore.JsonObject(members: [MarfaCore.JsonMember(key: "title", value: .string("t"))]))
             ], completeness: completeness)
     }
 
@@ -151,20 +152,20 @@ final class FillingCore: Core, @unchecked Sendable {
     }
 
     override func searchInView(query: String, id: String, limit: UInt32) throws -> MarfaCore.Found {
-        Found(hits: [SearchHit(item: Self.item, score: 1, snippet: "")], completeness: completeness)
+        Found(hits: [MarfaCore.SearchHit(item: Self.item, score: 1, snippet: "")], completeness: completeness)
     }
 
     override func viewGroups(id: String, timeZone: String?) throws -> MarfaCore.ViewGroups {
-        ViewGroups(groups: [ViewGroup(key: .null, count: 1)], completeness: completeness)
+        ViewGroups(groups: [MarfaCore.ViewGroup(key: .null, count: 1)], completeness: completeness)
     }
 }
 
 @Suite(.timeLimit(.minutes(1))) struct ReadsOfAFillingCopy {
-    private static func shape<Row>(_ rows: Rows<Row>) -> (count: Int, Completeness) {
+    private static func shape<Row>(_ rows: Rows<Row>) -> (count: Int, Marfa.Completeness) {
         (rows.count, rows.completeness)
     }
 
-    private static let reads: [(String, @Sendable (WorkingCopy) async throws -> (count: Int, Completeness))] = [
+    private static let reads: [(String, @Sendable (WorkingCopy) async throws -> (count: Int, Marfa.Completeness))] = [
         ("items.list", { shape(try await $0.items.list()) }),
         ("search", { shape(try await $0.search("x")) }),
         ("items.views", { shape(try await $0.items.views()) }),
@@ -210,7 +211,7 @@ final class FillingCore: Core, @unchecked Sendable {
         } throws: { error in
             if case .hydrationIncomplete = error as? Marfa.MarfaError { true } else { false }
         }
-        #expect(try await copy.items.get("i") == FillingCore.item)
+        #expect(try await copy.items.get("i") == Marfa.Item(FillingCore.item))
         let whole = WorkingCopy(holder: CoreHolder(FillingCore(.complete)), hasServer: false)
         #expect(try await whole.items.get("not-yet") == nil)
         await copy.close()
@@ -219,13 +220,13 @@ final class FillingCore: Core, @unchecked Sendable {
 
     @MainActor @Test func aLiveQueryShowsTheCompletenessOfItsLastRead() async throws {
         let copy = WorkingCopy(holder: CoreHolder(FillingCore(.partial)), hasServer: false)
-        let query = LiveQuery(copy, reading: Reading<Rows<Item>>.list())
+        let query = LiveQuery(copy, reading: Reading<Rows<Marfa.Item>>.list())
         #expect(query.value.isEmpty && query.value.completeness == .partial, "nothing is read yet")
         await query.refresh()
         #expect(query.value.count == 1 && query.value.completeness == .partial)
 
         let whole = WorkingCopy(holder: CoreHolder(FillingCore(.complete)), hasServer: false)
-        let settled = LiveQuery(whole, reading: Reading<Rows<Item>>.list())
+        let settled = LiveQuery(whole, reading: Reading<Rows<Marfa.Item>>.list())
         await settled.refresh()
         #expect(settled.value.count == 1 && settled.value.completeness == .complete)
         await copy.close()

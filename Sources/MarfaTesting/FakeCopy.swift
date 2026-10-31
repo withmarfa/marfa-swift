@@ -171,22 +171,25 @@ extension WorkingCopy {
     ///   - edgeTypes: The edge types its catalog holds.
     ///   - views: The saved views it holds, each as an item of type `system.view` at the version given.
     public static func fake(
-        items: [Item] = [], edges: [Edge] = [], itemTypes: [Marfa.ItemType] = [], edgeTypes: [Marfa.EdgeType] = [],
+        items: [Marfa.Item] = [], edges: [Marfa.Edge] = [], itemTypes: [Marfa.ItemType] = [],
+        edgeTypes: [Marfa.EdgeType] = [],
         views: [SavedView] = []
     ) -> FakeCopy {
         FakeCopy(
             core: InMemoryCore(
-                items: items + views.map(\.held), edges: edges, itemTypes: itemTypes.map(\.held),
+                items: items.map(\.core) + views.map(\.held), edges: edges.map(\.core),
+                itemTypes: itemTypes.map(\.held),
                 edgeTypes: edgeTypes.map(\.held)))
     }
 }
 
 extension SavedView {
-    fileprivate var held: Item {
+    fileprivate var held: MarfaCore.Item {
         let at = Minted.now()
-        let properties = Properties.served(settings.json)
-        return Item(
-            id: id, type: InMemoryCore.viewType, properties: properties, state: state, tier: .library, version: version,
+        let properties = Properties.served(settings.json.core)
+        return MarfaCore.Item(
+            id: id, type: InMemoryCore.viewType, properties: properties, state: state.core, tier: .library,
+            version: version,
             schemaVersion: 1, source: "device", sourceId: nil, occurredAt: at, createdAt: at, updatedAt: at, tags: [],
             title: Properties.string(properties, "title"), body: nil)
     }
@@ -205,7 +208,7 @@ extension Marfa.TypeField {
     fileprivate var held: MarfaCore.TypeField {
         MarfaCore.TypeField(
             name: name, fieldType: type, required: required, description: description, declaredBy: declaredBy,
-            definition: definition)
+            definition: definition.core)
     }
 }
 

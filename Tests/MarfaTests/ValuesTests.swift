@@ -239,9 +239,10 @@ struct OwnValueTypes {
             fileCache: FileCache(
                 setting: .bytes(bytes: 5), budget: 5, held: 3, heldUnreadable: nil, volumeUnreadable: true,
                 backupMarkFailure: "no",
-                attachments: Attachments(
+                attachments: KeptAttachments(
                     held: 1, heldBytes: 2, partialBytes: 3, notHeld: 4, notHeldBytes: 5,
-                    notHeldByReason: [NotHeld(reason: .rateLimited, attachments: 4, bytes: 5, unstated: 1)])))
+                    notHeldByReason: [NotHeldAttachments(reason: .rateLimited, attachments: 4, bytes: 5, unstated: 1)]))
+        )
         #expect(Marfa.Status(status.core) == status)
         let unheld = Marfa.Status(hydration: .never)
         #expect(Marfa.Status(unheld.core).catalogVersion == nil)
@@ -255,7 +256,7 @@ struct CatalogTypes {
     static func field(_ name: String, declaredBy: String, definition: JSONObject) -> MarfaCore.TypeField {
         MarfaCore.TypeField(
             name: name, fieldType: "string", required: true, description: "d", declaredBy: declaredBy,
-            definition: definition)
+            definition: definition.core)
     }
 
     @Test func anItemTypeArrivesWithEachFieldAndWhereItIsDeclared() {

@@ -701,7 +701,8 @@ struct ARefill {
             $0.hydrateFailsFirst = 1
         }
         let clock = ManualClock()
-        let copy = Self.copy(core, pace: .init(first: .seconds(1), most: .seconds(1), settle: .seconds(5)), clock: clock)
+        let copy = Self.copy(
+            core, pace: .init(first: .seconds(1), most: .seconds(1), settle: .seconds(5)), clock: clock)
         let heard = Heard(copy.changes())
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first attempt failed") { heard.all == [refreshed(.unfinished)] }

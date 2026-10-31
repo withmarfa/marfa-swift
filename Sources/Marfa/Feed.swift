@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// The streams `changes()` hands out.

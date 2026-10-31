@@ -1,4 +1,4 @@
-import MarfaCore
+package import MarfaCore
 
 extension JSONObject {
     /// A key by its bytes, as the core and the server tell keys apart: two

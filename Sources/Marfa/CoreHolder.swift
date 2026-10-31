@@ -1,4 +1,4 @@
-import MarfaCore
+package import MarfaCore
 import Synchronization
 
 /// The one place a working copy and all its parts reach the core, so the copy

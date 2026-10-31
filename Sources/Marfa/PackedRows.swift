@@ -1,17 +1,22 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 
 /// A listing's items cross from the core packed into one buffer, because UniFFI's generated reader costs several
 /// microseconds a field-heavy record. The layout is the one `core/bindings/swift/src/packed.rs` in withmarfa/marfa
 /// states and writes; the `PackedListing` tests hold the bytes both sides agree on.
 extension MarfaCore.Listing {
     var answer: Rows<Item> {
-        get throws(MarfaError) { Rows(try PackedRows.items(rows), completeness: completeness) }
+        get throws(MarfaError) { Rows(try PackedRows.items(rows), completeness: Completeness(completeness)) }
     }
 
     /// A listing of `items`, packed as the core packs one, for a core written in Swift.
-    package init(items: [Item], completeness: Completeness) {
-        self.init(rows: PackedRows.pack(items), completeness: completeness)
+    package init(items: [Item], completeness: Marfa.Completeness) {
+        self.init(rows: PackedRows.pack(items), completeness: completeness.core)
+    }
+
+    /// The same for a core written in Swift that holds the core's own rows.
+    package init(items: [MarfaCore.Item], completeness: MarfaCore.Completeness) {
+        self.init(rows: PackedRows.pack(items.map(Item.init)), completeness: completeness)
     }
 }
 

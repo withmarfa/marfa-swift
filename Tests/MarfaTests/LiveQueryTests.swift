@@ -68,7 +68,7 @@ struct LiveQueries {
         try #require(try await copy.items.create(Draft(type: "app.test.entry", properties: properties)).itemId)
     }
 
-    static let entries = Reading<Rows<Item>>.list(ListFilters(type: "app.test.entry"))
+    static let entries = Reading<Rows<Marfa.Item>>.list(Marfa.ListFilters(type: "app.test.entry"))
 
     /// Once its first read has ended, so a change told next is one the query has a stream for.
     static func settled<Value>(_ query: LiveQuery<Value>) async throws {
@@ -209,8 +209,8 @@ struct LiveQueries {
     @Test func aSearchAnItemAndTheQueueAreReadings() async throws {
         let copy = try await Self.open()
         let id = try await Self.make(copy, ["title": "zebra crossing"])
-        let search = LiveQuery(copy, reading: Reading<Rows<Item>>.search("zebra"))
-        let item = LiveQuery(copy, reading: Reading<Item?>.item(id))
+        let search = LiveQuery(copy, reading: Reading<Rows<Marfa.Item>>.search("zebra"))
+        let item = LiveQuery(copy, reading: Reading<Marfa.Item?>.item(id))
         let queue = LiveQuery(copy, reading: Reading<[Marfa.QueuedWrite]>.queue)
         try await eventually("all three read") {
             search.value.map(\.id) == [id] && item.value?.id == id && queue.value.count == 1
@@ -379,7 +379,7 @@ struct LiveQueries {
 
         let reopened = try await PropertyValues.open(store)
         let query = LiveQuery(reopened, reading: Self.entries)
-        let torn = LiveQuery(reopened, reading: Reading<Item?>.item(ids[1]))
+        let torn = LiveQuery(reopened, reading: Reading<Marfa.Item?>.item(ids[1]))
         try await eventually("both read") { query.value.count == 2 && torn.value != nil }
         #expect(query.value.filter { $0.unreadableProperties != nil }.map(\.id) == [ids[1]])
         #expect(torn.value?.unreadableProperties != nil)
@@ -532,7 +532,7 @@ struct LiveQueries {
 
     @Test func aRealCopyIsLetGoOfWhenItsQueryIs() async throws {
         let copy = try await Self.open()
-        var query: LiveQuery<Rows<Item>>? = LiveQuery(copy, reading: Self.entries)
+        var query: LiveQuery<Rows<Marfa.Item>>? = LiveQuery(copy, reading: Self.entries)
         try await Self.settled(try #require(query))
         #expect(copy.feed.count == 1)
         query = nil

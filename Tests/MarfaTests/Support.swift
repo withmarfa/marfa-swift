@@ -158,7 +158,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var hydrateInPlace = false
         var hydration = MarfaCore.Hydration.complete
         var edgeWriteFails: MarfaCore.MarfaError?
-        var declarations: [JSONObject] = []
+        var declarations: [MarfaCore.JsonObject] = []
         var registrationRefusals: [MarfaCore.UnregisteredType] = []
         var replacedTypes: [String] = []
         var replacementRefusals: [MarfaCore.UnregisteredType] = []
@@ -318,11 +318,11 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
-    override func declareTypes(types: [JSONObject]) {
+    override func declareTypes(types: [MarfaCore.JsonObject]) {
         state.withLock { $0.declarations = types }
     }
 
-    override func declaredTypes() -> [JSONObject] {
+    override func declaredTypes() -> [MarfaCore.JsonObject] {
         state.withLock { $0.declarations }
     }
 
@@ -772,7 +772,6 @@ final class OwnServer: Sendable {
         return String(decoding: printed, as: UTF8.self)
     }
 }
-
 
 /// A clock that moves only when a test advances it, so a wait the code under test asks for is seen and ended
 /// by the test, not by the machine's speed.

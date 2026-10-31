@@ -1,5 +1,5 @@
 import Foundation
-import MarfaCore
+package import MarfaCore
 
 /// The item type and edge type definitions the copy holds, custom types included.
 ///
@@ -168,7 +168,7 @@ public struct TypeField: Sendable, Hashable, Identifiable {
     init(_ core: MarfaCore.TypeField) {
         self.init(
             name: core.name, type: core.fieldType, required: core.required, description: core.description,
-            declaredBy: core.declaredBy, definition: core.definition)
+            declaredBy: core.declaredBy, definition: JSONObject(core.definition))
     }
 }
 

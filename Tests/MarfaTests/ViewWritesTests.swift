@@ -7,10 +7,10 @@ import Testing
 @Suite(.timeLimit(.minutes(1))) struct ViewWritesOffline {
     @Test func settingsWrittenAreReadBackUnchanged() throws {
         let read = try SavedView(
-            MarfaCore.ViewRow(id: "view", version: 1, state: .active, settings: ViewsOffline.settings))
+            MarfaCore.ViewRow(id: "view", version: 1, state: .active, settings: ViewsOffline.settings.core))
         let sent = read.settings.json
         #expect(try Self.sorted(sent) == Self.sorted(ViewsOffline.settings), "the same settings, under the same keys")
-        let again = try SavedView(MarfaCore.ViewRow(id: "view", version: 1, state: .active, settings: sent))
+        let again = try SavedView(MarfaCore.ViewRow(id: "view", version: 1, state: .active, settings: sent.core))
         #expect(again.settings == read.settings)
     }
 

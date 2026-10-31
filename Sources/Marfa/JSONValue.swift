@@ -1,21 +1,65 @@
-import MarfaCore
-
-@_exported import struct MarfaCore.JsonMember
-@_exported import struct MarfaCore.JsonObject
-@_exported import enum MarfaCore.JsonValue
+package import MarfaCore
 
 /// One JSON value.
 ///
-/// The core's own value, the one properties, bodies and answers cross the
-/// binding as; its cases and their documentation are the core's. An integer
-/// is kept exact, where a `Double` holds integers exactly only up to 2^53; an
-/// integer beyond `Int64` arrives as the nearest `number`.
+/// An integer is kept exact, where a `Double` holds integers exactly only up to 2^53; an integer beyond `Int64`
+/// arrives as the nearest `number`.
 ///
 /// Marfa holds a number as a 64-bit float, so a write refuses, as
 /// `MarfaError.validation` with the code `invalid_properties`, an integer
 /// with 16 or more digits that it would serve back with other digits, such as
 /// `9007199254740993`. Send such a number as a string.
-public typealias JSONValue = MarfaCore.JsonValue
+public enum JSONValue: Sendable, Hashable {
+    case null
+    case bool(Bool)
+    case integer(Int64)
+    case number(Double)
+    case string(String)
+    case array([JSONValue])
+    case object(JSONObject)
+
+    package init(_ core: MarfaCore.JsonValue) {
+        switch core {
+        case .null: self = .null
+        case .bool(let value): self = .bool(value)
+        case .integer(let value): self = .integer(value)
+        case .number(let value): self = .number(value)
+        case .string(let value): self = .string(value)
+        case .array(let values): self = .array(values.map(JSONValue.init))
+        case .object(let object): self = .object(JSONObject(object))
+        }
+    }
+
+    package var core: MarfaCore.JsonValue {
+        switch self {
+        case .null: .null
+        case .bool(let value): .bool(value)
+        case .integer(let value): .integer(value)
+        case .number(let value): .number(value)
+        case .string(let value): .string(value)
+        case .array(let values): .array(values.map(\.core))
+        case .object(let object): .object(object.core)
+        }
+    }
+}
+
+/// One key of a ``JSONObject`` and its value.
+public struct JSONMember: Sendable, Hashable {
+    public var key: String
+    public var value: JSONValue
+
+    public init(key: String, value: JSONValue) {
+        self.key = key
+        self.value = value
+    }
+
+    package init(_ core: MarfaCore.JsonMember) {
+        key = core.key
+        value = JSONValue(core.value)
+    }
+
+    package var core: MarfaCore.JsonMember { MarfaCore.JsonMember(key: key, value: value.core) }
+}
 
 /// A JSON object that keeps its keys in order.
 ///
@@ -26,10 +70,19 @@ public typealias JSONValue = MarfaCore.JsonValue
 /// strings, so two keys that differ only in Unicode normalization compare
 /// equal, though a lookup tells them apart by their UTF-8 bytes, as the core
 /// and the server do.
-public typealias JSONObject = MarfaCore.JsonObject
+public struct JSONObject: Sendable, Hashable {
+    public var members: [JSONMember]
 
-/// One key of a ``JSONObject`` and its value.
-public typealias JSONMember = MarfaCore.JsonMember
+    public init(members: [JSONMember] = []) {
+        self.members = members
+    }
+
+    package init(_ core: MarfaCore.JsonObject) {
+        members = core.members.map(JSONMember.init)
+    }
+
+    package var core: MarfaCore.JsonObject { MarfaCore.JsonObject(members: members.map(\.core)) }
+}
 
 extension JSONValue {
     /// The deepest nesting of arrays and objects that ``init(json:)`` and
