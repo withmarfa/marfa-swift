@@ -383,7 +383,8 @@ public enum SortDirection: Sendable, Hashable, CaseIterable {
 /// How a list orders its rows.
 ///
 /// A half left out is the list's own: `createdAt` descending, or `updatedAt` ascending beside
-/// `ListFilters.updatedAfter`, which refuses another order.
+/// `ListFilters.updatedAfter`, which refuses another order. A list of the bin alone (`states: [.trashed]`) that
+/// names no field orders by `trashedAt`, newest first, and by `updatedAt` for a row with no `trashedAt`.
 public struct Sort: Sendable, Hashable {
     public var field: SortField?
     public var direction: SortDirection?

@@ -343,8 +343,8 @@ public struct ListFilters: Sendable, Hashable {
     public var types: Set<String>?
     /// The states to answer. `nil` is the active state alone, unless `allStates` is set.
     ///
-    /// An empty set is refused `validation_error`, and so is a set beside `allStates`. A search never matches
-    /// the bin, even where the set names it.
+    /// An empty set is refused `validation_error`, and so is a set beside `allStates`. `[.trashed]` lists the bin
+    /// from the copy, newest first unless a sort names a field.
     public var states: Set<ItemState>?
     public var allStates: Bool
     public var tier: Tier?
