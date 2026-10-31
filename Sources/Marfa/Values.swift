@@ -1,5 +1,5 @@
 import Foundation
-package import MarfaCore
+internal import MarfaCore
 
 /// Every way the core refuses or fails. `code` is the server's, where the
 /// server answered.

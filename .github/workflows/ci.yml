@@ -263,7 +263,8 @@ jobs:
           swift build 2>&1 | tee "${RUNNER_TEMP}/swift-build.log"
           # What the package writes by hand builds without a warning. The generated wire types are out of
           # this check: their warnings come from the pinned generator, and `scripts/core.sh` rewrites them.
-          if grep -E '^[^ ]+: warning: ' "${RUNNER_TEMP}/swift-build.log" | grep -v -e '/Sources/MarfaTypes/' -e '/Sources/MarfaAPI/Generated/'; then
+          # The build colors its diagnostics, which puts escape codes between the position and `warning:`.
+          if sed -E $'s/\x1b\\[[0-9;]*[A-Za-z]//g' "${RUNNER_TEMP}/swift-build.log" | grep -E '^[^ ]+: warning: ' | grep -v -e '/Sources/MarfaTypes/' -e '/Sources/MarfaAPI/Generated/'; then
             echo "::error::The package builds with warnings."
             exit 1
           fi

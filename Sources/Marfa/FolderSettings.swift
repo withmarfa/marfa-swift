@@ -1,5 +1,5 @@
 import Foundation
-package import MarfaCore
+internal import MarfaCore
 
 /// A `system.folder`: the query and defaults that folders on disk follow.
 public struct Folder: Sendable, Hashable, Identifiable {
