@@ -553,7 +553,7 @@ public struct Change: Sendable, Hashable {
         case drained
         case withdrawn
         /// Answered or refused writes left the queue, through `forgetAnswered()`,
-        /// `forgetAnswered(ids:)` or `discard(_:)`; read the queue again.
+        /// `forgetAnswered(ids:)`, `takeAnswered()` or `discard(_:)`; read the queue again.
         case forgotten
         case pinned
         case unpinned
@@ -1102,6 +1102,19 @@ public struct Queue: Sendable {
         let forgotten = try await holder.run { core in try core.forgetAnsweredIds(ids: ids) }
         announceForgotten(forgotten > 0)
         return forgotten
+    }
+
+    /// Clears what `forgetAnswered()` clears and returns each write it took, as ``all()`` showed it, in one step.
+    ///
+    /// An app that acts on answers takes them with this, rather than reading the queue and then forgetting: two
+    /// callers taking at once never both get one answer, and no answer is cleared without being returned. A refused
+    /// write that carried content stays, its `body` readable, until `discard(_:)`.
+    ///
+    /// Tells every held stream `.refreshed(.forgotten)` when it took a write, and nothing when it took none.
+    public func takeAnswered() async throws -> [QueuedWrite] {
+        let taken = try await holder.run { core in try core.takeAnswered().map(QueuedWrite.init) }
+        announceForgotten(!taken.isEmpty)
+        return taken
     }
 
     /// Takes a refused write, and the content it carried, out of the queue.

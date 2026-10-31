@@ -103,6 +103,7 @@ extension InMemoryCore {
         try Properties.cross(edit.properties)
         try Checks.links(edit.properties, call: "items.update")
         try Properties.keptAsWritten(edit.properties)
+        let cleared = try Self.cleared(edit.clearProperties, setting: edit.properties)
         if edit.clearOccurredAt && edit.occurredAt != nil {
             throw Refuse.invalid("an edit sets the item's time or clears it, not both")
         }
@@ -125,11 +126,24 @@ extension InMemoryCore {
                 )
             }
             if let type = edit.type { try Self.refuseRetypeBreakingEdges(of: id, to: type, in: state) }
+            // Judged on any version: whatever the server holds by then, the field ends up empty.
+            if let target = types[edit.type ?? held.type] {
+                let required = cleared.filter { name in
+                    target.fields.contains { $0.required && $0.name.isBytes(name) }
+                }
+                if !required.isEmpty {
+                    throw Refuse.validation(
+                        "invalid_properties", required.map { "\($0): Required" }.joined(separator: "; "))
+                }
+            }
             var body = JsonObject(members: [
                 JsonMember(key: "properties", value: .object(edit.properties)),
                 JsonMember(key: "version", value: .integer(base)),
             ])
             if edit.replaceProperties { body.members.append(.init(key: "properties_mode", value: .string("replace"))) }
+            if !cleared.isEmpty {
+                body.members.append(.init(key: "clear_properties", value: .array(cleared.map(JsonValue.string))))
+            }
             if let key = edit.sourceId { body.members.append(.init(key: "source_id", value: .string(key))) }
             if let retype {
                 body.members.append(.init(key: "type", value: .string(retype)))
@@ -161,7 +175,8 @@ extension InMemoryCore {
             // so it cannot know which properties it clears: it merges.
             let replacing = edit.replaceProperties && base == held.version
             let before = held.properties
-            held.properties = Properties.merged(held.properties, with: edit.properties, replacing: replacing)
+            held.properties = Properties.merged(
+                held.properties, with: edit.properties, replacing: replacing, clearing: cleared)
             // A status word is judged where the edit changes it, and a move changes every property.
             let written = retype == nil ? Self.changed(edit.properties, from: before) : held.properties
             if let target { try Checks.statusWord(written, of: target, call: "items.update") }
@@ -184,7 +199,7 @@ extension InMemoryCore {
             return state.append(
                 .updateItem, item: id, baseVersion: base, body: body, dependsOn: state.pendingCreates(of: id),
                 effect: .edit(
-                    properties: edit.properties, replacing: replacing, type: retype, tier: tier,
+                    properties: edit.properties, replacing: replacing, cleared: cleared, type: retype, tier: tier,
                     sourceId: edit.sourceId,
                     occurredAt: shownTime))
         }
@@ -427,6 +442,21 @@ extension InMemoryCore {
         JsonObject(members: written.members.filter { Properties.value(held, $0.key) != $0.value })
     }
 
+    /// The names an edit clears, once each in the order given, refused as the core refuses them: an empty name, and
+    /// one the same edit also sets.
+    private static func cleared(_ names: [String], setting properties: JsonObject) throws -> [String] {
+        var problems: [String] = []
+        if names.contains(where: \.isEmpty) { problems.append("clear_properties: A property name must not be empty") }
+        let both = names.filter { name in properties.members.contains { $0.key.isBytes(name) } }
+        if !both.isEmpty {
+            problems.append("A property can't be both set and cleared: \(both.joined(separator: ", "))")
+        }
+        if !problems.isEmpty { throw Refuse.validation("validation_error", problems.joined(separator: "; ")) }
+        var once: [String] = []
+        for name in names where !once.contains(where: { $0.isBytes(name) }) { once.append(name) }
+        return once
+    }
+
     private static func requireFields(of type: ItemType, in properties: JsonObject) throws {
         for field in type.fields where field.required && Properties.value(properties, field.name) == nil {
             throw Refuse.validation("invalid_properties", "\(field.name): Required field is missing")
@@ -565,9 +595,10 @@ extension InMemoryCore.State {
                     if taken { edge.version = 1 }
                     add(edge)
                 }
-            case .edit(let properties, let replacing, let type, let tier, let sourceId, let occurredAt):
+            case .edit(let properties, let replacing, let cleared, let type, let tier, let sourceId, let occurredAt):
                 guard let id = write.itemId, var row = items[id] else { continue }
-                row.properties = Properties.merged(row.properties, with: properties, replacing: replacing)
+                row.properties = Properties.merged(
+                    row.properties, with: properties, replacing: replacing, clearing: cleared)
                 if let type { row.type = type }
                 if let tier { row.tier = tier }
                 if let sourceId { row.sourceId = sourceId }
@@ -620,10 +651,12 @@ extension InMemoryCore.State {
                 }
             case .updateItem:
                 entries[at].write.body.members.removeAll { $0.key == "occurred_at" }
-                if case .edit(let properties, let replacing, let type, let tier, let sourceId, _) = entries[at].effect {
+                if case .edit(let properties, let replacing, let cleared, let type, let tier, let sourceId, _) =
+                    entries[at].effect
+                {
                     entries[at].effect = .edit(
-                        properties: properties, replacing: replacing, type: type, tier: tier, sourceId: sourceId,
-                        occurredAt: nil)
+                        properties: properties, replacing: replacing, cleared: cleared, type: type, tier: tier,
+                        sourceId: sourceId, occurredAt: nil)
                 }
             default: break
             }
