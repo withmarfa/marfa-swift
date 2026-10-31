@@ -62,7 +62,9 @@ struct Values {
         list.types = ["core.note", "core.task"]
         list.states = [.active, .archived]
         #expect(Marfa.ListFilters(list.core) == list)
-        #expect(list.core.types == ["core.note", "core.task"] && list.core.states == [.active, .archived], "in a fixed order")
+        #expect(
+            list.core.types == ["core.note", "core.task"] && list.core.states == [.active, .archived],
+            "in a fixed order")
         var search = Marfa.SearchFilters()
         search.types = ["core.note", "core.task"]
         #expect(Marfa.SearchFilters(search.core) == search)

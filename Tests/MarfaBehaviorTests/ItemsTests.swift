@@ -219,7 +219,8 @@ struct ItemsOffline {
         let before = try #require(
             try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == second }?.trashedAt)
         _ = try await copy.items.transition(second, to: .trashed)
-        #expect(try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == second }?.trashedAt == before)
+        #expect(
+            try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == second }?.trashedAt == before)
         _ = try await copy.items.restore(second)
         #expect(try await copy.items.get(second)?.trashedAt == nil)
         #expect(try await copy.items.list(ListFilters(allStates: true)).first { $0.id == second }?.trashedAt == nil)

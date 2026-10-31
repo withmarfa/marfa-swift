@@ -232,7 +232,8 @@ struct LiveQueries {
         let limited = LiveQuery(copy, reading: .list(ListFilters(types: ["app.test.entry"], limit: 1)))
         let oldestFirst = LiveQuery(
             copy,
-            reading: .list(ListFilters(types: ["app.test.entry"]), sort: Sort(field: .createdAt, direction: .ascending)))
+            reading: .list(ListFilters(types: ["app.test.entry"]), sort: Sort(field: .createdAt, direction: .ascending))
+        )
         try await eventually("both read") { limited.value.count == 1 && oldestFirst.value.count == 2 }
         #expect(oldestFirst.value.last?.id == second)
         await copy.close()

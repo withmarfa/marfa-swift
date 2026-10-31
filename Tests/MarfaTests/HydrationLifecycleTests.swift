@@ -245,7 +245,9 @@ struct HydrationLifecycle {
         script.set("/events", [.stream(cursor: "60", instance: "another")])
         await #expect(
             performing: { _ = try await copy.hydrate(types: ["*"], tier: .library, inPlaceOnly: true) },
-            throws: Self.refused("instance_changed"))
+            throws: { error in
+                if case .instanceChanged? = error as? MarfaError { true } else { false }
+            })
         #expect(try await copy.queue.all().map(\.id) == queued, "the refusal changed the queue")
 
         // Hydrating afresh builds the copy from the other instance and holds the writes queued before it.

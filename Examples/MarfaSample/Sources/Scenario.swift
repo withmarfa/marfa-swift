@@ -175,7 +175,8 @@ enum Scenario {
         first: String, kept: String, in copy: WorkingCopy, _ expect: (Bool, String) -> Void
     ) async throws {
         let notes = try await copy.search("offline", filters: SearchFilters(types: ["core.note"]))
-        let favorites = try await copy.search("offline", filters: SearchFilters(types: ["core.note"], tags: ["favorite"]))
+        let favorites = try await copy.search(
+            "offline", filters: SearchFilters(types: ["core.note"], tags: ["favorite"]))
         let titles = { (hits: Rows<SearchHit>) in hits.map { $0.item.title ?? "-" } }
         print("searched for offline: \(titles(notes)), narrowed to favorites: \(titles(favorites))")
         expect(Set([first, kept]).isSubset(of: Set(notes.map(\.item.id))), "a search of the notes did not find both")
