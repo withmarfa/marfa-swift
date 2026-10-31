@@ -262,13 +262,20 @@ public struct Edit: Sendable, Hashable {
     /// Whole field values; a device never merges inside a field.
     ///
     /// Unless `replaceProperties` is set, each property given replaces its value and the rest stay, and a `null`
-    /// clears nothing: the server drops it, and so does the copy, so the property keeps its value.
+    /// clears nothing: the server drops it, and so does the copy, so the property keeps its value. To remove a
+    /// property, name it in `clearProperties`.
     public var properties: JSONObject
     /// The properties are the item's whole properties: one left out is cleared.
     ///
     /// Sent at a version older than the one the copy holds, through ``Items/updateAsRead(_:_:)``, it is merged as a
     /// merge is.
     public var replaceProperties: Bool
+    /// The properties to remove from the item.
+    ///
+    /// Every other property stays as the item holds it, one the app cannot read included, so a removal needs no
+    /// `replaceProperties`. A name the item lacks is not an error. A name also in `properties`, an empty name, or a
+    /// field the item's type requires is refused before anything is queued.
+    public var clearProperties: Set<String>
     /// The version the change was made against.
     public var baseVersion: Int64
     /// The natural key to move the row to.
@@ -287,11 +294,13 @@ public struct Edit: Sendable, Hashable {
     public var clearOccurredAt: Bool
 
     public init(
-        properties: JSONObject = [:], replaceProperties: Bool = false, baseVersion: Int64, sourceId: String? = nil,
-        type: String? = nil, tier: Tier? = nil, occurredAt: String? = nil, clearOccurredAt: Bool = false
+        properties: JSONObject = [:], replaceProperties: Bool = false, clearProperties: Set<String> = [],
+        baseVersion: Int64, sourceId: String? = nil, type: String? = nil, tier: Tier? = nil, occurredAt: String? = nil,
+        clearOccurredAt: Bool = false
     ) {
         self.properties = properties
         self.replaceProperties = replaceProperties
+        self.clearProperties = clearProperties
         self.baseVersion = baseVersion
         self.sourceId = sourceId
         self.type = type
@@ -303,6 +312,7 @@ public struct Edit: Sendable, Hashable {
     package init(_ core: MarfaCore.Edit) {
         properties = JSONObject(core.properties)
         replaceProperties = core.replaceProperties
+        clearProperties = Set(core.clearProperties)
         baseVersion = core.baseVersion
         sourceId = core.sourceId
         type = core.type
@@ -315,6 +325,8 @@ public struct Edit: Sendable, Hashable {
         MarfaCore.Edit(
             properties: properties.core,
             replaceProperties: replaceProperties,
+            // Sorted, so one edit always sends the same body.
+            clearProperties: clearProperties.sorted(),
             baseVersion: baseVersion,
             sourceId: sourceId,
             type: type,
