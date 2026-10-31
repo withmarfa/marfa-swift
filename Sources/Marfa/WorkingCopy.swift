@@ -1026,8 +1026,9 @@ public struct Queue: Sendable {
     /// Sends what the queue holds once, and records each verdict.
     ///
     /// A held `changes()` stream also drains once when its server is back,
-    /// and once after a drain left a write undelivered; otherwise nothing
-    /// drains on its own.
+    /// and once after a drain left a write undelivered. A held `updates()`
+    /// sequence also drains again, while the copy follows, after a drain
+    /// left a write undelivered. Otherwise nothing drains on its own.
     public func drain() async throws -> DrainReport {
         do {
             let report = try await drainQueue(holder, feed)

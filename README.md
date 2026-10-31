@@ -98,7 +98,7 @@ While the copy follows, writes left undelivered by a drain are sent again on the
 
 ## Fill a large library
 
-Use `hydrate(types: ["*"], tier: .all)` for every type except `system.*`. Add a system type explicitly when needed, such as `["*", "system.view"]` for saved views. During a fill, `update.fill` on `updates()` tells `itemsListed` and `itemsExpected` as they change, at most twice a second, or compare `status().itemsListed` with `itemsExpected` yourself when both are available; `items` also includes pinned rows and local creates.
+Use `hydrate(types: ["*"], tier: .all)` for every type except `system.*`. Add a system type explicitly when needed, such as `["*", "system.view"]` for saved views. During a fill, `update.fill` on `updates()` tells `listed` and `expected` as they change, at most twice a second, or compare `status().itemsListed` with `itemsExpected` yourself when both are available; `items` also includes pinned rows and local creates.
 
 Lists and searches return `Rows`, with `.complete`, `.partial` or `.stale` completeness. Read the rows as a collection, or use `.rows` when an API requires an array. Saved-view reads carry completeness too, including `LiveQuery<Rows<ViewGroup>>` for groups.
 
