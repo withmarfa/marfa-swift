@@ -61,9 +61,9 @@ final class CoreHolder: Sendable {
         }
     }
 
-    /// Runs `work` off the caller's thread against the core.
+    /// Runs `work` off the caller's thread against the core, on ``CoreQueue/calls`` at the caller's priority.
     func run<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
-        try await background { [self] in try with(work) }
+        try await CoreQueue.calls.run { [self] in try with(work) }
     }
 
     func runUntilCanceled<T: Sendable>(

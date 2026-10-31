@@ -26,12 +26,12 @@ public final class WorkingCopy: Sendable {
 
     init(
         holder: CoreHolder, hasServer: Bool, refillPace: Feed.RefillPace = .standard,
-        instanceAt: @escaping Feed.InstanceAt = Feed.instanceAt
+        refillClock: Feed.RefillClock = .continuous, instanceAt: @escaping Feed.InstanceAt = Feed.instanceAt
     ) {
         self.holder = holder
         feed = Feed(
             holder: holder, watched: hasServer || holder.handle == .reader, refillPace: refillPace,
-            instanceAt: instanceAt)
+            clock: refillClock, instanceAt: instanceAt)
         items = Items(holder: holder, feed: feed)
         edges = Edges(holder: holder, feed: feed)
         tags = Tags(holder: holder, feed: feed)
@@ -1023,30 +1023,10 @@ func queued(
     return written
 }
 
+/// Runs blocking work that is not a call into the open core, such as a network request, a keychain read or opening
+/// a store, on ``CoreQueue/blocking``.
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-    let job = Job(work)
-    return try await withCheckedThrowingContinuation { continuation in
-        DispatchQueue.global(qos: .userInitiated).async {
-            continuation.resume(with: job.run())
-        }
-    }
-}
-
-/// Releases the work before the caller resumes, so nothing it captured still
-/// holds the core, and with it the store, once the call has returned.
-private final class Job<T: Sendable>: Sendable {
-    private let work: Mutex<(@Sendable () throws -> T)?>
-
-    init(_ work: @escaping @Sendable () throws -> T) {
-        self.work = Mutex(work)
-    }
-
-    func run() -> Result<T, any Error> {
-        guard let work = self.work.withLock({ $0.take() }) else {
-            preconditionFailure("a job runs once")
-        }
-        return Result { try translated(work) }
-    }
+    try await CoreQueue.blocking.run(work)
 }
 
 func translated<T>(_ work: () throws -> T) throws -> T {
