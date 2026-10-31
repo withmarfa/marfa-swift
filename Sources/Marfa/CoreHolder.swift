@@ -61,9 +61,15 @@ final class CoreHolder: Sendable {
         }
     }
 
-    /// Runs `work` off the caller's thread against the core, on ``CoreQueue/calls`` at the caller's priority.
+    /// Runs `work` off the caller's thread against the core, on ``CoreQueue/calls`` at the caller's priority, never below utility.
     func run<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
         try await CoreQueue.calls.run { [self] in try with(work) }
+    }
+
+    /// Runs `work` as ``run(_:)`` does, on ``CoreQueue/blocking``, for a call that can wait on the server, so a few
+    /// slow transfers never fill the lane that reads and writes use.
+    func runBlocking<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
+        try await CoreQueue.blocking.run { [self] in try with(work) }
     }
 
     func runUntilCanceled<T: Sendable>(

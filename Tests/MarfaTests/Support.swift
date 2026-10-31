@@ -177,6 +177,9 @@ final class FakeCore: Core, @unchecked Sendable {
         var instanceId: String?
         var serverOrigin: String?
         var pins: Set<String> = []
+        /// Held by every call that goes to the server until signaled, once `holdNetwork()` sets it.
+        var networkGate: DispatchSemaphore?
+        var networkCalls = 0
         var probe: DropProbe?
         var budgets: [MarfaCore.FileBudget] = []
         var trimmed: UInt64 = 0
@@ -326,7 +329,40 @@ final class FakeCore: Core, @unchecked Sendable {
         state.withLock { $0.declarations }
     }
 
+    private func goToServer() {
+        let gate = state.withLock { state in
+            state.networkCalls += 1
+            return state.networkGate
+        }
+        gate?.wait()
+    }
+
+    /// Makes `pin`, `bin`, `purgeItem` and `blob` wait for a signal, and the last three then fail with `network`.
+    func holdNetwork() -> DispatchSemaphore {
+        let gate = DispatchSemaphore(value: 0)
+        state.withLock { $0.networkGate = gate }
+        return gate
+    }
+
+    var networkCalls: Int { state.withLock { $0.networkCalls } }
+
+    override func bin(type: String?, cursor: String?, limit: UInt32) throws -> MarfaCore.BinPage {
+        goToServer()
+        throw MarfaCore.MarfaError.Network(message: "offline")
+    }
+
+    override func purgeItem(id: String, version: Int64?) throws {
+        goToServer()
+        throw MarfaCore.MarfaError.Network(message: "offline")
+    }
+
+    override func blob(hash: String) throws -> MarfaCore.BlobPath {
+        goToServer()
+        throw MarfaCore.MarfaError.Network(message: "offline")
+    }
+
     override func pin(id: String) throws -> MarfaCore.PinReport {
+        goToServer()
         let added = state.withLock { $0.pins.insert(id).inserted }
         return MarfaCore.PinReport(pinned: true, wasPinned: !added)
     }

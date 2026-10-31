@@ -238,7 +238,7 @@ public final class WorkingCopy: Sendable {
     /// `trashed`, so the app can offer to restore it. One the server does not
     /// hold throws `notFound` with the code `not_found`.
     public func pin(_ id: String) async throws -> PinReport {
-        let report = PinReport(try await holder.run { core in try core.pin(id: id) })
+        let report = PinReport(try await holder.runBlocking { core in try core.pin(id: id) })
         feed.announce(Change(origin: .refreshed(.pinned), itemId: id, edgeId: nil))
         return report
     }
@@ -577,7 +577,7 @@ public struct Items: Sendable {
     /// queue stay as they were. A `network` failure after the request went
     /// out may follow a purge the server made, which its event then shows.
     public func purge(_ id: String, version: Int64? = nil) async throws {
-        try await holder.run { core in try core.purgeItem(id: id, version: version) }
+        try await holder.runBlocking { core in try core.purgeItem(id: id, version: version) }
         feed.announce(Change(origin: .refreshed(.purged), itemId: id, edgeId: nil))
     }
 
@@ -594,7 +594,7 @@ public struct Items: Sendable {
     /// answers for the bin. Restore an item with
     /// ``restore(_:)`` and destroy it with ``purge(_:version:)``.
     public func bin(type: String? = nil, after cursor: String? = nil, limit: Int = 50) async throws -> BinPage {
-        try await holder.run { core in
+        try await holder.runBlocking { core in
             BinPage(try core.bin(type: type, cursor: cursor, limit: UInt32(clamping: limit)))
         }
     }
@@ -863,7 +863,7 @@ public struct Blobs: Sendable {
         _ hash: String, isolation: isolated (any Actor)? = #isolation,
         _ body: (URL) async throws -> Result
     ) async throws -> Result {
-        let lease = try await holder.run { core in try core.blob(hash: hash) }
+        let lease = try await holder.runBlocking { core in try core.blob(hash: hash) }
         defer { withExtendedLifetime(lease) {} }
         return try await body(URL(fileURLWithPath: lease.path()))
     }
@@ -1025,8 +1025,11 @@ func queued(
 
 /// Runs blocking work that is not a call into the open core, such as a network request, a keychain read or opening
 /// a store, on ``CoreQueue/blocking``.
+///
+/// It runs even for a canceled task, since what it does, such as releasing the
+/// store or opening it, must not be left half done.
 func background<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
-    try await CoreQueue.blocking.run(work)
+    try await CoreQueue.blocking.run(cancelable: false, work)
 }
 
 func translated<T>(_ work: () throws -> T) throws -> T {
