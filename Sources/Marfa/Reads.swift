@@ -1,4 +1,3 @@
-
 extension Items {
     /// Each item the copy holds of `ids`, once each, in the order first named, read from one snapshot.
     ///

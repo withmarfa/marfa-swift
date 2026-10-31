@@ -1,4 +1,3 @@
-
 extension JSONObject {
     /// A key by its bytes, as the core and the server tell keys apart: two
     /// that differ only in Unicode normalization, which Swift compares as
