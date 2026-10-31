@@ -325,8 +325,9 @@ public struct Edit: Sendable, Hashable {
     }
 }
 
-/// With `state` unset, a list answers active items only; `allStates` lifts
-/// that. A named `state` beside `allStates` is refused `validation_error`.
+/// With `state` unset, a list answers active items only; `allStates` lifts that.
+///
+/// A named `state` beside `allStates` is refused `validation_error`.
 ///
 /// `filter` is an expression in the server's listing grammar. Its `status_group` term selects items by the group of
 /// the word their status field holds, as their own type declares it: `eq` and `neq` take a ``StatusGroup`` raw
