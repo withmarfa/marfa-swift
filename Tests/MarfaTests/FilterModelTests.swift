@@ -91,7 +91,7 @@ struct FilterModel {
         let text = try FilterExpression(
             conditions: [FilterCondition(field: .property("title"), operator: .eq, value: .text("Keep"))]
         ).encoded()
-        let found = try await copy.items.list(ListFilters(type: "core.note", filter: text))
+        let found = try await copy.items.list(ListFilters(types: ["core.note"], filter: text))
         #expect(found.map { $0.title } == ["Keep"])
         await copy.close()
     }
