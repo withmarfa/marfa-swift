@@ -25,7 +25,7 @@ jobs:
   build:
     name: Build the core
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 45
     outputs:
       version: ${{ steps.version.outputs.version }}
       checksum: ${{ steps.archive.outputs.checksum }}
@@ -210,7 +210,7 @@ jobs:
     name: Build an app on the release, without Rust
     needs: [build, publish]
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       VERSION: ${{ needs.build.outputs.version }}
     steps:

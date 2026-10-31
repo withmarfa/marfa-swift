@@ -1,47 +1,33 @@
 name: CodeQL Swift
 
-# Swift is analyzed on macOS, where the runner is scarce, so a pull request or
-# a push to `main` starts a run only when it changes what the build reads:
-# `Sources/`, the manifest, or this file. CodeQL is not a required check, so a
-# run that never starts leaves no check pending. A draft pull request is
-# analyzed once it is marked ready for review, and on every push after that. A
-# weekly run analyzes the whole tree. `codeql.yml` analyzes the workflows.
+# Swift is analyzed on macOS, where the runner is scarce, so the whole tree is
+# analyzed once a week and by hand, never on a pull request or a push. On a
+# pull request it ran beside `ci.yml` and rebuilt the core that run was still
+# building. Monday's run comes after the daily pin bump, which keeps the core
+# for the pin on `main`, so it builds none. `codeql.yml` analyzes the
+# workflows.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "Sources/**"
-      - Package.swift
-      - .github/workflows/codeql-swift.yml
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "Sources/**"
-      - Package.swift
-      - .github/workflows/codeql-swift.yml
   schedule:
     - cron: "41 4 * * 1"
+  workflow_dispatch:
 
+# One run at a time, and a run is never cancelled for a later one.
 concurrency:
-  # A draft and a ready pull request have groups of their own, so a draft's
-  # run, queued a moment after the ready one, never cancels it. Other events
-  # get a group each, so a run on `main` is never cancelled by a later push.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && format('{0}-{1}', github.ref, github.event.pull_request.draft && 'draft' || 'ready') || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
   # CodeQL reads Swift from a build it watches, and the package builds only
-  # beside the core's framework: the one `ci.yml` keeps for this pin, or one
-  # built here when that has gone.
+  # beside the core's framework: the one `pin-bump.yml` and `ci.yml` keep for
+  # this pin, or one built here when that has gone.
   swift:
     name: Analyze (swift)
-    if: ${{ !github.event.pull_request.draft }}
     runs-on: xcode-27
-    timeout-minutes: 60
+    # Twice the 90th percentile of a run that builds the core (27 minutes).
+    timeout-minutes: 55
     permissions:
       contents: read
       security-events: write

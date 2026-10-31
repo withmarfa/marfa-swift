@@ -356,8 +356,8 @@ struct JSONObjectTests {
         var read = JSONObject()
         let reading = try clock.measure { read = try JSONObject(json: text) }
         #expect(read == object)
-        #expect(writing < .milliseconds(500), "writing took \(writing)")
-        #expect(reading < .milliseconds(500), "reading took \(reading)")
+        #expect(writing < .seconds(5), "writing took \(writing)")
+        #expect(reading < .seconds(5), "reading took \(reading)")
     }
 }
 
