@@ -183,7 +183,7 @@ enum Checks {
         case ("number", .integer), ("number", .number): return nil
         case ("number", _): return "Expected number"
         case ("integer", .integer(let number)):
-            return abs(number) <= 9_007_199_254_740_991 ? nil : "Expected safe integer"
+            return (-9_007_199_254_740_991...9_007_199_254_740_991).contains(number) ? nil : "Expected safe integer"
         case ("integer", .number(let number)):
             return number.rounded() == number && abs(number) <= 9_007_199_254_740_991 ? nil : "Expected safe integer"
         default: return "Expected safe integer"
