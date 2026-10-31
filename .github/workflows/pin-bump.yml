@@ -7,7 +7,14 @@ name: Bump the core pin
 # to approve them, so the second job uses the token of the WithMarfa Bot app,
 # limited to contents and pull requests. Merging the bump runs the release
 # (`pin-bump-release.yml`). A bump whose checks fail stays open, and an open
-# pull request that changes `core.pin` stops a second one opening.
+# pull request that changes `core.pin` stops a second one opening. A bump that
+# cannot build, because the package no longer compiles against the new core,
+# opens an issue instead of a pull request.
+#
+# It saves nothing to the Actions cache. The run checks out code this repository
+# does not control, and what it saved would be read by every pull request. The
+# merge of the bump pushes to `main`, which runs `ci.yml`, and that saves the
+# core's output and the command line for the new pin from `main`.
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -34,7 +41,8 @@ jobs:
   bump:
     name: Open the pin bump
     runs-on: xcode-27
-    timeout-minutes: 90
+    # Twice the 90th percentile of a bump that builds the core and the command line (about 20 minutes).
+    timeout-minutes: 45
     env:
       MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
       CARGO_TARGET_DIR: ${{ github.workspace }}/.build/core-target
@@ -105,13 +113,15 @@ jobs:
           path: .build/marfa
           persist-credentials: false
 
-      - name: Move the pin and regenerate
+      - name: Move the pin
         if: ${{ steps.decide.outputs.bump == 'true' }}
         env:
           HEAD: ${{ steps.decide.outputs.head }}
-        run: |
-          echo "${HEAD}" > core.pin
-          scripts/core.sh
+        run: echo "${HEAD}" > core.pin
+
+      - name: Regenerate
+        if: ${{ steps.decide.outputs.bump == 'true' }}
+        run: scripts/core.sh
 
       - name: Build
         if: ${{ steps.decide.outputs.bump == 'true' }}
@@ -227,3 +237,28 @@ jobs:
           url="$(gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${BRANCH}" \
             --title "chore(package): build against marfa ${short}" --body-file "${RUNNER_TEMP}/body.md")"
           gh pr merge "${url##*/}" --repo "${GITHUB_REPOSITORY}" --squash --auto --delete-branch
+
+  # A bump that fails, in nearly every case because the package no longer
+  # compiles against the new core, opens no pull request, so without this the
+  # only sign is a red run. One issue stays open and each later failure
+  # comments on it. A dry run reports nothing.
+  report-failure:
+    name: Report the failure
+    needs: bump
+    if: ${{ always() && needs.bump.result == 'failure' && (github.event_name == 'schedule' || !inputs.dry_run) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/report-pin-bump-failure.sh
+          sparse-checkout-cone-mode: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          MARFA_HEAD: ${{ needs.bump.outputs.head || 'unknown' }}
+        run: scripts/report-pin-bump-failure.sh

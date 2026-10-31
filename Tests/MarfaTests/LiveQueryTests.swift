@@ -457,7 +457,8 @@ struct LiveQueries {
         #expect(probe.reads == 1, "an ended query read")
 
         await query.refresh()
-        #expect(core.places.count == 2, "refresh did not ask for a new stream")
+        // The new stream is taken by a task that `refresh` starts and does not wait for.
+        try await eventually("refresh asked for a new stream") { core.places.count == 2 }
         #expect(query.following == .live)
         copy.feed.announce(write(.addTag, item: "n1"))
         try await eventually("the new stream is heard") { probe.reads >= 3 && !query.isLoading }

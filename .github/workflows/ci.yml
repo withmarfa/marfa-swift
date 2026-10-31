@@ -1,8 +1,9 @@
 name: CI
 
 on:
-  # A draft runs only the quick checks; marking it ready for review runs the
-  # rest, and so does every push after that. `Full CI` is the required check.
+  # A draft runs only the quick checks, none of them on a Mac; marking it ready
+  # for review runs the rest, and so does every push after that. `Full CI` is
+  # the required check.
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
   push:
@@ -23,7 +24,7 @@ jobs:
   # `Build + test` runs only when `scripts/ci-changes.sh` says the change can
   # affect it, on a pull request and on a push to main alike. A skipped job
   # satisfies a required check, where a workflow filtered out by `paths` would
-  # leave it pending. A draft that changes it runs it only as far as the lint.
+  # leave it pending. A draft never runs it.
   # A push is classified only when the commit before it had a green run of this
   # workflow, which the script asks the API for, hence `actions: read`.
   changes:
@@ -45,6 +46,21 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci-changes.sh
+
+  # Format lint without a Mac, so a mistake in formatting costs seconds and no
+  # macOS runner, and a pull request that fails it never starts `Build + test`.
+  # The image is the Swift release Xcode 27 ships. `--portable` leaves out the
+  # one rule that answers differently on Linux, which `Build + test` checks.
+  lint:
+    name: Lint Swift
+    runs-on: ubuntu-latest
+    container: swift:6.4.2-noble
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: scripts/lint.sh --portable
 
   # On every change, since `Build + test` skips one only to `.github/`, and
   # `release.yml` runs only from main.
@@ -69,13 +85,24 @@ jobs:
           tar -xzf "${archive}" -C "${RUNNER_TEMP}" actionlint
           "${RUNNER_TEMP}/actionlint"
           shellcheck scripts/*.sh
+      - name: Test the retry and failure reports
+        run: |
+          scripts/test-verdict.test.sh
+          scripts/report-pin-bump-failure.test.sh
 
+  # Not on a draft, and on a pull request not until `Lint Swift` has passed. A
+  # push to `main` runs it whatever the lint said, so its verdict is the whole
+  # of what is wrong; `Full CI` fails on the lint alone.
   validate:
     name: Build + test
-    needs: changes
-    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false') }}
+    needs: [changes, lint]
+    if: >-
+      ${{ !cancelled() && !github.event.pull_request.draft
+      && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false')
+      && (github.event_name != 'pull_request' || needs.lint.result == 'success') }}
     runs-on: xcode-27
-    timeout-minutes: 60
+    # Twice the 90th percentile of a run that builds the core (23 minutes).
+    timeout-minutes: 45
     # Inside the workspace: actions/cache refuses a path with `..` in it.
     env:
       MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
@@ -93,37 +120,27 @@ jobs:
           fi
           echo "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer" >> "$GITHUB_ENV"
 
+      # Every rule, on the Mac's swift-format; `Lint Swift` ran the rest.
       - name: Lint
-        run: |
-          swift format lint --strict --configuration .swift-format -r \
-            Package.swift Sources/Marfa Sources/MarfaAPI/*.swift Sources/MarfaTesting Sources/MarfaTelemetry Sources/MarfaIcons Sources/MarfaBrandIcons Tests Examples/MarfaSample/Sources generator/MarfaNullValue.swift generator/MarfaNullable.swift
+        run: scripts/lint.sh
 
-      # The steps from here on are for a pull request that is ready for
-      # review and for a push. A draft ends here and passes; `Full CI`, named
-      # `Draft CI` for a draft, keeps it from merging.
       - name: Test which changes run this job
-        if: ${{ !github.event.pull_request.draft }}
         run: scripts/ci-changes.test.sh
 
       - name: Test the release steps
-        if: ${{ !github.event.pull_request.draft }}
         run: scripts/release.test.sh
 
       - name: Test the pin bump decision
-        if: ${{ !github.event.pull_request.draft }}
         run: scripts/pin-bump.test.sh
 
       - name: Test the pull request description check
-        if: ${{ !github.event.pull_request.draft }}
         run: scripts/check-pr-description.test.sh
 
       - name: Read the pin
         id: pin
-        if: ${{ !github.event.pull_request.draft }}
         run: echo "sha=$(tr -d '[:space:]' < core.pin)" >> "$GITHUB_OUTPUT"
 
       - name: Check out the core at the pin
-        if: ${{ !github.event.pull_request.draft }}
         uses: actions/checkout@v7
         with:
           repository: withmarfa/marfa
@@ -131,21 +148,21 @@ jobs:
           path: .build/marfa
 
       - name: Install sample project generator
-        if: ${{ !github.event.pull_request.draft }}
         run: brew install xcodegen
 
       # Emptied first, so a committed file the pin does not generate shows as
       # deleted whatever comes next.
       - name: Empty what the core generates
-        if: ${{ !github.event.pull_request.draft }}
         run: rm -rf Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
 
       # What core.sh makes depends only on the pin, the script and the
       # generator, so a change that leaves them alone reuses what it made
-      # last time and builds no Rust.
+      # last time and builds no Rust. A run on `main` saves it, which every
+      # pull request can read, so the first pull request after a bump merges
+      # hits it. The caches here are all small: a cargo
+      # build folder is 1.7 GB, and two of them evicted these.
       - name: Restore what the pin generates
         id: core
-        if: ${{ !github.event.pull_request.draft }}
         uses: actions/cache@v6
         with:
           path: |
@@ -156,63 +173,44 @@ jobs:
           key: core-output-${{ runner.os }}-${{ hashFiles('core.pin', 'scripts/core.sh', 'generator/**') }}
 
       - name: Add the iOS targets
-        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
         run: rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-      - name: Cache the core's build
-        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
+      # The version is in the core's build script, so the key follows it.
+      - name: Cache the tool that packages the core
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
         uses: actions/cache@v6
         with:
-          path: |
-            ~/.cargo/bin/cargo-swift
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            ${{ github.workspace }}/.build/core-target
-          key: core-${{ runner.os }}-${{ hashFiles('core.pin') }}
-          restore-keys: core-${{ runner.os }}-
+          path: ~/.cargo/bin/cargo-swift
+          key: cargo-swift-${{ runner.os }}-${{ hashFiles('.build/marfa/core/bindings/swift/build.sh') }}
       - name: Cache the generator's build
-        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
         uses: actions/cache@v6
         with:
           path: ${{ github.workspace }}/.build/generator-build
           key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
-      - if: ${{ !github.event.pull_request.draft }}
-        uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm
           package_json_file: .build/marfa/package.json
-      - if: ${{ !github.event.pull_request.draft }}
-        uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: .build/marfa/pnpm-lock.yaml
       - name: Build the core at the pin
-        if: ${{ !github.event.pull_request.draft && steps.core.outputs.cache-hit != 'true' }}
+        if: ${{ steps.core.outputs.cache-hit != 'true' }}
         run: scripts/core.sh
 
       # The folder tests hold the package's registry to the one `marfa folders list` reads. Its own target
-      # directory and cache, so it never starts cold behind a core cache hit or swells the core's cache.
+      # directory, so it never starts behind the core's. Only the binary is cached, like the core's output.
       - name: Restore the command line the pin builds
         id: cli
-        if: ${{ !github.event.pull_request.draft }}
         uses: actions/cache@v6
         with:
           path: .build/marfa-cli
           key: marfa-cli-${{ runner.os }}-${{ hashFiles('core.pin') }}
-      - name: Cache the command line's build
-        if: ${{ !github.event.pull_request.draft && steps.cli.outputs.cache-hit != 'true' }}
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-            ${{ github.workspace }}/.build/cli-target
-          key: cli-build-${{ runner.os }}-${{ hashFiles('core.pin') }}
-          restore-keys: cli-build-${{ runner.os }}-
       - name: Build the command line at the pin
-        if: ${{ !github.event.pull_request.draft && steps.cli.outputs.cache-hit != 'true' }}
+        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/.build/cli-target
         run: |
@@ -221,7 +219,6 @@ jobs:
           cp "${CARGO_TARGET_DIR}/debug/marfa" .build/marfa-cli/marfa
 
       - name: Test wire generation
-        if: ${{ !github.event.pull_request.draft }}
         run: |
           if [[ -x "${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator" ]]; then
             export MARFA_GENERATOR_BIN="${MARFA_GENERATOR_BUILD}/release/swift-openapi-generator"
@@ -229,7 +226,6 @@ jobs:
           node --test generator/generate.test.mjs
 
       - name: Check what the pin generates
-        if: ${{ !github.event.pull_request.draft }}
         run: |
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated)" ]]; then
             git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
@@ -240,14 +236,12 @@ jobs:
       # server-up.sh runs the server through tsx, which resolves
       # @withmarfa/shared through its dist.
       - name: Build the server at the pin
-        if: ${{ !github.event.pull_request.draft }}
         working-directory: .build/marfa
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter "@withmarfa/server..." build
 
       - name: Build and test against a booted server
-        if: ${{ !github.event.pull_request.draft }}
         env:
           MARFA_LIVE_REQUIRED: '1'
         run: |
@@ -272,9 +266,29 @@ jobs:
           service="$(sed -n 's/^ *let service = "\(.*\)"$/\1/p' Tests/MarfaTests/CredentialTests.swift)"
           [[ "${service}" =~ ^[a-z.-]+$ ]] || { echo "::error::CredentialTests.swift names no one service"; exit 1; }
           scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-before"
-          # Compared whether the suite passed or not.
+          # A test that fails is run once more. `swift test` exits 1 when any repetition failed, even if the
+          # test passed on the next, so the verdict comes from the event stream (`scripts/test-verdict.sh`):
+          # a test that passed on its second try is flaky and does not fail the run, and a warning and the
+          # summary name it; one that failed both times fails it. The keychain is compared either way.
+          swift test --repeat-until pass --maximum-repetitions 2 --event-stream-output-path "${RUNNER_TEMP}/swift-test-events.jsonl" 2>&1 | tee "${RUNNER_TEMP}/swift-test.log" || true
           tested=0
-          swift test || tested=$?
+          verdict="$(scripts/test-verdict.sh "${RUNNER_TEMP}/swift-test-events.jsonl")" || tested=$?
+          if [[ -n "${verdict}" ]]; then
+            while read -r kind name; do
+              if [[ "${kind}" == flaky ]]; then
+                echo "::warning title=Flaky test::${name} failed, then passed when run once more"
+              else
+                echo "::error title=Test failed::${name}"
+              fi
+            done <<<"${verdict}"
+            {
+              echo "### Tests that failed once or twice"
+              echo
+              echo "A failed test is run once more. A flaky one passed the second time and did not fail this run; fix it."
+              echo
+              while read -r kind name; do echo "- ${kind}: \`${name}\`"; done <<<"${verdict}"
+            } >>"$GITHUB_STEP_SUMMARY"
+          fi
           scripts/login-keychain.sh "${service}" >"${RUNNER_TEMP}/login-keychain-after"
           if ! diff "${RUNNER_TEMP}/login-keychain-before" "${RUNNER_TEMP}/login-keychain-after"; then
             echo "::error::The tests changed the login keychain under ${service}."
@@ -283,7 +297,6 @@ jobs:
           exit "${tested}"
 
       - name: Build the sample for macOS and the iOS simulator
-        if: ${{ !github.event.pull_request.draft }}
         working-directory: Examples/MarfaSample
         run: |
           xcodegen generate --quiet
@@ -294,7 +307,6 @@ jobs:
           done
 
       - name: Run the sample's scenario offline and back
-        if: ${{ !github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           sample="${RUNNER_TEMP}/marfa-sample/Build/Products/Debug/MarfaSample.app/Contents/MacOS/MarfaSample"
@@ -313,6 +325,19 @@ jobs:
           phase drain
           phase catch-up
 
+      # Only a failed run keeps them, for three days.
+      - name: Keep the logs of a failed run
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs
+          path: |
+            ${{ runner.temp }}/swift-build.log
+            ${{ runner.temp }}/swift-test.log
+            ${{ runner.temp }}/swift-test-events.jsonl
+          if-no-files-found: ignore
+          retention-days: 3
+
   # The one required check, since a skipped job passes a required check and a
   # draft skips most of `Build + test`. On a draft this job is `Draft CI`, so
   # the required `Full CI` stays expected, and blocks a merge, until the run
@@ -322,7 +347,7 @@ jobs:
   # a failed job still runs it, and it fails.
   gate:
     name: ${{ github.event.pull_request.draft && 'Draft CI' || 'Full CI' }}
-    needs: [changes, lint-workflows, validate]
+    needs: [changes, lint, lint-workflows, validate]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
