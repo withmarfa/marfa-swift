@@ -97,6 +97,8 @@ public enum FilterField: Sendable, Hashable {
     case tags
     /// The group of an item's status word.
     case statusGroup
+    /// Whether the item is a part of a host outside the bin.
+    case part
     /// The items at the other end of an edge of one type.
     case edge(type: String, direction: EdgeDirection)
 
@@ -112,6 +114,7 @@ public enum FilterField: Sendable, Hashable {
         case .member(let field, let member): self = .member(field: field, member: member)
         case .tags: self = .tags
         case .statusGroup: self = .statusGroup
+        case .part: self = .part
         case .edge(let edgeType, let direction): self = .edge(type: edgeType, direction: EdgeDirection(direction))
         }
     }
@@ -123,6 +126,7 @@ public enum FilterField: Sendable, Hashable {
         case .member(let field, let member): .member(field: field, member: member)
         case .tags: .tags
         case .statusGroup: .statusGroup
+        case .part: .part
         case .edge(let type, let direction): .edge(edgeType: type, direction: direction.core)
         }
     }

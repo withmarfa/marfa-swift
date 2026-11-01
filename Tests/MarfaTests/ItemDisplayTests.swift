@@ -5,6 +5,26 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct ItemDisplays {
+    @Test func aPartWithNoTitleIsNamedAfterItsHost() async throws {
+        let copy = try await WorkingCopy.open(store: temporaryStore())
+        let host = try #require(
+            try await copy.items.create(Draft(type: "core.note", properties: ["title": "Plan"])).itemId)
+        let part = try #require(
+            try await copy.items.create(Draft(type: "core.note", properties: ["body": "LGTM\n\nShip it"])).itemId)
+        _ = try await copy.edges.create(from: part, to: host, type: "comments-on")
+        let items = try await copy.items.get([part]).rows
+        #expect(
+            try await copy.items.displays(of: items) == [ItemDisplay(name: "Comment on Plan", preview: "LGTM Ship it")])
+        #expect(
+            try await copy.items.displays(for: [
+                ItemDisplayInput(type: items[0].type, properties: items[0].properties, id: part)
+            ]) == [ItemDisplay(name: "Comment on Plan", preview: "LGTM Ship it")])
+        #expect(
+            try await copy.items.displays(for: [ItemDisplayInput(type: items[0].type, properties: items[0].properties)])
+                == [ItemDisplay(name: "LGTM", preview: "Ship it")])
+        await copy.close()
+    }
+
     @Test func aNoteWithNoTitleIsNamedByTheFirstLineOfItsBodyAndThePreviewSkipsThatLine() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         let shown = try await copy.items.displays(for: [

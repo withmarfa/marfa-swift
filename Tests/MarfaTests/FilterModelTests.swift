@@ -9,6 +9,16 @@ private func refusal(_ error: any Error) -> (code: String, message: String)? {
 
 @Suite(.timeLimit(.minutes(1)))
 struct FilterModel {
+    @Test(arguments: [true, false], [FilterOperator.eq, .neq])
+    func thePartFieldRoundTrips(value: Bool, comparison: FilterOperator) throws {
+        let expression = FilterExpression(
+            conditions: [FilterCondition(field: .part, operator: comparison, value: .bool(value))])
+        let text = try expression.encoded()
+        #expect(text == "part \(comparison == .eq ? "eq" : "neq") \(value)")
+        #expect(try FilterExpression(decoding: text) == expression)
+        #expect(FilterField.part.operators == [.eq, .neq])
+    }
+
     @Test func aValueWithQuotesBackslashesCommasAndEmojiRoundTrips() throws {
         let value = #"He said "hi", \o/ 🎉👩‍👩‍👧 (really)"#
         let expression = FilterExpression(
