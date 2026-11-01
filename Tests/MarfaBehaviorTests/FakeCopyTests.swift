@@ -70,6 +70,17 @@ struct FakeCopyBehavior {
         #expect(await updates.next()?.connection == .closed)
     }
 
+    @Test func aScriptedUpdateSentBeforeTheFirstReadDoesNotSwallowTheInitialUpdate() async throws {
+        let fake = Self.seeded()
+        var updates = fake.copy.updates().makeAsyncIterator()
+        let scripted = CopyUpdate(reread: .parts(Reread.Parts(queue: true)), connection: .following)
+        fake.sendUpdate(scripted)
+        #expect(await updates.next() == scripted)
+        let initial = await updates.next()
+        #expect(initial?.reread == .everything)
+        await fake.copy.close()
+    }
+
     @Test func theCopyServesWhatItIsGiven() async throws {
         let fake = Self.seeded()
         let copy = fake.copy

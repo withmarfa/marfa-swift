@@ -404,7 +404,8 @@ final class Lifecycle: Sendable {
                 let update = consumer.scripted.removeFirst()
                 consumer.told = update
                 consumer.pending = pending
-                if !consumer.scripted.isEmpty { state.signals.append(consumer.signal) }
+                // What was pending, the initial update included, is still to be told.
+                state.signals.append(consumer.signal)
                 state.consumers[id] = consumer
                 return .scripted(update)
             }
