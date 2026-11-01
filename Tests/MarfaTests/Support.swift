@@ -211,12 +211,14 @@ final class FakeCore: Core, @unchecked Sendable {
 
     /// Room on the shared core queues for every gate the tests in the process park at once.
     ///
-    /// A gated call holds its
-    /// thread until released, and the queues are sized to the machine, so on a runner with a few cores the gated calls
-    /// of tests running side by side would fill them and hold up every other test.
+    /// A gated call holds its thread until released, and the queues are sized to the machine, so on a runner with a
+    /// few cores the gated calls of tests running side by side would fill them and hold up every other test. The
+    /// blocking queue keeps more room than the calls queue, as it does on any machine, since a test that fills the
+    /// calls queue with calls waiting on the server parks them all on the blocking queue. Both stay well under the
+    /// threads the system starts for a process, or the parked gates would starve everything else instead.
     private static let roomForGates: Void = {
-        CoreQueue.calls.allow(atLeast: 64)
-        CoreQueue.blocking.allow(atLeast: 64)
+        CoreQueue.calls.allow(atLeast: 16)
+        CoreQueue.blocking.allow(atLeast: 32)
     }()
 
     private static func make() -> FakeCore {
