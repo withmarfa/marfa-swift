@@ -25,8 +25,8 @@ public enum CopyConnection: Sendable, Hashable {
     /// store, `noCatalog` or `wrongServer`. The copy tries again every five minutes, in case the server changed, and
     /// follows again only once a catch-up or a hydration succeeds, the app's or the retry's. An error the app's own
     /// arguments caused (`invalid`, `unknownType`, `validation`), a call canceled, a call made during a key
-    /// change, a call that began under a key since replaced, and an app's call that failed with a failure that may
-    /// mend itself, such as the network, do not change it.
+    /// change, a call that began under a key since replaced, and a failure that may mend itself, such as the
+    /// network, of an app's call or of the retry itself, do not change it.
     ///
     /// For a reader, the core ended its watch of the writer's saves on a fault. The reader takes it again by itself,
     /// further apart each time, and is `.local` once it has.
@@ -244,6 +244,14 @@ final class Lifecycle: Sendable {
         /// Moves with every key change, so an app's call that began under an earlier key says nothing of the copy
         /// the new key opened.
         var keyEpoch = 0
+        /// Whether only a catch-up or a hydration that succeeds may show the copy following again.
+        ///
+        /// Set whenever a follow stops or the copy needs a hydration, cleared by a pull that succeeds and by a key
+        /// change. A server event, a failure that may mend itself or a status read never clear it.
+        var mustPull = false
+        /// Counts the pulls that succeeded, so a first status read can tell that a hydration or a catch-up completed
+        /// while it was being taken, which makes what it read stale; a failure leaves the read as true as it was.
+        var pulls = 0
         /// The stream the lifecycle holds or is taking, so no second one is taken beside it.
         var streamClaim: UUID?
         /// Counts the claimed streams that ended, so a pull can tell whether the stream it found claimed had ended
@@ -340,7 +348,10 @@ final class Lifecycle: Sendable {
     }
 
     /// Read when an app's call begins, for ``pulled(epoch:keyEpoch:began:)`` and ``failed(_:epoch:keyEpoch:claim:)``.
-    var keyEpoch: Int { state.withLock { $0.keyEpoch } }
+    ///
+    /// During a key change it is a value no result matches, since the call then leases the old core and says
+    /// nothing of the new key's copy.
+    var keyEpoch: Int { state.withLock { $0.keyChanging ? -1 : $0.keyEpoch } }
 
     /// What the copy is doing with its server now.
     var connection: CopyConnection { state.withLock { $0.connection } }
@@ -503,7 +514,10 @@ final class Lifecycle: Sendable {
 
     private func set(_ state: inout State, _ connection: CopyConnection) {
         guard state.connection != connection else { return }
-        if connection == .following { state.followingSince = clock.now }
+        if connection == .following {
+            guard !state.mustPull else { return }
+            state.followingSince = clock.now
+        }
         state.connection = connection
         mark(&state) { _ in }
     }
@@ -581,13 +595,15 @@ final class Lifecycle: Sendable {
     /// The first step of a run: a copy that holds a completed hydration is caught up, which says whether the
     /// server answers.
     private func begin(_ epoch: Int) async {
+        let seen = locked { $0.pulls }
         let hydration = try? await holder.run { core in Hydration(try core.status().hydration) }
         switch hydration {
         case .never?, .inProgress?, .expired?:
-            // An app's own call may have said something since the status was read: a hydration that failed has
-            // stopped the copy, and one that completed has it following.
+            // What the status said is as old as the read: a pull that succeeded since knows more, and the read leaves
+            // it be. A call that failed since is told as needing a hydration.
             locked { state in
-                guard state.epoch == epoch else { return }
+                guard state.epoch == epoch, state.pulls == seen else { return }
+                state.mustPull = true
                 switch state.connection {
                 case .connecting:
                     set(&state, .needsHydration(nil))
@@ -628,6 +644,8 @@ final class Lifecycle: Sendable {
             else { return nil }
             if let retry = state.retry { state.canceled.append(retry) }
             state.retry = nil
+            state.mustPull = false
+            state.pulls += 1
             set(&state, .following)
             mark(&state) { $0.synced = true }
             return claimStream(&state, began: began).map { (state.run, $0) }
@@ -645,7 +663,8 @@ final class Lifecycle: Sendable {
     /// once another stream is claimed: a pull may have succeeded and taken one since the stop was heard. A call of
     /// the app's that began under an earlier key (`keyEpoch`) changes nothing, a refusal of the old key included.
     ///
-    /// An app's call that finds the copy stopped, or without a hydration, with a failure that may mend leaves it so:
+    /// A copy stopped or without a hydration must pull: whatever fails afterwards that may mend, the app's call or
+    /// the lifecycle's own retry, leaves it showing why it stopped (the retry asks again at the slow pace), and
     /// only a catch-up or a hydration that succeeds follows again.
     func failed(_ error: any Error, epoch: Int? = nil, keyEpoch: Int? = nil, claim: UUID? = nil) {
         let error = error as? MarfaError ?? .store(message: "\(error)")
@@ -672,18 +691,23 @@ final class Lifecycle: Sendable {
                 cancelRetry(&state)
                 set(&state, .keyRefused(error))
             case .needsHydration:
+                state.mustPull = true
                 cancelRetry(&state)
                 set(&state, .needsHydration(error))
             case .offline:
-                if epoch == nil {
-                    switch state.connection {
-                    case .stopped, .needsHydration: return
-                    default: break
+                if state.mustPull {
+                    // The copy keeps showing why it stopped, which a failure that may mend does not change. Its
+                    // own retry, which this one ended, is asked again at the slow pace, since the fault that
+                    // stopped it is not the network's.
+                    if case .stopped = state.connection, state.retry == nil {
+                        schedulePull(&state, after: max(pace.slow, Self.retryAfter(error)))
                     }
+                    return
                 }
                 set(&state, .offline(error))
                 schedulePull(&state, after: backoff(&state, retryAfter: Self.retryAfter(error)))
             case .stopped:
+                state.mustPull = true
                 if epoch == nil, case .needsHydration = state.connection {
                     set(&state, .needsHydration(error))
                     return
@@ -860,8 +884,9 @@ final class Lifecycle: Sendable {
         }
     }
 
-    /// The core's follow reached the server, which shows it follows only where it was offline or connecting; a
-    /// follow that stopped follows again only once a catch-up or a hydration succeeds.
+    /// The core's follow reached the server, which shows it follows only where it was offline or connecting, and
+    /// never while the copy must pull (``set(_:_:)`` holds that); a follow that stopped follows again only once a
+    /// catch-up or a hydration succeeds.
     private func reached(_ state: inout State) {
         switch state.connection {
         case .offline, .connecting: set(&state, .following)
@@ -987,6 +1012,7 @@ final class Lifecycle: Sendable {
             state.attempts = 0
             state.drainAttempts = 0
             state.followingSince = nil
+            state.mustPull = false
             set(&state, .connecting)
             return state.epoch
         }

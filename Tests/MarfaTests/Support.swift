@@ -159,6 +159,8 @@ final class FakeCore: Core, @unchecked Sendable {
         var catchUps = 0
         /// Held by the next `status()` after it has read the copy, so it answers what the copy was when it began.
         var statusGate: DispatchSemaphore?
+        /// How many held `status()` reads have returned.
+        var heldStatuses = 0
         var drains = 0
         /// While a hydration runs, what `status()` says of its progress.
         var itemsExpected: UInt64?
@@ -443,6 +445,7 @@ final class FakeCore: Core, @unchecked Sendable {
             return (state.slice, state.serverOrigin, state.instanceId, state.hydration, state.statusGate)
         }
         held?.wait()
+        if held != nil { state.withLock { $0.heldStatuses += 1 } }
         return MarfaCore.Status(
             serverOrigin: origin, instanceId: instance, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
             sliceEdgeTypes: slice?.edgeTypes ?? [], pinned: [],

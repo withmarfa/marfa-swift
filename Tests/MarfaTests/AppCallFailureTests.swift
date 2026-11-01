@@ -245,8 +245,37 @@ struct AnAppCallThatFails {
         try await eventually("following") { updates.connection == .following }
 
         status.signal()
-        try await Task.sleep(for: .milliseconds(100))
+        try await eventually("the held status read returned") { core.state.withLock { $0.heldStatuses == 1 } }
+        copy.lifecycle.whileLocked {}
         #expect(copy.lifecycle.connection == .following)
+        await copy.close()
+    }
+
+    @Test func aStatusReadTakenBeforeAHydrationAndAStopDoesNotStrandTheCopy() async throws {
+        let core = FakeCore.writer()
+        let status = DispatchSemaphore(value: 0)
+        core.state.withLock {
+            $0.hydration = .never
+            $0.hydrationCompletes = true
+            $0.statusGate = status
+        }
+        let clock = ManualClock()
+        let copy = ALifecycle.copy(core, clock)
+        let updates = Updates(copy.updates())
+        try await eventually("the first status read began") { core.state.withLock { $0.statusGate == nil } }
+
+        _ = try await copy.hydrate(types: ["app.test.entry"], tier: .all)
+        try await eventually("following") { updates.connection == .following }
+        let stopped = Marfa.MarfaError.store(message: "damaged")
+        core.state.withLock { $0.catchUpFails = .Store(message: "damaged") }
+        await #expect(throws: stopped) { try await copy.catchUp() }
+        try await eventually("stopped") { updates.connection == .stopped(stopped) }
+
+        status.signal()
+        try await eventually("the held status read returned") { core.state.withLock { $0.heldStatuses == 1 } }
+        copy.lifecycle.whileLocked {}
+        #expect(copy.lifecycle.connection == .stopped(stopped))
+        #expect(clock.waiting == 1, "the slow retry was dropped")
         await copy.close()
     }
 
@@ -267,6 +296,63 @@ struct AnAppCallThatFails {
         let calling = Task { try await copy.catchUp() }
         try await eventually("the call is in the core") { core.state.withLock { $0.catchUpScript.count == 1 } }
         copy.lifecycle.keyWillChange()
+        copy.lifecycle.keyChanged()
+        app.signal()
+        await #expect(throws: (any Error).self) { try await calling.value }
+
+        try await eventually("the new key's catch-up is in the core") {
+            core.state.withLock { $0.catchUpScript.isEmpty }
+        }
+        #expect(copy.lifecycle.connection == .connecting)
+        #expect(clock.waiting == 0)
+        pull.signal()
+        try await eventually("following") { updates.connection == .following }
+        await copy.close()
+    }
+
+    // MARK: A stopped copy's own retry
+
+    @Test func aStoppedCopyStaysStoppedWhenItsOwnRetryFailsOnTheNetwork() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await followingCopy(core, clock)
+        let stopped = Marfa.MarfaError.store(message: "damaged")
+
+        core.state.withLock { $0.catchUpFails = .Store(message: "damaged") }
+        await #expect(throws: stopped) { try await copy.catchUp() }
+        try await eventually("stopped") { updates.connection == .stopped(stopped) }
+        #expect(try await ALifecycle.wait(clock, after: 0) == .seconds(300))
+
+        let before = ALifecycle.catchUps(core)
+        core.state.withLock { $0.catchUpFails = ALifecycle.offline }
+        clock.advance(by: .seconds(300))
+        try await eventually("the retry ran") { ALifecycle.catchUps(core) == before + 1 }
+        #expect(try await ALifecycle.wait(clock, after: 1) == .seconds(300), "the retry was not asked for again")
+
+        core.change(0, ALifecycle.applied("a"))
+        try await eventually("the event's row was named") { updates.namedItems.contains("a") }
+        #expect(copy.lifecycle.connection == .stopped(stopped))
+        #expect(updates.connection == .stopped(stopped))
+
+        core.state.withLock { $0.catchUpFails = nil }
+        clock.advance(by: .seconds(300))
+        try await eventually("following once a retry succeeded") { updates.connection == .following }
+        await copy.close()
+    }
+
+    // MARK: A call that starts during a key change
+
+    @Test func aCallThatBeganDuringAKeyChangeSaysNothingOfTheNewKeysCopy() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await followingCopy(core, clock)
+        let app = DispatchSemaphore(value: 0)
+        let pull = DispatchSemaphore(value: 0)
+        core.state.withLock { $0.catchUpScript = [(app, .Store(message: "old core")), (pull, nil)] }
+
+        copy.lifecycle.keyWillChange()
+        let calling = Task { try await copy.catchUp() }
+        try await eventually("the call is in the core") { core.state.withLock { $0.catchUpScript.count == 1 } }
         copy.lifecycle.keyChanged()
         app.signal()
         await #expect(throws: (any Error).self) { try await calling.value }
