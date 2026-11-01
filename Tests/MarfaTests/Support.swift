@@ -209,20 +209,35 @@ final class FakeCore: Core, @unchecked Sendable {
 
     let state = Mutex(State())
 
+    /// Room on the shared core queues for every gate the tests in the process park at once.
+    ///
+    /// A gated call holds its
+    /// thread until released, and the queues are sized to the machine, so on a runner with a few cores the gated calls
+    /// of tests running side by side would fill them and hold up every other test.
+    private static let roomForGates: Void = {
+        CoreQueue.calls.allow(atLeast: 64)
+        CoreQueue.blocking.allow(atLeast: 64)
+    }()
+
+    private static func make() -> FakeCore {
+        _ = roomForGates
+        return FakeCore(noHandle: .init())
+    }
+
     static func reader() -> FakeCore {
-        let core = FakeCore(noHandle: .init())
+        let core = make()
         core.state.withLock { $0.handle = .reader }
         return core
     }
 
     static func writer() -> FakeCore {
-        FakeCore(noHandle: .init())
+        make()
     }
 
     /// A writer whose drop waits on `probe`, to hold a close in the middle of
     /// releasing the store.
     static func writer(probe: DropProbe) -> FakeCore {
-        let core = FakeCore(noHandle: .init())
+        let core = make()
         core.state.withLock { $0.probe = probe }
         return core
     }

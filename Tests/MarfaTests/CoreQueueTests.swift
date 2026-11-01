@@ -130,6 +130,20 @@ struct ACoreQueue {
         #expect(CoreQueue.calls.limit >= 4 && CoreQueue.blocking.limit >= 8)
     }
 
+    @Test func makingRoomStartsTheJobsThatWaitedAndNeverShrinksTheQueue() async throws {
+        let queue = CoreQueue(limit: 1)
+        let hold = DispatchSemaphore(value: 0)
+        let first = Task { try await queue.run { hold.wait() } }
+        let second = Task { try await queue.run { 2 } }
+        try await eventually("the second job waits") { queue.waitingCount == 1 }
+        queue.allow(atLeast: 2)
+        #expect(try await second.value == 2)
+        queue.allow(atLeast: 1)
+        #expect(queue.limit == 2)
+        hold.signal()
+        try await first.value
+    }
+
     @Test func aJobCanceledWhileItWaitsLeavesTheQueueAndThrowsCanceled() async throws {
         let queue = CoreQueue(limit: 1)
         let hold = DispatchSemaphore(value: 0)
