@@ -49,6 +49,10 @@ import Synchronization
 /// - `changes()`, which tells the app's own writes, and the changes ``send(_:)``
 ///   puts on it, and `updates()`, which tells `.local` and the updates ``sendUpdate(_:)`` scripts.
 ///
+/// - Scripted answers: `items.displays(for:)`, `items.displays(of:)` and `items.linkCandidates(of:in:)` need the
+///   core's naming and link-matching rules, which the fake does not copy. They throw
+///   ``FakeCopyError/unsupported(call:)`` until the test scripts the answer with ``displays`` or ``linkCandidates``.
+///
 /// Every other call throws ``FakeCopyError/unsupported(call:)``, including
 /// `changes(since:most:)`, since the fake records no changes to name, and the
 /// reads of body links.
@@ -100,11 +104,19 @@ public final class FakeCopy: Sendable {
 
     private let core: InMemoryCore
     private let chooser = Chooser()
+    private let scripted = Mutex(PublicAnswers())
 
     init(core: InMemoryCore) {
         self.core = core
         copy = WorkingCopy(core: core)
         core.chooseVerdicts { [chooser] write in chooser.verdict(Marfa.QueuedWrite(write))?.core }
+    }
+
+    private func script(_ change: (inout PublicAnswers) -> Void) {
+        scripted.withLock { held in
+            change(&held)
+            core.scripted.withLock { $0 = held.inCoreTypes }
+        }
     }
 
     /// Tells every stream `copy.changes()` handed out of `change`, as if the
@@ -136,6 +148,38 @@ public final class FakeCopy: Sendable {
         core.writes.map(Marfa.QueuedWrite.init)
     }
 
+    /// Scripts the name and preview `copy.items.displays(for:)` and `displays(of:)` answer, once for each input.
+    ///
+    /// The fake does not work out a name from the type's display hints, as the Rust core does, so the closure says
+    /// what an item shows. Without one (the default), both calls throw ``FakeCopyError/unsupported(call:)``.
+    ///
+    /// ```swift
+    /// fake.displays = { input in
+    ///     ItemDisplay(name: input.properties["title"]?.string, preview: nil)
+    /// }
+    /// let shown = try await fake.copy.items.displays(of: [note])
+    /// ```
+    public var displays: (@Sendable (Marfa.ItemDisplayInput) -> Marfa.ItemDisplay)? {
+        get { scripted.withLock { $0.displays } }
+        set { script { $0.displays = newValue } }
+    }
+
+    /// Scripts what `copy.items.linkCandidates(of:in:)` answers for each target, with the `item` it was asked in.
+    ///
+    /// The fake does not match a link's name to the items it holds, so the closure gives the whole answer. The
+    /// returned ``LinkCandidates/target`` is replaced by the one asked, so the answer stays in order. Without a
+    /// closure (the default), the call throws ``FakeCopyError/unsupported(call:)``.
+    ///
+    /// ```swift
+    /// fake.linkCandidates = { target, _ in
+    ///     LinkCandidates(target: target, state: .bound, item: "item-1", candidates: ["item-1"])
+    /// }
+    /// ```
+    public var linkCandidates: (@Sendable (_ target: String, _ item: String?) -> Marfa.LinkCandidates)? {
+        get { scripted.withLock { $0.linkCandidates } }
+        set { script { $0.linkCandidates = newValue } }
+    }
+
     /// Chooses the verdict of each write a drain offers.
     ///
     /// Returning `nil` leaves the write unanswered, as when the server is lost.
@@ -146,6 +190,45 @@ public final class FakeCopy: Sendable {
     public var verdict: @Sendable (Marfa.QueuedWrite) -> Marfa.Verdict? {
         get { chooser.verdict }
         set { chooser.verdict = newValue }
+    }
+}
+
+/// The answers an app scripted for the calls that need the Rust core's rules.
+struct ScriptedAnswers {
+    var displays: (@Sendable (MarfaCore.ItemDisplayInput) -> MarfaCore.ItemDisplay)?
+    var linkCandidates: (@Sendable (_ target: String, _ item: String?) -> MarfaCore.LinkCandidates)?
+}
+
+/// The same answers in the package's public types, which is what an app scripts.
+private struct PublicAnswers: Sendable {
+    var displays: (@Sendable (Marfa.ItemDisplayInput) -> Marfa.ItemDisplay)?
+    var linkCandidates: (@Sendable (_ target: String, _ item: String?) -> Marfa.LinkCandidates)?
+
+    /// The closures as the core's own calls, so `InMemoryCore` answers in the core's types.
+    var inCoreTypes: ScriptedAnswers {
+        var answers = ScriptedAnswers()
+        answers.displays = displays.map { (shown) -> @Sendable (MarfaCore.ItemDisplayInput) -> MarfaCore.ItemDisplay in
+            { (input: MarfaCore.ItemDisplayInput) -> MarfaCore.ItemDisplay in
+                let properties = Marfa.JSONObject(input.properties)
+                let answer = shown(Marfa.ItemDisplayInput(type: input.type, properties: properties))
+                return MarfaCore.ItemDisplay(name: answer.name, preview: answer.preview)
+            }
+        }
+        answers.linkCandidates = linkCandidates.map {
+            (found) -> @Sendable (String, String?) -> MarfaCore.LinkCandidates in
+            { (target: String, item: String?) -> MarfaCore.LinkCandidates in
+                let answer = found(target, item)
+                let state: MarfaCore.LinkState =
+                    switch answer.state {
+                    case .bound: .bound
+                    case .ambiguous: .ambiguous
+                    case .unresolved: .unresolved
+                    }
+                return MarfaCore.LinkCandidates(
+                    target: target, state: state, item: answer.item, candidates: answer.candidates)
+            }
+        }
+        return answers
     }
 }
 
@@ -189,16 +272,24 @@ extension WorkingCopy {
     ///     outside them and the app's declarations throws `unknownType`.
     ///   - edgeTypes: The edge types its catalog holds.
     ///   - views: The saved views it holds, each as an item of type `system.view` at the version given.
+    ///   - displays: The answer to `items.displays`, as ``FakeCopy/displays`` sets it. `nil` leaves the call unsupported.
+    ///   - linkCandidates: The answer to `items.linkCandidates`, as ``FakeCopy/linkCandidates`` sets it. `nil` leaves it
+    ///     unsupported.
     public static func fake(
         items: [Marfa.Item] = [], edges: [Marfa.Edge] = [], itemTypes: [Marfa.ItemType] = [],
         edgeTypes: [Marfa.EdgeType] = [],
-        views: [SavedView] = []
+        views: [SavedView] = [],
+        displays: (@Sendable (Marfa.ItemDisplayInput) -> Marfa.ItemDisplay)? = nil,
+        linkCandidates: (@Sendable (_ target: String, _ item: String?) -> Marfa.LinkCandidates)? = nil
     ) -> FakeCopy {
-        FakeCopy(
+        let fake = FakeCopy(
             core: InMemoryCore(
                 items: items.map(\.core) + views.map(\.held), edges: edges.map(\.core),
                 itemTypes: itemTypes.map(\.held),
                 edgeTypes: edgeTypes.map(\.held)))
+        fake.displays = displays
+        fake.linkCandidates = linkCandidates
+        return fake
     }
 }
 

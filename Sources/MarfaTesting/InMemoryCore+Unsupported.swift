@@ -62,11 +62,17 @@ extension InMemoryCore {
     }
 
     func itemDisplays(items: [ItemDisplayInput]) throws -> [ItemDisplay] {
-        try unsupported("items.displays")
+        guard let answer = scripted.withLock({ $0.displays }) else {
+            throw FakeCopyError.unsupported(call: "items.displays")
+        }
+        return items.map(answer)
     }
 
     func linkCandidates(item: String?, targets: [String]) throws -> [LinkCandidates] {
-        try unsupported("links.candidates")
+        guard let answer = scripted.withLock({ $0.linkCandidates }) else {
+            throw FakeCopyError.unsupported(call: "links.candidates")
+        }
+        return targets.map { answer($0, item) }
     }
 
     func hydrate(types: [String], tier: SliceTier, stop: Stop?) throws -> HydrateReport {

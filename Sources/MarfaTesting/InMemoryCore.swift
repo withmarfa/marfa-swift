@@ -60,6 +60,9 @@ final class InMemoryCore: CoreProtocol, Sendable {
     }
 
     let state: Mutex<State>
+
+    /// The answers an app scripted for the calls that need the Rust core's rules.
+    let scripted = Mutex(ScriptedAnswers())
     /// Held for a whole drain, so two never answer the same write.
     let draining = NSLock()
 
