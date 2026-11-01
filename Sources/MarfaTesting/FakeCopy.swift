@@ -113,11 +113,10 @@ public final class FakeCopy: Sendable {
     }
 
     private func script(_ change: (inout PublicAnswers) -> Void) {
-        let answers = scripted.withLock { held in
+        scripted.withLock { held in
             change(&held)
-            return held.inCoreTypes
+            core.scripted.withLock { $0 = held.inCoreTypes }
         }
-        core.scripted.withLock { $0 = answers }
     }
 
     /// Tells every stream `copy.changes()` handed out of `change`, as if the
