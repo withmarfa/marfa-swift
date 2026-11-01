@@ -679,9 +679,9 @@ final class Lifecycle: Sendable {
     /// once another stream is claimed: a pull may have succeeded and taken one since the stop was heard. A call of
     /// the app's that began under an earlier key (`keyEpoch`) changes nothing, a refusal of the old key included.
     ///
-    /// A copy stopped or without a hydration must pull: whatever fails afterwards that may mend, the app's call or
-    /// the lifecycle's own retry, leaves it showing why it stopped (the retry asks again at the slow pace), and
-    /// only a catch-up or a hydration that succeeds follows again.
+    /// A copy stopped or without a hydration must pull: only a catch-up or a hydration that succeeds follows again.
+    /// A failure that may mend itself leaves a stopped copy showing why it stopped (the retry asks again at the slow
+    /// pace), and shows a copy that needs a hydration `.offline` until the wait ends (see ``claimRetry(_:)``).
     func failed(_ error: any Error, epoch: Int? = nil, keyEpoch: Int? = nil, claim: UUID? = nil) {
         let error = error as? MarfaError ?? .store(message: "\(error)")
         locked { state in
