@@ -254,6 +254,24 @@ struct AnAppCallThatFails {
         await copy.close()
     }
 
+    @Test func aFaultWhileOfflineBeforeAHydrationStillAsksForTheHydration() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await copyWithoutAHydration(core, clock)
+        let network = Marfa.MarfaError.network(message: "offline")
+        let garbled = Marfa.MarfaError.decoding(message: "garbled")
+
+        core.state.withLock { $0.hydrateFails = ALifecycle.offline }
+        await #expect(throws: network) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+        try await eventually("offline") { updates.connection == .offline(network) }
+
+        core.state.withLock { $0.hydrateFails = .Decoding(message: "garbled") }
+        await #expect(throws: garbled) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+        try await eventually("needs the hydration, for the fault") { updates.connection == .needsHydration(garbled) }
+        #expect(ALifecycle.catchUps(core) == 0, "a copy without a hydration was caught up")
+        await copy.close()
+    }
+
     @Test func aFirstHydrationThatIsRateLimitedWaitsAsLongAsTheServerAsks() async throws {
         let core = FakeCore.writer()
         let clock = ManualClock()
