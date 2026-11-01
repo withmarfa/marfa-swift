@@ -218,7 +218,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
             .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle, .unsentDiffers,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,
-            .firstSyncWaiting, .invalid, .keyChanging, .versionConflict, .instanceChanged,
+            .firstSyncWaiting, .invalid, .fault, .keyChanging, .versionConflict, .instanceChanged,
             .closed, .noConnection:
             true
         }

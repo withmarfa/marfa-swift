@@ -101,6 +101,11 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case firstSyncWaiting(message: String)
     /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
+    /// The core itself went wrong, such as a panic it caught at its boundary, so the call ended without an answer.
+    ///
+    /// It is never the app's input or the server's answer, so it is neither ``isTransient`` nor the caller's mistake:
+    /// asking again with nothing changed is not known to help. Report it.
+    case fault(message: String)
     /// The call came while ``WorkingCopy/useKey(_:)`` replaced the copy's key, and was not made. Ask again once
     /// the change is done.
     case keyChanging(message: String)
@@ -178,7 +183,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
-            .invalid(let message), .keyChanging(let message), .versionConflict(let message),
+            .invalid(let message), .fault(let message), .keyChanging(let message), .versionConflict(let message),
             .instanceChanged(let message), .closed(let message), .noConnection(let message):
             message
         }
@@ -231,6 +236,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
+        case .fault(let message): core = .Fault(message: message)
         case .versionConflict(let message): core = .Server(status: 409, code: "version_conflict", message: message)
         case .instanceChanged(let message): core = .CopyExpired(reason: "instance_changed", message: message)
         case .keyChanging: return "key_changing"
@@ -288,6 +294,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
         case .Invalid(let message): self = .invalid(message: message)
+        case .Fault(let message): self = .fault(message: message)
         }
     }
 }
