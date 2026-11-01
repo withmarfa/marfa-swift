@@ -185,20 +185,137 @@ struct AnAppCallThatFails {
         await copy.close()
     }
 
-    @Test func aTransientFailureOfAnAppCallLeavesACopyThatNeedsAHydrationAlone() async throws {
-        let core = FakeCore.writer()
-        core.state.withLock { $0.hydration = .never }
-        let clock = ManualClock()
+    // MARK: A transient failure of an app's call on a copy that needs a hydration
+
+    private static func isOffline(_ connection: CopyConnection?) -> Bool {
+        if case .offline? = connection { true } else { false }
+    }
+
+    /// The `count`th wait of a retry, which a hydration's half-second progress reads sit between.
+    private static func retryWait(_ clock: ManualClock, _ count: Int) async throws -> Duration {
+        try await eventually("a retry was waited for") {
+            clock.requested.filter { $0 >= .seconds(1) }.count > count && clock.waiting > 0
+        }
+        return clock.requested.filter { $0 >= .seconds(1) }[count]
+    }
+
+    private func copyWithoutAHydration(_ core: FakeCore, _ clock: ManualClock) async throws -> (WorkingCopy, Updates) {
+        core.state.withLock {
+            $0.hydration = .never
+            $0.hydrationCompletes = true
+        }
         let copy = ALifecycle.copy(core, clock)
         let updates = Updates(copy.updates())
         try await eventually("waiting for a hydration") { updates.connection == .needsHydration(nil) }
+        return (copy, updates)
+    }
+
+    @Test func aFirstHydrationThatFailsOnTheNetworkIsOfflineThenAsksForAHydrationAgain() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await copyWithoutAHydration(core, clock)
+        let network = Marfa.MarfaError.network(message: "offline")
+
+        core.state.withLock { $0.hydrateFails = ALifecycle.offline }
+        await #expect(throws: network) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+        try await eventually("offline") { updates.connection == .offline(network) }
+        #expect(try await Self.retryWait(clock, 0) == .seconds(5))
+
+        // A server event does not show the copy following: only a hydration or a catch-up that succeeds does.
+        core.change(0, ALifecycle.applied("a"))
+        try await eventually("the event's row was named") { updates.namedItems.contains("a") }
+        #expect(updates.connection == .offline(network))
+
+        clock.advance(by: .seconds(5))
+        try await eventually("asks for a hydration again") { updates.connection == .needsHydration(nil) }
+        #expect(ALifecycle.catchUps(core) == 0, "a copy without a hydration was caught up")
+        #expect(clock.waiting == 0)
+
+        core.state.withLock { $0.hydrateFails = nil }
+        _ = try await copy.hydrate(types: ["app.test.entry"], tier: .all)
+        try await eventually("following") { updates.connection == .following }
+        await copy.close()
+    }
+
+    @Test func aFirstHydrationThatKeepsFailingOnTheNetworkWaitsLongerEachTime() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await copyWithoutAHydration(core, clock)
+        let network = Marfa.MarfaError.network(message: "offline")
+        core.state.withLock { $0.hydrateFails = ALifecycle.offline }
+
+        for (round, wait) in [5, 10, 20].enumerated() {
+            await #expect(throws: network) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+            try await eventually("offline") { updates.connection == .offline(network) }
+            #expect(try await Self.retryWait(clock, round) == .seconds(wait))
+            clock.advance(by: .seconds(wait))
+            try await eventually("asks for a hydration again") { updates.connection == .needsHydration(nil) }
+        }
+        await copy.close()
+    }
+
+    @Test func aFirstHydrationThatIsRateLimitedWaitsAsLongAsTheServerAsks() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await copyWithoutAHydration(core, clock)
+
+        core.state.withLock {
+            $0.hydrateFails = .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 60)
+        }
+        await #expect(throws: (any Error).self) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+        try await eventually("offline") { Self.isOffline(updates.connection) }
+        #expect(try await Self.retryWait(clock, 0) == .seconds(60))
+
+        clock.advance(by: .seconds(5))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(Self.isOffline(updates.connection), "asked again before the rate limit allowed")
+
+        clock.advance(by: .seconds(55))
+        try await eventually("asks for a hydration again") { updates.connection == .needsHydration(nil) }
+        await copy.close()
+    }
+
+    @Test func anExpiredCopyThatFailsToHydrateOnTheNetworkIsOfflineThenNeedsItsHydrationAgain() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let expired = Marfa.MarfaError.copyExpired(reason: "catchup_too_old", message: "refill")
+        core.state.withLock { $0.catchUpFails = .CopyExpired(reason: "catchup_too_old", message: "refill") }
+        let copy = ALifecycle.copy(core, clock)
+        let updates = Updates(copy.updates())
+        try await eventually("needs a hydration, and why") { updates.connection == .needsHydration(expired) }
+
+        core.state.withLock { $0.hydrateFails = ALifecycle.offline }
+        await #expect(throws: (any Error).self) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
+        try await eventually("offline") { updates.connection == .offline(.network(message: "offline")) }
+        core.change(0, ALifecycle.applied("a"))
+        try await eventually("the event's row was named") { updates.namedItems.contains("a") }
+        #expect(Self.isOffline(updates.connection))
+
+        let catchUps = ALifecycle.catchUps(core)
+        clock.advance(by: .seconds(5))
+        try await eventually("needs its hydration again, and why") { updates.connection == .needsHydration(expired) }
+        #expect(ALifecycle.catchUps(core) == catchUps, "an expired copy was caught up")
+
+        core.state.withLock {
+            $0.hydrateFails = nil
+            $0.catchUpFails = nil
+        }
+        _ = try await copy.hydrate(types: ["app.test.entry"], tier: .all)
+        try await eventually("following") { updates.connection == .following }
+        await copy.close()
+    }
+
+    @Test func aTransientFailureOfAnAppCatchUpOnACopyWithoutAHydrationIsOfflineToo() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await copyWithoutAHydration(core, clock)
 
         core.state.withLock { $0.catchUpFails = ALifecycle.offline }
         await #expect(throws: (any Error).self) { try await copy.catchUp() }
-        core.change(0, ALifecycle.applied("a"))
-        try await eventually("the event's row was named") { updates.namedItems.contains("a") }
-        #expect(copy.lifecycle.connection == .needsHydration(nil))
-        #expect(clock.waiting == 0, "a copy that needs a hydration was asked again")
+        try await eventually("offline") { Self.isOffline(updates.connection) }
+        clock.advance(by: .seconds(5))
+        try await eventually("asks for a hydration again") { updates.connection == .needsHydration(nil) }
+        #expect(ALifecycle.catchUps(core) == 1, "only the app's own catch-up was made")
         await copy.close()
     }
 

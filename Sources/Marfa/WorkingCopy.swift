@@ -424,8 +424,8 @@ public final class WorkingCopy: Sendable {
     ///   that fails with such an error while the copy follows, and one that fails on a copy without a completed
     ///   hydration leaves it `.needsHydration` with the error. An error the app's arguments caused, a canceled call,
     ///   a call made during a key change, a call that began under a key since replaced, and an app's call that fails
-    ///   with a failure that may mend itself while the copy is `.stopped` or `.needsHydration` change nothing, and
-    ///   neither does such a failure of the five-minute retry, which is made again after five minutes. A server
+    ///   with a failure that may mend itself while the copy is `.stopped` change nothing, and neither does such a
+    ///   failure of the five-minute retry, which is made again after five minutes. A server
     ///   event does not make a stopped copy `.following`; a catch-up or a hydration that succeeds, the app's or the
     ///   retry's, does.
     /// - When the core's own fault ends the follow, the sequence still hears the copy's own writes, and the server's
@@ -437,7 +437,10 @@ public final class WorkingCopy: Sendable {
     ///   everything.
     /// - A key the server refused is `.keyRefused`, and nothing is tried until ``useKey(_:)``, which catches up at
     ///   once with the new key.
-    /// - A copy that must be hydrated first is `.needsHydration`, and nothing is tried until a hydration completes.
+    /// - A copy that must be hydrated first is `.needsHydration`, and the app hydrates it; nothing else is tried until
+    ///   a hydration completes. When the app's own hydration or catch-up of such a copy fails with a failure that may
+    ///   mend itself, the copy is `.offline`, waits as above, and is `.needsHydration` again, so the app hydrates
+    ///   again; a server event does not show it following in the meantime.
     /// - A drain, the app's or the follow's, that left writes undelivered while the copy follows is made again after
     ///   the same waits, honoring the report's `retryAfterSeconds`. The app still drains after its own writes.
     ///
