@@ -16841,25 +16841,33 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OwnerPasskey/created_at`.
             public var createdAt: Swift.String
+            /// When the passkey last signed the owner in, in UTC, to the second, or `null` if no use is recorded.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskey/last_used_at`.
+            public var lastUsedAt: Swift.String?
             /// Creates a new `OwnerPasskey`.
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the passkey.
             ///   - name: The owner's name for the passkey, or `null` when unnamed.
             ///   - createdAt: When the passkey was registered, in UTC.
+            ///   - lastUsedAt: When the passkey last signed the owner in, in UTC, to the second, or `null` if no use is recorded.
             public init(
                 id: Swift.String,
                 name: Swift.String? = nil,
-                createdAt: Swift.String
+                createdAt: Swift.String,
+                lastUsedAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.name = name
                 self.createdAt = createdAt
+                self.lastUsedAt = lastUsedAt
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case name
                 case createdAt = "created_at"
+                case lastUsedAt = "last_used_at"
             }
         }
         /// An error response.
