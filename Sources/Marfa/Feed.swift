@@ -356,31 +356,52 @@ final class Feed: Sendable {
     /// how it ended.
     ///
     /// One that waited, for the same slice as a hydration that just completed under the same key, returns that one's
-    /// report while the copy is still whole.
-    func hydrate(types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], inPlaceOnly: Bool) async throws
-        -> MarfaCore.HydrateReport
-    {
+    /// report while the copy is still whole. `told` hears how the call ended before the next call's turn begins, so
+    /// calls that wait for each other are reported in the order they ran.
+    func hydrate(
+        types: [String], tier: MarfaCore.SliceTier, edgeTypes: [String], inPlaceOnly: Bool,
+        told: (Result<MarfaCore.HydrateReport, any Error>) -> Void
+    ) async throws -> MarfaCore.HydrateReport {
         let waited = try await takeFill()
         defer { releaseFill() }
         let underThisKey = { (state: inout State) in
             state.lastFill.flatMap { $0.suspensions == state.suspensions ? $0 : nil }
         }
-        if waited, let filled = locked(underThisKey),
-            filled.types == types, filled.tier == tier, filled.edgeTypes == edgeTypes,
-            (try? await holder.run({ try $0.status() }).hydration) == .complete
-        {
-            return filled.report
+        let result: Result<MarfaCore.HydrateReport, any Error>
+        do {
+            if waited, let filled = locked(underThisKey),
+                filled.types == types, filled.tier == tier, filled.edgeTypes == edgeTypes,
+                (try? await holder.run({ try $0.status() }).hydration) == .complete
+            {
+                result = .success(filled.report)
+            } else {
+                result = .success(
+                    try await fill(
+                        types: types, tier: tier, edgeTypes: edgeTypes, byRefill: false, inPlaceOnly: inPlaceOnly))
+            }
+        } catch {
+            result = .failure(error)
         }
-        return try await fill(types: types, tier: tier, edgeTypes: edgeTypes, byRefill: false, inPlaceOnly: inPlaceOnly)
+        told(result)
+        return try result.get()
     }
 
     /// Runs the app's catch-up after any hydration or catch-up this copy is running, since the core refuses one
-    /// that meets another.
-    func catchUp<T: Sendable>(_ work: () async throws -> T) async throws -> T {
+    /// that meets another, and tells `told` how it ended before the next call's turn begins.
+    func catchUp<T: Sendable>(
+        _ work: () async throws -> T, told: (Result<T, any Error>) -> Void = { _ in }
+    ) async throws -> T {
         _ = try await takeFill()
         defer { releaseFill() }
         locked { $0.lastFill = nil }
-        return try await work()
+        let result: Result<T, any Error>
+        do {
+            result = .success(try await work())
+        } catch {
+            result = .failure(error)
+        }
+        told(result)
+        return try result.get()
     }
 
     /// Waits until no other hydration or catch-up of this copy runs, and says whether it had to.

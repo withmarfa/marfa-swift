@@ -153,7 +153,14 @@ final class FakeCore: Core, @unchecked Sendable {
         var refused: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
+        /// What each next catch-up does before `catchUpFails` applies, in order: it waits for `hold` to be
+        /// signaled, and fails with `fails` where one is given.
+        var catchUpScript: [(hold: DispatchSemaphore?, fails: MarfaCore.MarfaError?)] = []
         var catchUps = 0
+        /// Held by the next `status()` after it has read the copy, so it answers what the copy was when it began.
+        var statusGate: DispatchSemaphore?
+        /// How many held `status()` reads have returned.
+        var heldStatuses = 0
         var drains = 0
         /// While a hydration runs, what `status()` says of its progress.
         var itemsExpected: UInt64?
@@ -202,20 +209,37 @@ final class FakeCore: Core, @unchecked Sendable {
 
     let state = Mutex(State())
 
+    /// Room on the shared core queues for every gate the tests in the process park at once.
+    ///
+    /// A gated call holds its thread until released, and the queues are sized to the machine, so on a runner with a
+    /// few cores the gated calls of tests running side by side would fill them and hold up every other test. The
+    /// blocking queue keeps more room than the calls queue, as it does on any machine, since a test that fills the
+    /// calls queue with calls waiting on the server parks them all on the blocking queue. Both stay well under the
+    /// threads the system starts for a process, or the parked gates would starve everything else instead.
+    private static let roomForGates: Void = {
+        CoreQueue.calls.allow(atLeast: 16)
+        CoreQueue.blocking.allow(atLeast: 32)
+    }()
+
+    private static func make() -> FakeCore {
+        _ = roomForGates
+        return FakeCore(noHandle: .init())
+    }
+
     static func reader() -> FakeCore {
-        let core = FakeCore(noHandle: .init())
+        let core = make()
         core.state.withLock { $0.handle = .reader }
         return core
     }
 
     static func writer() -> FakeCore {
-        FakeCore(noHandle: .init())
+        make()
     }
 
     /// A writer whose drop waits on `probe`, to hold a close in the middle of
     /// releasing the store.
     static func writer(probe: DropProbe) -> FakeCore {
-        let core = FakeCore(noHandle: .init())
+        let core = make()
         core.state.withLock { $0.probe = probe }
         return core
     }
@@ -408,7 +432,13 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
-        try state.withLock { state in
+        let step = state.withLock { state in state.catchUpScript.isEmpty ? nil : state.catchUpScript.removeFirst() }
+        step?.hold?.wait()
+        if let failure = step?.fails {
+            state.withLock { $0.catchUps += 1 }
+            throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: false)
+        }
+        return try state.withLock { state in
             // The core's catch-up claims the stream a hydration holds (`claim_stream(Mover::CatchUp)`).
             guard !state.hydrating else {
                 throw MarfaCore.CatchUpError.Failed(
@@ -427,12 +457,17 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func status() throws -> MarfaCore.Status {
-        let (slice, origin, instance) = state.withLock { ($0.slice, $0.serverOrigin, $0.instanceId) }
+        let (slice, origin, instance, hydration, held) = state.withLock { state in
+            defer { state.statusGate = nil }
+            return (state.slice, state.serverOrigin, state.instanceId, state.hydration, state.statusGate)
+        }
+        held?.wait()
+        if held != nil { state.withLock { $0.heldStatuses += 1 } }
         return MarfaCore.Status(
             serverOrigin: origin, instanceId: instance, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
             sliceEdgeTypes: slice?.edgeTypes ?? [], pinned: [],
             eventCursor: nil,
-            hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
+            hydration: hydration, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
             itemsListed: state.withLock { $0.itemsListed }, edges: 0,
             catalogVersion: 1, syncedAt: state.withLock { $0.syncedAt },
             fileCache: MarfaCore.FileCache(

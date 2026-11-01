@@ -4,19 +4,24 @@ import Testing
 
 @testable import Marfa
 
-/// What an error means for an app: offline, a refused key, or a failure that passes by itself.
+/// What an error means for an app: offline, a refused key, a failure that passes by itself, or a copy that needs a
+/// hydration.
 @Suite struct ErrorMeaning {
     private struct Meaning: Equatable, CustomStringConvertible {
         var offline = false
         var keyRefusal = false
         var transient = false
+        var hydrationNeeded = false
 
         static let none = Meaning()
         static let offline = Meaning(offline: true, transient: true)
         static let keyRefusal = Meaning(keyRefusal: true)
         static let transient = Meaning(transient: true)
+        static let hydration = Meaning(hydrationNeeded: true)
 
-        var description: String { "offline \(offline), key refusal \(keyRefusal), transient \(transient)" }
+        var description: String {
+            "offline \(offline), key refusal \(keyRefusal), transient \(transient), hydration needed \(hydrationNeeded)"
+        }
     }
 
     /// One example of every case, and some of them more than once where the values they carry change the answer.
@@ -48,15 +53,15 @@ import Testing
         (.noKeychain(message: "m"), .none),
         (.redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m"), .none),
         (.noServer(message: "m"), .none),
-        (.noCursor(message: "m"), .none),
-        (.hydrationIncomplete(message: "m"), .none),
+        (.noCursor(message: "m"), .hydration),
+        (.hydrationIncomplete(message: "m"), .hydration),
         (.noCatalog(message: "m"), .none),
         (.wrongSchema(path: "p", reason: "r", unsent: 0, message: "m"), .none),
         (.readingHandle(message: "m"), .none),
         (.unsentDiffers(path: "p", unsent: 1, agreed: 0, message: "m"), .none),
         (.copyExpired(reason: "credential_ended", message: "m"), .keyRefusal),
-        (.copyExpired(reason: "reach_changed", message: "m"), .none),
-        (.copyExpired(reason: "catchup_too_old", message: "m"), .none),
+        (.copyExpired(reason: "reach_changed", message: "m"), .hydration),
+        (.copyExpired(reason: "catchup_too_old", message: "m"), .hydration),
         (.streamIncomplete(reason: "credential_ended", message: "m"), .keyRefusal),
         (.streamIncomplete(reason: "replay_failed", message: "m"), .none),
         (.wrongServer(expected: "a", got: "b", message: "m"), .none),
@@ -64,18 +69,20 @@ import Testing
         (.noRoom(hash: "h", size: 5, free: 3, message: "m"), .none),
         (.contractMismatch(served: "3", expected: 2, status: 200, writeSent: false, message: "m"), .none),
         (.canceled(message: "m"), .none),
-        (.firstSyncWaiting(message: "m"), .none),
+        (.firstSyncWaiting(message: "m"), .hydration),
         (.invalid(message: "m"), .none),
         (.keyChanging(message: "m"), .transient),
         (.versionConflict(message: "m"), .none),
-        (.instanceChanged(message: "m"), .none),
+        (.instanceChanged(message: "m"), .hydration),
         (.closed(message: "m"), .none),
         (.noConnection(message: "m"), .offline),
     ]
 
     @Test(arguments: meanings)
     private func eachErrorSaysWhatItMeans(error: Marfa.MarfaError, meaning: Meaning) {
-        let said = Meaning(offline: error.isOffline, keyRefusal: error.isKeyRefusal, transient: error.isTransient)
+        let said = Meaning(
+            offline: error.isOffline, keyRefusal: error.isKeyRefusal, transient: error.isTransient,
+            hydrationNeeded: error.isHydrationNeeded)
         #expect(said == meaning, "\(error)")
     }
 
@@ -83,6 +90,7 @@ import Testing
         for (error, _) in Self.meanings {
             #expect(!(error.isKeyRefusal && error.isTransient), "\(error)")
             #expect(!error.isOffline || error.isTransient, "\(error)")
+            #expect(!(error.isHydrationNeeded && (error.isKeyRefusal || error.isTransient)), "\(error)")
         }
     }
 

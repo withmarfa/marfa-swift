@@ -52,14 +52,31 @@ final class CoreQueue: Sendable {
         var running = 0
         var sequence: UInt64 = 0
         var pending: [Pending] = []
+        var limit: Int
     }
 
-    let limit: Int
-    private let state = Mutex(State())
+    private let state: Mutex<State>
 
     init(limit: Int) {
         precondition(limit > 0, "a queue needs room for one job")
-        self.limit = limit
+        state = Mutex(State(limit: limit))
+    }
+
+    /// How many jobs may run at once.
+    var limit: Int { state.withLock { $0.limit } }
+
+    /// Makes room for at least `limit` jobs at once and starts any that were waiting for it.
+    ///
+    /// Tests that park core calls on gates use it: the queues are shared by every test in the process, and a few
+    /// parked calls from tests running side by side would otherwise fill a small machine's room and hold up all the rest.
+    func allow(atLeast limit: Int) {
+        let started = state.withLock { state -> [Pending] in
+            state.limit = max(state.limit, limit)
+            var started: [Pending] = []
+            while let next = take(&state) { started.append(next) }
+            return started
+        }
+        for job in started { dispatch(job) }
     }
 
     /// How many jobs wait for room.
@@ -132,7 +149,7 @@ final class CoreQueue: Sendable {
 
     /// The pending job to start now, if there is room for one.
     private func take(_ state: inout State) -> Pending? {
-        guard state.running < limit else { return nil }
+        guard state.running < state.limit else { return nil }
         guard
             let best = state.pending.indices.min(by: {
                 let (a, b) = (state.pending[$0], state.pending[$1])

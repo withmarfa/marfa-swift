@@ -3,7 +3,7 @@ internal import MarfaCore
 
 /// Every way the working copy refuses or fails. `code` is the server's refusal code, where the server answered.
 ///
-/// Three properties say what an error means for an app, so that it needs no list of cases of its own:
+/// Four properties say what an error means for an app, so that it needs no list of cases of its own:
 ///
 /// - ``isOffline``: the server could not be reached, or its answer did not arrive. A write may still have reached
 ///   the server.
@@ -14,6 +14,10 @@ internal import MarfaCore
 /// - ``isTransient``: asking again later can clear it, with nothing changed. It is the rule the core's own
 ///   follow waits out, with `noConnection` and `keyChanging` added. No error is both a key refusal and transient,
 ///   and every offline error is transient.
+/// - ``isHydrationNeeded``: the copy must be hydrated before it can be caught up or followed. Asking again cannot
+///   clear it. It is `true` for `copyExpired` (unless its reason is `credential_ended`, which is a key refusal),
+///   `instanceChanged`, `noCursor`, `hydrationIncomplete` and `firstSyncWaiting`, and never for a key refusal or
+///   a transient error.
 public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The server has no such row, route or name (404).
     case notFound(code: String, message: String)
@@ -143,6 +147,18 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         switch self {
         case .network, .noConnection, .io, .storageFull, .rateLimited, .unnamed, .keyChanging: true
         case .server(let status, _, _): status >= 500 || status == 408
+        default: false
+        }
+    }
+
+    /// The copy must be hydrated before it can be caught up or followed, and asking again cannot clear it.
+    ///
+    /// It is the rule ``CopyConnection/needsHydration(_:)`` follows. A `copyExpired` whose reason is
+    /// `credential_ended` is a key refusal instead, which a new key clears.
+    public var isHydrationNeeded: Bool {
+        switch self {
+        case .copyExpired(let reason, _): reason != "credential_ended"
+        case .instanceChanged, .noCursor, .hydrationIncomplete, .firstSyncWaiting: true
         default: false
         }
     }

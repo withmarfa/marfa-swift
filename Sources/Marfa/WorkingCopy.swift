@@ -54,6 +54,12 @@ public final class WorkingCopy: Sendable {
         feed.announce(change)
     }
 
+    #if DEBUG
+    package func script(_ update: CopyUpdate) {
+        lifecycle.script(update)
+    }
+    #endif
+
     /// What ``open(store:server:fileBudget:ifRefused:)`` does with a store another build of the core made.
     public enum IfRefused: Sendable, Hashable {
         /// Throws `wrongSchema` and leaves the store as it is.
@@ -238,21 +244,23 @@ public final class WorkingCopy: Sendable {
     public func hydrate(types: [String], tier: SliceTier, edgeTypes: [String] = [], inPlaceOnly: Bool = false)
         async throws -> HydrateReport
     {
-        let began = lifecycle.streamsLetGo()
-        do {
-            let report = HydrateReport(
-                try await feed.hydrate(types: types, tier: tier.core, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly))
-            lifecycle.pulled(began: began)
-            return report
-        } catch {
-            // An in-place hydration refused for the copy it found leaves that copy as it was, so only a refused key
-            // or a failure that may mend says anything about the follow.
-            if let refusal = error as? MarfaError, inPlaceOnly, !refusal.isKeyRefusal, !refusal.isTransient {
-                throw error
+        let (began, key) = (lifecycle.streamsLetGo(), lifecycle.keyEpoch)
+        let report = try await feed.hydrate(
+            types: types, tier: tier.core, edgeTypes: edgeTypes, inPlaceOnly: inPlaceOnly
+        ) { [lifecycle] outcome in
+            switch outcome {
+            case .success:
+                lifecycle.pulled(keyEpoch: key, began: began)
+            case .failure(let error):
+                // An in-place hydration refused for the copy it found leaves that copy as it was, so only a refused
+                // key or a failure that may mend says anything about the follow.
+                if let refusal = error as? MarfaError, inPlaceOnly, !refusal.isKeyRefusal, !refusal.isTransient {
+                    return
+                }
+                lifecycle.failed(error, keyEpoch: key)
             }
-            lifecycle.failed(error)
-            throw error
         }
+        return HydrateReport(report)
     }
 
     /// Replaces the app's declared types, each a type definition.
@@ -295,14 +303,12 @@ public final class WorkingCopy: Sendable {
     /// `changes()` stream starts, waits for it and then catches up from the
     /// cursor it left.
     public func catchUp() async throws -> CatchUpReport {
-        let began = lifecycle.streamsLetGo()
-        do {
-            let report = try await caughtUp(holder, feed)
-            lifecycle.pulled(began: began)
-            return report
-        } catch {
-            lifecycle.failed(error)
-            throw error
+        let (began, key) = (lifecycle.streamsLetGo(), lifecycle.keyEpoch)
+        return try await caughtUp(holder, feed) { [lifecycle] outcome in
+            switch outcome {
+            case .success: lifecycle.pulled(keyEpoch: key, began: began)
+            case .failure(let error): lifecycle.failed(error, keyEpoch: key)
+            }
         }
     }
 
@@ -414,7 +420,14 @@ public final class WorkingCopy: Sendable {
     ///   doubling up to 5 minutes apart, and never sooner than a rate limit's `retryAfterSeconds` asks. A follow that
     ///   ran 5 minutes since it last failed starts again from 5 seconds.
     /// - A follow the core stopped with any other error is `.stopped`, and a catch-up is tried every 5 minutes, since
-    ///   the server may change. A server event does not make it `.following`; the catch-up that succeeds does.
+    ///   the server may change. So is the app's own ``catchUp()`` or ``hydrate(types:tier:edgeTypes:inPlaceOnly:)``
+    ///   that fails with such an error while the copy follows, and one that fails on a copy without a completed
+    ///   hydration leaves it `.needsHydration` with the error. An error the app's arguments caused, a canceled call,
+    ///   a call made during a key change, a call that began under a key since replaced, and an app's call that fails
+    ///   with a failure that may mend itself while the copy is `.stopped` or `.needsHydration` change nothing, and
+    ///   neither does such a failure of the five-minute retry, which is made again after five minutes. A server
+    ///   event does not make a stopped copy `.following`; a catch-up or a hydration that succeeds, the app's or the
+    ///   retry's, does.
     /// - When the core's own fault ends the follow, the sequence still hears the copy's own writes, and the server's
     ///   events again once a catch-up succeeds and the follow starts again.
     /// - A refill of a stale copy is `.connecting`, and `.offline` while a failure that may mend itself holds it up;
@@ -463,7 +476,7 @@ public final class WorkingCopy: Sendable {
     /// The store cannot be reopened while a call is running, so this waits for
     /// the slowest running call, and from the moment it starts until the new
     /// key is in use every call on the copy, new ones included, throws
-    /// `invalid`: ask again. The role the copy holds, `handle`, is taken again,
+    /// `keyChanging`: ask again. The role the copy holds, `handle`, is taken again,
     /// so it is a reader if another opener took the writer role in between.
     ///
     /// Throws `noServer` for a copy opened without a server, and `closed` for
@@ -1143,7 +1156,12 @@ public struct Queue: Sendable {
 
 /// Reads the type catalog again, then applies every event since the last hydration or catch-up, and tells every
 /// held stream what changed.
-func caughtUp(_ holder: CoreHolder, _ feed: Feed) async throws -> CatchUpReport {
+///
+/// `told` hears how the catch-up ended while the copy's turn is still held, so a call that waited for this one runs
+/// after it has been told.
+func caughtUp(
+    _ holder: CoreHolder, _ feed: Feed, told: ((Result<CatchUpReport, any Error>) -> Void)? = nil
+) async throws -> CatchUpReport {
     // The core commits a new catalog before it applies anything, so a
     // catch-up that then fails has still changed it, and says so.
     let (caughtUp, catalogChanged) = try await feed.catchUp {
@@ -1154,6 +1172,11 @@ func caughtUp(_ holder: CoreHolder, _ feed: Feed) async throws -> CatchUpReport 
             } catch MarfaCore.CatchUpError.Failed(let error, let catalogChanged) {
                 return (.failure(MarfaError(error)), catalogChanged)
             }
+        }
+    } told: { outcome in
+        switch outcome {
+        case .success((let result, _)): told?(result.mapError { $0 as any Error })
+        case .failure(let error): told?(.failure(error))
         }
     }
     if catalogChanged {
