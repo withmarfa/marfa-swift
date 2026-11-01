@@ -10,7 +10,12 @@ public enum CopyConnection: Sendable, Hashable {
     /// The copy must be hydrated before it can follow its server, for this reason: an error with
     /// ``MarfaError/isHydrationNeeded``, such as `copyExpired` or `instanceChanged`; for a copy that holds no
     /// completed hydration, the error the app's own catch-up or hydration last failed with, such as `wrongServer`;
-    /// or `nil` for such a copy before one has failed. Nothing is tried again until a hydration completes.
+    /// or `nil` for such a copy before one has failed. The copy tries nothing itself until a hydration completes:
+    /// the app hydrates.
+    ///
+    /// A failure of the app's own hydration or catch-up that may mend itself, such as the network, shows the copy
+    /// `.offline` instead, and when its wait ends the copy is `.needsHydration` again with the same reason, so the
+    /// app hydrates again. Only a hydration or a catch-up that succeeds shows it following.
     case needsHydration(MarfaError?)
     /// The copy is asking its server: as updates begin, after ``WorkingCopy/useKey(_:)``, and while a refill fills
     /// a stale copy again.
@@ -19,6 +24,11 @@ public enum CopyConnection: Sendable, Hashable {
     case following
     /// The server can't be reached for now, for this error. The copy tries again by itself, further apart each
     /// time, and never sooner than a rate limit asks.
+    ///
+    /// For a copy that must be hydrated first, the app's own hydration or catch-up failed this way. It is not
+    /// following whatever else the server tells it: only a hydration or a catch-up that succeeds changes that. When
+    /// the wait ends it is ``needsHydration(_:)`` again, since a catch-up cannot do what only a hydration does, and the
+    /// app hydrates again.
     case offline(MarfaError)
     /// The follow, or the app's own ``WorkingCopy/catchUp()`` or ``WorkingCopy/hydrate(types:tier:edgeTypes:inPlaceOnly:)``,
     /// stopped with an error that asking again may not clear, such as a refusal from the server, a fault in the
@@ -250,6 +260,14 @@ final class Lifecycle: Sendable {
         /// and by a new run, whose first status read decides again. A server event, a failure that may mend itself or
         /// a status read never clear it.
         var mustPull = false
+        /// Whether the copy needs a hydration, whatever it shows now.
+        ///
+        /// Set whenever it is told `.needsHydration`, and cleared, as `mustPull` is, by a pull that succeeds, a key
+        /// change and a new run. A failure that may mend itself shows such a copy `.offline` for a while, so the
+        /// connection alone can't say it.
+        var needsHydration = false
+        /// Why the copy last needed a hydration, so the end of an `.offline` wait can say it again.
+        var needed: MarfaError?
         /// Counts the pulls that succeeded, so a first status read can tell that a hydration or a catch-up completed
         /// while it was being taken, which makes what it read stale; a failure leaves the read as true as it was.
         var pulls = 0
@@ -336,6 +354,8 @@ final class Lifecycle: Sendable {
             state.drainAttempts = 0
             state.followingSince = nil
             state.mustPull = false
+            state.needsHydration = false
+            state.needed = nil
             state.connection = follows ? .connecting : .local
             if state.fills > 0 { startProgress(&state) }
             return (state.run, state.epoch, claimStream(&state))
@@ -520,6 +540,10 @@ final class Lifecycle: Sendable {
             guard !state.mustPull else { return }
             state.followingSince = clock.now
         }
+        if case .needsHydration(let reason) = connection {
+            state.needsHydration = true
+            state.needed = reason
+        }
         state.connection = connection
         mark(&state) { _ in }
     }
@@ -647,6 +671,7 @@ final class Lifecycle: Sendable {
             if let retry = state.retry { state.canceled.append(retry) }
             state.retry = nil
             state.mustPull = false
+            state.needsHydration = false
             state.pulls += 1
             set(&state, .following)
             mark(&state) { $0.synced = true }
@@ -665,9 +690,9 @@ final class Lifecycle: Sendable {
     /// once another stream is claimed: a pull may have succeeded and taken one since the stop was heard. A call of
     /// the app's that began under an earlier key (`keyEpoch`) changes nothing, a refusal of the old key included.
     ///
-    /// A copy stopped or without a hydration must pull: whatever fails afterwards that may mend, the app's call or
-    /// the lifecycle's own retry, leaves it showing why it stopped (the retry asks again at the slow pace), and
-    /// only a catch-up or a hydration that succeeds follows again.
+    /// A copy stopped or without a hydration must pull: only a catch-up or a hydration that succeeds follows again.
+    /// A failure that may mend itself leaves a stopped copy showing why it stopped (the retry asks again at the slow
+    /// pace), and shows a copy that needs a hydration `.offline` until the wait ends (see ``claimRetry(_:)``).
     func failed(_ error: any Error, epoch: Int? = nil, keyEpoch: Int? = nil, claim: UUID? = nil) {
         let error = error as? MarfaError ?? .store(message: "\(error)")
         locked { state in
@@ -697,20 +722,25 @@ final class Lifecycle: Sendable {
                 cancelRetry(&state)
                 set(&state, .needsHydration(error))
             case .offline:
-                if state.mustPull {
-                    // The copy keeps showing why it stopped, which a failure that may mend does not change. Its
-                    // own retry, which this one ended, is asked again at the slow pace, since the fault that
-                    // stopped it is not the network's.
-                    if case .stopped = state.connection, state.retry == nil {
-                        schedulePull(&state, after: max(pace.slow, Self.retryAfter(error)))
+                if state.mustPull, !state.needsHydration {
+                    switch state.connection {
+                    case .offline, .connecting:
+                        break
+                    default:
+                        // The copy keeps showing why it stopped, which a failure that may mend itself does not
+                        // change. Its own retry, which this one ended, is asked again at the slow pace, since the
+                        // fault that stopped it is not the network's.
+                        if case .stopped = state.connection, state.retry == nil {
+                            schedulePull(&state, after: max(pace.slow, Self.retryAfter(error)))
+                        }
+                        return
                     }
-                    return
                 }
                 set(&state, .offline(error))
                 schedulePull(&state, after: backoff(&state, retryAfter: Self.retryAfter(error)))
             case .stopped:
                 state.mustPull = true
-                if epoch == nil, case .needsHydration = state.connection {
+                if epoch == nil, state.needsHydration {
                     set(&state, .needsHydration(error))
                     return
                 }
@@ -786,11 +816,17 @@ final class Lifecycle: Sendable {
 
     /// Lets the waiting retry go on, unless a stop or a key change came first; a later success then won't cancel
     /// the pull it runs.
+    ///
+    /// A copy that needed a hydration and is `.offline` because the app's hydration could not reach the server is not
+    /// caught up: a catch-up on a copy without a completed hydration, or one that expired, only fails with the need
+    /// for a hydration. It is `.needsHydration` again, with the reason it had, so the app hydrates again.
     private func claimRetry(_ epoch: Int) -> Bool {
         locked { state in
             guard state.epoch == epoch, state.active, !state.closed else { return false }
             state.retry = nil
-            return true
+            guard state.needsHydration, case .offline = state.connection else { return true }
+            set(&state, .needsHydration(state.needed))
+            return false
         }
     }
 
@@ -1015,6 +1051,7 @@ final class Lifecycle: Sendable {
             state.drainAttempts = 0
             state.followingSince = nil
             state.mustPull = false
+            state.needsHydration = false
             set(&state, .connecting)
             return state.epoch
         }
