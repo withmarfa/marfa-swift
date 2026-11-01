@@ -40,6 +40,36 @@ struct FakeCopyBehavior {
         { error in (error as? FakeCopyError) == .unsupported(call: call) }
     }
 
+    @Test func aScriptedUpdateArrivesThroughTheCopysOwnUpdates() async throws {
+        let fake = Self.seeded()
+        var updates = fake.copy.updates().makeAsyncIterator()
+        let first = await updates.next()
+        #expect(first?.connection == .local)
+
+        let offline = CopyUpdate(
+            reread: .parts(Reread.Parts(queue: true)), connection: .offline(.noConnection(message: "off")),
+            fill: FillProgress(listed: 2, expected: 4), lastSynced: Date(timeIntervalSince1970: 1_000))
+        fake.sendUpdate(offline)
+        #expect(await updates.next() == offline)
+
+        // Two sent at once arrive in order, each as given.
+        let following = CopyUpdate(reread: .everything, connection: .following)
+        let stopped = CopyUpdate(reread: .parts(Reread.Parts()), connection: .stopped(.store(message: "m")))
+        fake.sendUpdate(following)
+        fake.sendUpdate(stopped)
+        #expect(await updates.next() == following)
+        #expect(await updates.next() == stopped)
+
+        // The copy's own announcements still arrive, telling the connection the script left.
+        fake.send(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
+        let heard = await updates.next()
+        #expect(heard?.reread == .parts(Reread.Parts(catalog: true)))
+        #expect(heard?.connection == .stopped(.store(message: "m")))
+
+        await fake.copy.close()
+        #expect(await updates.next()?.connection == .closed)
+    }
+
     @Test func theCopyServesWhatItIsGiven() async throws {
         let fake = Self.seeded()
         let copy = fake.copy

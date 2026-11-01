@@ -47,7 +47,7 @@ import Synchronization
 ///   `queue.discard(_:)`, `queue.forgetAnswered()`, with or without `ids`, and
 ///   `queue.takeAnswered()`.
 /// - `changes()`, which tells the app's own writes, and the changes ``send(_:)``
-///   puts on it.
+///   puts on it, and `updates()`, which tells `.local` and the updates ``sendUpdate(_:)`` scripts.
 ///
 /// Every other call throws ``FakeCopyError/unsupported(call:)``, including
 /// `changes(since:most:)`, since the fake records no changes to name, and the
@@ -111,6 +111,21 @@ public final class FakeCopy: Sendable {
     /// copy had made it.
     public func send(_ change: Marfa.Change) {
         copy.announce(change)
+    }
+
+    /// Delivers `update` as given through the copy's own ``WorkingCopy/updates()``, to every sequence held now.
+    ///
+    /// The update's connection, fill and `lastSynced` also become what later updates tell, so a test drives an
+    /// app's handling of ``CopyUpdate``s through the code the app runs. The copy has no server, so it reports
+    /// `.local` and does nothing else by itself: call this after `copy.updates()`, which resets the connection as
+    /// its first sequence begins.
+    ///
+    /// ```swift
+    /// var updates = fake.copy.updates().makeAsyncIterator()
+    /// fake.sendUpdate(CopyUpdate(reread: .everything, connection: .offline(.noConnection(message: "off"))))
+    /// ```
+    public func sendUpdate(_ update: CopyUpdate) {
+        copy.script(update)
     }
 
     /// Every write the copy received, in order, with the verdict it holds now.

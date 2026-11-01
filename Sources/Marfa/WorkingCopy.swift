@@ -54,6 +54,12 @@ public final class WorkingCopy: Sendable {
         feed.announce(change)
     }
 
+    #if DEBUG
+    package func script(_ update: CopyUpdate) {
+        lifecycle.script(update)
+    }
+    #endif
+
     /// What ``open(store:server:fileBudget:ifRefused:)`` does with a store another build of the core made.
     public enum IfRefused: Sendable, Hashable {
         /// Throws `wrongSchema` and leaves the store as it is.
@@ -414,7 +420,11 @@ public final class WorkingCopy: Sendable {
     ///   doubling up to 5 minutes apart, and never sooner than a rate limit's `retryAfterSeconds` asks. A follow that
     ///   ran 5 minutes since it last failed starts again from 5 seconds.
     /// - A follow the core stopped with any other error is `.stopped`, and a catch-up is tried every 5 minutes, since
-    ///   the server may change. A server event does not make it `.following`; the catch-up that succeeds does.
+    ///   the server may change. So is the app's own ``catchUp()`` or ``hydrate(types:tier:edgeTypes:inPlaceOnly:)``
+    ///   that fails with such an error while the copy follows, and one that fails on a copy without a completed
+    ///   hydration leaves it `.needsHydration` with the error. An error the app's arguments caused, a canceled call
+    ///   and a call made during a key change change nothing. A server event does not make a stopped copy
+    ///   `.following`; a catch-up or a hydration that succeeds, the app's or the retry's, does.
     /// - When the core's own fault ends the follow, the sequence still hears the copy's own writes, and the server's
     ///   events again once a catch-up succeeds and the follow starts again.
     /// - A refill of a stale copy is `.connecting`, and `.offline` while a failure that may mend itself holds it up;
@@ -463,7 +473,7 @@ public final class WorkingCopy: Sendable {
     /// The store cannot be reopened while a call is running, so this waits for
     /// the slowest running call, and from the moment it starts until the new
     /// key is in use every call on the copy, new ones included, throws
-    /// `invalid`: ask again. The role the copy holds, `handle`, is taken again,
+    /// `keyChanging`: ask again. The role the copy holds, `handle`, is taken again,
     /// so it is a reader if another opener took the writer role in between.
     ///
     /// Throws `noServer` for a copy opened without a server, and `closed` for
