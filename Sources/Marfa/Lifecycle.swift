@@ -246,8 +246,9 @@ final class Lifecycle: Sendable {
         var keyEpoch = 0
         /// Whether only a catch-up or a hydration that succeeds may show the copy following again.
         ///
-        /// Set whenever a follow stops or the copy needs a hydration, cleared by a pull that succeeds and by a key
-        /// change. A server event, a failure that may mend itself or a status read never clear it.
+        /// Set whenever a follow stops or the copy needs a hydration, cleared by a pull that succeeds, by a key change
+        /// and by a new run, whose first status read decides again. A server event, a failure that may mend itself or
+        /// a status read never clear it.
         var mustPull = false
         /// Counts the pulls that succeeded, so a first status read can tell that a hydration or a catch-up completed
         /// while it was being taken, which makes what it read stale; a failure leaves the read as true as it was.
@@ -334,6 +335,7 @@ final class Lifecycle: Sendable {
             state.attempts = 0
             state.drainAttempts = 0
             state.followingSince = nil
+            state.mustPull = false
             state.connection = follows ? .connecting : .local
             if state.fills > 0 { startProgress(&state) }
             return (state.run, state.epoch, claimStream(&state))

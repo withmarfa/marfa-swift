@@ -340,6 +340,30 @@ struct AnAppCallThatFails {
         await copy.close()
     }
 
+    @Test func aNewRunForgetsTheStopOfTheRunBefore() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let (copy, updates) = try await followingCopy(core, clock)
+        let stopped = Marfa.MarfaError.store(message: "damaged")
+
+        core.state.withLock { $0.catchUpFails = .Store(message: "damaged") }
+        await #expect(throws: stopped) { try await copy.catchUp() }
+        try await eventually("stopped") { updates.connection == .stopped(stopped) }
+        updates.cancel()
+        try await eventually("the follow was let go") { copy.feed.count == 0 && clock.waiting == 0 }
+
+        // The new run's first catch-up fails on the network: it is offline and asks again, not stuck connecting.
+        core.state.withLock { $0.catchUpFails = ALifecycle.offline }
+        let again = Updates(copy.updates())
+        try await eventually("offline") {
+            if case .offline = again.connection { return true }
+            return false
+        }
+        #expect(try await ALifecycle.wait(clock, after: 1) > .zero, "the offline catch-up was not asked again")
+        again.cancel()
+        await copy.close()
+    }
+
     // MARK: A call that starts during a key change
 
     @Test func aCallThatBeganDuringAKeyChangeSaysNothingOfTheNewKeysCopy() async throws {
