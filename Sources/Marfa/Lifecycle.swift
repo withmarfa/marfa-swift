@@ -7,10 +7,10 @@ public enum CopyConnection: Sendable, Hashable {
     /// The copy has no server to follow: it was opened without one, or it is a reader, which hears the writer's
     /// saves instead.
     case local
-    /// The copy must be hydrated before it can follow its server: `nil` while it holds no completed hydration, and
-    /// otherwise why it could not carry on. That is an error with ``MarfaError/isHydrationNeeded``, such as
-    /// `copyExpired` or `instanceChanged`, or, for a copy that holds no completed hydration, the error the app's own
-    /// hydration failed with, such as `wrongServer`. Nothing is tried again until a hydration completes.
+    /// The copy must be hydrated before it can follow its server, for this reason: an error with
+    /// ``MarfaError/isHydrationNeeded``, such as `copyExpired` or `instanceChanged`; for a copy that holds no
+    /// completed hydration, the error the app's own catch-up or hydration last failed with, such as `wrongServer`;
+    /// or `nil` for such a copy before one has failed. Nothing is tried again until a hydration completes.
     case needsHydration(MarfaError?)
     /// The copy is asking its server: as updates begin, after ``WorkingCopy/useKey(_:)``, and while a refill fills
     /// a stale copy again.
