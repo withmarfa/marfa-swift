@@ -699,6 +699,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/source_id`.
             public var sourceId: Swift.String?
+            /// `true` if every connector with a live write key for the item's type that owns or claims its `source` lists the type in `read_only_types`, so it puts back an edit made in Marfa on its next run. Marfa doesn't refuse the edit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/read_only`.
+            public var readOnly: Swift.Bool
             /// The latitude where the item was captured. Absent if the writer set none.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/capture_latitude`.
@@ -809,6 +813,7 @@ extension Components {
             ///   - schemaVersion: The `version` the item's type had when the item was created. Marfa never changes it, even when the item moves to another type, and doesn't act on it.
             ///   - source: The source the item was written under: the writer's own, or one its key claims. It never changes.
             ///   - sourceId: The item's identifier at its source. With `source`, it is the item's natural key. Absent if the writer set none.
+            ///   - readOnly: `true` if every connector with a live write key for the item's type that owns or claims its `source` lists the type in `read_only_types`, so it puts back an edit made in Marfa on its next run. Marfa doesn't refuse the edit.
             ///   - captureLatitude: The latitude where the item was captured. Absent if the writer set none.
             ///   - captureLongitude: The longitude where the item was captured. Absent if the writer set none.
             ///   - occurredAt: When the item happened, in UTC. Defaults to when it was created.
@@ -829,6 +834,7 @@ extension Components {
                 schemaVersion: Swift.Int,
                 source: Swift.String,
                 sourceId: Swift.String? = nil,
+                readOnly: Swift.Bool,
                 captureLatitude: Swift.Double? = nil,
                 captureLongitude: Swift.Double? = nil,
                 occurredAt: Swift.String,
@@ -849,6 +855,7 @@ extension Components {
                 self.schemaVersion = schemaVersion
                 self.source = source
                 self.sourceId = sourceId
+                self.readOnly = readOnly
                 self.captureLatitude = captureLatitude
                 self.captureLongitude = captureLongitude
                 self.occurredAt = occurredAt
@@ -870,6 +877,7 @@ extension Components {
                 case schemaVersion = "schema_version"
                 case source
                 case sourceId = "source_id"
+                case readOnly = "read_only"
                 case captureLatitude = "capture_latitude"
                 case captureLongitude = "capture_longitude"
                 case occurredAt = "occurred_at"
@@ -8015,6 +8023,10 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ListedType/value2/provenance`.
                 public var provenance: Components.Schemas.TypeProvenance
+                /// The fields this type declares in another shape than a type above it. Present only while there are some, and it clears once the type declares the shape above. Items of the type stay readable.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ListedType/value2/conflicts`.
+                public var conflicts: [Components.Schemas.TypeConflict]?
                 /// The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ListedType/value2/own_roles`.
@@ -8023,16 +8035,20 @@ extension Components {
                 ///
                 /// - Parameters:
                 ///   - provenance: The type's recorded origin and creator.
+                ///   - conflicts: The fields this type declares in another shape than a type above it. Present only while there are some, and it clears once the type declares the shape above. Items of the type stay readable.
                 ///   - ownRoles: The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
                 public init(
                     provenance: Components.Schemas.TypeProvenance,
+                    conflicts: [Components.Schemas.TypeConflict]? = nil,
                     ownRoles: [Components.Schemas.TypeRole]
                 ) {
                     self.provenance = provenance
+                    self.conflicts = conflicts
                     self.ownRoles = ownRoles
                 }
                 public enum CodingKeys: String, CodingKey {
                     case provenance
+                    case conflicts
                     case ownRoles = "own_roles"
                 }
             }
@@ -8630,6 +8646,59 @@ extension Components {
                     forKey: .maximum
                 )
                 try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// A field this type declares in a shape a type above it declares differently.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeConflict`.
+        public struct TypeConflict: Codable, Hashable, Sendable {
+            /// The name of the field the type declares.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeConflict/field`.
+            public var field: Swift.String
+            /// The first part of the field's shape that differs, such as `type`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeConflict/attribute`.
+            public var attribute: Swift.String
+            /// The ID of the type above this one that declares the field.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeConflict/inherited_from`.
+            public var inheritedFrom: Swift.String
+            /// What the types above give the field, such as `type "string"`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeConflict/inherited`.
+            public var inherited: Swift.String
+            /// What this type declares, such as `type "number"`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeConflict/declared`.
+            public var declared: Swift.String
+            /// Creates a new `TypeConflict`.
+            ///
+            /// - Parameters:
+            ///   - field: The name of the field the type declares.
+            ///   - attribute: The first part of the field's shape that differs, such as `type`.
+            ///   - inheritedFrom: The ID of the type above this one that declares the field.
+            ///   - inherited: What the types above give the field, such as `type "string"`.
+            ///   - declared: What this type declares, such as `type "number"`.
+            public init(
+                field: Swift.String,
+                attribute: Swift.String,
+                inheritedFrom: Swift.String,
+                inherited: Swift.String,
+                declared: Swift.String
+            ) {
+                self.field = field
+                self.attribute = attribute
+                self.inheritedFrom = inheritedFrom
+                self.inherited = inherited
+                self.declared = declared
+            }
+            public enum CodingKeys: String, CodingKey {
+                case field
+                case attribute
+                case inheritedFrom = "inherited_from"
+                case inherited
+                case declared
             }
         }
         /// A type says which fields the items of that type hold, and what else Marfa does for them.
@@ -12524,7 +12593,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/registered_at`.
             public var registeredAt: Swift.String
-            /// When the connector's name or description was last set.
+            /// When the connector's name, description or `read_only_types` was last set.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/updated_at`.
             public var updatedAt: Swift.String
@@ -12532,6 +12601,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/last_heartbeat_at`.
             public var lastHeartbeatAt: Swift.String?
+            /// The types whose items the connector holds read only, putting back any edit made in Marfa. `[]` if it declared none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Connector/read_only_types`.
+            public var readOnlyTypes: [Swift.String]
             /// The connector's most recently reported run; `null` if it has reported none.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/last_run`.
@@ -12553,8 +12626,9 @@ extension Components {
             ///   - name: The connector's name.
             ///   - description: What the connector does; `null` if none was given.
             ///   - registeredAt: When the connector first registered.
-            ///   - updatedAt: When the connector's name or description was last set.
+            ///   - updatedAt: When the connector's name, description or `read_only_types` was last set.
             ///   - lastHeartbeatAt: When the connector last sent a heartbeat; `null` if never.
+            ///   - readOnlyTypes: The types whose items the connector holds read only, putting back any edit made in Marfa. `[]` if it declared none.
             ///   - lastRun: The connector's most recently reported run; `null` if it has reported none.
             ///   - problems: The source's current problems, by opaque key; `{}` if there are none.
             ///   - holdExpiresAt: When the hold on the connector lapses; `null` if no process holds it or its hold has lapsed.
@@ -12567,6 +12641,7 @@ extension Components {
                 registeredAt: Swift.String,
                 updatedAt: Swift.String,
                 lastHeartbeatAt: Swift.String? = nil,
+                readOnlyTypes: [Swift.String],
                 lastRun: Components.Schemas.MarfaNullableConnectorRun,
                 problems: Components.Schemas.ConnectorProblems,
                 holdExpiresAt: Swift.String? = nil
@@ -12579,6 +12654,7 @@ extension Components {
                 self.registeredAt = registeredAt
                 self.updatedAt = updatedAt
                 self.lastHeartbeatAt = lastHeartbeatAt
+                self.readOnlyTypes = readOnlyTypes
                 self.lastRun = lastRun
                 self.problems = problems
                 self.holdExpiresAt = holdExpiresAt
@@ -12592,6 +12668,7 @@ extension Components {
                 case registeredAt = "registered_at"
                 case updatedAt = "updated_at"
                 case lastHeartbeatAt = "last_heartbeat_at"
+                case readOnlyTypes = "read_only_types"
                 case lastRun = "last_run"
                 case problems
                 case holdExpiresAt = "hold_expires_at"

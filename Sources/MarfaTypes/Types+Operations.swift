@@ -106898,7 +106898,7 @@ public enum Operations {
     }
     /// Register a connector
     ///
-    /// Registers your key as a connector and returns it. Repeating registration updates its name and description and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
+    /// Registers your key as a connector and returns it. Repeating registration replaces its name, description and `read_only_types` and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -106938,21 +106938,29 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/connectors/POST/requestBody/json/description`.
                     public var description: Swift.String?
+                    /// The types whose items the connector holds read only, putting back any edit made in Marfa. An item reads `read_only` as `true` when every connector for its source whose live key may write its type lists the type. The types needn't be registered. Leaving it out clears the list.
+                    ///
+                    /// - Remark: Generated from `#/paths/connectors/POST/requestBody/json/read_only_types`.
+                    public var readOnlyTypes: [Swift.String]?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - name: The connector's name.
                     ///   - description: What the connector does. Leave it out for none: registering again without it clears the old one.
+                    ///   - readOnlyTypes: The types whose items the connector holds read only, putting back any edit made in Marfa. An item reads `read_only` as `true` when every connector for its source whose live key may write its type lists the type. The types needn't be registered. Leaving it out clears the list.
                     public init(
                         name: Swift.String,
-                        description: Swift.String? = nil
+                        description: Swift.String? = nil,
+                        readOnlyTypes: [Swift.String]? = nil
                     ) {
                         self.name = name
                         self.description = description
+                        self.readOnlyTypes = readOnlyTypes
                     }
                     public enum CodingKeys: String, CodingKey {
                         case name
                         case description
+                        case readOnlyTypes = "read_only_types"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -106964,9 +106972,14 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .description
                         )
+                        self.readOnlyTypes = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .readOnlyTypes
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "name",
-                            "description"
+                            "description",
+                            "read_only_types"
                         ])
                     }
                 }
@@ -107067,7 +107080,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// Returns the existing connector with its name and description updated. Its `id` and `registered_at` don't change.
+            /// Returns the existing connector with its name, description and `read_only_types` replaced. Its `id` and `registered_at` don't change.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/200`.
             ///
@@ -107279,7 +107292,7 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `name` is missing.
-            /// - `validation_error`: `name` isn't 1 to 200 characters, `description` is over 2,000 characters, or the body has a top-level field this endpoint doesn't take.
+            /// - `validation_error`: `name` isn't 1 to 200 characters, `description` is over 2,000 characters, `read_only_types` holds a malformed type identifier or over 1,000 entries, or the body has a top-level field this endpoint doesn't take.
             ///
             /// - Remark: Generated from `#/paths//connectors/post(registerConnector)/responses/400`.
             ///

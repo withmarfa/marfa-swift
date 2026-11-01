@@ -587,7 +587,7 @@ public protocol APIProtocol: Sendable {
     func listConnectors(_ input: Operations.ListConnectors.Input) async throws -> Operations.ListConnectors.Output
     /// Register a connector
     ///
-    /// Registers your key as a connector and returns it. Repeating registration updates its name and description and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
+    /// Registers your key as a connector and returns it. Repeating registration replaces its name, description and `read_only_types` and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
@@ -2265,7 +2265,7 @@ extension APIProtocol {
     }
     /// Register a connector
     ///
-    /// Registers your key as a connector and returns it. Repeating registration updates its name and description and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
+    /// Registers your key as a connector and returns it. Repeating registration replaces its name, description and `read_only_types` and keeps its ID. A successor key inherits its own source's inbound endpoints and retained deliveries.
     ///
     /// - Remark: HTTP `POST /connectors`.
     /// - Remark: Generated from `#/paths//connectors/post(registerConnector)`.
