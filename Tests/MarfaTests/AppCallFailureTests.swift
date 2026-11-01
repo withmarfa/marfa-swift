@@ -405,21 +405,24 @@ struct AnAppCallThatFails {
         try await Task.sleep(for: .milliseconds(20))
         let before = ALifecycle.catchUps(core)
 
-        // While the lifecycle is busy, the first call ends: the second must still wait for it to report.
+        // While the lifecycle is busy, the first call ends: the second must still wait for it to report. The
+        // holder runs on its own thread and lets go by the clock, and looks at the core from inside the lock, so
+        // nothing here waits for a task to get a turn: the first call's report blocks a cooperative thread
+        // until the lock is free, and a pool with no free thread would otherwise never run the release.
         let held = Mutex(false)
-        let release = Mutex(false)
-        DispatchQueue.global().async {
+        let seen = Mutex<Int?>(nil)
+        let holder = Thread {
             lifecycle.whileLocked {
                 held.withLock { $0 = true }
-                while !release.withLock({ $0 }) { Thread.sleep(forTimeInterval: 0.005) }
+                Thread.sleep(forTimeInterval: 0.4)
+                seen.withLock { $0 = ALifecycle.catchUps(core) }
             }
         }
+        holder.start()
         try await eventually("the lock is held") { held.withLock { $0 } }
         first.signal()
-        try await eventually("the first ran") { ALifecycle.catchUps(core) == before + 1 }
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(ALifecycle.catchUps(core) == before + 1, "the second call ran before the first had reported")
-        release.withLock { $0 = true }
+        try await eventually("the lock was let go") { seen.withLock { $0 != nil } }
+        #expect(seen.withLock { $0 } == before + 1, "the second call ran before the first had reported")
 
         _ = try await a.value
         await #expect(throws: (any Error).self) { try await b.value }
