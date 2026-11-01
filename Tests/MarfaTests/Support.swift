@@ -201,6 +201,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var probe: DropProbe?
         var budgets: [MarfaCore.FileBudget] = []
         var trimmed: UInt64 = 0
+        var removed: UInt64 = 5
         var keptFetches = 0
         var cache = MarfaCore.FileCache(
             setting: .default, budget: nil, held: nil, heldUnreadable: nil, volumeUnreadable: false,
@@ -367,6 +368,10 @@ final class FakeCore: Core, @unchecked Sendable {
 
     override func trimFiles() throws -> UInt64 {
         state.withLock { $0.trimmed }
+    }
+
+    override func removeFetchedFiles() throws -> UInt64 {
+        state.withLock { $0.removed }
     }
 
     override func fileCache() throws -> MarfaCore.FileCache {

@@ -1022,6 +1022,16 @@ public struct Blobs: Sendable {
         try await holder.run { core in try core.trimFiles() }
     }
 
+    /// Removes every file the cache holds that the device can fetch again, and leaves the file budget as it was.
+    ///
+    /// Returns the bytes it took. It keeps the bytes of attachments, of queued uploads and of files being read inside
+    /// ``withFile(_:isolation:_:)``, and the partial files a fetch holds. Where the cache cannot be read, it takes
+    /// nothing and throws `store`. An attachment made while the files go can lose its bytes, which the next
+    /// ``fetchKept()`` brings back. Throws `readingHandle` for a reader.
+    public func removeFetchedFiles() async throws -> UInt64 {
+        try await holder.run { core in try core.removeFetchedFiles() }
+    }
+
     /// Fetches the bytes of every file attached to an item the copy holds that the cache does not hold whole,
     /// smallest first, so they are there offline.
     ///
