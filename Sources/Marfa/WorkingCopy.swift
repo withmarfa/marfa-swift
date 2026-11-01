@@ -424,8 +424,9 @@ public final class WorkingCopy: Sendable {
     ///   that fails with such an error while the copy follows, and one that fails on a copy without a completed
     ///   hydration leaves it `.needsHydration` with the error. An error the app's arguments caused, a canceled call,
     ///   a call made during a key change, a call that began under a key since replaced, and an app's call that fails
-    ///   with a failure that may mend itself while the copy is `.stopped` or `.needsHydration` change nothing. A server event does not make a stopped copy
-    ///   `.following`; a catch-up or a hydration that succeeds, the app's or the retry's, does.
+    ///   with a failure that may mend itself while the copy is `.stopped` or `.needsHydration` change nothing. A
+    ///   server event does not make a stopped copy `.following`; a catch-up or a hydration that succeeds, the app's
+    ///   or the retry's, does.
     /// - When the core's own fault ends the follow, the sequence still hears the copy's own writes, and the server's
     ///   events again once a catch-up succeeds and the follow starts again.
     /// - A refill of a stale copy is `.connecting`, and `.offline` while a failure that may mend itself holds it up;
