@@ -53,15 +53,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/target_type_constraints`.
             public var targetTypeConstraints: [Swift.String]
-            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case cascade = "cascade"
                 case orphan = "orphan"
                 case block = "block"
+                case withHosts = "with-hosts"
             }
-            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload
@@ -127,7 +128,7 @@ extension Components {
             ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
             ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
             ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`.
-            ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists.
+            ///   - cascadeOnDelete: What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any.
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
@@ -5139,11 +5140,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/version`.
             public var version: Swift.Int
-            /// The other items you can read that a cascading edge such as `parent-of` would take into the trash with this item, leaves first, at most 100.
+            /// The other items you can read that trashing the named items would take into the trash with this item, leaves first, at most 100: what a cascading edge such as `parent-of` reaches, and each comment or attachment whose hosts would all be in the trash.
             ///
             /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/takes`.
             public var takes: [Components.Schemas.TrashPreviewEntry]
-            /// How many items you can read that trashing this item would move to the trash, the item itself included.
+            /// How many items you can read that trashing the named items would move to the trash with this item, the item itself included.
             ///
             /// - Remark: Generated from `#/components/schemas/TrashPreviewItem/count`.
             public var count: Swift.Int
@@ -5157,8 +5158,8 @@ extension Components {
             ///   - id: The ID of an item you named.
             ///   - _type: The item's type.
             ///   - version: The item's version.
-            ///   - takes: The other items you can read that a cascading edge such as `parent-of` would take into the trash with this item, leaves first, at most 100.
-            ///   - count: How many items you can read that trashing this item would move to the trash, the item itself included.
+            ///   - takes: The other items you can read that trashing the named items would take into the trash with this item, leaves first, at most 100: what a cascading edge such as `parent-of` reaches, and each comment or attachment whose hosts would all be in the trash.
+            ///   - count: How many items you can read that trashing the named items would move to the trash with this item, the item itself included.
             ///   - truncated: `true` if `takes` was cut at its limit. Absent when it lists every item.
             public init(
                 id: Swift.String,
@@ -7683,15 +7684,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/target_type_constraints`.
             public var targetTypeConstraints: [Swift.String]?
-            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
+            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any. Leave it out for `orphan`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case cascade = "cascade"
                 case orphan = "orphan"
                 case block = "block"
+                case withHosts = "with-hosts"
             }
-            /// What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
+            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any. Leave it out for `orphan`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload?
@@ -7749,7 +7751,7 @@ extension Components {
             ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
             ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
             ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
-            ///   - cascadeOnDelete: What happens when an item an edge joins is deleted. `cascade`: deleting the source trashes the target. `orphan`: the other item stays. `block`: the delete fails while the edge exists. Leave it out for `orphan`.
+            ///   - cascadeOnDelete: What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any. Leave it out for `orphan`.
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
             ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
@@ -15444,6 +15446,171 @@ extension Components {
                 case error
             }
         }
+        /// A page holding every source.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SourcePage`.
+        public struct SourcePage: Codable, Hashable, Sendable {
+            /// Every source.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SourcePage/data`.
+            public var data: [Components.Schemas.Source]
+            /// Always `null`: Marfa returns every source in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SourcePage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `SourcePage`.
+            ///
+            /// - Parameters:
+            ///   - data: Every source.
+            ///   - nextCursor: Always `null`: Marfa returns every source in one page.
+            public init(
+                data: [Components.Schemas.Source],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// A source code with the name and mark it's shown by.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Source`.
+        public struct Source: Codable, Hashable, Sendable {
+            /// The source code, as items carry it in `source`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Source/source`.
+            public var source: Swift.String
+            /// The name to show for the source.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Source/name`.
+            public var name: Swift.String
+            /// Where `name` comes from: `set` on the source, the `app` signed in under it, the label of the `key` that holds it, or the `code` itself.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Source/name_from`.
+            @frozen public enum NameFromPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case set = "set"
+                case app = "app"
+                case key = "key"
+                case code = "code"
+            }
+            /// Where `name` comes from: `set` on the source, the `app` signed in under it, the label of the `key` that holds it, or the `code` itself.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Source/name_from`.
+            public var nameFrom: Components.Schemas.Source.NameFromPayload
+            /// The icon ID set for the source, from the same sets as a type's `icon`. Absent until someone sets one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Source/mark`.
+            public var mark: Swift.String?
+            /// Creates a new `Source`.
+            ///
+            /// - Parameters:
+            ///   - source: The source code, as items carry it in `source`.
+            ///   - name: The name to show for the source.
+            ///   - nameFrom: Where `name` comes from: `set` on the source, the `app` signed in under it, the label of the `key` that holds it, or the `code` itself.
+            ///   - mark: The icon ID set for the source, from the same sets as a type's `icon`. Absent until someone sets one.
+            public init(
+                source: Swift.String,
+                name: Swift.String,
+                nameFrom: Components.Schemas.Source.NameFromPayload,
+                mark: Swift.String? = nil
+            ) {
+                self.source = source
+                self.name = name
+                self.nameFrom = nameFrom
+                self.mark = mark
+            }
+            public enum CodingKeys: String, CodingKey {
+                case source
+                case name
+                case nameFrom = "name_from"
+                case mark
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal`.
+        public struct SourceNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case sourceNotFound = "source_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.SourceNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.SourceNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.SourceNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.SourceNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SourceNotFoundRefusal/error`.
+            public var error: Components.Schemas.SourceNotFoundRefusal._ErrorPayload
+            /// Creates a new `SourceNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.SourceNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// The instance configuration: its display name, enforcement levers and live settings, with the instance's ID.
         ///
         /// - Remark: Generated from `#/components/schemas/InstanceConfig`.
@@ -19280,14 +19447,14 @@ extension Components {
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaInline00404e686415370f`.
         public typealias MarfaInline00404e686415370f = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline52ba84a4bbf396ba`.
+        public typealias MarfaInline52ba84a4bbf396ba = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaInline0606c3c8f2e5ac06 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInlineea288f4ef558f5f1`.
         public typealias MarfaInlineea288f4ef558f5f1 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline7cb541e84f226754`.
         public typealias MarfaInline7cb541e84f226754 = Swift.Bool
-        /// - Remark: Generated from `#/components/schemas/MarfaInline52ba84a4bbf396ba`.
-        public typealias MarfaInline52ba84a4bbf396ba = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlineaeb0b69539bcab54`.
         public struct MarfaInlineaeb0b69539bcab54: Codable, Hashable, Sendable {
             /// Types on which a write may not set a property the type doesn't declare.
@@ -19552,6 +19719,8 @@ extension Components {
         public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableViewGroup`.
         public typealias MarfaNullableViewGroup = MarfaNullable<Components.Schemas.ViewGroup>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline52ba84a4bbf396ba`.
+        public typealias MarfaNullableMarfaInline52ba84a4bbf396ba = MarfaNullable<Components.Schemas.MarfaInline52ba84a4bbf396ba>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.
@@ -19560,8 +19729,6 @@ extension Components {
         public typealias MarfaNullableMarfaInlineea288f4ef558f5f1 = MarfaNullable<Components.Schemas.MarfaInlineea288f4ef558f5f1>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline7cb541e84f226754`.
         public typealias MarfaNullableMarfaInline7cb541e84f226754 = MarfaNullable<Components.Schemas.MarfaInline7cb541e84f226754>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline52ba84a4bbf396ba`.
-        public typealias MarfaNullableMarfaInline52ba84a4bbf396ba = MarfaNullable<Components.Schemas.MarfaInline52ba84a4bbf396ba>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineaeb0b69539bcab54`.
         public typealias MarfaNullableMarfaInlineaeb0b69539bcab54 = MarfaNullable<Components.Schemas.MarfaInlineaeb0b69539bcab54>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline9983a886c97e38f1`.

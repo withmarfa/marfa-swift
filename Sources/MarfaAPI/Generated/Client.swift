@@ -46,7 +46,7 @@ public struct Client: ClientProtocol {
     }
     /// Get item counts
     ///
-    /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
+    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -3305,6 +3305,310 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.FolderStatus.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List sources
+    ///
+    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the owner see every source in use or named.
+    ///
+    /// - Remark: HTTP `GET /sources`.
+    /// - Remark: Generated from `#/paths//sources/get(listSources)`.
+    public func listSources(_ input: Operations.ListSources.Input) async throws -> Operations.ListSources.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListSources.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/sources",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListSources.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Limit",
+                            as: Components.Headers.XRateLimitLimit.self
+                        ),
+                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Remaining",
+                            as: Components.Headers.XRateLimitRemaining.self
+                        ),
+                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Reset",
+                            as: Components.Headers.XRateLimitReset.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListSources.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.SourcePage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get a source
+    ///
+    /// Returns a source's name and mark. A source needs no item or key to be read, but you see only your own, those you claim and those of items you can read, unless you hold `keys.manage`.
+    ///
+    /// - Remark: HTTP `GET /source`.
+    /// - Remark: Generated from `#/paths//source/get(getSource)`.
+    public func getSource(_ input: Operations.GetSource.Input) async throws -> Operations.GetSource.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetSource.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/source",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "source",
+                    value: input.query.source
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetSource.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Limit",
+                            as: Components.Headers.XRateLimitLimit.self
+                        ),
+                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Remaining",
+                            as: Components.Headers.XRateLimitRemaining.self
+                        ),
+                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Reset",
+                            as: Components.Headers.XRateLimitReset.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetSource.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Source.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Name a source
+    ///
+    /// Sets or clears a source's name and mark, and returns the source. A field left out keeps its value. You can change your own source and those you claim; any other needs `keys.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /source`.
+    /// - Remark: Generated from `#/paths//source/patch(updateSource)`.
+    public func updateSource(_ input: Operations.UpdateSource.Input) async throws -> Operations.UpdateSource.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.UpdateSource.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/source",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .patch
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "source",
+                    value: input.query.source
+                )
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.UpdateSource.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Limit",
+                            as: Components.Headers.XRateLimitLimit.self
+                        ),
+                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Remaining",
+                            as: Components.Headers.XRateLimitRemaining.self
+                        ),
+                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-RateLimit-Reset",
+                            as: Components.Headers.XRateLimitReset.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.UpdateSource.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Source.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)

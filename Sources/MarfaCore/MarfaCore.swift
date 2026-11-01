@@ -1179,7 +1179,9 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     /**
      * The name and preview text of each item, in order, by the copy's
-     * catalog alone. An unknown type is named by the fallback fields.
+     * held catalog and rows. An unknown type is named by the fallback fields. An
+     * item given with its id is named after its host where it is a part
+     * the copy holds a host for.
      */
     func itemDisplays(items: [ItemDisplayInput]) throws  -> [ItemDisplay]
     
@@ -2059,7 +2061,9 @@ open func hydrateWith(types: [String], tier: SliceTier, edgeTypes: [String], inP
     
     /**
      * The name and preview text of each item, in order, by the copy's
-     * catalog alone. An unknown type is named by the fallback fields.
+     * held catalog and rows. An unknown type is named by the fallback fields. An
+     * item given with its id is named after its host where it is a part
+     * the copy holds a host for.
      */
 open func itemDisplays(items: [ItemDisplayInput])throws  -> [ItemDisplay]  {
     return try  FfiConverterSequenceTypeItemDisplay.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -4050,8 +4054,9 @@ public struct Attached: Equatable, Hashable {
     public var item: QueuedWrite
     public var edge: QueuedWrite
     /**
-     * `![[title]]`, which reads back as `edge` once written into the item's
-     * body; none where its title cannot name it alone in an embed.
+     * `![[title]]`, which reads back as the item's `references` edge to the
+     * file once written into the item's body; none where its title cannot
+     * name it alone in an embed.
      */
     public var embed: String?
 
@@ -4059,8 +4064,9 @@ public struct Attached: Equatable, Hashable {
     // declare one manually.
     public init(upload: QueuedWrite, item: QueuedWrite, edge: QueuedWrite, 
         /**
-         * `![[title]]`, which reads back as `edge` once written into the item's
-         * body; none where its title cannot name it alone in an embed.
+         * `![[title]]`, which reads back as the item's `references` edge to the
+         * file once written into the item's body; none where its title cannot
+         * name it alone in an embed.
          */embed: String?) {
         self.upload = upload
         self.item = item
@@ -7789,17 +7795,20 @@ public func FfiConverterTypeItemDisplay_lower(_ value: ItemDisplay) -> RustBuffe
 
 
 /**
- * An item to name and preview: its type and properties.
+ * An item to name and preview: its type and properties, and its id where
+ * the copy may hold it, so a part is named after its host.
  */
 public struct ItemDisplayInput: Equatable, Hashable {
     public var type: String
     public var properties: JsonObject
+    public var id: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(type: String, properties: JsonObject) {
+    public init(type: String, properties: JsonObject, id: String? = nil) {
         self.type = type
         self.properties = properties
+        self.id = id
     }
 
     
@@ -7819,13 +7828,15 @@ public struct FfiConverterTypeItemDisplayInput: FfiConverterRustBuffer {
         return
             try ItemDisplayInput(
                 type: FfiConverterString.read(from: &buf), 
-                properties: FfiConverterTypeJsonObject.read(from: &buf)
+                properties: FfiConverterTypeJsonObject.read(from: &buf), 
+                id: FfiConverterOptionString.read(from: &buf)
         )
     }
 
     public static func write(_ value: ItemDisplayInput, into buf: inout [UInt8]) {
         FfiConverterString.write(value.type, into: &buf)
         FfiConverterTypeJsonObject.write(value.properties, into: &buf)
+        FfiConverterOptionString.write(value.id, into: &buf)
     }
 }
 
@@ -11607,6 +11618,11 @@ public enum FilterField: Equatable, Hashable {
     )
     case tags
     case statusGroup
+    /**
+     * Whether the item is a part of another, compared with `eq` or `neq`
+     * and a boolean.
+     */
+    case part
     case edge(edgeType: String, direction: EdgeDirection
     )
 
@@ -11643,7 +11659,9 @@ public struct FfiConverterTypeFilterField: FfiConverterRustBuffer {
         
         case 5: return .statusGroup
         
-        case 6: return .edge(edgeType: try FfiConverterString.read(from: &buf), direction: try FfiConverterTypeEdgeDirection.read(from: &buf)
+        case 6: return .part
+        
+        case 7: return .edge(edgeType: try FfiConverterString.read(from: &buf), direction: try FfiConverterTypeEdgeDirection.read(from: &buf)
         )
         
         default: throw UniffiInternalError.unexpectedEnumCase
@@ -11678,8 +11696,12 @@ public struct FfiConverterTypeFilterField: FfiConverterRustBuffer {
             writeInt(&buf, Int32(5))
         
         
-        case let .edge(edgeType,direction):
+        case .part:
             writeInt(&buf, Int32(6))
+        
+        
+        case let .edge(edgeType,direction):
+            writeInt(&buf, Int32(7))
             FfiConverterString.write(edgeType, into: &buf)
             FfiConverterTypeEdgeDirection.write(direction, into: &buf)
             
@@ -16463,7 +16485,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 40233) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_item_displays() != 22306) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_item_displays() != 34912) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_item_type() != 51576) {
