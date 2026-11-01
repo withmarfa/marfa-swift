@@ -158,6 +158,7 @@ struct FileBudgetAndKeptAttachments {
         #expect(core.state.withLock { $0.budgets } == [.bytes(bytes: 1_000), .keepAll])
         #expect(try await copy.blobs.cache().setting == .keepAll)
         #expect(try await copy.blobs.trim() == 7)
+        #expect(try await copy.blobs.removeFetchedFiles() == 5)
         await copy.close()
     }
 
@@ -234,6 +235,7 @@ struct FileBudgetOnOpen {
         let reader = try await WorkingCopy.openReader(store: store)
         for call in [
             { _ = try await reader.blobs.setBudget(.keepAll) }, { _ = try await reader.blobs.trim() },
+            { _ = try await reader.blobs.removeFetchedFiles() },
             { _ = try await reader.blobs.fetchKept() },
         ] as [@Sendable () async throws -> Void] {
             await #expect {

@@ -1264,6 +1264,16 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func releaseReason(reason: BlockedReason) throws  -> UInt64
     
+    /**
+     * Removes every file the cache holds that can be fetched again and
+     * answers the bytes it took, leaving the budget as it was. Keeps the
+     * files of attachments, queued uploads and reads in progress, and the
+     * part of a file a fetch is writing. Takes nothing and fails where the
+     * cache, the queue or the attachments cannot be read. Refused to a
+     * reading handle.
+     */
+    func removeFetchedFiles() throws  -> UInt64
+    
     func removeTag(id: String, tag: String) throws  -> QueuedWrite
     
     /**
@@ -2227,6 +2237,22 @@ open func releaseReason(reason: BlockedReason)throws  -> UInt64  {
     uniffi_marfa_core_ffi_fn_method_core_release_reason(
             self.uniffiCloneHandle(),
         FfiConverterTypeBlockedReason_lower(reason),$0
+    )
+})
+}
+    
+    /**
+     * Removes every file the cache holds that can be fetched again and
+     * answers the bytes it took, leaving the budget as it was. Keeps the
+     * files of attachments, queued uploads and reads in progress, and the
+     * part of a file a fetch is writing. Takes nothing and fails where the
+     * cache, the queue or the attachments cannot be read. Refused to a
+     * reading handle.
+     */
+open func removeFetchedFiles()throws  -> UInt64  {
+    return try  FfiConverterUInt64.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_remove_fetched_files(
+            self.uniffiCloneHandle(),$0
     )
 })
 }
@@ -13021,6 +13047,12 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     )
     case Invalid(message: String
     )
+    /**
+     * The core panicked, or a listener it called did, and it caught the
+     * panic. A fault in the core, never the caller's input.
+     */
+    case Fault(message: String
+    )
 
     
     /**
@@ -13188,6 +13220,9 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf)
             )
         case 32: return .Invalid(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 33: return .Fault(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -13391,6 +13426,11 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         
         case let .Invalid(message):
             writeInt(&buf, Int32(32))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Fault(message):
+            writeInt(&buf, Int32(33))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -16519,6 +16559,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_release_reason() != 2563) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_remove_fetched_files() != 24106) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_remove_tag() != 65124) {

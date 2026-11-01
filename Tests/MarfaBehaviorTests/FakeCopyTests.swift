@@ -150,6 +150,7 @@ struct FakeCopyBehavior {
             ("blobs.cache", { _ = try await copy.blobs.cache() }),
             ("blobs.setBudget", { _ = try await copy.blobs.setBudget(.keepAll) }),
             ("blobs.trim", { _ = try await copy.blobs.trim() }),
+            ("blobs.removeFetched", { _ = try await copy.blobs.removeFetchedFiles() }),
             ("blobs.fetchKept", { _ = try await copy.blobs.fetchKept() }),
             ("queue.release", { _ = try await copy.queue.release(id) }),
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),

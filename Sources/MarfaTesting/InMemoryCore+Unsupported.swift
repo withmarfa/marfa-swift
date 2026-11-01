@@ -162,5 +162,9 @@ extension InMemoryCore {
     func trimFiles() throws -> UInt64 {
         try unsupported("blobs.trim")
     }
+
+    func removeFetchedFiles() throws -> UInt64 {
+        try unsupported("blobs.removeFetched")
+    }
 }
 #endif

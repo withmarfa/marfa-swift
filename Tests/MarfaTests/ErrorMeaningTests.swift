@@ -71,6 +71,7 @@ import Testing
         (.canceled(message: "m"), .none),
         (.firstSyncWaiting(message: "m"), .hydration),
         (.invalid(message: "m"), .none),
+        (.fault(message: "m"), .none),
         (.keyChanging(message: "m"), .transient),
         (.versionConflict(message: "m"), .none),
         (.instanceChanged(message: "m"), .hydration),
@@ -102,6 +103,14 @@ import Testing
         #expect(throws: Marfa.MarfaError.server(status: 409, code: "conflict", message: "m")) {
             try translated { throw MarfaCore.MarfaError.Server(status: 409, code: "conflict", message: "m") }
         }
+    }
+
+    @Test func aFaultInTheCoreArrivesAsItsOwnCase() {
+        #expect(throws: Marfa.MarfaError.fault(message: "m")) {
+            try translated { throw MarfaCore.MarfaError.Fault(message: "m") }
+        }
+        #expect(Marfa.MarfaError.fault(message: "m").code() == "fault")
+        #expect(Marfa.MarfaError.fault(message: "m").fixedText.code == "fault")
     }
 
     @Test func anotherInstanceAtTheAddressArrivesAsItsOwnCase() {

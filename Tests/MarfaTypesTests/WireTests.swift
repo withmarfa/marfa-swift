@@ -4,7 +4,7 @@ import Testing
 
 @Test func aPageOfItemsReadsEachRow() throws {
     let item =
-        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","schema_version":1}"#
+        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1}"#
     let page = try JSONDecoder().decode(
         Components.Schemas.ItemPage.self, from: Data(#"{"data":[\#(item)],"next_cursor":null}"#.utf8))
     guard case .Item(let row)? = page.data.first else {
@@ -72,7 +72,7 @@ func thePinnedServerAnswersInTheseTypes() async throws {
     let connector = try decoder.decode(
         Components.Schemas.Connector.self,
         from: Data(
-            #"{"id":"c","key_id":"k","source":"s","name":"n","description":null,"registered_at":"now","updated_at":"now","last_heartbeat_at":null,"hold_expires_at":null,"last_run":null,"problems":{}}"#
+            #"{"id":"c","key_id":"k","source":"s","name":"n","description":null,"registered_at":"now","updated_at":"now","last_heartbeat_at":null,"hold_expires_at":null,"last_run":null,"problems":{},"read_only_types":[]}"#
                 .utf8))
     #expect(connector.lastRun == .null)
     let run = try decoder.decode(
