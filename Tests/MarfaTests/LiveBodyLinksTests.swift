@@ -12,7 +12,7 @@ extension LiveWorkingCopies {
             Dictionary(report.verdicts.map { ($0.id, $0.verdict) }, uniquingKeysWith: { first, _ in first })
         }
 
-        @Test func anEmbeddedFileIsOneEdgeTheServerHoldsAndALinkResolvesByTheServersLookup() async throws {
+        @Test func anEmbeddedFileKeepsItsAttachmentEdgeAndALinkResolvesByTheServersLookup() async throws {
             let copy = try await Live.hydrated()
             let suffix = UUID().uuidString
             let unique = "Unique \(suffix)"
@@ -54,11 +54,10 @@ extension LiveWorkingCopies {
             #expect(found.links[1].target == .ambiguous)
             #expect(found.links[2].target == .missing)
 
-            // The embed is the attach's own edge, and the server holds no second one.
             let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
             _ = try await fresh.hydrate(types: ["core.note"], tier: .feed, edgeTypes: ["attached-to"])
             let edges = try await fresh.edges.to(hostId).filter { $0.sourceId == fileId }
-            #expect(edges.count == 1, "the embed made more than one edge: \(edges)")
+            #expect(edges.count == 1, "the embed changed the attachment edges: \(edges)")
             await fresh.close()
             await copy.close()
         }

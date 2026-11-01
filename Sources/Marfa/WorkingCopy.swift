@@ -732,7 +732,7 @@ public struct Items: Sendable {
     /// Attaches `file` to the item and adds its embed to the end of the item's body, after a blank line.
     ///
     /// Queues the writes of `attach(to:file:_:)` and an edit of the body, which
-    /// reads back as the attachment's own edge and makes no second one. The edit
+    /// reads back as a `references` edge from the item to the file. The edit
     /// is based on the body and version the copy holds, as `update(_:_:)`'s is,
     /// so a body another device changes first is answered as the type's merge
     /// policy says: `conflicted` for a note. Where the file's title cannot name

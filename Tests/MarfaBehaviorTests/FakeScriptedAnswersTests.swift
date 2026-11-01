@@ -39,6 +39,19 @@ struct FakeScriptedAnswersBehavior {
         }
     }
 
+    @Test func aScriptedDisplayReceivesTheItemIDThroughBothPublicCalls() async throws {
+        let fake = WorkingCopy.fake(displays: { ItemDisplay(name: $0.id, preview: nil) })
+        let expected = [ItemDisplay(name: Self.note.id, preview: nil)]
+        #expect(try await fake.copy.items.displays(of: [Self.note]) == expected)
+        #expect(
+            try await fake.copy.items.displays(for: [
+                ItemDisplayInput(type: Self.note.type, properties: Self.note.properties, id: Self.note.id)
+            ]) == expected)
+        #expect(
+            try await fake.copy.items.displays(for: [ItemDisplayInput(type: Self.note.type, properties: [:])])
+                == [ItemDisplay(name: nil, preview: nil)])
+    }
+
     @Test func linkCandidatesAreUnsupportedUntilScripted() async throws {
         let fake = WorkingCopy.fake()
         await #expect(throws: FakeCopyError.unsupported(call: "links.candidates")) {

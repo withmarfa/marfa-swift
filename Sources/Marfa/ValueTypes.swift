@@ -846,7 +846,7 @@ public struct Attached: Sendable, Hashable {
     public var item: QueuedWrite
     public var edge: QueuedWrite
     /// The text that embeds the file in the item's body, `![[title]]`, which
-    /// the body reads back as `edge` and not as a second one; `nil` where the
+    /// the body reads back as a `references` edge from the item to the file; `nil` where the
     /// file's title cannot name it alone in an embed.
     public var embed: String?
 

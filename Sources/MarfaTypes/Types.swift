@@ -48,7 +48,7 @@ public protocol APIProtocol: Sendable {
     func deleteItem(_ input: Operations.DeleteItem.Input) async throws -> Operations.DeleteItem.Output
     /// Preview trashing items
     ///
-    /// Returns what `POST /items/trash` would move to the trash for the same `ids`: each item and every item you can read that a cascading edge such as `parent-of` would take with it. Nothing changes.
+    /// Returns what `POST /items/trash` would move to the trash for the same `ids`: each item and every item you can read that a cascading edge such as `parent-of` reaches, or comment or attachment whose hosts would all be in the trash. Nothing changes.
     ///
     /// - Remark: HTTP `POST /items/trash-preview`.
     /// - Remark: Generated from `#/paths//items/trash-preview/post(previewItemTrash)`.
@@ -111,7 +111,7 @@ public protocol APIProtocol: Sendable {
     func bulkUpsertItems(_ input: Operations.BulkUpsertItems.Input) async throws -> Operations.BulkUpsertItems.Output
     /// Get item counts
     ///
-    /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
+    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -725,6 +725,27 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /connectors/{id}/deliveries/handled`.
     /// - Remark: Generated from `#/paths//connectors/{id}/deliveries/handled/post(markInboundDeliveriesHandled)`.
     func markInboundDeliveriesHandled(_ input: Operations.MarkInboundDeliveriesHandled.Input) async throws -> Operations.MarkInboundDeliveriesHandled.Output
+    /// List sources
+    ///
+    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the owner see every source in use or named.
+    ///
+    /// - Remark: HTTP `GET /sources`.
+    /// - Remark: Generated from `#/paths//sources/get(listSources)`.
+    func listSources(_ input: Operations.ListSources.Input) async throws -> Operations.ListSources.Output
+    /// Get a source
+    ///
+    /// Returns a source's name and mark. A source needs no item or key to be read, but you see only your own, those you claim and those of items you can read, unless you hold `keys.manage`.
+    ///
+    /// - Remark: HTTP `GET /source`.
+    /// - Remark: Generated from `#/paths//source/get(getSource)`.
+    func getSource(_ input: Operations.GetSource.Input) async throws -> Operations.GetSource.Output
+    /// Name a source
+    ///
+    /// Sets or clears a source's name and mark, and returns the source. A field left out keeps its value. You can change your own source and those you claim; any other needs `keys.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /source`.
+    /// - Remark: Generated from `#/paths//source/patch(updateSource)`.
+    func updateSource(_ input: Operations.UpdateSource.Input) async throws -> Operations.UpdateSource.Output
     /// List API keys
     ///
     /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
@@ -1073,7 +1094,7 @@ extension APIProtocol {
     }
     /// Preview trashing items
     ///
-    /// Returns what `POST /items/trash` would move to the trash for the same `ids`: each item and every item you can read that a cascading edge such as `parent-of` would take with it. Nothing changes.
+    /// Returns what `POST /items/trash` would move to the trash for the same `ids`: each item and every item you can read that a cascading edge such as `parent-of` reaches, or comment or attachment whose hosts would all be in the trash. Nothing changes.
     ///
     /// - Remark: HTTP `POST /items/trash-preview`.
     /// - Remark: Generated from `#/paths//items/trash-preview/post(previewItemTrash)`.
@@ -1216,7 +1237,7 @@ extension APIProtocol {
     }
     /// Get item counts
     ///
-    /// Returns item counts by state or type using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
+    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -2560,6 +2581,47 @@ extension APIProtocol {
     ) async throws -> Operations.MarkInboundDeliveriesHandled.Output {
         try await markInboundDeliveriesHandled(Operations.MarkInboundDeliveriesHandled.Input(
             path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// List sources
+    ///
+    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the owner see every source in use or named.
+    ///
+    /// - Remark: HTTP `GET /sources`.
+    /// - Remark: Generated from `#/paths//sources/get(listSources)`.
+    public func listSources(headers: Operations.ListSources.Input.Headers = .init()) async throws -> Operations.ListSources.Output {
+        try await listSources(Operations.ListSources.Input(headers: headers))
+    }
+    /// Get a source
+    ///
+    /// Returns a source's name and mark. A source needs no item or key to be read, but you see only your own, those you claim and those of items you can read, unless you hold `keys.manage`.
+    ///
+    /// - Remark: HTTP `GET /source`.
+    /// - Remark: Generated from `#/paths//source/get(getSource)`.
+    public func getSource(
+        query: Operations.GetSource.Input.Query,
+        headers: Operations.GetSource.Input.Headers = .init()
+    ) async throws -> Operations.GetSource.Output {
+        try await getSource(Operations.GetSource.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Name a source
+    ///
+    /// Sets or clears a source's name and mark, and returns the source. A field left out keeps its value. You can change your own source and those you claim; any other needs `keys.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /source`.
+    /// - Remark: Generated from `#/paths//source/patch(updateSource)`.
+    public func updateSource(
+        query: Operations.UpdateSource.Input.Query,
+        headers: Operations.UpdateSource.Input.Headers = .init(),
+        body: Operations.UpdateSource.Input.Body
+    ) async throws -> Operations.UpdateSource.Output {
+        try await updateSource(Operations.UpdateSource.Input(
+            query: query,
             headers: headers,
             body: body
         ))

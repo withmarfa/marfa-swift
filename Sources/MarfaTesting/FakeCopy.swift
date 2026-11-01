@@ -210,7 +210,7 @@ private struct PublicAnswers: Sendable {
         answers.displays = displays.map { (shown) -> @Sendable (MarfaCore.ItemDisplayInput) -> MarfaCore.ItemDisplay in
             { (input: MarfaCore.ItemDisplayInput) -> MarfaCore.ItemDisplay in
                 let properties = Marfa.JSONObject(input.properties)
-                let answer = shown(Marfa.ItemDisplayInput(type: input.type, properties: properties))
+                let answer = shown(Marfa.ItemDisplayInput(type: input.type, properties: properties, id: input.id))
                 return MarfaCore.ItemDisplay(name: answer.name, preview: answer.preview)
             }
         }
