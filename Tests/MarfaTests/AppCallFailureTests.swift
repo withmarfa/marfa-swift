@@ -145,7 +145,6 @@ struct AnAppCallThatFails {
 
         copy.lifecycle.failed(error)
         #expect(copy.lifecycle.connection == .following)
-        copy.lifecycle.failed(error, epoch: nil)
         try await Task.sleep(for: .milliseconds(100))
         #expect(updates.connection == .following)
         #expect(clock.waiting == 0)
