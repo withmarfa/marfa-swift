@@ -153,7 +153,12 @@ final class FakeCore: Core, @unchecked Sendable {
         var refused: Set<String> = []
         var catchUpChangesCatalog = false
         var catchUpFails: MarfaCore.MarfaError?
+        /// What each next catch-up does before `catchUpFails` applies, in order: it waits for `hold` to be
+        /// signaled, and fails with `fails` where one is given.
+        var catchUpScript: [(hold: DispatchSemaphore?, fails: MarfaCore.MarfaError?)] = []
         var catchUps = 0
+        /// Held by the next `status()` after it has read the copy, so it answers what the copy was when it began.
+        var statusGate: DispatchSemaphore?
         var drains = 0
         /// While a hydration runs, what `status()` says of its progress.
         var itemsExpected: UInt64?
@@ -408,7 +413,13 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func catchUp(stop: MarfaCore.Stop?) throws -> MarfaCore.CatchUpReport {
-        try state.withLock { state in
+        let step = state.withLock { state in state.catchUpScript.isEmpty ? nil : state.catchUpScript.removeFirst() }
+        step?.hold?.wait()
+        if let failure = step?.fails {
+            state.withLock { $0.catchUps += 1 }
+            throw MarfaCore.CatchUpError.Failed(error: failure, catalogChanged: false)
+        }
+        return try state.withLock { state in
             // The core's catch-up claims the stream a hydration holds (`claim_stream(Mover::CatchUp)`).
             guard !state.hydrating else {
                 throw MarfaCore.CatchUpError.Failed(
@@ -427,12 +438,16 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func status() throws -> MarfaCore.Status {
-        let (slice, origin, instance) = state.withLock { ($0.slice, $0.serverOrigin, $0.instanceId) }
+        let (slice, origin, instance, hydration, held) = state.withLock { state in
+            defer { state.statusGate = nil }
+            return (state.slice, state.serverOrigin, state.instanceId, state.hydration, state.statusGate)
+        }
+        held?.wait()
         return MarfaCore.Status(
             serverOrigin: origin, instanceId: instance, sliceTypes: slice?.types ?? [], sliceTier: slice?.tier,
             sliceEdgeTypes: slice?.edgeTypes ?? [], pinned: [],
             eventCursor: nil,
-            hydration: state.withLock { $0.hydration }, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
+            hydration: hydration, items: 0, itemsExpected: state.withLock { $0.itemsExpected },
             itemsListed: state.withLock { $0.itemsListed }, edges: 0,
             catalogVersion: 1, syncedAt: state.withLock { $0.syncedAt },
             fileCache: MarfaCore.FileCache(
