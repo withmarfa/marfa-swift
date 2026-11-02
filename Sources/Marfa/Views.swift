@@ -259,10 +259,12 @@ extension Items {
     ///
     /// Throws `MarfaError.invalid`, naming the reason, where the copy cannot answer the whole view: a type or tier
     /// the query lists that the slice does not hold, `beneath` without `parent-of` held whole, a `backref` in the
-    /// filter of an edge type the slice does not hold whole, a revoked view, or an item that is not a `system.view`. While a
-    /// hydration is still filling the copy the list holds the items that have arrived, and `completeness` says
-    /// `.partial`. Throws `MarfaError.notFound` with the code `not_held` for a view the copy does not hold; hydrate
-    /// with `system.view` in the slice, or pin it.
+    /// filter of an edge type the slice does not hold whole, a revoked view, or an item that is not a `system.view`.
+    ///
+    /// Throws `MarfaError.hydrationIncomplete` while a hydration is filling the copy and while the copy is stale,
+    /// since a view's answer would be wrong for rows that have not arrived: ask again once the copy is whole. Unlike
+    /// ``list(_:sort:)``, it never answers in part. Throws `MarfaError.notFound` with the code `not_held` for a view
+    /// the copy does not hold; hydrate with `system.view` in the slice, or pin it.
     public func list(inView id: String, limit: UInt32? = nil, offset: UInt32? = nil) async throws -> Rows<Item> {
         try await holder.run { core in
             try core.listInView(id: id, limit: limit, offset: offset).answer
@@ -275,9 +277,10 @@ extension Items {
     /// the `null` group last, and the groups in ``ViewGrouping/hidden`` are left out. A view that groups nothing
     /// answers one `null` group of every item.
     ///
-    /// Date groups follow the calendar of `timeZone`, or of the device's when it is `nil`. Throws as
-    /// ``list(inView:limit:offset:)`` does, and `MarfaError.invalid` for a group by `edge[<type>]` or
-    /// `backref[<type>]` of an edge type the slice does not hold whole: pass it as an `edgeTypes` of `hydrate`.
+    /// Date groups follow the calendar of `timeZone`, or of the device's when it is `nil`. Throws
+    /// `MarfaError.invalid` for a group by `edge[<type>]` or `backref[<type>]` of an edge type the slice does not
+    /// hold whole: pass it as an `edgeTypes` of `hydrate`. It refuses a copy that is filling or stale and a view it
+    /// cannot answer as ``list(inView:limit:offset:)`` does.
     public func groups(inView id: String, timeZone: TimeZone? = nil) async throws -> Rows<ViewGroup> {
         try await holder.run { core in
             let groups = try core.viewGroups(id: id, timeZone: timeZone?.identifier)
@@ -287,8 +290,10 @@ extension Items {
 }
 
 extension WorkingCopy {
-    /// A full-text search narrowed to what the view lists; it throws as ``Items/list(inView:limit:offset:)``
-    /// throws.
+    /// A full-text search narrowed to what the view lists.
+    ///
+    /// It refuses a copy that is filling or stale and a view it cannot answer as ``Items/list(inView:limit:offset:)``
+    /// does.
     public func search(_ query: String, inView id: String, limit: Int = 20) async throws -> Rows<SearchHit> {
         try await holder.run { core in
             try core.searchInView(query: query, id: id, limit: UInt32(clamping: limit)).answer

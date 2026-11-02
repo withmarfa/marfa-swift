@@ -56,8 +56,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The copy holds no position in the server's events; hydrate first.
     case noCursor(message: String)
     /// A read by id asked for a row this copy does not hold while a hydration is still filling it, so the row may
-    /// yet arrive. Reads that list or search answer the rows that have arrived and say `.partial` instead. An edge
-    /// write throws it too until the copy is whole, as does an item write to a row the copy does not hold.
+    /// yet arrive. Reads that list or search answer the rows that have arrived and say `.partial` instead, except reads
+    /// of a view's items, groups or search hits, which throw it while a hydration fills the copy and while the copy
+    /// is stale. An edge write throws it too until the copy is whole, as does an item write to a row the copy does
+    /// not hold.
     case hydrationIncomplete(message: String)
     /// The copy holds no type catalog; a hydration reads the server's catalog.
     case noCatalog(message: String)
