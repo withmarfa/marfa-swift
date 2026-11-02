@@ -83,6 +83,9 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// naming only its body keeps its parent's title field.
     public let titleField: String?
     public let bodyField: String?
+    /// Whether an item with no title is named by the first line of its body; `false` where the body is not a name,
+    /// such as a highlight's passage. `true` where no type in the chain says.
+    public let nameFromBody: Bool
     /// The Iconify ID of the icon that stands for the type, `<set>:<name>`
     /// such as `lucide:book-open` or `simple-icons:github`; `nil` when no
     /// type in its chain sets one.
@@ -112,7 +115,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     public init(
         id: String, label: String? = nil, plural: String? = nil, description: String? = nil, parent: String? = nil,
         version: Int64 = 0, fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil,
-        icon: String? = nil,
+        nameFromBody: Bool = true, icon: String? = nil,
         linkField: String? = nil, roles: [String] = [], compatibleWith: [String] = []
     ) {
         // An empty label or plural names nothing, as the core reads one.
@@ -128,6 +131,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.fields = fields
         self.titleField = titleField
         self.bodyField = bodyField
+        self.nameFromBody = nameFromBody
         self.icon = icon
         self.linkField = linkField
         self.roles = roles
@@ -142,8 +146,8 @@ public struct ItemType: Sendable, Hashable, Identifiable {
             id: core.id, label: core.label, plural: core.plural, description: core.description,
             parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
             titleField: core.titleField,
-            bodyField: core.bodyField, icon: core.icon, linkField: core.linkField, roles: core.roles,
-            compatibleWith: core.compatibleWith)
+            bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField,
+            roles: core.roles, compatibleWith: core.compatibleWith)
     }
 }
 

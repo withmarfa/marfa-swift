@@ -309,8 +309,8 @@ extension Marfa.ItemType {
     fileprivate var held: MarfaCore.ItemType {
         MarfaCore.ItemType(
             id: id, label: label, plural: plural, description: description, parent: parent, version: version,
-            fields: fields.map(\.held), titleField: titleField, bodyField: bodyField, icon: icon, linkField: linkField,
-            roles: roles, compatibleWith: compatibleWith)
+            fields: fields.map(\.held), titleField: titleField, bodyField: bodyField, nameFromBody: nameFromBody,
+            icon: icon, linkField: linkField, roles: roles, compatibleWith: compatibleWith)
     }
 }
 

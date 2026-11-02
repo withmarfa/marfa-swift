@@ -117,6 +117,22 @@ struct DeclaredTypesOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func aTypeIsNamedFromItsBodyUnlessTheNearestTypeThatSaysSaysNot(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        try await copy.declareTypes([
+            ["id": "app.notes.quote", "parent": "core.note", "display_hints": ["name_from_body": false]],
+            ["id": "app.notes.pull", "parent": "app.notes.quote"],
+            ["id": "app.notes.again", "parent": "app.notes.pull", "display_hints": ["name_from_body": true]],
+            ["id": "app.notes.plain", "parent": "core.note"],
+        ])
+        #expect(try await copy.catalog.itemType("app.notes.quote").nameFromBody == false)
+        #expect(try await copy.catalog.itemType("app.notes.pull").nameFromBody == false, "inherited from its parent")
+        #expect(try await copy.catalog.itemType("app.notes.again").nameFromBody == true, "its own hint wins")
+        #expect(try await copy.catalog.itemType("app.notes.plain").nameFromBody == true, "true where no type says")
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func eachDisplayHintComesFromTheNearestTypeThatSetsIt(kind: CopyKind) async throws {
         let copy = try await kind.open()
         try await copy.declareTypes([

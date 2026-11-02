@@ -1556,7 +1556,7 @@ extension Components {
                 case _type = "type"
             }
         }
-        /// How clients show a type and its items: the fields that hold an item's title and body, and the type's icon. Each hint comes from the nearest type that sets it.
+        /// How clients show a type and its items: the fields that hold an item's title and body, whether the body names an item, and the type's icon. Each hint comes from the nearest type that sets it.
         ///
         /// - Remark: Generated from `#/components/schemas/DisplayHints`.
         public struct DisplayHints: Codable, Hashable, Sendable {
@@ -1568,6 +1568,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
+            /// Whether an item with no title is named by the first line of its body. `false` where the body is not a name, such as a highlight's passage: such an item is named after what it comes from, or `Untitled`. Defaults to `true`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/DisplayHints/name_from_body`.
+            public var nameFromBody: Swift.Bool?
             /// The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/icon`.
@@ -1579,22 +1583,26 @@ extension Components {
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
             ///   - bodyField: The field that holds an item's body for display. The field holds Markdown.
+            ///   - nameFromBody: Whether an item with no title is named by the first line of its body. `false` where the body is not a name, such as a highlight's passage: such an item is named after what it comes from, or `Untitled`. Defaults to `true`.
             ///   - icon: The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
                 titleField: Swift.String? = nil,
                 bodyField: Swift.String? = nil,
+                nameFromBody: Swift.Bool? = nil,
                 icon: Swift.String? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.titleField = titleField
                 self.bodyField = bodyField
+                self.nameFromBody = nameFromBody
                 self.icon = icon
                 self.additionalProperties = additionalProperties
             }
             public enum CodingKeys: String, CodingKey {
                 case titleField = "title_field"
                 case bodyField = "body_field"
+                case nameFromBody = "name_from_body"
                 case icon
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -1607,6 +1615,10 @@ extension Components {
                     Swift.String.self,
                     forKey: .bodyField
                 )
+                self.nameFromBody = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .nameFromBody
+                )
                 self.icon = try container.decodeIfPresent(
                     Swift.String.self,
                     forKey: .icon
@@ -1614,6 +1626,7 @@ extension Components {
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
                     "title_field",
                     "body_field",
+                    "name_from_body",
                     "icon"
                 ])
             }
@@ -1626,6 +1639,10 @@ extension Components {
                 try container.encodeIfPresent(
                     self.bodyField,
                     forKey: .bodyField
+                )
+                try container.encodeIfPresent(
+                    self.nameFromBody,
+                    forKey: .nameFromBody
                 )
                 try container.encodeIfPresent(
                     self.icon,
@@ -8761,7 +8778,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
             public var version: Swift.Int
-            /// How clients show the type and its items: the title field, the body field and the icon.
+            /// How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
@@ -8793,7 +8810,7 @@ extension Components {
             ///   - roles: The structural roles the type plays, including those it inherits.
             ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
             ///   - version: The version number the type was last saved with.
-            ///   - displayHints: How clients show the type and its items: the title field, the body field and the icon.
+            ///   - displayHints: How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
@@ -9380,7 +9397,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with`.
             public var compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload?
-            /// How clients show the type and its items: the title field, the body field and the icon.
+            /// How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
@@ -9416,7 +9433,7 @@ extension Components {
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
             ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///   - displayHints: How clients show the type and its items: the title field, the body field and the icon.
+            ///   - displayHints: How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
@@ -9930,7 +9947,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with`.
             public var compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload?
-            /// How clients show the type and its items: the title field, the body field and the icon.
+            /// How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/display_hints`.
             public var displayHints: Components.Schemas.DisplayHints?
@@ -9970,7 +9987,7 @@ extension Components {
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
             ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///   - displayHints: How clients show the type and its items: the title field, the body field and the icon.
+            ///   - displayHints: How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
             ///   - mergePolicy: How Marfa merges conflicting edits to the type's items.
@@ -12565,7 +12582,7 @@ extension Components {
                 case error
             }
         }
-        /// A connector is a process outside Marfa that registers under an API key, sends heartbeats and reports its runs.
+        /// A connector is a program outside Marfa that registers under an API key of its own, sends heartbeats and reports its runs.
         ///
         /// - Remark: Generated from `#/components/schemas/Connector`.
         public struct Connector: Codable, Hashable, Sendable {
