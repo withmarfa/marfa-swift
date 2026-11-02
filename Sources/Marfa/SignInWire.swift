@@ -99,13 +99,13 @@ struct SignInPlace: Sendable, Hashable {
     /// process or another runs at the same time.
     ///
     /// Blocks the calling thread while another holder has the lease; never call it on the main thread. Throws
-    /// ``SignInError/unavailable(message:)`` when the lease stays held past the wait.
+    /// ``SignInError/heldElsewhere`` when the lease stays held past the wait.
     func exclusively<T>(_ transport: SignInTransport, _ work: () throws -> T) throws -> T {
         let lease: RenewalLease
         do {
             lease = try RenewalLease.take(self, transport)
         } catch is RenewalLease.Held {
-            throw SignInError.unavailable(message: "another process is using the sign-in")
+            throw SignInError.heldElsewhere
         }
         defer { lease.release() }
         return try work()

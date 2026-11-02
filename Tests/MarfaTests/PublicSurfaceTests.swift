@@ -240,7 +240,7 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         let errors: [SignInError] = [
             .canceled, .denied, .expired, .stateMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect,
             .refused(code: "invalid_scope", message: "m"),
-            .unavailable(message: "offline"), .unreadable(message: "unreadable"),
+            .unavailable(message: "offline"), .heldElsewhere, .unreadable(message: "unreadable"),
         ]
         #expect(Set(errors.map(\.description)).count == errors.count)
     }
