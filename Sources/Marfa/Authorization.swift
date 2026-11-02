@@ -6,6 +6,12 @@ import Foundation
 /// The app registers with the server as a native client the first time it signs in, for the grant that
 /// sign-in uses, and the registration is kept with the tokens. It registers again after it signs out or the
 /// sign-in ends, and when it signs in another way than the kept registration allows.
+///
+/// Signing in again replaces the sign-in kept for the server and then ends the grant it held there, as
+/// ``signOut()`` does, so each sign-in leaves one grant standing. A sign-in that reused the kept registration
+/// shares its grant, so only the replaced access token is revoked. ``Credential/replacedGrantStands`` says when
+/// the server did not confirm the replaced grant ended.
+///
 /// Sign in with a browser through ``signIn(presentingFrom:prefersEphemeralWebBrowserSession:)`` or
 /// ``signIn(using:)``, or, without a browser, through ``startDeviceSignIn()``. Then open a copy with
 /// ``Server/init(url:credential:)``: the copy renews the access token with the kept refresh token whenever the
@@ -77,11 +83,17 @@ public struct Authorization: Sendable {
     /// Signs in through the system's web authentication session, which shows the server's sign-in and
     /// approval pages over `anchor`.
     ///
+    /// Once the sign-in is kept, it ends the grant of the sign-in it replaced, and the credential's
+    /// ``Credential/replacedGrantStands`` says whether that grant still stands.
+    ///
     /// Throws ``SignInError/canceled`` when the person closes the browser, ``SignInError/denied`` when they
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
     /// ask for, ``SignInError/noRedirect`` when the client names no redirect, and
-    /// ``SignInError/unavailable(message:)`` when another process sharing the keychain holds the sign-in too
-    /// long to keep the approval, after which the approved grant is revoked at the server.
+    /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
+    /// keep the approval. When the approval cannot be kept, for that or a keychain error, it asks the server to
+    /// revoke it: by its refresh token, which ends its grant, or by its access token alone when it reused the
+    /// kept registration and the sign-in kept for the server shares, or may share, that grant. The error does
+    /// not say whether the server confirmed it.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -178,10 +190,10 @@ public struct Authorization: Sendable {
     /// Ends the sign-in: deletes its tokens and registration from the keychain, then revokes the refresh
     /// token at the server, which ends the app's grant there.
     ///
-    /// Answers whether the server confirmed the revocation. The keychain no longer holds the sign-in either
-    /// way; on `false`, the grant stands at the server until the owner revokes it. Throws
-    /// ``SignInError/unavailable(message:)``, changing nothing, when another process sharing the keychain
-    /// holds the sign-in too long.
+    /// Answers whether the server confirmed that the grant ended. The keychain no longer holds the sign-in
+    /// either way; on `false`, the grant stands at the server until the owner revokes it. Throws
+    /// ``SignInError/heldElsewhere``, changing nothing, when another process sharing the keychain holds the
+    /// sign-in too long.
     @discardableResult
     public func signOut() async throws -> Bool {
         let place = place
@@ -197,19 +209,21 @@ public struct Authorization: Sendable {
         return await revoke(kept)
     }
 
-    /// Revokes the sign-in at the server, and answers whether the server confirmed it.
+    /// Revokes the sign-in at the server, and answers whether the server confirmed that its grant ended.
     ///
-    /// Revoking the refresh token ends the app's grant there; a sign-in with none revokes its access token.
-    private func revoke(_ kept: KeptSignIn) async -> Bool {
+    /// Revoking the refresh token ends the app's grant, with every token of its client, other sign-ins on the
+    /// client included. With `endingGrant` off, or for a sign-in with no refresh token, only the access token
+    /// is revoked, and the grant stands.
+    private func revoke(_ kept: KeptSignIn, endingGrant: Bool = true) async -> Bool {
         guard let revocation = kept.revocationEndpoint else { return false }
-        let (token, hint) =
-            kept.refreshToken.map { ($0, "refresh_token") } ?? (kept.accessToken, "access_token")
+        let refreshToken = endingGrant ? kept.refreshToken : nil
+        let (token, hint) = refreshToken.map { ($0, "refresh_token") } ?? (kept.accessToken, "access_token")
         do {
             let answer = try await send(
                 try formRequest(
                     revocation, [("token", token), ("token_type_hint", hint), ("client_id", kept.clientId)]),
                 transport)
-            return answer.status == 200
+            return refreshToken != nil && answer.status == 200
         } catch {
             return false
         }
@@ -227,7 +241,8 @@ public struct Authorization: Sendable {
         if let kept = try await background({ try place.read() }), kept.grantTypes.contains(grant),
             kept.redirect == redirect
         {
-            return Registered(clientId: kept.clientId, grantTypes: kept.grantTypes, redirect: kept.redirect)
+            return Registered(
+                clientId: kept.clientId, grantTypes: kept.grantTypes, redirect: kept.redirect, reused: true)
         }
         let grantTypes = [grant, "refresh_token"]
         var metadata: [String: Any] = [
@@ -251,7 +266,7 @@ public struct Authorization: Sendable {
         guard let clientId = answer.object?["client_id"] as? String, !clientId.isEmpty else {
             throw SignInError.unreadable(message: "the registration answered no client_id")
         }
-        return Registered(clientId: clientId, grantTypes: grantTypes, redirect: redirect)
+        return Registered(clientId: clientId, grantTypes: grantTypes, redirect: redirect, reused: false)
     }
 
     /// A client registered for one sign-in flow.
@@ -259,6 +274,9 @@ public struct Authorization: Sendable {
         let clientId: String
         let grantTypes: [String]
         let redirect: String?
+        /// Whether it is the kept sign-in's registration, whose grant another sign-in may hold, rather than one
+        /// registered for this sign-in alone.
+        let reused: Bool
     }
 
     fileprivate func keep(_ token: TokenAnswer, registered: Registered, discovery: Discovery) async throws
@@ -271,14 +289,37 @@ public struct Authorization: Sendable {
             tokenEndpoint: discovery.tokenEndpoint, revocationEndpoint: discovery.revocationEndpoint)
         let place = place
         let transport = transport
+        let replaced: KeptSignIn?
         do {
-            try await background { try place.exclusively(transport) { try place.keep(kept) } }
+            replaced = try await background {
+                try place.exclusively(transport) { () throws -> KeptSignIn? in
+                    let replaced = try place.read()
+                    try place.keep(kept)
+                    return replaced
+                }
+            }
         } catch {
-            // The person approved a grant the app cannot use; ending it keeps it from standing at the server.
-            _ = await revoke(kept)
+            // The person approved a grant the app cannot use; ending it keeps it from standing at the server,
+            // unless the sign-in kept now, or one the keychain cannot read, may share it on a reused client.
+            var shared = false
+            if registered.reused {
+                do {
+                    shared = try await background { try place.read() }?.clientId == kept.clientId
+                } catch {
+                    shared = true
+                }
+            }
+            _ = await revoke(kept, endingGrant: !shared)
             throw error
         }
-        return Credential(place: place, kept: kept, transport: transport)
+        var replacedGrantStands = false
+        if let replaced {
+            // Revoking the refresh token of a sign-in on the same client would end the new sign-in's grant too.
+            let shared = replaced.clientId == kept.clientId
+            let ended = await revoke(replaced, endingGrant: !shared)
+            replacedGrantStands = !shared && !ended
+        }
+        return Credential(place: place, kept: kept, transport: transport, replacedGrantStands: replacedGrantStands)
     }
 }
 
@@ -309,9 +350,15 @@ public struct DeviceSignIn: Sendable {
     /// When the server cannot be reached or fails with a 5xx status, it doubles the interval and keeps
     /// asking, as RFC 8628 section 3.5 recommends, until the code expires.
     ///
+    /// Once the sign-in is kept, it ends the grant of the sign-in it replaced, and the credential's
+    /// ``Credential/replacedGrantStands`` says whether that grant still stands.
+    ///
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
-    /// expires, and ``SignInError/unavailable(message:)`` when another process sharing the keychain holds
-    /// the sign-in too long to keep the approval, after which the approved grant is revoked at the server.
+    /// expires, and ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
+    /// too long to keep the approval. When the approval cannot be kept, for that or a keychain error, it asks
+    /// the server to revoke it: by its refresh token, which ends its grant, or by its access token alone when it
+    /// reused the kept registration and the sign-in kept for the server shares, or may share, that grant. The
+    /// error does not say whether the server confirmed it.
     /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
@@ -365,12 +412,20 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     public let server: URL
     /// The scopes the owner approved, which may be fewer than the app asked for.
     public let scopes: [String]
+    /// Whether the grant of the sign-in this one replaced still stands at the server.
+    ///
+    /// `true` only on a credential a sign-in returned, when it replaced a sign-in kept for the server on
+    /// another registered client and the server did not confirm that the replaced grant ended, such as when
+    /// it could not be reached. The new sign-in is kept either way. The replaced grant stands until the owner
+    /// revokes it, so an app can tell the person to remove it from the server's connected apps.
+    public let replacedGrantStands: Bool
     let place: SignInPlace
     let transport: SignInTransport
 
-    init(place: SignInPlace, kept: KeptSignIn, transport: SignInTransport) {
+    init(place: SignInPlace, kept: KeptSignIn, transport: SignInTransport, replacedGrantStands: Bool = false) {
         server = URL(string: place.account) ?? URL(filePath: "/")
         scopes = (kept.scope ?? "").split(separator: " ").map(String.init)
+        self.replacedGrantStands = replacedGrantStands
         self.place = place
         self.transport = transport
     }
@@ -408,8 +463,11 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     case noRedirect
     /// The server refused, with the OAuth error `code`.
     case refused(code: String, message: String)
-    /// The server could not be reached.
+    /// The server could not be reached, or the browser could not open.
     case unavailable(message: String)
+    /// Another process sharing the keychain, such as an app extension, held the sign-in too long, so the
+    /// keychain was left as it was.
+    case heldElsewhere
     /// The server answered something this package cannot use, or named another server as the one that signs
     /// in to it.
     case unreadable(message: String)
@@ -424,6 +482,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .notAServer: "The address is not an http or https server address."
         case .otherServer: "The sign-in is for another server."
         case .noRedirect: "The app names no redirect address for a browser sign-in."
+        case .heldElsewhere: "Another process is using the sign-in."
         case .refused(let code, let message): "The server refused the sign-in (\(code)): \(message)"
         case .unavailable(let message), .unreadable(let message): message
         }
