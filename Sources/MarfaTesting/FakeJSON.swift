@@ -137,6 +137,10 @@ enum Properties {
         if case .string(let text)? = value(object, key) { text } else { nil }
     }
 
+    static func bool(_ object: JsonObject, _ key: String) -> Bool? {
+        if case .bool(let flag)? = value(object, key) { flag } else { nil }
+    }
+
     static func strings(_ object: JsonObject, _ key: String) -> [String] {
         guard case .array(let items)? = value(object, key) else { return [] }
         return items.compactMap { if case .string(let text) = $0 { text } else { nil } }

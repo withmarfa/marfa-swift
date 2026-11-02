@@ -233,6 +233,7 @@ enum Declaring {
             fields: fields.values.sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) },
             titleField: hints.flatMap { Properties.string($0, "title_field") } ?? inherited?.titleField,
             bodyField: hints.flatMap { Properties.string($0, "body_field") } ?? inherited?.bodyField,
+            nameFromBody: hints.flatMap { Properties.bool($0, "name_from_body") } ?? inherited?.nameFromBody ?? true,
             icon: hints.flatMap { Properties.string($0, "icon") } ?? inherited?.icon,
             linkField: Properties.string(row, "link_field"), roles: Properties.strings(row, "roles"),
             compatibleWith: Properties.strings(row, "compatible_with"))

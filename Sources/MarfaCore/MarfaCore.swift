@@ -7900,6 +7900,11 @@ public struct ItemType: Equatable, Hashable {
     public var titleField: String?
     public var bodyField: String?
     /**
+     * False where an item's body does not name it, such as a highlight's
+     * passage (`types/item-name-fields`).
+     */
+    public var nameFromBody: Bool
+    /**
      * The Iconify icon ID, `<set>:<name>`, such as `lucide:book-open`.
      */
     public var icon: String?
@@ -7915,6 +7920,10 @@ public struct ItemType: Equatable, Hashable {
          * `People`: the type's own, else one made from its label.
          */plural: String, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, 
         /**
+         * False where an item's body does not name it, such as a highlight's
+         * passage (`types/item-name-fields`).
+         */nameFromBody: Bool, 
+        /**
          * The Iconify icon ID, `<set>:<name>`, such as `lucide:book-open`.
          */icon: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
         self.id = id
@@ -7926,6 +7935,7 @@ public struct ItemType: Equatable, Hashable {
         self.fields = fields
         self.titleField = titleField
         self.bodyField = bodyField
+        self.nameFromBody = nameFromBody
         self.icon = icon
         self.linkField = linkField
         self.roles = roles
@@ -7957,6 +7967,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
                 fields: FfiConverterSequenceTypeTypeField.read(from: &buf), 
                 titleField: FfiConverterOptionString.read(from: &buf), 
                 bodyField: FfiConverterOptionString.read(from: &buf), 
+                nameFromBody: FfiConverterBool.read(from: &buf), 
                 icon: FfiConverterOptionString.read(from: &buf), 
                 linkField: FfiConverterOptionString.read(from: &buf), 
                 roles: FfiConverterSequenceString.read(from: &buf), 
@@ -7974,6 +7985,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
         FfiConverterSequenceTypeTypeField.write(value.fields, into: &buf)
         FfiConverterOptionString.write(value.titleField, into: &buf)
         FfiConverterOptionString.write(value.bodyField, into: &buf)
+        FfiConverterBool.write(value.nameFromBody, into: &buf)
         FfiConverterOptionString.write(value.icon, into: &buf)
         FfiConverterOptionString.write(value.linkField, into: &buf)
         FfiConverterSequenceString.write(value.roles, into: &buf)
