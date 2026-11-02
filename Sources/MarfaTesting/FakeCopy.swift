@@ -35,8 +35,8 @@ import Synchronization
 ///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`,
 ///   `clearOccurredAt` and `clearProperties`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
 ///   `items.restore(_:)`, `items.transition(_:to:)`, `tags`, `metadata`,
-///   `extensions`, `edges.create`, `edges.check(from:to:type:)`, `edges.update(_:_:)`, `edges.delete(_:)` and
-///   `declareTypes(_:)`.
+///   `extensions`, `edges.create`, `edges.check(from:to:type:)`, `edges.check(_:moving:)`, `edges.update(_:_:)`,
+///   `edges.delete(_:)` and `declareTypes(_:)`.
 /// - Views: `createView`, `changeView`, `deleteView`, `items.views()`, `items.view(_:)`,
 ///   `items.list(inView:limit:offset:)` and `items.groups(inView:timeZone:)`, over the views it is given
 ///   or makes. A view write goes straight through, never into the queue, and a change based on an older version
@@ -91,9 +91,10 @@ import Synchronization
 /// - It knows only the types it was given and the ones the app declares, not
 ///   Marfa's built-in catalog. `edges.create`, `edges.check`,
 ///   `items.create(edges:)`, `edges.update` moving an end and `items.update` changing an item's type refuse as the
-///   core does, from the types it holds, with the core's code and message: an end the edge type does not admit,
-///   nesting under a flat edge type, an end in the bin and a cycle through held edges (an edge an update moves is
-///   left out of that walk). A retype is refused when an edge the item holds would no longer fit its new type.
+///   core does, from the types and edges it holds, with the core's code, message and `details`: an end the edge
+///   type does not admit, nesting under a flat edge type, an end in the bin, an edge of a triple it holds, an end
+///   that already holds the one edge of the type it may, and a cycle through held edges (an edge an update moves is
+///   left out of these). A retype is refused when an edge the item holds would no longer fit its new type.
 /// - A search finds an item again once it is restored from the bin, as the contract says. A real copy does not
 ///   until it reads the row again (withmarfa/marfa#2526).
 ///

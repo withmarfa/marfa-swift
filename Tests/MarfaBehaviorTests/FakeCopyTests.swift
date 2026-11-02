@@ -198,7 +198,7 @@ struct FakeCopyBehavior {
         let copy = fake.copy
         let created = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"], tags: ["t"]))
         let edited = try await copy.items.update(Self.note.id, Edit(properties: ["title": "E"], baseVersion: 4))
-        let edge = try await copy.edges.create(from: Self.note.id, to: Self.other.id, type: "references")
+        let edge = try await copy.edges.create(from: Self.other.id, to: Self.note.id, type: "references")
 
         #expect(fake.writes.map(\.id) == [created.id, try await copy.queue.all()[1].id, edited.id, edge.id])
         _ = try await copy.queue.drain()

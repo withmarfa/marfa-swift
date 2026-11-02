@@ -236,7 +236,7 @@ extension LiveWorkingCopies {
             await #expect {
                 try await copy.items.purge(id)
             } throws: { error in
-                if case MarfaError.validation(code: "invalid_transition", _) = error { true } else { false }
+                if case MarfaError.validation(code: "invalid_transition", _, _) = error { true } else { false }
             }
             _ = try await copy.items.delete(id)
             _ = try await copy.queue.drain()

@@ -124,7 +124,7 @@ struct FakeViews {
             await #expect {
                 _ = try await copy.createView(refused)
             } throws: { error in
-                guard case .validation(let code, _)? = error as? MarfaError else { return false }
+                guard case .validation(let code, _, _)? = error as? MarfaError else { return false }
                 return code == "validation_error"
             }
         }
@@ -268,7 +268,7 @@ struct FakeViews {
         await #expect {
             _ = try await copy.changeView(revoked.id, ViewSettingsChange(title: "x"), baseVersion: 2)
         } throws: { error in
-            guard case .validation(let code, _)? = error as? MarfaError else { return false }
+            guard case .validation(let code, _, _)? = error as? MarfaError else { return false }
             return code == "invalid_transition"
         }
         try await copy.deleteView(revoked.id)

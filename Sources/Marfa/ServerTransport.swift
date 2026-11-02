@@ -63,7 +63,7 @@ package func refusal(
     let shown = message.isEmpty ? "\(origin) answered \(status)" : message
     switch status {
     case 400 where code == "unknown_type": return .unknownType(message: shown)
-    case 400, 422: return .validation(code: code, message: shown)
+    case 400, 422: return .validation(code: code, message: shown, details: nil)
     case 401: return .unauthorized(code: code, message: shown)
     case 403: return .forbidden(code: code, message: shown)
     case 404: return .notFound(code: code, message: shown)

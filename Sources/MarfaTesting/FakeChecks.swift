@@ -292,7 +292,9 @@ enum Checks {
                     throw Refuse.validation("invalid_id", "Invalid edges: \"\(target)\" is not a UUIDv7 in lowercase")
                 }
                 if draft.id == target {
-                    throw Refuse.validation("edge_cycle", "an edge from \(target) to itself closes a cycle")
+                    throw Refuse.validation(
+                        "edge_cycle", "an edge from \(target) to itself closes a cycle",
+                        details: Refuse.details(["edge_type": .string(type)]))
                 }
             }
         }

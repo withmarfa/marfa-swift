@@ -26,7 +26,7 @@ struct ListEntries {
 
     static func refused(_ message: String) -> (any Error) -> Bool {
         { error in
-            if case .validation("invalid_properties", let given)? = error as? MarfaError {
+            if case .validation("invalid_properties", let given, _)? = error as? MarfaError {
                 given.hasSuffix("phones: Item 0: \(message)")
             } else {
                 false
@@ -89,7 +89,7 @@ struct ListEntries {
         await #expect {
             try await Self.create(copy, phones: "020 7946 0000")
         } throws: { error in
-            if case .validation("invalid_properties", let given)? = error as? MarfaError {
+            if case .validation("invalid_properties", let given, _)? = error as? MarfaError {
                 given.hasSuffix("phones: Expected array")
             } else {
                 false

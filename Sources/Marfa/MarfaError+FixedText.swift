@@ -48,7 +48,7 @@ extension MarfaError {
             FixedErrorText(
                 type: "forbidden", sentence: "the request was refused because the credential lacks a permission",
                 serverCode: code)
-        case .validation(let code, _):
+        case .validation(let code, _, _):
             FixedErrorText(type: "validation", sentence: "the request was rejected as invalid", serverCode: code)
         case .unknownType:
             FixedErrorText(type: "unknown_type", sentence: "the server does not know the type that was named")

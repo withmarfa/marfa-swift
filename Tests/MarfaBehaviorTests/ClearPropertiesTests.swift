@@ -30,7 +30,7 @@ struct ClearProperties {
         await #expect {
             _ = try await copy.items.update(id, edit)
         } throws: { error in
-            guard case MarfaError.validation(code, let message) = error else { return false }
+            guard case MarfaError.validation(code, let message, _) = error else { return false }
             return message.contains(name)
         }
         #expect(try await copy.items.get(id) == before)
@@ -109,7 +109,7 @@ struct ClearProperties {
         await #expect {
             _ = try await copy.items.updateAsRead(id, Edit(clearProperties: ["title"], baseVersion: version))
         } throws: { error in
-            if case MarfaError.validation("invalid_properties", _) = error { true } else { false }
+            if case MarfaError.validation("invalid_properties", _, _) = error { true } else { false }
         }
         #expect(try await copy.items.get(id) == before)
         #expect(try await copy.queue.all().count == 1)

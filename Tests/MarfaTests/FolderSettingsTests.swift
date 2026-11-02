@@ -71,7 +71,11 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.changeFolder(made.id, FolderSettingsChange(title: "Again"), baseVersion: 2)
             } throws: { error in
-                if case .validation(let code, _) = error as? MarfaError { code == "invalid_transition" } else { false }
+                if case .validation(let code, _, _) = error as? MarfaError {
+                    code == "invalid_transition"
+                } else {
+                    false
+                }
             }
             #expect(try await copy.queue.all().allSatisfy { $0.itemId != made.id }, "nothing was queued")
             try await Task.sleep(for: .milliseconds(300))

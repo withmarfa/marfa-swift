@@ -199,8 +199,13 @@ enum Refuse {
         .NotFound(code: code, message: "not found (\(code)): \(message)")
     }
 
-    static func validation(_ code: String, _ message: String) -> MarfaCore.MarfaError {
-        .Validation(code: code, message: "validation (\(code)): \(message)")
+    static func validation(_ code: String, _ message: String, details: JsonValue? = nil) -> MarfaCore.MarfaError {
+        .Validation(code: code, message: "validation (\(code)): \(message)", details: details)
+    }
+
+    /// A refusal's `details`, with its members in the order given, as the core writes them.
+    static func details(_ members: KeyValuePairs<String, JsonValue>) -> JsonValue {
+        .object(JsonObject(members: members.map { JsonMember(key: $0.key, value: $0.value) }))
     }
 
     /// The core's refusal of a concrete type in a list or search that its catalog does not hold.

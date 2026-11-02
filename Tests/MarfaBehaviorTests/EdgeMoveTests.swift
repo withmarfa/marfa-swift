@@ -5,7 +5,7 @@ import Testing
 
 private func refused(with code: String) -> (any Error) -> Bool {
     { error in
-        if case .validation(let given, _)? = error as? MarfaError { given == code } else { false }
+        if case .validation(let given, _, _)? = error as? MarfaError { given == code } else { false }
     }
 }
 
@@ -208,6 +208,104 @@ struct EdgeMoveOffline {
 
         #expect(try await tree.copy.queue.all() == before)
         #expect(try await tree.copy.edges.from(tree.parent).map(\.id) == [tree.edge])
+        await tree.copy.close()
+    }
+
+    // MARK: The move check
+
+    /// What the move check and the update say about the same move, as the error each threw, or `nil` where it
+    /// returned; and how many writes the check queued.
+    static func checked(
+        _ copy: WorkingCopy, _ edge: String, _ move: EdgeEdit.Move
+    ) async throws -> (check: MarfaError?, update: MarfaError?, queuedByCheck: Int) {
+        let before = try await copy.queue.all().count
+        let check = await failure { try await copy.edges.check(edge, moving: move) }
+        let queuedByCheck = try await copy.queue.all().count - before
+        let held = try #require(try await copy.edges.get(edge))
+        let update = await failure {
+            _ = try await copy.edges.update(edge, EdgeEdit(baseVersion: held.version, move: move))
+        }
+        return (check, update, queuedByCheck)
+    }
+
+    static func failure(_ call: () async throws -> Void) async -> MarfaError? {
+        do {
+            try await call()
+            return nil
+        } catch {
+            return error as? MarfaError
+        }
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func theMoveCheckRefusesAMoveOntoAFullEndAndAllowsAFreeOne(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let newer = try await Self.note("newer", in: copy)
+        let old = try await Self.note("old", in: copy)
+        let other = try await Self.note("other", in: copy)
+        let another = try await Self.note("another", in: copy)
+        let free = try await Self.note("free", in: copy)
+        let edge = try #require(try await copy.edges.create(from: newer, to: old, type: "supersedes").edgeId)
+        _ = try await copy.edges.create(from: other, to: another, type: "supersedes")
+
+        // `other` already supersedes one item and `another` is superseded by one.
+        let ontoSource = try await Self.checked(copy, edge, .source(other))
+        #expect(ontoSource.queuedByCheck == 0)
+        #expect(ontoSource.check == ontoSource.update)
+        guard case .validation("edge_constraint_violation", _, let details)? = ontoSource.check else {
+            Issue.record("a move onto a full source was answered \(String(describing: ontoSource.check))")
+            return
+        }
+        #expect(
+            details == .object(["edge_type": "supersedes", "source_id": .string(other), "constraint": "cardinality"]))
+        guard case .object(let read)? = details else { return }
+        #expect(read["constraint"] == "cardinality")
+
+        let ontoTarget = try await Self.checked(copy, edge, .target(another))
+        #expect(ontoTarget.check == ontoTarget.update)
+        guard case .validation("edge_constraint_violation", _, let targetDetails)? = ontoTarget.check else {
+            Issue.record("a move onto a full target was answered \(String(describing: ontoTarget.check))")
+            return
+        }
+        #expect(
+            targetDetails
+                == .object(["edge_type": "supersedes", "target_id": .string(another), "constraint": "cardinality"]))
+        #expect(try await copy.edges.from(newer).map(\.targetId) == [old], "a refused move moved the edge")
+
+        // The edge itself is left out: the end that stays holds only it.
+        let before = try await copy.queue.all().count
+        try await copy.edges.check(edge, moving: .target(free))
+        try await copy.edges.check(edge, moving: .source(free))
+        try await copy.edges.check(edge, moving: .target(old))
+        #expect(try await copy.queue.all().count == before, "the check queued a write")
+        let held = try #require(try await copy.edges.get(edge))
+        let moved = try await copy.edges.update(edge, EdgeEdit(baseVersion: held.version, move: .target(free)))
+        #expect(moved?.kind == .updateEdge, "the update refused a move the check allowed")
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func theMoveCheckAnswersAsTheUpdateForEveryOtherRefusal(kind: CopyKind) async throws {
+        let tree = try await Self.tree(kind)
+        let loop = try await Self.checked(tree.copy, tree.edge, .source(tree.child))
+        #expect(loop.check == loop.update)
+        guard case .validation("edge_cycle", _, let details)? = loop.check else {
+            Issue.record("a move that loops was answered \(String(describing: loop.check))")
+            return
+        }
+        #expect(details == .object(["edge_type": "parent-of"]))
+        let many = try await Self.checked(tree.copy, tree.edge, .target(tree.other))
+        #expect(many.check == many.update)
+        guard case .validation("validation_error", _, nil)? = many.check else {
+            Issue.record("a move of an end whose other end holds many was answered \(String(describing: many.check))")
+            return
+        }
+        #expect(loop.queuedByCheck == 0 && many.queuedByCheck == 0)
+        await #expect {
+            try await tree.copy.edges.check("missing", moving: .source(tree.other))
+        } throws: { error in
+            if case .notFound("edge_not_found", _)? = error as? MarfaError { true } else { false }
+        }
         await tree.copy.close()
     }
 

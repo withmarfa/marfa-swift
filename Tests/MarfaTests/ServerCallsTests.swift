@@ -347,7 +347,7 @@ struct ServerCallsTests {
             let scripted = ScriptedAuthServer { _ in refused(400, "invalid_schema") }
             let server = try signedIn(scripted, keychain)
             let error = await failure { try await server.setTypeIcon("book-open", ofType: "t") }
-            guard case .validation("invalid_schema", _)? = error else {
+            guard case .validation("invalid_schema", _, _)? = error else {
                 Issue.record("expected validation, got \(String(describing: error))")
                 return
             }

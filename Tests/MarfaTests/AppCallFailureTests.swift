@@ -137,7 +137,8 @@ struct AnAppCallThatFails {
 
     @Test(arguments: [
         Marfa.MarfaError.keyChanging(message: "m"), .canceled(message: "m"), .closed(message: "m"),
-        .invalid(message: "m"), .unknownType(message: "m"), .validation(code: "validation_error", message: "m"),
+        .invalid(message: "m"), .unknownType(message: "m"),
+        .validation(code: "validation_error", message: "m", details: nil),
     ])
     func changesNothingForAnErrorThatProvesNothingOfTheServerOrTheCopy(error: Marfa.MarfaError) async throws {
         let core = FakeCore.writer()

@@ -75,7 +75,7 @@ extension LiveWorkingCopies {
                 await #expect {
                     _ = try await copy.items.list(ListFilters(filter: "\(mine) AND \(refusal)"))
                 } throws: { error in
-                    if case .validation("validation_error", _)? = error as? MarfaError { true } else { false }
+                    if case .validation("validation_error", _, _)? = error as? MarfaError { true } else { false }
                 }
             }
             await copy.close()

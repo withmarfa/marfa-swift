@@ -25,8 +25,26 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case unauthorized(code: String, message: String)
     /// The key is valid but lacks the permission the call needs (403), such as `type_not_permitted`.
     case forbidden(code: String, message: String)
-    /// The server refused the values sent (400 or 422).
-    case validation(code: String, message: String)
+    /// The server refused the values sent (400 or 422), or the copy refused them before sending, as the server
+    /// would.
+    ///
+    /// `details` holds what the server's `error.details` holds for the same refusal, for each refusal over an
+    /// edge that the copy gives itself (an edge check, an edge write, a move check, an item create naming edges,
+    /// and a type change that an edge the item holds would not fit), so an app reads it one way whichever refused:
+    ///
+    /// - `edge_constraint_violation` for an end of a type the edge type does not admit: `edge_type`,
+    ///   `source_type` or `target_type`, and `allowed`, the type constraints of that end.
+    /// - `edge_constraint_violation` for nesting under a flat edge type: `edge_type`, `source_id`, `source_type`
+    ///   and `constraint` `"nesting"`.
+    /// - `edge_constraint_violation` for an edge of the same type, source and target the copy already shows:
+    ///   `edge_type`, `source_id`, `target_id` and `constraint` `"duplicate"`.
+    /// - `edge_constraint_violation` for an end that already holds the one edge of the type it may: `edge_type`,
+    ///   `source_id` or `target_id` (the end that is full) and `constraint` `"cardinality"`.
+    /// - `edge_cycle`: `edge_type`, `source_id` and `target_id` for a longer cycle, and `edge_type` alone for an
+    ///   edge from an item to itself.
+    ///
+    /// It is `nil` for every other refusal, including one the server answers to a request sent to it directly.
+    case validation(code: String, message: String, details: JSONValue?)
     /// The copy's type catalog holds no type of the name given.
     case unknownType(message: String)
     /// The server asks the client to slow down (429), for `retryAfterSeconds` where it says.
@@ -174,7 +192,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     public var message: String {
         switch self {
         case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
-            .validation(_, let message), .unknownType(let message), .rateLimited(_, let message, _),
+            .validation(_, let message, _), .unknownType(let message), .rateLimited(_, let message, _),
             .server(_, _, let message), .io(let message), .network(let message), .unnamed(_, let message),
             .decoding(let message),
             .store(let message), .storageFull(let message), .signedOut(_, let message),
@@ -200,7 +218,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .notFound(let code, let message): core = .NotFound(code: code, message: message)
         case .unauthorized(let code, let message): core = .Unauthorized(code: code, message: message)
         case .forbidden(let code, let message): core = .Forbidden(code: code, message: message)
-        case .validation(let code, let message): core = .Validation(code: code, message: message)
+        case .validation(let code, let message, let details):
+            core = .Validation(code: code, message: message, details: details?.core)
         case .unknownType(let message): core = .UnknownType(message: message)
         case .rateLimited(let code, let message, let retryAfterSeconds):
             core = .RateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
@@ -255,7 +274,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .NotFound(let code, let message): self = .notFound(code: code, message: message)
         case .Unauthorized(let code, let message): self = .unauthorized(code: code, message: message)
         case .Forbidden(let code, let message): self = .forbidden(code: code, message: message)
-        case .Validation(let code, let message): self = .validation(code: code, message: message)
+        case .Validation(let code, let message, let details):
+            self = .validation(code: code, message: message, details: details.map(JSONValue.init))
         case .UnknownType(let message): self = .unknownType(message: message)
         case .RateLimited(let code, let message, let retryAfterSeconds):
             self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
@@ -353,12 +373,18 @@ extension Edge: Identifiable {}
 /// edge holds queues nothing: ``Edges/update(_:_:)`` returns `nil`. Only one
 /// end moves at a time, so the type cannot name both.
 ///
-/// A move is refused `MarfaError.validation` before anything is queued, with
-/// the code `validation_error` where the edge's type lets the end that stays
-/// hold more than one edge, such as `about`, and with the code `edge_cycle`
-/// where the move would leave the edge running from an item to itself. A
-/// move the copy cannot judge, such as one that closes a longer cycle, is
-/// queued and refused by the server, and its verdict says why.
+/// A move is refused before anything is queued, with the server's code:
+/// `validation_error` where the edge's type lets the end that stays hold more
+/// than one edge, such as `about`, and `edge_cycle` where the move would leave
+/// the edge running from an item to itself. Otherwise the edge the move would
+/// leave is judged as ``Edges/check(from:to:type:properties:id:)`` judges a
+/// new one, with the edge itself left out: a move onto an item that already
+/// holds the one edge of the type its end may, such as a second `supersedes`
+/// edge, throws `edge_constraint_violation` with `details.constraint`
+/// `"cardinality"`. ``Edges/check(_:moving:)`` answers the same without
+/// queueing. A move the copy cannot judge, such as one that closes a cycle
+/// through edges outside its slice, is queued and refused by the server, and
+/// its verdict says why.
 ///
 /// Once the server accepts a source move, the copy expires. The drain sends
 /// the writes queued behind the move first, then throws
@@ -386,12 +412,13 @@ public struct EdgeEdit: Sendable, Hashable {
     }
 
     var core: MarfaCore.EdgeEdit {
-        let moves: MarfaCore.EdgeMove? =
-            switch move {
-            case .source(let id): MarfaCore.EdgeMove(end: .source, to: id)
-            case .target(let id): MarfaCore.EdgeMove(end: .target, to: id)
-            case nil: nil
-            }
-        return MarfaCore.EdgeEdit(properties: properties.core, baseVersion: baseVersion, moves: moves)
+        MarfaCore.EdgeEdit(properties: properties.core, baseVersion: baseVersion, moves: move.map(Self.coreMove))
+    }
+
+    static func coreMove(_ move: Move) -> MarfaCore.EdgeMove {
+        switch move {
+        case .source(let id): MarfaCore.EdgeMove(end: .source, to: id)
+        case .target(let id): MarfaCore.EdgeMove(end: .target, to: id)
+        }
     }
 }

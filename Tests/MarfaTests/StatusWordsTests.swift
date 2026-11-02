@@ -47,7 +47,7 @@ struct StatusWords {
             _ = try await copy.items.create(
                 Draft(type: "core.task", properties: ["title": "Fix", "status": "blocked"]))
         } throws: { error in
-            if case .validation("invalid_properties", let message)? = error as? MarfaError {
+            if case .validation("invalid_properties", let message, _)? = error as? MarfaError {
                 message.hasSuffix(
                     "status: Must be a status word the type declares: not_started, in_progress, completed, canceled")
             } else {

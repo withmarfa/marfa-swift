@@ -1012,6 +1012,14 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func checkEdge(draft: EdgeDraft) throws 
     
     /**
+     * Throws the error `update_edge` would throw for a move of edge `id`'s
+     * end now, whatever version the edit would carry, and queues nothing. A
+     * move onto the end the edge holds already changes nothing and returns.
+     * Returning is not the server's verdict, which a queued move still meets.
+     */
+    func checkEdgeMove(id: String, moves: EdgeMove) throws 
+    
+    /**
      * The held conflicted copies made from `id` that are outside the bin,
      * oldest link first.
      */
@@ -1715,6 +1723,21 @@ open func checkEdge(draft: EdgeDraft)throws   {try rustCallWithError(FfiConverte
     uniffi_marfa_core_ffi_fn_method_core_check_edge(
             self.uniffiCloneHandle(),
         FfiConverterTypeEdgeDraft_lower(draft),$0
+    )
+}
+}
+    
+    /**
+     * Throws the error `update_edge` would throw for a move of edge `id`'s
+     * end now, whatever version the edit would carry, and queues nothing. A
+     * move onto the end the edge holds already changes nothing and returns.
+     * Returning is not the server's verdict, which a queued move still meets.
+     */
+open func checkEdgeMove(id: String, moves: EdgeMove)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_check_edge_move(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(id),
+        FfiConverterTypeEdgeMove_lower(moves),$0
     )
 }
 }
@@ -12948,7 +12971,14 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     )
     case Forbidden(code: String, message: String
     )
-    case Validation(code: String, message: String
+    case Validation(code: String, message: String, 
+        /**
+         * The server's `error.details` for the same refusal, on each
+         * `edge_constraint_violation` and `edge_cycle` the copy gives
+         * itself, such as its `constraint`; `nil` on every other refusal.
+         * Shaped as a refused write's `answer` holds them, under
+         * `error.details`.
+         */details: JsonValue?
     )
     case UnknownType(message: String
     )
@@ -13120,7 +13150,8 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             )
         case 4: return .Validation(
             code: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionTypeJsonValue.read(from: &buf)
             )
         case 5: return .UnknownType(
             message: try FfiConverterString.read(from: &buf)
@@ -13267,10 +13298,11 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Validation(code,message):
+        case let .Validation(code,message,details):
             writeInt(&buf, Int32(4))
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeJsonValue.write(details, into: &buf)
             
         
         case let .UnknownType(message):
@@ -16457,6 +16489,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_check_edge() != 5659) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_check_edge_move() != 6528) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_conflicted_copies_of() != 13481) {

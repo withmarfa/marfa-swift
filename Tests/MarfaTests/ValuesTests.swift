@@ -136,7 +136,19 @@ struct Errors {
         (.NotFound(code: "c", message: "m"), .notFound(code: "c", message: "m")),
         (.Unauthorized(code: "c", message: "m"), .unauthorized(code: "c", message: "m")),
         (.Forbidden(code: "c", message: "m"), .forbidden(code: "c", message: "m")),
-        (.Validation(code: "c", message: "m"), .validation(code: "c", message: "m")),
+        (.Validation(code: "c", message: "m", details: nil), .validation(code: "c", message: "m", details: nil)),
+        (
+            .Validation(
+                code: "edge_constraint_violation", message: "m",
+                details: .object(
+                    JsonObject(members: [
+                        JsonMember(key: "edge_type", value: .string("supersedes")),
+                        JsonMember(key: "constraint", value: .string("cardinality")),
+                    ]))),
+            .validation(
+                code: "edge_constraint_violation", message: "m",
+                details: .object(["edge_type": "supersedes", "constraint": "cardinality"]))
+        ),
         (.UnknownType(message: "m"), .unknownType(message: "m")),
         (
             .RateLimited(code: "c", message: "m", retryAfterSeconds: 9),

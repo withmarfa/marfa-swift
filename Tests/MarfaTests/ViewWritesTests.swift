@@ -217,7 +217,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.createView(settings)
             } throws: { error in
-                if case .validation(let code, _) = error as? Marfa.MarfaError {
+                if case .validation(let code, _, _) = error as? Marfa.MarfaError {
                     code == "validation_error"
                 } else {
                     false
@@ -228,7 +228,7 @@ extension LiveWorkingCopies {
                 _ = try await copy.changeView(
                     good.id, ViewSettingsChange(query: ViewQuery(filter: "title eq 1")), baseVersion: 1)
             } throws: { error in
-                if case .validation(let code, _) = error as? Marfa.MarfaError {
+                if case .validation(let code, _, _) = error as? Marfa.MarfaError {
                     code == "validation_error"
                 } else {
                     false
