@@ -870,6 +870,7 @@ public struct Edges: Sendable {
     /// It judges the edge from the catalog, items and edges the copy holds, makes no request and needs no server,
     /// and refuses as the server does, in the server's order:
     ///
+    /// - An edge from an item to itself throws `validation` with the code `edge_cycle`.
     /// - An end in the bin throws `notFound` with the code `item_not_found`.
     /// - An end of a type the edge type does not admit, then nesting under a flat edge type, throws `validation`
     ///   with the code `edge_constraint_violation`.
@@ -878,11 +879,12 @@ public struct Edges: Sendable {
     /// - An end that already holds the one edge of the type it may, such as a target that has a `parent-of` parent,
     ///   throws `edge_constraint_violation` with `details.constraint` `"cardinality"`, naming the full end in
     ///   `details.source_id` or `details.target_id`.
-    /// - A cycle through edges the copy holds, or an edge from an item to itself, throws `edge_cycle`.
+    /// - A cycle through edges the copy holds throws `edge_cycle`.
     ///
     /// ``MarfaError/validation(code:message:details:)`` describes the `details` each refusal carries. The edges
     /// counted are those the copy shows: the server's, with the copy's own waiting creates and moves where they will
-    /// stand, and none a waiting delete removes.
+    /// stand, and none a waiting delete removes. An edge the copy still shows only because of a write the server
+    /// refused is not counted until the copy reads the server's row again.
     ///
     /// Returning is not the server's verdict. Where the copy does not hold what decides a refusal, such as an edge
     /// or a cycle outside its slice, the check returns and the server judges the queued edge.

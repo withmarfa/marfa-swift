@@ -28,9 +28,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The server refused the values sent (400 or 422), or the copy refused them before sending, as the server
     /// would.
     ///
-    /// `details` holds what the server's `error.details` holds for the same refusal, for each refusal over an
-    /// edge that the copy gives itself (an edge check, an edge write, a move check, an item create naming edges,
-    /// and a type change that an edge the item holds would not fit), so an app reads it one way whichever refused:
+    /// `details` holds what the server's `error.details` holds for the same refusal, for each
+    /// `edge_constraint_violation` and `edge_cycle` the copy gives itself (an edge check, an edge write, a move
+    /// check, an item create naming edges, and a type change that an edge the item holds would not fit), so an app
+    /// reads it one way whichever refused:
     ///
     /// - `edge_constraint_violation` for an end of a type the edge type does not admit: `edge_type`,
     ///   `source_type` or `target_type`, and `allowed`, the type constraints of that end.
