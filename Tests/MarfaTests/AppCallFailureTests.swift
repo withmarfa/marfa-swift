@@ -562,7 +562,8 @@ struct AnAppCallThatFails {
         _ = try await a.value
         await #expect(throws: (any Error).self) { try await b.value }
         #expect(copy.lifecycle.connection == .stopped(.store(message: "second")))
-        #expect(updates.connection == .stopped(.store(message: "second")))
+        // The stream delivers on its own task, so it can lag the lifecycle by a turn.
+        try await eventually("the stream says stopped") { updates.connection == .stopped(.store(message: "second")) }
         await copy.close()
     }
 }
