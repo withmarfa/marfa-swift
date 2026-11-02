@@ -1031,6 +1031,48 @@ struct SigningInAgain {
             #expect(revoked == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
         }
     }
+
+    @Test func anApprovalOnANewClientThatAnUnreadableKeychainCannotKeepIsRevokedByItsRefreshToken() async throws {
+        let server = replacingServer()
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (kept, _) = try signedIn(server, keychain, transport: server.transport())
+            let authorization = try Authorization(
+                server: server.url, client: deviceClient, keychain: fault.on(keychain, account: kept.place.account),
+                service: service, transport: server.transport())
+            let started = try await authorization.startDeviceSignIn()
+            fault.fail()
+            await #expect(throws: Keychain.Failure.self) { try await started.credential() }
+            fault.stop()
+
+            #expect(try kept.place.read()?.refreshToken == "rt-1")
+            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            #expect(revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]])
+        }
+    }
+
+    @Test func anApprovalOnTheKeptClientThatAnUnreadableKeychainCannotKeepRevokesOnlyItsAccessToken() async throws {
+        let server = replacingServer()
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (kept, _) = try signedIn(server, keychain, transport: server.transport())
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: fault.on(keychain, account: kept.place.account),
+                service: service, transport: server.transport())
+            await #expect(throws: Keychain.Failure.self) {
+                try await authorization.signIn { url, scheme in
+                    fault.fail()
+                    return try await approveAtOnce(url, scheme)
+                }
+            }
+            fault.stop()
+
+            #expect(server.requests(to: "/auth/oauth2/register").isEmpty)
+            #expect(try kept.place.read()?.refreshToken == "rt-1")
+            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            #expect(revoked == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
+        }
+    }
 }
 
 @Suite(.timeLimit(.minutes(1)))

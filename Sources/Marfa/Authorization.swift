@@ -90,9 +90,10 @@ public struct Authorization: Sendable {
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
     /// ask for, ``SignInError/noRedirect`` when the client names no redirect, and
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
-    /// keep the approval. It then asks the server to revoke the approval: by its refresh token, which ends its
-    /// grant, or by its access token alone when the sign-in kept for the server shares, or may share, that
-    /// grant. The error does not say whether the server confirmed it.
+    /// keep the approval. When the approval cannot be kept, for that or a keychain error, it asks the server to
+    /// revoke it: by its refresh token, which ends its grant, or by its access token alone when it reused the
+    /// kept registration and the sign-in kept for the server shares, or may share, that grant. The error does
+    /// not say whether the server confirmed it.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -240,7 +241,8 @@ public struct Authorization: Sendable {
         if let kept = try await background({ try place.read() }), kept.grantTypes.contains(grant),
             kept.redirect == redirect
         {
-            return Registered(clientId: kept.clientId, grantTypes: kept.grantTypes, redirect: kept.redirect)
+            return Registered(
+                clientId: kept.clientId, grantTypes: kept.grantTypes, redirect: kept.redirect, reused: true)
         }
         let grantTypes = [grant, "refresh_token"]
         var metadata: [String: Any] = [
@@ -264,7 +266,7 @@ public struct Authorization: Sendable {
         guard let clientId = answer.object?["client_id"] as? String, !clientId.isEmpty else {
             throw SignInError.unreadable(message: "the registration answered no client_id")
         }
-        return Registered(clientId: clientId, grantTypes: grantTypes, redirect: redirect)
+        return Registered(clientId: clientId, grantTypes: grantTypes, redirect: redirect, reused: false)
     }
 
     /// A client registered for one sign-in flow.
@@ -272,6 +274,9 @@ public struct Authorization: Sendable {
         let clientId: String
         let grantTypes: [String]
         let redirect: String?
+        /// Whether it is the kept sign-in's registration, whose grant another sign-in may hold, rather than one
+        /// registered for this sign-in alone.
+        let reused: Bool
     }
 
     fileprivate func keep(_ token: TokenAnswer, registered: Registered, discovery: Discovery) async throws
@@ -295,12 +300,14 @@ public struct Authorization: Sendable {
             }
         } catch {
             // The person approved a grant the app cannot use; ending it keeps it from standing at the server,
-            // unless the sign-in kept now, or one the keychain cannot read, shares it.
-            let shared: Bool
-            do {
-                shared = try await background { try place.read() }?.clientId == kept.clientId
-            } catch {
-                shared = true
+            // unless the sign-in kept now, or one the keychain cannot read, may share it on a reused client.
+            var shared = false
+            if registered.reused {
+                do {
+                    shared = try await background { try place.read() }?.clientId == kept.clientId
+                } catch {
+                    shared = true
+                }
             }
             _ = await revoke(kept, endingGrant: !shared)
             throw error
@@ -348,9 +355,10 @@ public struct DeviceSignIn: Sendable {
     ///
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
     /// expires, and ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
-    /// too long to keep the approval. It then asks the server to revoke the approval: by its refresh token,
-    /// which ends its grant, or by its access token alone when the sign-in kept for the server shares, or may
-    /// share, that grant. The error does not say whether the server confirmed it.
+    /// too long to keep the approval. When the approval cannot be kept, for that or a keychain error, it asks
+    /// the server to revoke it: by its refresh token, which ends its grant, or by its access token alone when it
+    /// reused the kept registration and the sign-in kept for the server shares, or may share, that grant. The
+    /// error does not say whether the server confirmed it.
     /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
