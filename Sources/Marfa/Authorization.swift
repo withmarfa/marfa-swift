@@ -90,8 +90,9 @@ public struct Authorization: Sendable {
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
     /// ask for, ``SignInError/noRedirect`` when the client names no redirect, and
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
-    /// keep the approval. The approval is then revoked at the server: its grant ends, unless the sign-in kept
-    /// for the server shares that grant, when only the approval's access token is revoked.
+    /// keep the approval. It then asks the server to revoke the approval: by its refresh token, which ends its
+    /// grant, or by its access token alone when the sign-in kept for the server shares, or may share, that
+    /// grant. The error does not say whether the server confirmed it.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -347,8 +348,9 @@ public struct DeviceSignIn: Sendable {
     ///
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
     /// expires, and ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
-    /// too long to keep the approval. The approval is then revoked at the server: its grant ends, unless the
-    /// sign-in kept for the server shares that grant, when only the approval's access token is revoked.
+    /// too long to keep the approval. It then asks the server to revoke the approval: by its refresh token,
+    /// which ends its grant, or by its access token alone when the sign-in kept for the server shares, or may
+    /// share, that grant. The error does not say whether the server confirmed it.
     /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
@@ -453,7 +455,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     case noRedirect
     /// The server refused, with the OAuth error `code`.
     case refused(code: String, message: String)
-    /// The server could not be reached.
+    /// The server could not be reached, or the browser could not open.
     case unavailable(message: String)
     /// Another process sharing the keychain, such as an app extension, held the sign-in too long, so the
     /// keychain was left as it was.
