@@ -216,14 +216,14 @@ public final class WorkingCopy: Sendable {
     /// its types first. Beside `system.*` types it adds them, and beside any other type it throws `invalid`.
     ///
     /// While the call runs, `status()` says how far it has got in `itemsListed` against `itemsExpected`, and a
-    /// list or search answers the rows that have arrived, marked `.partial`. A hydration that was interrupted
-    /// carries on from the page it reached when its slice is unchanged; the report says whether it did
-    /// (`resumed`) or why it started again (`restarted`).
+    /// list or search answers the rows that have arrived, marked `.partial`, while a read of a view throws
+    /// `hydrationIncomplete`. A hydration that was interrupted carries on from the page it reached when its slice
+    /// is unchanged; the report says whether it did (`resumed`) or why it started again (`restarted`).
     ///
     /// A copy whose cursor the server's event log let go (`status().hydration` is `.stale`) is filled again over the
-    /// rows it holds, which reads answer meanwhile marked `.stale`, and the report says `inPlace`. Until a fill
-    /// completes, writes to items (file items and attaches included) are queued, to a row the copy holds or a new
-    /// one, and edge writes throw `hydrationIncomplete`.
+    /// rows it holds, which reads answer meanwhile marked `.stale`, except a read of a view, which throws; the report
+    /// says `inPlace`. Until a fill completes, writes to items (file items and attaches included) are queued, to a
+    /// row the copy holds or a new one, and edge writes throw `hydrationIncomplete`.
     ///
     /// The copy runs one hydration at a time. A call made while another runs, such as the refill a held `changes()`
     /// stream starts, waits for it and then runs. When the one it waited for completed over the same slice under
