@@ -55,7 +55,7 @@ struct FakeStatusBehavior {
         await #expect {
             _ = try await copy.items.update(held.id, Edit(properties: ["stage": "waiting"], baseVersion: 1))
         } throws: { error in
-            if case .validation("invalid_properties", let message)? = error as? MarfaError {
+            if case .validation("invalid_properties", let message, _)? = error as? MarfaError {
                 message.hasSuffix("stage: Must be a status word the type declares: open, done")
             } else {
                 false

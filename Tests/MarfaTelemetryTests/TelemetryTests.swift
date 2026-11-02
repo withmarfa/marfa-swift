@@ -70,7 +70,7 @@ struct Reports {
         let shaped = MarfaError.server(status: 500, code: "internal_error", message: "")
         #expect(shaped.fixedText.code == "internal_error")
         for code in ["Note abc 123", "01a1648c-0824", "", String(repeating: "a", count: 49), "/Users/x"] {
-            let text = MarfaError.validation(code: code, message: "").fixedText
+            let text = MarfaError.validation(code: code, message: "", details: nil).fixedText
             #expect(text.code == "validation", "\(code)")
         }
         #expect(MarfaError.closed(message: "/Users/x").fixedText.code == "closed")

@@ -161,6 +161,7 @@ struct PropertyValuesOffline {
         let copy = try await Self.open(kind)
         let id = try await Self.create(copy, ["title": "t"])
         let other = try await Self.create(copy, ["title": "other"])
+        let spare = try await Self.create(copy, ["title": "spare"])
         let version = try #require(try await copy.items.get(id)).version
         let made = try await copy.edges.create(from: id, to: other, type: "references", properties: [:])
         let edgeId = try #require(made.edgeId)
@@ -180,7 +181,7 @@ struct PropertyValuesOffline {
                     "edge",
                     {
                         _ = try await copy.edges.create(
-                            from: id, to: other, type: "references", properties: nested(levels))
+                            from: id, to: spare, type: "references", properties: nested(levels))
                     }
                 ),
                 ("edge update", { _ = try await copy.edges.update(edgeId, EdgeEdit(nested(levels), baseVersion: 0)) }),
@@ -237,7 +238,7 @@ struct PropertyValuesOffline {
                 await #expect {
                     try await attempt()
                 } throws: { error in
-                    guard case MarfaError.validation("invalid_properties", let message) = error else {
+                    guard case MarfaError.validation("invalid_properties", let message, _) = error else {
                         Issue.record("\(name) threw \(error)")
                         return false
                     }
@@ -268,7 +269,7 @@ struct PropertyValuesOffline {
             _ = try await copy.edges.create(
                 from: first, to: second, type: "in-thread", properties: ["position": .integer(9_007_199_254_740_993)])
         } throws: { error in
-            if case MarfaError.validation("invalid_properties", let message) = error {
+            if case MarfaError.validation("invalid_properties", let message, _) = error {
                 message.contains("position: Must be a whole number")
             } else {
                 false
@@ -279,7 +280,7 @@ struct PropertyValuesOffline {
             _ = try await copy.edges.update(
                 try #require(made.edgeId), EdgeEdit(["position": .integer(9_007_199_254_740_993)], baseVersion: 0))
         } throws: { error in
-            if case MarfaError.validation("invalid_properties", _) = error { true } else { false }
+            if case MarfaError.validation("invalid_properties", _, _) = error { true } else { false }
         }
         #expect(try await copy.queue.all().count == queued + 1)
         await copy.close()
@@ -317,7 +318,7 @@ struct PropertyValuesOffline {
         await #expect {
             _ = try await copy.items.create(Draft(type: "app.test.entry", properties: beyond, tags: [""]))
         } throws: { error in
-            if case MarfaError.validation("validation_error", let message) = error {
+            if case MarfaError.validation("validation_error", let message, _) = error {
                 message.contains("tags[0]: A tag must not be empty")
             } else {
                 false
@@ -326,7 +327,7 @@ struct PropertyValuesOffline {
         await #expect {
             _ = try await copy.edges.create(from: first, to: first, type: "in-thread", properties: beyond)
         } throws: { error in
-            if case MarfaError.validation("edge_cycle", _) = error { true } else { false }
+            if case MarfaError.validation("edge_cycle", _, _) = error { true } else { false }
         }
         // The same write with nothing before it to fail is refused for the number, and
         // where the core judges the number before it looks for the row, so is a write to a
@@ -342,7 +343,7 @@ struct PropertyValuesOffline {
             await #expect {
                 try await write()
             } throws: { error in
-                if case MarfaError.validation("invalid_properties", _) = error { true } else { false }
+                if case MarfaError.validation("invalid_properties", _, _) = error { true } else { false }
             }
         }
         #expect(try await copy.queue.all().count == queued)

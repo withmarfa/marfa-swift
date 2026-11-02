@@ -867,11 +867,27 @@ public struct Edges: Sendable {
 
     /// Throws what ``create(from:to:type:properties:id:)`` would throw for the same arguments now, and queues nothing.
     ///
-    /// It judges the edge from the catalog, items and edges the copy holds, makes no request and needs no server:
-    /// an end of a type the edge type does not admit, nesting under a flat edge type, an end in the bin, and a cycle
-    /// through edges the copy holds all throw `validation` or `notFound` with the server's code. Returning is not the
-    /// server's verdict. Where the copy does not hold what decides a refusal, such as a cycle through edges outside
-    /// its slice, the check returns and the server judges the queued edge.
+    /// It judges the edge from the catalog, items and edges the copy holds, makes no request and needs no server,
+    /// and refuses as the server does, in the server's order:
+    ///
+    /// - An edge from an item to itself throws `validation` with the code `edge_cycle`.
+    /// - An end in the bin throws `notFound` with the code `item_not_found`.
+    /// - An end of a type the edge type does not admit, then nesting under a flat edge type, throws `validation`
+    ///   with the code `edge_constraint_violation`.
+    /// - An edge of the same type, source and target as one the copy shows throws `edge_constraint_violation`
+    ///   with `details.constraint` `"duplicate"`.
+    /// - An end that already holds the one edge of the type it may, such as a target that has a `parent-of` parent,
+    ///   throws `edge_constraint_violation` with `details.constraint` `"cardinality"`, naming the full end in
+    ///   `details.source_id` or `details.target_id`.
+    /// - A cycle through edges the copy holds throws `edge_cycle`.
+    ///
+    /// ``MarfaError/validation(code:message:details:)`` describes the `details` each refusal carries. The edges
+    /// counted are those the copy shows: the server's, with the copy's own waiting creates and moves where they will
+    /// stand, and none a waiting delete removes. An edge the copy still shows only because of a write the server
+    /// refused is not counted until the copy reads the server's row again.
+    ///
+    /// Returning is not the server's verdict. Where the copy does not hold what decides a refusal, such as an edge
+    /// or a cycle outside its slice, the check returns and the server judges the queued edge.
     ///
     /// Throws `hydrationIncomplete` until the copy is whole, as ``create(from:to:type:properties:id:)`` does.
     public func check(
@@ -879,6 +895,23 @@ public struct Edges: Sendable {
     ) async throws {
         let draft = Self.draft(from: source, to: target, type: type, properties: properties, id: id)
         try await holder.run { core in try core.checkEdge(draft: draft) }
+    }
+
+    /// Throws what ``update(_:_:)`` would throw for a move of one end of the edge `id` now, and queues nothing.
+    ///
+    /// Use it to tell, before the person tries, whether an edge's source or target may move to another item, such as
+    /// whether a drop target can take an item's one parent. It refuses as ``EdgeEdit`` describes, whatever version an
+    /// edit would carry: a move onto an item whose end already holds the one edge of the type it may throws
+    /// `validation` with the code `edge_constraint_violation` and `details.constraint` `"cardinality"`. It throws
+    /// `notFound` with the code `edge_not_found` for an edge the copy does not hold. A move onto the end the edge
+    /// already holds changes nothing and returns.
+    ///
+    /// Returning is not the server's verdict, which a queued move still meets.
+    ///
+    /// Throws `hydrationIncomplete` until the copy is whole, as ``update(_:_:)`` does.
+    public func check(_ id: String, moving move: EdgeEdit.Move) async throws {
+        let moves = EdgeEdit.coreMove(move)
+        try await holder.run { core in try core.checkEdgeMove(id: id, moves: moves) }
     }
 
     private static func draft(
@@ -893,7 +926,7 @@ public struct Edges: Sendable {
     /// Refused unless `edit.baseVersion` is the version the copy holds. An edge
     /// the copy shows moved stays at its new end, read from either end, until
     /// the server answers. A move to an item whose create is still queued waits
-    /// for that create. See ``EdgeEdit`` for the two refusals a move can meet.
+    /// for that create. See ``EdgeEdit`` for the refusals a move can meet, which ``check(_:moving:)`` answers first.
     ///
     /// Returns `nil`, and queues and announces nothing, for an edit that names
     /// no property and no end other than the ends the copy holds: the server

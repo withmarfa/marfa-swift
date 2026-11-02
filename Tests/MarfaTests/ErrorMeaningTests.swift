@@ -33,7 +33,7 @@ import Testing
         (.forbidden(code: "type_not_permitted", message: "m"), .none),
         (.forbidden(code: "edge_permission_denied", message: "m"), .none),
         (.forbidden(code: "core_type_immutable", message: "m"), .none),
-        (.validation(code: "validation_error", message: "m"), .none),
+        (.validation(code: "validation_error", message: "m", details: nil), .none),
         (.unknownType(message: "m"), .none),
         (.rateLimited(code: "rate_limited", message: "m", retryAfterSeconds: 3), .transient),
         (.rateLimited(code: "rate_limited", message: "m", retryAfterSeconds: nil), .transient),

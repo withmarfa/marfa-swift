@@ -19,7 +19,7 @@ struct EdgeChecksOffline {
         do {
             try await call()
             return nil
-        } catch MarfaError.validation(let code, let message) {
+        } catch MarfaError.validation(let code, let message, _) {
             return "\(code): \(normalised(message))"
         } catch MarfaError.notFound(let code, let message) {
             return "\(code): \(normalised(message))"
@@ -126,6 +126,114 @@ struct EdgeChecksOffline {
         #expect(try await copy.catalog.edgeType("parent-of").acyclic)
         #expect(try await copy.catalog.edgeType("in-collection").flat)
         #expect(try await copy.catalog.edgeType("references").acyclic == false)
+        await copy.close()
+    }
+
+    // MARK: Duplicates and full ends
+
+    /// The `details` a refusal carries, or `nil` where the call returned or threw something other than `validation`.
+    static func details(of call: () async throws -> Void) async -> JSONValue? {
+        do {
+            try await call()
+            return nil
+        } catch MarfaError.validation(_, _, let details) {
+            return details
+        } catch {
+            return nil
+        }
+    }
+
+    static func duplicate(_ type: String) -> String {
+        "edge_constraint_violation: Edge \"\(type)\" already exists between these items"
+    }
+
+    static func full(_ type: String, _ cardinality: String, at end: String) -> String {
+        let direction = end == "source" ? "outbound" : "inbound"
+        return
+            "edge_constraint_violation: Edge \"\(type)\" is \(cardinality); \(end) already has an \(direction) edge of this type"
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func aSecondEdgeOfAHeldTripleIsRefusedAsADuplicateUntilItsDeleteIsQueued(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let a = try await Self.item("core.note", in: copy)
+        let b = try await Self.item("core.note", in: copy)
+        let edge = try #require(try await copy.edges.create(from: a, to: b, type: "references").edgeId)
+
+        #expect(try await Self.refusal(copy, from: a, to: b, type: "references") == Self.duplicate("references"))
+        let details = await Self.details { try await copy.edges.check(from: a, to: b, type: "references") }
+        #expect(
+            details
+                == .object([
+                    "edge_type": "references", "source_id": .string(a), "target_id": .string(b),
+                    "constraint": "duplicate",
+                ]))
+        #expect(try await Self.refusal(copy, from: b, to: a, type: "references") == nil, "the reverse is its own edge")
+
+        _ = try await copy.edges.delete(edge)
+        #expect(try await Self.refusal(copy, from: a, to: b, type: "references") == nil, "a queued delete frees it")
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEndThatHoldsItsOneEdgeIsRefusedForCardinalityAndNamesTheFullEnd(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let newer = try await Self.item("core.note", in: copy)
+        let old = try await Self.item("core.note", in: copy)
+        let other = try await Self.item("core.note", in: copy)
+        _ = try await copy.edges.create(from: newer, to: old, type: "supersedes")
+
+        #expect(
+            try await Self.refusal(copy, from: other, to: old, type: "supersedes")
+                == Self.full("supersedes", "one-to-one", at: "target"))
+        #expect(
+            await Self.details { try await copy.edges.check(from: other, to: old, type: "supersedes") }
+                == .object(["edge_type": "supersedes", "target_id": .string(old), "constraint": "cardinality"]))
+        #expect(
+            try await Self.refusal(copy, from: newer, to: other, type: "supersedes")
+                == Self.full("supersedes", "one-to-one", at: "source"))
+        #expect(
+            await Self.details { try await copy.edges.check(from: newer, to: other, type: "supersedes") }
+                == .object(["edge_type": "supersedes", "source_id": .string(newer), "constraint": "cardinality"]))
+        #expect(
+            try await Self.refusal(copy, from: newer, to: old, type: "supersedes") == Self.duplicate("supersedes"),
+            "a duplicate is judged before cardinality")
+
+        // A child has one parent; a parent has many children.
+        let parent = try await Self.item("core.note", in: copy)
+        let child = try await Self.item("core.note", in: copy)
+        _ = try await copy.edges.create(from: parent, to: child, type: "parent-of")
+        #expect(
+            try await Self.refusal(copy, from: other, to: child, type: "parent-of")
+                == Self.full("parent-of", "one-to-many", at: "target"))
+        #expect(try await Self.refusal(copy, from: parent, to: other, type: "parent-of") == nil)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anItemCreatedWithEdgesCountsThemWithEachOther(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let first = try await Self.item("core.note", in: copy)
+        let second = try await Self.item("core.note", in: copy)
+        let own = "0190f3a0-0000-7000-8000-0000000000bb"
+        let title: JSONObject = ["title": .string("made")]
+        let draft = Draft(type: "core.note", properties: title, id: own, edges: ["supersedes": [first, second]])
+
+        let both = try await Self.refusal(of: { _ = try await copy.items.create(draft) }, queued: copy)
+        #expect(both.0 == Self.full("supersedes", "one-to-one", at: "source"))
+        #expect(both.1 == 0, "a refused create queued a write")
+        #expect(
+            await Self.details { _ = try await copy.items.create(draft) }
+                == .object(["edge_type": "supersedes", "source_id": .string(own), "constraint": "cardinality"]))
+
+        _ = try await copy.edges.create(from: second, to: first, type: "supersedes")
+        let held = try await Self.refusal(
+            of: {
+                _ = try await copy.items.create(
+                    Draft(type: "core.note", properties: title, edges: ["supersedes": [first]]))
+            },
+            queued: copy)
+        #expect(held.0 == Self.full("supersedes", "one-to-one", at: "target"), "an edge the copy holds counts")
         await copy.close()
     }
 

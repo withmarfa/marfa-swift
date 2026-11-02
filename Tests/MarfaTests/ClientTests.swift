@@ -155,7 +155,10 @@ struct ClientTests {
                 .server(status: 500, code: "unknown", message: "<html>oops</html>")
             ),
             (.raw(404, Data(), headers: contract), .notFound(code: "unknown", message: "")),
-            (.raw(422, Data("{\"error\": 3}".utf8), headers: contract), .validation(code: "unknown", message: "")),
+            (
+                .raw(422, Data("{\"error\": 3}".utf8), headers: contract),
+                .validation(code: "unknown", message: "", details: nil)
+            ),
             (
                 refused(403, "type_not_permitted"),
                 .forbidden(code: "type_not_permitted", message: "scripted type_not_permitted")

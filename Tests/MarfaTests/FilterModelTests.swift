@@ -4,7 +4,7 @@ import Testing
 @testable import Marfa
 
 private func refusal(_ error: any Error) -> (code: String, message: String)? {
-    if case MarfaError.validation(let code, let message)? = error as? MarfaError { (code, message) } else { nil }
+    if case MarfaError.validation(let code, let message, _)? = error as? MarfaError { (code, message) } else { nil }
 }
 
 @Suite(.timeLimit(.minutes(1)))

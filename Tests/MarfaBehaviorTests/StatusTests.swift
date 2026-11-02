@@ -14,7 +14,7 @@ struct StatusOffline {
 
     static func refused(_ message: String) -> (any Error) -> Bool {
         { error in
-            if case .validation("invalid_properties", let given)? = error as? MarfaError {
+            if case .validation("invalid_properties", let given, _)? = error as? MarfaError {
                 given.hasSuffix(message)
             } else {
                 false
@@ -110,7 +110,7 @@ struct StatusOffline {
         await #expect {
             _ = try await copy.items.create(Draft(type: "core.task", properties: ["title": "t", "status": 3]))
         } throws: { error in
-            if case .validation("invalid_properties", let message)? = error as? MarfaError {
+            if case .validation("invalid_properties", let message, _)? = error as? MarfaError {
                 message.hasSuffix("status: Expected string")
             } else {
                 false
@@ -205,7 +205,7 @@ struct StatusOffline {
             _ = try await copy.items.create(
                 Draft(type: "core.event", properties: ["title": "x", "status": "postponed"]))
         } throws: { error in
-            if case .validation("invalid_properties", let message)? = error as? MarfaError {
+            if case .validation("invalid_properties", let message, _)? = error as? MarfaError {
                 message.hasSuffix("status: Must be one of \"tentative\", \"confirmed\", \"canceled\"")
             } else {
                 false
@@ -215,7 +215,7 @@ struct StatusOffline {
             _ = try await copy.items.update(
                 events[0].id, Edit(properties: ["status": "maybe"], baseVersion: 0))
         } throws: { error in
-            if case .validation("invalid_properties", _)? = error as? MarfaError { true } else { false }
+            if case .validation("invalid_properties", _, _)? = error as? MarfaError { true } else { false }
         }
         await copy.close()
     }
@@ -247,7 +247,7 @@ struct StatusOffline {
             _ = try await copy.items.create(
                 Draft(type: "app.test.meeting", properties: ["title": "x", "status": "postponed"]))
         } throws: { error in
-            if case .validation("invalid_properties", let message)? = error as? MarfaError {
+            if case .validation("invalid_properties", let message, _)? = error as? MarfaError {
                 message.hasSuffix("status: Must be one of \"tentative\", \"confirmed\", \"canceled\"")
             } else {
                 false

@@ -96,7 +96,7 @@ extension LiveWorkingCopies {
                 let refused = await #expect(throws: MarfaError.self) {
                     try await server.setTypeIcon(refusedID, ofType: id)
                 }
-                guard case .validation(let code, _)? = refused else {
+                guard case .validation(let code, _, _)? = refused else {
                     Issue.record("expected a validation refusal for \(refusedID), got \(String(describing: refused))")
                     return
                 }

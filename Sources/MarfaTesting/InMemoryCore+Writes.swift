@@ -28,15 +28,15 @@ extension InMemoryCore {
             try Checks.statusWord(kept, of: type, call: "items.create")
             let properties = Self.inAnswerOrder(kept, of: type, in: types)
             let id = draft.id ?? Minted.id()
-            for named in edges {
-                for target in named.targets {
-                    try Self.refuseUnwritable(
+            try Self.refuseUnwritable(
+                edges.flatMap { named in
+                    named.targets.map { target in
                         Proposed(
                             edgeType: named.type, source: .made(id: id, type: draft.type), targetId: target,
-                            replacing: nil),
-                        in: state)
-                }
-            }
+                            replacing: nil)
+                    }
+                },
+                in: state)
             var body = JsonObject(members: [
                 JsonMember(key: "id", value: .string(id)), JsonMember(key: "type", value: .string(draft.type)),
                 JsonMember(key: "properties", value: .object(properties)),
@@ -357,25 +357,8 @@ extension InMemoryCore {
                     "the update to edge \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
                 )
             }
-            var source = edit.moves.flatMap { $0.end == .source ? $0.to : nil }
-            var target = edit.moves.flatMap { $0.end == .target ? $0.to : nil }
-            if source == held.sourceId { source = nil }
-            if target == held.targetId { target = nil }
-            if source != nil || target != nil {
-                let type = state.edgeTypes[held.edgeType]
-                if let type, !Self.holdsAtMostOne(type, at: source != nil ? .target : .source) {
-                    throw Refuse.validation(
-                        "validation_error",
-                        "\(held.edgeType) is \(type.cardinality), so the end that stays can hold more than this edge and there is none to replace; create the edge wanted and delete this one"
-                    )
-                }
-                try Self.refuseSelfLoop(source ?? held.sourceId, target ?? held.targetId)
-                try Self.refuseUnwritable(
-                    Proposed(
-                        edgeType: held.edgeType, source: .held(source ?? held.sourceId),
-                        targetId: target ?? held.targetId, replacing: id),
-                    in: state)
-            }
+            let (source, target) = Self.endsMoved(held, edit.moves)
+            try Self.refuseMove(of: held, source: source, target: target, in: state)
             try Properties.keptAsWritten(edit.properties)
             guard !edit.properties.members.isEmpty || source != nil || target != nil else { return nil }
             var body = JsonObject(members: [
@@ -418,20 +401,6 @@ extension InMemoryCore {
             return state.append(
                 .deleteEdge, item: held.sourceId, target: held.targetId, edge: id, body: body, dependsOn: dependsOn,
                 effect: .removedEdge)
-        }
-    }
-
-    static func refuseSelfLoop(_ source: String, _ target: String) throws {
-        guard source != target else {
-            throw Refuse.validation("edge_cycle", "an edge from \(source) to itself closes a cycle")
-        }
-    }
-
-    /// Whether an item at `end` holds at most one edge of the type.
-    private static func holdsAtMostOne(_ type: EdgeType, at end: EdgeEnd) -> Bool {
-        switch (end, type.cardinality) {
-        case (.source, "one-to-one"), (.source, "many-to-one"), (.target, "one-to-one"), (.target, "one-to-many"): true
-        default: false
         }
     }
 

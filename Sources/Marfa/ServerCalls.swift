@@ -267,7 +267,7 @@ extension Server {
     /// The type can be one Marfa ships. Removing the owner's icon shows the author's again.
     ///
     /// `icon` is an Iconify ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open`, or `simple-icons:github`
-    /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:)`` and the code
+    /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:details:)`` and the code
     /// `invalid_schema`. Needs `schema.write` and write on the type. A working copy's `catalog` takes the change
     /// when its server stream next reopens, so another device shows it within about two minutes.
     @discardableResult

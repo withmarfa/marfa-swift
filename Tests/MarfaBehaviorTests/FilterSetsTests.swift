@@ -29,7 +29,7 @@ struct FilterSets {
 
     static func validation(_ code: String) -> (any Error) -> Bool {
         { error in
-            if case .validation(let given, _)? = error as? MarfaError { given == code } else { false }
+            if case .validation(let given, _, _)? = error as? MarfaError { given == code } else { false }
         }
     }
 
