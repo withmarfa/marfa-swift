@@ -146,8 +146,8 @@ public struct ItemType: Sendable, Hashable, Identifiable {
             id: core.id, label: core.label, plural: core.plural, description: core.description,
             parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
             titleField: core.titleField,
-            bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField, roles: core.roles,
-            compatibleWith: core.compatibleWith)
+            bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField,
+            roles: core.roles, compatibleWith: core.compatibleWith)
     }
 }
 
