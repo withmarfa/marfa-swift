@@ -168332,7 +168332,7 @@ public enum Operations {
     }
     /// Get instance metrics
     ///
-    /// Returns instance-wide counters and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
+    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getInstanceMetrics)`.
@@ -168540,7 +168540,174 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/uptime_seconds`.
                         public var uptimeSeconds: Swift.Double
-                        /// When these counters were collected, in UTC.
+                        /// What this server process costs, since it started.
+                        ///
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process`.
+                        public struct ProcessPayload: Codable, Hashable, Sendable {
+                            /// The release this server runs.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/release`.
+                            public var release: Swift.String
+                            /// Memory the server process holds in RAM, in bytes. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/memory_rss_bytes`.
+                            public var memoryRssBytes: Swift.Double?
+                            /// The most memory the process has held in RAM, in bytes. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/memory_rss_peak_bytes`.
+                            public var memoryRssPeakBytes: Swift.Double?
+                            /// Memory the JavaScript engine uses for live objects, in bytes. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/heap_used_bytes`.
+                            public var heapUsedBytes: Swift.Double?
+                            /// Memory the JavaScript engine has reserved, in bytes. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/heap_total_bytes`.
+                            public var heapTotalBytes: Swift.Double?
+                            /// CPU seconds the process has spent on its own work since it started. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/cpu_user_seconds`.
+                            public var cpuUserSeconds: Swift.Double?
+                            /// CPU seconds the process has spent in the operating system since it started. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/cpu_system_seconds`.
+                            public var cpuSystemSeconds: Swift.Double?
+                            /// Creates a new `ProcessPayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - release: The release this server runs.
+                            ///   - memoryRssBytes: Memory the server process holds in RAM, in bytes. `null` if it can't be read.
+                            ///   - memoryRssPeakBytes: The most memory the process has held in RAM, in bytes. `null` if it can't be read.
+                            ///   - heapUsedBytes: Memory the JavaScript engine uses for live objects, in bytes. `null` if it can't be read.
+                            ///   - heapTotalBytes: Memory the JavaScript engine has reserved, in bytes. `null` if it can't be read.
+                            ///   - cpuUserSeconds: CPU seconds the process has spent on its own work since it started. `null` if it can't be read.
+                            ///   - cpuSystemSeconds: CPU seconds the process has spent in the operating system since it started. `null` if it can't be read.
+                            public init(
+                                release: Swift.String,
+                                memoryRssBytes: Swift.Double? = nil,
+                                memoryRssPeakBytes: Swift.Double? = nil,
+                                heapUsedBytes: Swift.Double? = nil,
+                                heapTotalBytes: Swift.Double? = nil,
+                                cpuUserSeconds: Swift.Double? = nil,
+                                cpuSystemSeconds: Swift.Double? = nil
+                            ) {
+                                self.release = release
+                                self.memoryRssBytes = memoryRssBytes
+                                self.memoryRssPeakBytes = memoryRssPeakBytes
+                                self.heapUsedBytes = heapUsedBytes
+                                self.heapTotalBytes = heapTotalBytes
+                                self.cpuUserSeconds = cpuUserSeconds
+                                self.cpuSystemSeconds = cpuSystemSeconds
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case release
+                                case memoryRssBytes = "memory_rss_bytes"
+                                case memoryRssPeakBytes = "memory_rss_peak_bytes"
+                                case heapUsedBytes = "heap_used_bytes"
+                                case heapTotalBytes = "heap_total_bytes"
+                                case cpuUserSeconds = "cpu_user_seconds"
+                                case cpuSystemSeconds = "cpu_system_seconds"
+                            }
+                        }
+                        /// What this server process costs, since it started.
+                        ///
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process`.
+                        public var process: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.ProcessPayload
+                        /// Database size and row counts.
+                        ///
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage`.
+                        public struct StoragePayload: Codable, Hashable, Sendable {
+                            /// Size of the database file, in bytes. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/database_bytes`.
+                            public var databaseBytes: Swift.Double?
+                            /// Size of the database's write-ahead log file, in bytes. 0 when there is none. `null` if it can't be read.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/wal_bytes`.
+                            public var walBytes: Swift.Double?
+                            /// Row counts of the largest tables, as of `counted_at`. `null` if a count can't be read, and all `null` until the first count finishes.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows`.
+                            public struct RowsPayload: Codable, Hashable, Sendable {
+                                /// Number of items.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/items`.
+                                public var items: Swift.Double?
+                                /// Number of stored item versions.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/versions`.
+                                public var versions: Swift.Double?
+                                /// Number of event log entries.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/event_log`.
+                                public var eventLog: Swift.Double?
+                                /// Number of audit log entries.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/audit_log`.
+                                public var auditLog: Swift.Double?
+                                /// Creates a new `RowsPayload`.
+                                ///
+                                /// - Parameters:
+                                ///   - items: Number of items.
+                                ///   - versions: Number of stored item versions.
+                                ///   - eventLog: Number of event log entries.
+                                ///   - auditLog: Number of audit log entries.
+                                public init(
+                                    items: Swift.Double? = nil,
+                                    versions: Swift.Double? = nil,
+                                    eventLog: Swift.Double? = nil,
+                                    auditLog: Swift.Double? = nil
+                                ) {
+                                    self.items = items
+                                    self.versions = versions
+                                    self.eventLog = eventLog
+                                    self.auditLog = auditLog
+                                }
+                                public enum CodingKeys: String, CodingKey {
+                                    case items
+                                    case versions
+                                    case eventLog = "event_log"
+                                    case auditLog = "audit_log"
+                                }
+                            }
+                            /// Row counts of the largest tables, as of `counted_at`. `null` if a count can't be read, and all `null` until the first count finishes.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows`.
+                            public var rows: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload.RowsPayload
+                            /// When the row counts were taken, in UTC. `null` until the first count finishes. A request never counts: when there is no count or it is over an hour old, Marfa starts one in the background.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/counted_at`.
+                            public var countedAt: Swift.String?
+                            /// Creates a new `StoragePayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - databaseBytes: Size of the database file, in bytes. `null` if it can't be read.
+                            ///   - walBytes: Size of the database's write-ahead log file, in bytes. 0 when there is none. `null` if it can't be read.
+                            ///   - rows: Row counts of the largest tables, as of `counted_at`. `null` if a count can't be read, and all `null` until the first count finishes.
+                            ///   - countedAt: When the row counts were taken, in UTC. `null` until the first count finishes. A request never counts: when there is no count or it is over an hour old, Marfa starts one in the background.
+                            public init(
+                                databaseBytes: Swift.Double? = nil,
+                                walBytes: Swift.Double? = nil,
+                                rows: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload.RowsPayload,
+                                countedAt: Swift.String? = nil
+                            ) {
+                                self.databaseBytes = databaseBytes
+                                self.walBytes = walBytes
+                                self.rows = rows
+                                self.countedAt = countedAt
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case databaseBytes = "database_bytes"
+                                case walBytes = "wal_bytes"
+                                case rows
+                                case countedAt = "counted_at"
+                            }
+                        }
+                        /// Database size and row counts.
+                        ///
+                        /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage`.
+                        public var storage: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload
+                        /// When the item, blob, type, key and webhook counters were collected, in UTC. They are reused for up to a minute. The `process` and `storage` blocks are read on each request.
                         ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/cached_at`.
                         public var cachedAt: Swift.String
@@ -168553,7 +168720,9 @@ public enum Operations {
                         ///   - keys:
                         ///   - webhooks: Number of webhook registrations.
                         ///   - uptimeSeconds: Seconds since this server process started.
-                        ///   - cachedAt: When these counters were collected, in UTC.
+                        ///   - process: What this server process costs, since it started.
+                        ///   - storage: Database size and row counts.
+                        ///   - cachedAt: When the item, blob, type, key and webhook counters were collected, in UTC. They are reused for up to a minute. The `process` and `storage` blocks are read on each request.
                         public init(
                             items: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.ItemsPayload,
                             blobs: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.BlobsPayload,
@@ -168561,6 +168730,8 @@ public enum Operations {
                             keys: Components.Schemas.MetricCount,
                             webhooks: Components.Schemas.MetricCount,
                             uptimeSeconds: Swift.Double,
+                            process: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.ProcessPayload,
+                            storage: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload,
                             cachedAt: Swift.String
                         ) {
                             self.items = items
@@ -168569,6 +168740,8 @@ public enum Operations {
                             self.keys = keys
                             self.webhooks = webhooks
                             self.uptimeSeconds = uptimeSeconds
+                            self.process = process
+                            self.storage = storage
                             self.cachedAt = cachedAt
                         }
                         public enum CodingKeys: String, CodingKey {
@@ -168578,6 +168751,8 @@ public enum Operations {
                             case keys
                             case webhooks
                             case uptimeSeconds = "uptime_seconds"
+                            case process
+                            case storage
                             case cachedAt = "cached_at"
                         }
                     }

@@ -4387,7 +4387,7 @@ public struct Client: ClientProtocol {
     }
     /// Get instance metrics
     ///
-    /// Returns instance-wide counters and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
+    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getInstanceMetrics)`.
