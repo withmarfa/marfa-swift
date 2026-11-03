@@ -85,8 +85,8 @@ extension Server {
     /// Changes the name or mark of the source `code` and answers the source as it now reads.
     ///
     /// A change left `nil` is not sent, so the server keeps that field; ``SettingChange/clear`` removes it, so the
-    /// source shows the name its app or key gives it, or its code. A name is trimmed and is 1 to 200 characters
-    /// with no control character; a mark is an Iconify ID from a set Marfa pins, as for ``setTypeIcon(_:ofType:expecting:timeout:)``.
+    /// source shows the name its app or key gives it, or its code. A name is trimmed and is 1 to 200 UTF-16 code units
+    /// with no control or bidirectional formatting character; a mark is an Iconify ID from a set Marfa pins, as for ``setTypeIcon(_:ofType:expecting:timeout:)``.
     /// The server refuses a name with ``MarfaError/validation(code:message:details:)`` and the code
     /// `validation_error`, and a mark with `invalid_schema`, changing neither field.
     ///
@@ -119,8 +119,8 @@ extension Server {
 
     /// How many items each source wrote, as `GET /items/stats` counts them, keyed by source code.
     ///
-    /// The count is the server's own, under the same filters as a listing: `type` is a type, a comma-separated list
-    /// or a wildcard such as `core.*`; `state` is one lifecycle state or a comma-separated list, and without it every
+    /// The count is the server's own, under the filters given, which mean what they mean for a listing: `type` is a
+    /// type, a comma-separated list or a wildcard such as `core.*`; `state` is one lifecycle state or a comma-separated list, and without it every
     /// state is counted, the bin included; `tier` leaves out the other tier; `filter` is a filter expression. A
     /// source that wrote no matching item is absent. Items a key cannot read are not counted.
     public func itemCountsBySource(

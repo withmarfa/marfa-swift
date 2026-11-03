@@ -115,11 +115,8 @@ struct ItemSourcesTests {
 
     @Test func aRefusedChangeArrivesAsAMarfaError() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { request in
-                request.body.isEmpty
-                    ? reply("{}")
-                    : .json(
-                        403, ["error": ["code": "forbidden", "message": "keys.manage"]], headers: contract)
+            let scripted = ScriptedAuthServer { _ in
+                .json(403, ["error": ["code": "forbidden", "message": "keys.manage"]], headers: contract)
             }
             let error = await failure {
                 try await signedIn(scripted, keychain).updateSource("other", name: .set("X"))
