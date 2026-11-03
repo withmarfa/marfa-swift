@@ -6869,6 +6869,12 @@ public struct FolderScan: Equatable, Hashable {
      * Why the scan read nothing, where the folder's directory is gone.
      */
     public var rootGone: String?
+    /**
+     * Why links by name wait though the server answered, where they do: it
+     * refused a title lookup as a whole, or has none. Said once for the
+     * folder, not for each file.
+     */
+    public var lookupRefused: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -6894,7 +6900,12 @@ public struct FolderScan: Equatable, Hashable {
          */secrets: [String], warnings: [FlaggedFile], 
         /**
          * Why the scan read nothing, where the folder's directory is gone.
-         */rootGone: String?) {
+         */rootGone: String?, 
+        /**
+         * Why links by name wait though the server answered, where they do: it
+         * refused a title lookup as a whole, or has none. Said once for the
+         * folder, not for each file.
+         */lookupRefused: String?) {
         self.created = created
         self.updated = updated
         self.renamed = renamed
@@ -6909,6 +6920,7 @@ public struct FolderScan: Equatable, Hashable {
         self.secrets = secrets
         self.warnings = warnings
         self.rootGone = rootGone
+        self.lookupRefused = lookupRefused
     }
 
     
@@ -6940,7 +6952,8 @@ public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
                 trashed: FfiConverterSequenceString.read(from: &buf), 
                 secrets: FfiConverterSequenceString.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
-                rootGone: FfiConverterOptionString.read(from: &buf)
+                rootGone: FfiConverterOptionString.read(from: &buf), 
+                lookupRefused: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -6959,6 +6972,7 @@ public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.secrets, into: &buf)
         FfiConverterSequenceTypeFlaggedFile.write(value.warnings, into: &buf)
         FfiConverterOptionString.write(value.rootGone, into: &buf)
+        FfiConverterOptionString.write(value.lookupRefused, into: &buf)
     }
 }
 

@@ -6625,6 +6625,134 @@ extension Components {
                 case error
             }
         }
+        /// An item whose title matches a name.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TitledItem`.
+        public struct TitledItem: Codable, Hashable, Sendable {
+            /// The item's ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TitledItem/id`.
+            public var id: Swift.String
+            /// The item's type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TitledItem/type`.
+            public var _type: Swift.String
+            /// The item's title as it is stored, which the caller can compare itself.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TitledItem/title`.
+            public var title: Swift.String
+            /// `true` if the item's `blob_ref` property holds a blob digest.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TitledItem/has_blob`.
+            public var hasBlob: Swift.Bool
+            /// Creates a new `TitledItem`.
+            ///
+            /// - Parameters:
+            ///   - id: The item's ID.
+            ///   - _type: The item's type.
+            ///   - title: The item's title as it is stored, which the caller can compare itself.
+            ///   - hasBlob: `true` if the item's `blob_ref` property holds a blob digest.
+            public init(
+                id: Swift.String,
+                _type: Swift.String,
+                title: Swift.String,
+                hasBlob: Swift.Bool
+            ) {
+                self.id = id
+                self._type = _type
+                self.title = title
+                self.hasBlob = hasBlob
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case _type = "type"
+                case title
+                case hasBlob = "has_blob"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
+        public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case missingRequiredField = "missing_required_field"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// An item's extension namespaces that you can read.
         ///
         /// - Remark: Generated from `#/components/schemas/ExtensionsResponse`.
@@ -12773,89 +12901,6 @@ extension Components {
                 case summary
                 case error
                 case reportedAt = "reported_at"
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.
-        public struct MissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case missingRequiredField = "missing_required_field"
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `MissingRequiredFieldOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.MissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
             }
         }
         /// A page holding every connector you can read.
