@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-http-types", from: "1.0.0"),
     ],
     targets: [
-        .binaryTarget(name: "MarfaCoreFFI", path: "Frameworks/MarfaCoreFFI.xcframework"),
+        .binaryTarget(name: "MarfaCoreFFI", url: "https://github.com/withmarfa/marfa-swift/releases/download/v0.0.62/MarfaCoreFFI.xcframework.zip", checksum: "0a9e7cb5fce23a535e319b80ad7469bb87c0770039e2fe6fdcae675961226a31"),
         // Swift 5, because the generated glue is not Swift 6 clean.
         .target(
             name: "MarfaCore",
