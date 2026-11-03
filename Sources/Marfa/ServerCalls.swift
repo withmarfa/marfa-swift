@@ -290,7 +290,7 @@ extension Server {
         return answer.type.displayHints?.icon
     }
 
-    private func decode<T: Decodable>(_ data: Data) throws(MarfaError) -> T {
+    func decode<T: Decodable>(_ data: Data) throws(MarfaError) -> T {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
