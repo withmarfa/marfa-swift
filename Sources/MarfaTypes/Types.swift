@@ -95,6 +95,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /items/lookup`.
     /// - Remark: Generated from `#/paths//items/lookup/post(lookupItems)`.
     func lookupItems(_ input: Operations.LookupItems.Input) async throws -> Operations.LookupItems.Output
+    /// Find items by title
+    ///
+    /// Finds the active and archived items titled by each of up to 200 names, matched without regard to case, Unicode form or the white space around a name. `system.*` items and items you can't read are left out.
+    ///
+    /// - Remark: HTTP `POST /items/titles`.
+    /// - Remark: Generated from `#/paths//items/titles/post(findItemsByTitle)`.
+    func findItemsByTitle(_ input: Operations.FindItemsByTitle.Input) async throws -> Operations.FindItemsByTitle.Output
     /// Get items in bulk
     ///
     /// Returns up to 100 items by ID in one call, in the order you named them, each once. Items you can't read, trashed items and IDs that name nothing are left out.
@@ -1201,6 +1208,21 @@ extension APIProtocol {
         body: Operations.LookupItems.Input.Body
     ) async throws -> Operations.LookupItems.Output {
         try await lookupItems(Operations.LookupItems.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Find items by title
+    ///
+    /// Finds the active and archived items titled by each of up to 200 names, matched without regard to case, Unicode form or the white space around a name. `system.*` items and items you can't read are left out.
+    ///
+    /// - Remark: HTTP `POST /items/titles`.
+    /// - Remark: Generated from `#/paths//items/titles/post(findItemsByTitle)`.
+    public func findItemsByTitle(
+        headers: Operations.FindItemsByTitle.Input.Headers = .init(),
+        body: Operations.FindItemsByTitle.Input.Body
+    ) async throws -> Operations.FindItemsByTitle.Output {
+        try await findItemsByTitle(Operations.FindItemsByTitle.Input(
             headers: headers,
             body: body
         ))

@@ -15,7 +15,7 @@ private func corePass(
         scan: MarfaCore.FolderScan(
             created: 0, updated: 0, renamed: 0, unchanged: unchanged, waiting: waiting, missing: 0, deleted: 0,
             skipped: 0, movedAway: 0,
-            paused: 0, trashed: [], secrets: [], warnings: [], rootGone: nil),
+            paused: 0, trashed: [], secrets: [], warnings: [], rootGone: nil, lookupRefused: nil),
         drain: drain, rebased: 0, gaveWay: 0,
         pull: MarfaCore.FolderPull(
             written: 0, rewritten: 0, moved: 0, unchanged: 0, skipped: 0, removed: removed, purged: purged, kept: 0,

@@ -624,6 +624,10 @@ public struct FolderScan: Sendable, Hashable {
     public let warnings: [FlaggedFile]
     /// Why the scan read nothing, where the folder's directory is gone.
     public let rootGone: String?
+    /// Why the server refused a title lookup as a whole, where it did, so links by name waited.
+    ///
+    /// Said once for the pass.
+    public let lookupRefused: String?
 
     init(_ core: MarfaCore.FolderScan) {
         created = core.created
@@ -640,6 +644,7 @@ public struct FolderScan: Sendable, Hashable {
         secrets = core.secrets
         warnings = core.warnings.map(FlaggedFile.init)
         rootGone = core.rootGone
+        lookupRefused = core.lookupRefused
     }
 }
 
