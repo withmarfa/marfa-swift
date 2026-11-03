@@ -268,7 +268,10 @@ const bulkWrites = new Set(["applyBulkAction"]);
 // A copy uploads a blob's bytes and fetches them itself.
 const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
 // `Server` in the Marfa module makes these itself, so an app has one way to call each.
-const serverCalls = new Set(["listItemVersions", "getConfig", "updateConfig", "setTypeIcon", "clearTypeIcon"]);
+const serverCalls = new Set([
+  "listItemVersions", "getConfig", "updateConfig", "setTypeIcon", "clearTypeIcon", "listSources", "getSource",
+  "updateSource", "getItemStats",
+]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 
 function* operations(document) {

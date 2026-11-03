@@ -433,7 +433,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
   for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "replaceConfig"]) assert.ok(client.has(kept), kept);
   for (const left of [
     "createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance", "listItemVersions", "getConfig",
-    "updateConfig", "setTypeIcon", "clearTypeIcon",
+    "updateConfig", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
   ]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);

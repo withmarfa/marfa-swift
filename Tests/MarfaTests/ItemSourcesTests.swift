@@ -129,6 +129,22 @@ struct ItemSourcesTests {
         }
     }
 
+    @Test func aMarkOutsideThePinnedSetsArrivesAsAValidationRefusal() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer { _ in
+                .json(400, ["error": ["code": "invalid_schema", "message": "no such icon"]], headers: contract)
+            }
+            let error = await failure {
+                try await signedIn(scripted, keychain).updateSource("s", mark: .set("nope:x"))
+            }
+            guard case .validation(let code, _, _)? = error else {
+                Issue.record("expected validation, got \(String(describing: error))")
+                return
+            }
+            #expect(code == "invalid_schema")
+        }
+    }
+
     @Test func countsBySourceAskForTheGroupingAndTheFiltersGiven() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in reply(#"{"github": 12, "k": 1}"#) }
