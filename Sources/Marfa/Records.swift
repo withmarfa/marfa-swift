@@ -27,6 +27,14 @@ public struct Item: Sendable, Hashable {
     public var captureLongitude: Double?
     /// When the item went to the bin; none outside it, and for a row an archive restored to the bin without the time.
     public var trashedAt: String?
+    /// Whether a person's connector holds the item read only, as the server last answered it.
+    ///
+    /// This is advice from the server, so an app can show the item as not editable. The server does not refuse a
+    /// write to the item, and neither does the copy. The value can be up to one refresh interval old: the copy asks
+    /// the server again at the end of a catch-up and when a held stream reaches the head, but not within 15 minutes of
+    /// its last ask, and a change to the connector sends no event. An item the server has not answered yet, such as
+    /// one saved here and not yet sent, holds `false`.
+    public var readOnly: Bool
     /// The text under the property the type's display hints name as its
     /// title, or `title` where they name none; none where that holds no
     /// string.
@@ -45,7 +53,8 @@ public struct Item: Sendable, Hashable {
         id: String, type: String, properties: JSONObject, state: ItemState, tier: Tier?, version: Int64,
         schemaVersion: Int64, source: String, sourceId: String?, occurredAt: String, createdAt: String,
         updatedAt: String, tags: [String], captureLatitude: Double? = nil, captureLongitude: Double? = nil,
-        trashedAt: String? = nil, title: String? = nil, body: String? = nil, unreadableProperties: String? = nil
+        trashedAt: String? = nil, readOnly: Bool = false, title: String? = nil, body: String? = nil,
+        unreadableProperties: String? = nil
     ) {
         self.id = id
         self.type = type
@@ -63,6 +72,7 @@ public struct Item: Sendable, Hashable {
         self.captureLatitude = captureLatitude
         self.captureLongitude = captureLongitude
         self.trashedAt = trashedAt
+        self.readOnly = readOnly
         self.title = title
         self.body = body
         self.unreadableProperties = unreadableProperties
@@ -85,6 +95,7 @@ public struct Item: Sendable, Hashable {
         captureLatitude = core.captureLatitude
         captureLongitude = core.captureLongitude
         trashedAt = core.trashedAt
+        readOnly = core.readOnly
         title = core.title
         body = core.body
         unreadableProperties = core.unreadableProperties
@@ -108,6 +119,7 @@ public struct Item: Sendable, Hashable {
             captureLatitude: captureLatitude,
             captureLongitude: captureLongitude,
             trashedAt: trashedAt,
+            readOnly: readOnly,
             title: title,
             body: body,
             unreadableProperties: unreadableProperties

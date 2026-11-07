@@ -12,6 +12,7 @@ import Testing
         #expect(item.properties["body"]?.string == "text")
         #expect(item.version == 3)
         #expect(item.title == nil)
+        #expect(!item.readOnly)
         let titled = Item(
             id: "item", type: "core.event", properties: ["title": "Standup", "description": "Daily"], state: .active,
             tier: .library, version: 1, schemaVersion: 1, source: "app", sourceId: nil,

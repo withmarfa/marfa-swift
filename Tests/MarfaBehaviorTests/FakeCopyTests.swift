@@ -101,6 +101,29 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
+    @Test func aSeededReadOnlyRowIsServedAsReadOnlyAndStillTakesAWrite() async throws {
+        var held = Self.note
+        held.readOnly = true
+        let fake = WorkingCopy.fake(items: [held, Self.other], itemTypes: [Self.noteType])
+        let copy = fake.copy
+
+        #expect(try await copy.items.get(held.id)?.readOnly == true)
+        #expect(try await copy.items.get(Self.other.id)?.readOnly == false)
+        let listed = try await copy.items.list(sort: Sort(field: .occurredAt, direction: .ascending))
+        #expect(listed.map(\.readOnly) == [true, false])
+        #expect(try await copy.items.get([held.id, Self.other.id]).rows.map(\.readOnly) == [true, false])
+
+        // The server's advice refuses nothing, and the advice stays until the server gives another.
+        let edit = Edit(properties: ["title": "Edited"], baseVersion: held.version)
+        let write = try await copy.items.update(held.id, edit)
+        #expect(fake.writes == [write])
+        let edited = try await copy.items.get(held.id)
+        #expect(edited?.title == "Edited" && edited?.readOnly == true)
+        _ = try await copy.queue.drain()
+        #expect(try await copy.items.get(held.id)?.readOnly == true)
+        await copy.close()
+    }
+
     @Test func aWriteToASeededRowIsBasedOnTheVersionItWasGiven() async throws {
         let fake = Self.seeded()
         let write = try await fake.copy.items.update(

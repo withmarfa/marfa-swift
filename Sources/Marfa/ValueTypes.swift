@@ -725,26 +725,38 @@ public struct PinReport: Sendable, Hashable {
 }
 
 public struct CatchUpReport: Sendable, Hashable {
+    /// The server events the catch-up applied.
     public var applied: UInt64
     public var skipped: UInt64
     public var cursor: String
     /// The catch-up changed the type catalog the copy holds.
     public var catalogChanged: Bool
+    /// The rows whose ``Item/readOnly`` the catch-up changed, which no event brought and `applied` does not count.
+    ///
+    /// A catch-up with `applied` of 0 can still have changed the copy through these, such as the first one after an
+    /// upgrade. Read the copy again; ``Change`` names no row for them.
+    public var readOnlyHeld: UInt64
 
-    public init(applied: UInt64, skipped: UInt64, cursor: String, catalogChanged: Bool = false) {
+    public init(
+        applied: UInt64, skipped: UInt64, cursor: String, catalogChanged: Bool = false, readOnlyHeld: UInt64 = 0
+    ) {
         self.applied = applied
         self.skipped = skipped
         self.cursor = cursor
         self.catalogChanged = catalogChanged
+        self.readOnlyHeld = readOnlyHeld
     }
 
     init(_ core: MarfaCore.CatchUpReport) {
         self.init(
-            applied: core.applied, skipped: core.skipped, cursor: core.cursor, catalogChanged: core.catalogChanged)
+            applied: core.applied, skipped: core.skipped, cursor: core.cursor, catalogChanged: core.catalogChanged,
+            readOnlyHeld: core.readOnlyHeld)
     }
 
     var core: MarfaCore.CatchUpReport {
-        MarfaCore.CatchUpReport(applied: applied, skipped: skipped, cursor: cursor, catalogChanged: catalogChanged)
+        MarfaCore.CatchUpReport(
+            applied: applied, skipped: skipped, readOnlyHeld: readOnlyHeld, cursor: cursor,
+            catalogChanged: catalogChanged)
     }
 }
 
