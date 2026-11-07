@@ -54,6 +54,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/filter`.
                 public var filter: Swift.String?
+                /// An item ID. Only return that item and the items under it by `parent-of` edges, at any depth, walking only through items you can read. Needs read on `parent-of` edges.
+                ///
+                /// - Remark: Generated from `#/paths/items/GET/query/beneath`.
+                public var beneath: Swift.String?
                 /// Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`. Properties sort by stored value: an enum sorts alphabetically. Defaults to `created_at`, or for `state=trashed` alone the trash time, which you can't name here.
                 ///
                 /// - Remark: Generated from `#/paths/items/GET/query/sort`.
@@ -106,6 +110,7 @@ public enum Operations {
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - tags: Comma-separated tags. Only return items that carry all of them.
                 ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on it; `edge[<type>]=<id>` also works as a query parameter. `status_group` matches by status group; `properties.<field>.<member>`, by a list entry.
+                ///   - beneath: An item ID. Only return that item and the items under it by `parent-of` edges, at any depth, walking only through items you can read. Needs read on `parent-of` edges.
                 ///   - sort: Field to sort by: `created_at`, `updated_at`, `occurred_at` or `properties.<field>`. Properties sort by stored value: an enum sorts alphabetically. Defaults to `created_at`, or for `state=trashed` alone the trash time, which you can't name here.
                 ///   - direction: Sort direction. Defaults to `desc`.
                 ///   - occurredAfter: Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
@@ -122,6 +127,7 @@ public enum Operations {
                     tier: Operations.ListItems.Input.Query.TierPayload? = nil,
                     tags: Swift.String? = nil,
                     filter: Swift.String? = nil,
+                    beneath: Swift.String? = nil,
                     sort: Swift.String? = nil,
                     direction: Operations.ListItems.Input.Query.DirectionPayload? = nil,
                     occurredAfter: Swift.String? = nil,
@@ -138,6 +144,7 @@ public enum Operations {
                     self.tier = tier
                     self.tags = tags
                     self.filter = filter
+                    self.beneath = beneath
                     self.sort = sort
                     self.direction = direction
                     self.occurredAfter = occurredAfter
@@ -21936,6 +21943,10 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/filter`.
                 public var filter: Swift.String?
+                /// An item ID. Only return that item and the items under it by `parent-of` edges, at any depth, walking only through items you can read. Needs read on `parent-of` edges.
+                ///
+                /// - Remark: Generated from `#/paths/items/stats/GET/query/beneath`.
+                public var beneath: Swift.String?
                 /// Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
                 ///
                 /// - Remark: Generated from `#/paths/items/stats/GET/query/occurred_after`.
@@ -21972,6 +21983,7 @@ public enum Operations {
                 ///   - tier: Only return items in this tier. Omit it or send `all` for both tiers.
                 ///   - tags: Comma-separated tags. Only return items that carry all of them.
                 ///   - filter: A filter expression. A term naming an edge type, `edge[<type>]` or `backref[<type>]`, needs read on it; `edge[<type>]=<id>` also works as a query parameter. `status_group` matches by status group; `properties.<field>.<member>`, by a list entry.
+                ///   - beneath: An item ID. Only return that item and the items under it by `parent-of` edges, at any depth, walking only through items you can read. Needs read on `parent-of` edges.
                 ///   - occurredAfter: Only return items whose own time (`occurred_at`, else `created_at`) is after this time. For the modification time, use `updated_after`.
                 ///   - occurredBefore: Only return items whose own time (`occurred_at`, else `created_at`) is before this time.
                 ///   - updatedAfter: Only return items changed at or after this time. Send the latest `updated_at` you hold, and deduplicate by ID, as items can share an instant. Ordered by `updated_at`, then ID, ascending, so leave out `sort` and `direction`. Purges aren't reported.
@@ -21985,6 +21997,7 @@ public enum Operations {
                     tier: Operations.GetItemStats.Input.Query.TierPayload? = nil,
                     tags: Swift.String? = nil,
                     filter: Swift.String? = nil,
+                    beneath: Swift.String? = nil,
                     occurredAfter: Swift.String? = nil,
                     occurredBefore: Swift.String? = nil,
                     updatedAfter: Swift.String? = nil,
@@ -21998,6 +22011,7 @@ public enum Operations {
                     self.tier = tier
                     self.tags = tags
                     self.filter = filter
+                    self.beneath = beneath
                     self.occurredAfter = occurredAfter
                     self.occurredBefore = occurredBefore
                     self.updatedAfter = updatedAfter
@@ -94551,6 +94565,23 @@ public enum Operations {
                     public var firstPlacement: Operations.CreateFolder.Input.Body.JsonPayload.FirstPlacementPayload?
                     /// - Remark: Generated from `#/paths/folders/POST/requestBody/json/removal_threshold`.
                     public var removalThreshold: Components.Schemas.FolderRemovalThreshold?
+                    /// Seconds between the passes of a watch that read every file in the folder, in case the system missed a file event: 60 to 86400. Absent means 600.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/POST/requestBody/json/full_pass_interval_seconds`.
+                    public var fullPassIntervalSeconds: Swift.Int?
+                    /// - Remark: Generated from `#/paths/folders/POST/requestBody/json/addition_threshold`.
+                    public var additionThreshold: Components.Schemas.FolderAdditionThreshold?
+                    /// What a machine does with a new file whose item the query would not hold. `send` makes it an item and keeps it in the folder, flagged unmatched. `hold` leaves it on the disk, not sent and with no item, until it matches the query or the setting is `send`. A file that already has an item is never affected. Absent means `send`.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/POST/requestBody/json/outside_query`.
+                    @frozen public enum OutsideQueryPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case send = "send"
+                        case hold = "hold"
+                    }
+                    /// What a machine does with a new file whose item the query would not hold. `send` makes it an item and keeps it in the folder, flagged unmatched. `hold` leaves it on the disk, not sent and with no item, until it matches the query or the setting is `send`. A file that already has an item is never affected. Absent means `send`.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/POST/requestBody/json/outside_query`.
+                    public var outsideQuery: Operations.CreateFolder.Input.Body.JsonPayload.OutsideQueryPayload?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
@@ -94561,6 +94592,9 @@ public enum Operations {
                     ///   - ignore: Gitignore patterns, relative to the folder's root, for the paths the folder leaves alone. They win over `include`.
                     ///   - firstPlacement: Where an item made elsewhere first appears in the folder: a map from type identifier to a directory relative to the folder's root. The most specific matching type wins.
                     ///   - removalThreshold:
+                    ///   - fullPassIntervalSeconds: Seconds between the passes of a watch that read every file in the folder, in case the system missed a file event: 60 to 86400. Absent means 600.
+                    ///   - additionThreshold:
+                    ///   - outsideQuery: What a machine does with a new file whose item the query would not hold. `send` makes it an item and keeps it in the folder, flagged unmatched. `hold` leaves it on the disk, not sent and with no item, until it matches the query or the setting is `send`. A file that already has an item is never affected. Absent means `send`.
                     public init(
                         title: Swift.String,
                         query: Components.Schemas.FolderQuery? = nil,
@@ -94568,7 +94602,10 @@ public enum Operations {
                         include: [Swift.String]? = nil,
                         ignore: [Swift.String]? = nil,
                         firstPlacement: Operations.CreateFolder.Input.Body.JsonPayload.FirstPlacementPayload? = nil,
-                        removalThreshold: Components.Schemas.FolderRemovalThreshold? = nil
+                        removalThreshold: Components.Schemas.FolderRemovalThreshold? = nil,
+                        fullPassIntervalSeconds: Swift.Int? = nil,
+                        additionThreshold: Components.Schemas.FolderAdditionThreshold? = nil,
+                        outsideQuery: Operations.CreateFolder.Input.Body.JsonPayload.OutsideQueryPayload? = nil
                     ) {
                         self.title = title
                         self.query = query
@@ -94577,6 +94614,9 @@ public enum Operations {
                         self.ignore = ignore
                         self.firstPlacement = firstPlacement
                         self.removalThreshold = removalThreshold
+                        self.fullPassIntervalSeconds = fullPassIntervalSeconds
+                        self.additionThreshold = additionThreshold
+                        self.outsideQuery = outsideQuery
                     }
                     public enum CodingKeys: String, CodingKey {
                         case title
@@ -94586,6 +94626,9 @@ public enum Operations {
                         case ignore
                         case firstPlacement = "first_placement"
                         case removalThreshold = "removal_threshold"
+                        case fullPassIntervalSeconds = "full_pass_interval_seconds"
+                        case additionThreshold = "addition_threshold"
+                        case outsideQuery = "outside_query"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -94617,6 +94660,18 @@ public enum Operations {
                             Components.Schemas.FolderRemovalThreshold.self,
                             forKey: .removalThreshold
                         )
+                        self.fullPassIntervalSeconds = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .fullPassIntervalSeconds
+                        )
+                        self.additionThreshold = try container.decodeIfPresent(
+                            Components.Schemas.FolderAdditionThreshold.self,
+                            forKey: .additionThreshold
+                        )
+                        self.outsideQuery = try container.decodeIfPresent(
+                            Operations.CreateFolder.Input.Body.JsonPayload.OutsideQueryPayload.self,
+                            forKey: .outsideQuery
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "title",
                             "query",
@@ -94624,7 +94679,10 @@ public enum Operations {
                             "include",
                             "ignore",
                             "first_placement",
-                            "removal_threshold"
+                            "removal_threshold",
+                            "full_pass_interval_seconds",
+                            "addition_threshold",
+                            "outside_query"
                         ])
                     }
                 }
@@ -96094,6 +96152,23 @@ public enum Operations {
                     public var firstPlacement: Operations.UpdateFolder.Input.Body.JsonPayload.FirstPlacementPayload?
                     /// - Remark: Generated from `#/paths/folders/{id}/PATCH/requestBody/json/removal_threshold`.
                     public var removalThreshold: Components.Schemas.FolderRemovalThreshold?
+                    /// Seconds between the passes of a watch that read every file in the folder, in case the system missed a file event: 60 to 86400. Absent means 600.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/PATCH/requestBody/json/full_pass_interval_seconds`.
+                    public var fullPassIntervalSeconds: Swift.Int?
+                    /// - Remark: Generated from `#/paths/folders/{id}/PATCH/requestBody/json/addition_threshold`.
+                    public var additionThreshold: Components.Schemas.FolderAdditionThreshold?
+                    /// What a machine does with a new file whose item the query would not hold. `send` makes it an item and keeps it in the folder, flagged unmatched. `hold` leaves it on the disk, not sent and with no item, until it matches the query or the setting is `send`. A file that already has an item is never affected. Absent means `send`.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/PATCH/requestBody/json/outside_query`.
+                    @frozen public enum OutsideQueryPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case send = "send"
+                        case hold = "hold"
+                    }
+                    /// What a machine does with a new file whose item the query would not hold. `send` makes it an item and keeps it in the folder, flagged unmatched. `hold` leaves it on the disk, not sent and with no item, until it matches the query or the setting is `send`. A file that already has an item is never affected. Absent means `send`.
+                    ///
+                    /// - Remark: Generated from `#/paths/folders/{id}/PATCH/requestBody/json/outside_query`.
+                    public var outsideQuery: Operations.UpdateFolder.Input.Body.JsonPayload.OutsideQueryPayload?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
@@ -96105,6 +96180,9 @@ public enum Operations {
                     ///   - ignore: Gitignore patterns, relative to the folder's root, for the paths the folder leaves alone. They win over `include`.
                     ///   - firstPlacement: Where an item made elsewhere first appears in the folder: a map from type identifier to a directory relative to the folder's root. The most specific matching type wins.
                     ///   - removalThreshold:
+                    ///   - fullPassIntervalSeconds: Seconds between the passes of a watch that read every file in the folder, in case the system missed a file event: 60 to 86400. Absent means 600.
+                    ///   - additionThreshold:
+                    ///   - outsideQuery: What a machine does with a new file whose item the query would not hold. `send` makes it an item and keeps it in the folder, flagged unmatched. `hold` leaves it on the disk, not sent and with no item, until it matches the query or the setting is `send`. A file that already has an item is never affected. Absent means `send`.
                     public init(
                         version: Swift.Int,
                         title: Swift.String? = nil,
@@ -96113,7 +96191,10 @@ public enum Operations {
                         include: [Swift.String]? = nil,
                         ignore: [Swift.String]? = nil,
                         firstPlacement: Operations.UpdateFolder.Input.Body.JsonPayload.FirstPlacementPayload? = nil,
-                        removalThreshold: Components.Schemas.FolderRemovalThreshold? = nil
+                        removalThreshold: Components.Schemas.FolderRemovalThreshold? = nil,
+                        fullPassIntervalSeconds: Swift.Int? = nil,
+                        additionThreshold: Components.Schemas.FolderAdditionThreshold? = nil,
+                        outsideQuery: Operations.UpdateFolder.Input.Body.JsonPayload.OutsideQueryPayload? = nil
                     ) {
                         self.version = version
                         self.title = title
@@ -96123,6 +96204,9 @@ public enum Operations {
                         self.ignore = ignore
                         self.firstPlacement = firstPlacement
                         self.removalThreshold = removalThreshold
+                        self.fullPassIntervalSeconds = fullPassIntervalSeconds
+                        self.additionThreshold = additionThreshold
+                        self.outsideQuery = outsideQuery
                     }
                     public enum CodingKeys: String, CodingKey {
                         case version
@@ -96133,6 +96217,9 @@ public enum Operations {
                         case ignore
                         case firstPlacement = "first_placement"
                         case removalThreshold = "removal_threshold"
+                        case fullPassIntervalSeconds = "full_pass_interval_seconds"
+                        case additionThreshold = "addition_threshold"
+                        case outsideQuery = "outside_query"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -96168,6 +96255,18 @@ public enum Operations {
                             Components.Schemas.FolderRemovalThreshold.self,
                             forKey: .removalThreshold
                         )
+                        self.fullPassIntervalSeconds = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .fullPassIntervalSeconds
+                        )
+                        self.additionThreshold = try container.decodeIfPresent(
+                            Components.Schemas.FolderAdditionThreshold.self,
+                            forKey: .additionThreshold
+                        )
+                        self.outsideQuery = try container.decodeIfPresent(
+                            Operations.UpdateFolder.Input.Body.JsonPayload.OutsideQueryPayload.self,
+                            forKey: .outsideQuery
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "version",
                             "title",
@@ -96176,7 +96275,10 @@ public enum Operations {
                             "include",
                             "ignore",
                             "first_placement",
-                            "removal_threshold"
+                            "removal_threshold",
+                            "full_pass_interval_seconds",
+                            "addition_threshold",
+                            "outside_query"
                         ])
                     }
                 }
@@ -162085,7 +162187,7 @@ public enum Operations {
     }
     /// Get the instance
     ///
-    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks and the features it serves. Needs no credential.
+    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.

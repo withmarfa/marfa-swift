@@ -1564,7 +1564,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/title_field`.
             public var titleField: Swift.String?
-            /// The field that holds an item's body for display. The field holds Markdown.
+            /// The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `maxLength` says otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
@@ -1582,7 +1582,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
-            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown.
+            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `maxLength` says otherwise.
             ///   - nameFromBody: Whether an item with no title is named by the first line of its body. `false` where the body is not a name, such as a highlight's passage: such an item is named after what it comes from, or `Untitled`. Defaults to `true`.
             ///   - icon: The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///   - additionalProperties: A container of undocumented properties.
@@ -2289,7 +2289,7 @@ extension Components {
                 ])
             }
         }
-        /// An instance: its identity, build, contract version and features.
+        /// An instance: its identity, build, contract version, features and request size.
         ///
         /// - Remark: Generated from `#/components/schemas/InstanceDescription`.
         public struct InstanceDescription: Codable, Hashable, Sendable {
@@ -2317,6 +2317,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/features`.
             public var features: [Swift.String]
+            /// The largest body, in bytes, the instance takes in an ordinary JSON request. A larger one is answered `413 request_too_large`. Bulk writes, blob uploads and a few other operations have their own limits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceDescription/max_request_bytes`.
+            public var maxRequestBytes: Swift.Int
             /// Creates a new `InstanceDescription`.
             ///
             /// - Parameters:
@@ -2326,13 +2330,15 @@ extension Components {
             ///   - instanceId: Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
             ///   - contract: The contract version, the same number as this document's `info.version`. It stays at `0` until the first public release.
             ///   - features: The features the instance serves, such as `items` and `webhooks`.
+            ///   - maxRequestBytes: The largest body, in bytes, the instance takes in an ordinary JSON request. A larger one is answered `413 request_too_large`. Bulk writes, blob uploads and a few other operations have their own limits.
             public init(
                 name: Swift.String,
                 version: Swift.String,
                 release: Swift.String? = nil,
                 instanceId: Swift.String,
                 contract: Swift.Int,
-                features: [Swift.String]
+                features: [Swift.String],
+                maxRequestBytes: Swift.Int
             ) {
                 self.name = name
                 self.version = version
@@ -2340,6 +2346,7 @@ extension Components {
                 self.instanceId = instanceId
                 self.contract = contract
                 self.features = features
+                self.maxRequestBytes = maxRequestBytes
             }
             public enum CodingKeys: String, CodingKey {
                 case name
@@ -2348,6 +2355,7 @@ extension Components {
                 case instanceId = "instance_id"
                 case contract
                 case features
+                case maxRequestBytes = "max_request_bytes"
             }
         }
         /// An error response.
@@ -8322,7 +8330,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/searchable`.
             public var searchable: Swift.Bool?
-            /// The longest value a `string` or `enum` field allows.
+            /// The longest value a `string` or `enum` field allows, in UTF-16 code units. Defaults to 1,000,000 on the `string` field `display_hints.body_field` names, and to 100,000 on any other.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxLength`.
             public var maxLength: Swift.Int?
@@ -8353,7 +8361,7 @@ extension Components {
             ///   - itemsFields: The members of each entry of an `array` field whose `items_type` is `object`, by name. A write is refused if an entry has another member, lacks a required one, holds a value a member does not take, or has none.
             ///   - format: Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///   - searchable: `false` if full-text search should skip the field. Items still return it.
-            ///   - maxLength: The longest value a `string` or `enum` field allows.
+            ///   - maxLength: The longest value a `string` or `enum` field allows, in UTF-16 code units. Defaults to 1,000,000 on the `string` field `display_hints.body_field` names, and to 100,000 on any other.
             ///   - maxItems: The most elements an `array` field allows.
             ///   - minimum: The lowest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may raise it, never lower or drop it.
             ///   - maximum: The highest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may lower it, never raise or drop it.
@@ -14206,6 +14214,50 @@ extension Components {
             /// - Parameters:
             ///   - files: A removal waits to be confirmed only if it takes more than this many files. Absent means 10.
             ///   - fraction: A removal waits to be confirmed only if it takes more than this fraction of the folder's files. Absent means 0.25.
+            public init(
+                files: Swift.Int? = nil,
+                fraction: Swift.Double? = nil
+            ) {
+                self.files = files
+                self.fraction = fraction
+            }
+            public enum CodingKeys: String, CodingKey {
+                case files
+                case fraction
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.files = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .files
+                )
+                self.fraction = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .fraction
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "files",
+                    "fraction"
+                ])
+            }
+        }
+        /// New files wait to be confirmed when a scan would add more than `files` files and more than `fraction` of the folder's files.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderAdditionThreshold`.
+        public struct FolderAdditionThreshold: Codable, Hashable, Sendable {
+            /// New files wait to be confirmed only if they number more than this. Absent means 50.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderAdditionThreshold/files`.
+            public var files: Swift.Int?
+            /// New files wait to be confirmed only if they number more than this fraction of the folder's files. Absent means 0.25.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderAdditionThreshold/fraction`.
+            public var fraction: Swift.Double?
+            /// Creates a new `FolderAdditionThreshold`.
+            ///
+            /// - Parameters:
+            ///   - files: New files wait to be confirmed only if they number more than this. Absent means 50.
+            ///   - fraction: New files wait to be confirmed only if they number more than this fraction of the folder's files. Absent means 0.25.
             public init(
                 files: Swift.Int? = nil,
                 fraction: Swift.Double? = nil
