@@ -909,7 +909,7 @@ public protocol APIProtocol: Sendable {
     func deleteOwnerPasskey(_ input: Operations.DeleteOwnerPasskey.Input) async throws -> Operations.DeleteOwnerPasskey.Output
     /// Get the instance
     ///
-    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks and the features it serves. Needs no credential.
+    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -2950,7 +2950,7 @@ extension APIProtocol {
     }
     /// Get the instance
     ///
-    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks and the features it serves. Needs no credential.
+    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.

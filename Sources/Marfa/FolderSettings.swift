@@ -30,11 +30,15 @@ public struct FolderSettings: Sendable, Hashable {
     /// Where an item of a type made elsewhere first appears, from type to directory.
     public var firstPlacement: [String: String]
     public var removalThreshold: RemovalThreshold
+    public var additionThreshold: AdditionThreshold
+    /// What the folder does with a new file its query would not hold.
+    public var outsideQuery: OutsideQuery
 
     public init(
         title: String? = nil, query: FolderQuery = FolderQuery(), defaults: FolderDefaults = FolderDefaults(),
         include: [String] = [], ignore: [String] = [], firstPlacement: [String: String] = [:],
-        removalThreshold: RemovalThreshold = RemovalThreshold()
+        removalThreshold: RemovalThreshold = RemovalThreshold(),
+        additionThreshold: AdditionThreshold = AdditionThreshold(), outsideQuery: OutsideQuery = .send
     ) {
         self.title = title
         self.query = query
@@ -43,19 +47,23 @@ public struct FolderSettings: Sendable, Hashable {
         self.ignore = ignore
         self.firstPlacement = firstPlacement
         self.removalThreshold = removalThreshold
+        self.additionThreshold = additionThreshold
+        self.outsideQuery = outsideQuery
     }
 
     init(_ core: MarfaCore.FolderSettings) {
         self.init(
             title: core.title, query: FolderQuery(core.query), defaults: FolderDefaults(core.defaults),
             include: core.include, ignore: core.ignore, firstPlacement: core.firstPlacement,
-            removalThreshold: RemovalThreshold(core.removalThreshold))
+            removalThreshold: RemovalThreshold(core.removalThreshold),
+            additionThreshold: AdditionThreshold(core.additionThreshold), outsideQuery: OutsideQuery(core.outsideQuery))
     }
 
     var core: MarfaCore.FolderSettings {
         MarfaCore.FolderSettings(
             title: title, query: query.core, defaults: defaults.core, include: include, ignore: ignore,
-            firstPlacement: firstPlacement, removalThreshold: removalThreshold.core)
+            firstPlacement: firstPlacement, removalThreshold: removalThreshold.core,
+            additionThreshold: additionThreshold.core, outsideQuery: outsideQuery.core)
     }
 }
 
@@ -148,6 +156,49 @@ public struct RemovalThreshold: Sendable, Hashable {
     var core: MarfaCore.RemovalThreshold { MarfaCore.RemovalThreshold(files: files, fraction: fraction) }
 }
 
+/// How large a drop of new files into a folder on disk must be to wait for confirmation.
+public struct AdditionThreshold: Sendable, Hashable {
+    /// `nil` is 50.
+    public var files: UInt64?
+    /// `nil` is 0.25.
+    public var fraction: Double?
+
+    public init(files: UInt64? = nil, fraction: Double? = nil) {
+        self.files = files
+        self.fraction = fraction
+    }
+
+    init(_ core: MarfaCore.AdditionThreshold) {
+        self.init(files: core.files, fraction: core.fraction)
+    }
+
+    var core: MarfaCore.AdditionThreshold { MarfaCore.AdditionThreshold(files: files, fraction: fraction) }
+}
+
+/// What a folder on disk does with a new file that its query would not hold.
+///
+/// A file that already has an item is never affected.
+public enum OutsideQuery: Sendable, Hashable, CaseIterable {
+    /// Makes it an item and keeps it in the folder, flagged unmatched.
+    case send
+    /// Leaves it on the disk, with no item and nothing sent, until it matches the query or the folder says `send`.
+    case hold
+
+    init(_ core: MarfaCore.OutsideQuery) {
+        switch core {
+        case .send: self = .send
+        case .hold: self = .hold
+        }
+    }
+
+    var core: MarfaCore.OutsideQuery {
+        switch self {
+        case .send: .send
+        case .hold: .hold
+        }
+    }
+}
+
 /// The settings to replace, each whole; a `nil` one is left as it is.
 public struct FolderSettingsChange: Sendable, Hashable {
     public var title: String?
@@ -157,10 +208,13 @@ public struct FolderSettingsChange: Sendable, Hashable {
     public var ignore: [String]?
     public var firstPlacement: [String: String]?
     public var removalThreshold: RemovalThreshold?
+    public var additionThreshold: AdditionThreshold?
+    public var outsideQuery: OutsideQuery?
 
     public init(
         title: String? = nil, query: FolderQuery? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil,
-        ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil
+        ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil,
+        additionThreshold: AdditionThreshold? = nil, outsideQuery: OutsideQuery? = nil
     ) {
         self.title = title
         self.query = query
@@ -169,12 +223,15 @@ public struct FolderSettingsChange: Sendable, Hashable {
         self.ignore = ignore
         self.firstPlacement = firstPlacement
         self.removalThreshold = removalThreshold
+        self.additionThreshold = additionThreshold
+        self.outsideQuery = outsideQuery
     }
 
     var core: MarfaCore.FolderSettingsChange {
         MarfaCore.FolderSettingsChange(
             title: title, query: query?.core, defaults: defaults?.core, include: include, ignore: ignore,
-            firstPlacement: firstPlacement, removalThreshold: removalThreshold?.core)
+            firstPlacement: firstPlacement, removalThreshold: removalThreshold?.core,
+            additionThreshold: additionThreshold?.core, outsideQuery: outsideQuery?.core)
     }
 }
 

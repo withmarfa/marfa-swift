@@ -423,7 +423,7 @@ extension LiveWorkingCopies {
                 return try await FolderFixture.sync(directory)
             }
             #expect(try await removeAll().pass.scan.paused == 3)
-            #expect(try await folders.status(of: directory).paused == PausedRemoval(disk: 3))
+            #expect(try await folders.status(of: directory).paused == FolderPaused(disk: 3))
             let restored = try await folders.restoreRemoval(in: directory)
             #expect(restored.putBack == 3)
             for name in names {

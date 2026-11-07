@@ -78,11 +78,11 @@ public struct Folders: Sendable {
         return try await run { folders in try folders.confirmFirstSync(dir: dir) }
     }
 
-    /// Lets a paused large removal go: its deletes are queued for the next sync, and files whose items left
-    /// elsewhere are removed.
-    public func confirmRemoval(in directory: URL) async throws -> ConfirmedRemoval {
+    /// Lets a paused large removal and a paused drop of new files go: deletes are queued for the next sync, files
+    /// whose items left elsewhere are removed, and the held new files are queued as items.
+    public func confirmRemoval(in directory: URL) async throws -> ConfirmedFolder {
         let dir = directory.path(percentEncoded: false)
-        return ConfirmedRemoval(try await run { folders in try folders.confirm(dir: dir) })
+        return ConfirmedFolder(try await run { folders in try folders.confirm(dir: dir) })
     }
 
     /// Cancels a paused large removal: files gone from the disk are written back, and items that left elsewhere
@@ -373,12 +373,13 @@ public enum StorageCause: Sendable, Hashable {
 /// Where every file in a folder stands.
 public struct FolderStatus: Sendable, Hashable {
     public var files: [FileStatus]
-    /// A large removal waiting for `confirmRemoval(in:)` or `restoreRemoval(in:)`.
-    public var paused: PausedRemoval
+    /// A large removal or a large drop of new files waiting for `confirmRemoval(in:)`; a removal can also wait for
+    /// `restoreRemoval(in:)`.
+    public var paused: FolderPaused
     /// Set while the folder's first sync waits for `confirmFirstSync(in:)`.
     public var firstSync: WaitingFirstSync?
 
-    public init(files: [FileStatus], paused: PausedRemoval = PausedRemoval(), firstSync: WaitingFirstSync? = nil) {
+    public init(files: [FileStatus], paused: FolderPaused = FolderPaused(), firstSync: WaitingFirstSync? = nil) {
         self.files = files
         self.paused = paused
         self.firstSync = firstSync
@@ -386,7 +387,7 @@ public struct FolderStatus: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderStatus) {
         self.init(
-            files: core.files.map(FileStatus.init), paused: PausedRemoval(core.paused),
+            files: core.files.map(FileStatus.init), paused: FolderPaused(core.paused),
             firstSync: core.firstSync.map(WaitingFirstSync.init))
     }
 }
@@ -449,23 +450,34 @@ public enum FileState: Sendable, Hashable {
     }
 }
 
-/// A large removal that waits for the person to confirm or cancel it.
-public struct PausedRemoval: Sendable, Hashable {
+/// A large removal, or a large drop of new files, that waits for the person to confirm it; a removal can also be
+/// cancelled.
+public struct FolderPaused: Sendable, Hashable {
     /// Files gone from the disk whose deletes aren't sent.
     public var disk: UInt64
     /// Files left in place whose items left the folder's query elsewhere.
     public var pull: UInt64
+    /// New files held back for being more than the folder's addition threshold lets in at once; confirming sends
+    /// them.
+    public var additions: UInt64
+    /// New files left on the disk because the query would not hold them and the folder's ``OutsideQuery`` is `hold`.
+    ///
+    /// Confirming does not release them, so they don't count toward ``isPaused``.
+    public var outsideQuery: UInt64
 
-    /// Whether a removal waits.
-    public var isPaused: Bool { disk + pull > 0 }
+    /// Whether a removal or a drop of new files waits for confirmation.
+    public var isPaused: Bool { disk + pull + additions > 0 }
 
-    public init(disk: UInt64 = 0, pull: UInt64 = 0) {
+    public init(disk: UInt64 = 0, pull: UInt64 = 0, additions: UInt64 = 0, outsideQuery: UInt64 = 0) {
         self.disk = disk
         self.pull = pull
+        self.additions = additions
+        self.outsideQuery = outsideQuery
     }
 
-    init(_ core: MarfaCore.PausedRemoval) {
-        self.init(disk: core.disk, pull: core.pull)
+    init(_ core: MarfaCore.FolderPaused) {
+        self.init(
+            disk: core.disk, pull: core.pull, additions: core.additions, outsideQuery: core.outsideQuery)
     }
 }
 
@@ -617,6 +629,10 @@ public struct FolderScan: Sendable, Hashable {
     public let movedAway: UInt64
     /// Deletes a large removal holds back.
     public let paused: UInt64
+    /// New files a large drop holds back, so they are not sent.
+    public let pausedAdditions: UInt64
+    /// New files left on the disk because the query would not hold them.
+    public let heldOutside: UInt64
     /// Files found in no folder on this Mac, whose items were moved to the bin.
     public let trashed: [String]
     /// Files not sent because their names are ones that secrets use.
@@ -640,6 +656,8 @@ public struct FolderScan: Sendable, Hashable {
         skipped = core.skipped
         movedAway = core.movedAway
         paused = core.paused
+        pausedAdditions = core.pausedAdditions
+        heldOutside = core.heldOutside
         trashed = core.trashed
         secrets = core.secrets
         warnings = core.warnings.map(FlaggedFile.init)
@@ -713,21 +731,24 @@ public struct FlaggedFile: Sendable, Hashable {
     }
 }
 
-/// What confirming a paused removal did.
-public struct ConfirmedRemoval: Sendable, Hashable {
+/// What confirming a paused removal and a paused drop of new files did.
+public struct ConfirmedFolder: Sendable, Hashable {
     /// Deletes queued for the next sync.
     public let deleted: UInt64
     /// Files found in another folder on this Mac, whose items stay.
     public let moved: UInt64
     /// Files removed whose items left elsewhere.
     public let removed: UInt64
+    /// Held new files the confirmation released, queued as items.
+    public let added: UInt64
     /// Files not let go, because the other folders couldn't all be read.
     public let unsure: [UnsureFile]
 
-    init(_ core: MarfaCore.ConfirmedRemoval) {
+    init(_ core: MarfaCore.ConfirmedFolder) {
         deleted = core.deleted
         moved = core.moved
         removed = core.removed
+        added = core.added
         unsure = core.unsure.map(UnsureFile.init)
     }
 }

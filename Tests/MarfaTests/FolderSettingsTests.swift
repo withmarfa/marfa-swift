@@ -14,7 +14,8 @@ import Testing
                 type: "core.note", tier: .feed, properties: ["rating": 3, "cuisine": "any"], tags: ["new"],
                 edges: ["about": ["topic"]]),
             include: ["*.md"], ignore: ["drafts/"], firstPlacement: ["core.note": "Notes"],
-            removalThreshold: RemovalThreshold(files: 4, fraction: 0.5))
+            removalThreshold: RemovalThreshold(files: 4, fraction: 0.5),
+            additionThreshold: AdditionThreshold(files: 7, fraction: 0.5), outsideQuery: .hold)
         let crossed = FolderSettings(settings.core)
         #expect(crossed == settings)
         #expect(crossed.query.tier == .all, "a query of both tiers")
