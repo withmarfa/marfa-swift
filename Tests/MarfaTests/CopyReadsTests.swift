@@ -136,7 +136,7 @@ struct CopyReads {
 struct PackedListing {
     /// The bytes `the_layout_of_a_plain_item_is_the_one_the_swift_package_reads` in the core's `packed.rs` holds.
     static let agreed: [UInt8] = {
-        var bytes: [UInt8] = [2, 0, 0, 0, 1, 0, 0, 0]
+        var bytes: [UInt8] = [3, 0, 0, 0, 1, 0, 0, 0]
         bytes += [2, 0, 0, 0] + Array("id".utf8)
         bytes += [9, 0, 0, 0] + Array("core.note".utf8)
         bytes += [1, 0, 0, 0, 1, 0, 0, 0] + Array("k".utf8) + [3, 1, 0, 0, 0, 0, 0, 0, 0]
@@ -149,7 +149,7 @@ struct PackedListing {
             bytes += [20, 0, 0, 0] + Array(at.utf8)
         }
         bytes += [0, 0, 0, 0]
-        bytes += [0, 0, 0, 0, 0, 0]
+        bytes += [0, 0, 0, 0, 0, 0, 0]
         return bytes
     }()
 
@@ -157,6 +157,12 @@ struct PackedListing {
         id: "id", type: "core.note", properties: ["k": 1], state: .active, tier: nil, version: .max,
         schemaVersion: 2, source: "device", sourceId: nil, occurredAt: "2026-01-01T00:00:00Z",
         createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z", tags: [])
+
+    static let plainReadOnly: Marfa.Item = {
+        var item = plain
+        item.readOnly = true
+        return item
+    }()
 
     static let full = Item(
         id: "a", type: "core.note",
@@ -167,7 +173,7 @@ struct PackedListing {
         state: .revoked, tier: .feed, version: 7, schemaVersion: 2, source: "device", sourceId: "source",
         occurredAt: "2026-01-01T00:00:00Z", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z",
         tags: ["x", ""], captureLatitude: 51.5, captureLongitude: -0.12, trashedAt: "2026-01-04T00:00:00Z",
-        title: "Title", body: "", unreadableProperties: "why")
+        readOnly: true, title: "Title", body: "", unreadableProperties: "why")
 
     /// The bytes `the_layout_of_a_full_item_is_the_one_the_swift_package_reads` in the core's `packed.rs` holds.
     static let fullBytes: [UInt8] = {
@@ -175,7 +181,7 @@ struct PackedListing {
             withUnsafeBytes(of: UInt32(text.utf8.count).littleEndian, Array.init) + Array(text.utf8)
         }
         func bits<T>(_ value: T) -> [UInt8] { withUnsafeBytes(of: value, Array.init) }
-        var bytes: [UInt8] = [2, 0, 0, 0, 1, 0, 0, 0]
+        var bytes: [UInt8] = [3, 0, 0, 0, 1, 0, 0, 0]
         bytes += text("a") + text("core.note")
         bytes += [8, 0, 0, 0]
         bytes += text("null") + [0]
@@ -194,6 +200,7 @@ struct PackedListing {
         bytes += [1] + bits((51.5).bitPattern.littleEndian)
         bytes += [1] + bits((-0.12).bitPattern.littleEndian)
         bytes += [1] + text("2026-01-04T00:00:00Z")
+        bytes += [1]
         bytes += [1] + text("Title") + [1] + text("") + [1] + text("why")
         return bytes
     }()
@@ -217,13 +224,13 @@ struct PackedListing {
 
     @Test func aListingOfAnotherFormatIsRefusedNamingBoth() {
         var other = Self.agreed
-        other[0] = 3
+        other[0] = 4
         do {
             _ = try PackedRows.items(Data(other))
-            Issue.record("a listing of format 3 was read")
+            Issue.record("a listing of format 4 was read")
         } catch {
             if case .decoding(let message) = error {
-                #expect(message.contains("format 3, where this package reads format 2"), "\(message)")
+                #expect(message.contains("format 4, where this package reads format 3"), "\(message)")
             } else {
                 Issue.record("\(error)")
             }
@@ -258,6 +265,16 @@ struct PackedListing {
         var badValue = Self.agreed
         badValue[8 + 6 + 13 + 9] = 8
         #expect(Self.refused(badValue))
+    }
+
+    @Test func aReadOnlyMarkOtherThanFalseOrTrueIsRefused() throws {
+        // `read_only` is the fourth byte from the end, before the title, the body and the unreadable reason.
+        let at = Self.agreed.count - 4
+        var held = Self.agreed
+        held[at] = 1
+        #expect(try PackedRows.items(Data(held)) == [Self.plainReadOnly])
+        held[at] = 2
+        #expect(Self.refused(held))
     }
 
     @Test func aValueNestedBeyondTheLimitIsRefused() {

@@ -299,6 +299,9 @@ public final class WorkingCopy: Sendable {
     /// Reads the type catalog again, then applies every event since the
     /// last hydration or catch-up.
     ///
+    /// A catch-up that applied no event can still have moved rows, which `readOnlyHeld` counts; every held stream is
+    /// told `.refreshed(.caughtUp)` for either.
+    ///
     /// A catch-up made while a hydration runs, such as the refill a held
     /// `changes()` stream starts, waits for it and then catches up from the
     /// cursor it left.
@@ -330,8 +333,11 @@ public final class WorkingCopy: Sendable {
     /// the copy, ``updates()`` coalesces these changes and keeps the follow going.
     ///
     /// A server event the copy applied arrives as `.server`, naming the
-    /// event's type and the item or edge it was about. A catch-up or a held
-    /// stream that read a changed type catalog arrives as
+    /// event's type and the item or edge it was about. A held stream that
+    /// moved the ``Item/readOnly`` of rows arrives as `.server` with the event
+    /// `item.updated` and no `itemId`, since no event brought those rows and
+    /// there can be as many as the copy holds: read the copy again. A catch-up
+    /// or a held stream that read a changed type catalog arrives as
     /// `.refreshed(.catalog)`, naming neither.
     ///
     /// The copy says what became of the server: `.serverUnreachable` with
@@ -1229,7 +1235,7 @@ func caughtUp(
         feed.announce(Change(origin: .refreshed(.catalog), itemId: nil, edgeId: nil))
     }
     let report = try caughtUp.get()
-    if report.applied > 0 {
+    if report.applied > 0 || report.readOnlyHeld > 0 {
         feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
     }
     return report

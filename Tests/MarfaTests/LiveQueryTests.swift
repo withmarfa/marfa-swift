@@ -184,7 +184,8 @@ struct LiveQueries {
     @Test func aHydrationAndACatchUpReadAgain() async throws {
         let (core, copy) = Self.fake()
         core.state.withLock {
-            $0.caughtUp = MarfaCore.CatchUpReport(applied: 2, skipped: 0, cursor: "9", catalogChanged: false)
+            $0.caughtUp = MarfaCore.CatchUpReport(
+                applied: 2, skipped: 0, readOnlyHeld: 0, cursor: "9", catalogChanged: false)
         }
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))

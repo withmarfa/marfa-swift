@@ -254,6 +254,35 @@ struct Changes {
         }
     }
 
+    /// A catch-up that moved only `read_only` applies no event, and a copy that was told nothing would show rows it
+    /// no longer holds.
+    @Test func aCatchUpThatOnlyMovedReadOnlyRowsIsToldSoAndReportsThem() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let heard = Heard(copy.changes())
+        let quiet = try await bounded("the quiet catch-up") { try await copy.catchUp() }
+        #expect((quiet.applied, quiet.readOnlyHeld) == (0, 0))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.all.isEmpty, "a catch-up that changed nothing was told \(heard.all)")
+
+        core.state.withLock { $0.caughtUp.readOnlyHeld = 3 }
+        let held = try await bounded("the held-only catch-up") { try await copy.catchUp() }
+        #expect((held.applied, held.readOnlyHeld) == (0, 3))
+        try await eventually("the held rows were told") { heard.all == [refreshed(.caughtUp)] }
+        try await bounded("close") { await copy.close() }
+    }
+
+    /// The core tells rows a read of `read_only` moved as one `item.updated` that names no row.
+    @Test func rowsAHeldStreamMovedForReadOnlyAreToldAsAServerChangeNamingNoRow() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
+        let heard = Heard(copy.changes())
+        core.change(0, MarfaCore.Change.applied(event: "item.updated", itemId: nil, edgeId: nil, cursor: "5"))
+        let told = Marfa.Change(origin: .server(event: "item.updated", cursor: "5"), itemId: nil, edgeId: nil)
+        try await eventually("the change was told") { heard.all == [told] }
+        try await bounded("close") { await copy.close() }
+    }
+
     /// A catch-up reads the catalog before it applies anything, and may
     /// change it while applying no event.
     @Test func aCatchUpThatChangedTheCatalogIsToldSo() async throws {

@@ -235,6 +235,20 @@ struct ALifecycle {
         await copy.close()
     }
 
+    /// The core tells rows a read of `read_only` moved as an `item.updated` that names no row, and `changes_since`
+    /// names them.
+    @Test func rowsMovedForReadOnlyAreNamedByTheChangesNotByTheEventThatToldThem() async throws {
+        let core = FakeCore.writer()
+        let copy = Self.copy(core, ManualClock())
+        let updates = Updates(copy.updates())
+        try await eventually("following") { updates.connection == .following }
+
+        core.state.withLock { $0.changedItems.append("a") }
+        core.change(0, .applied(event: "item.updated", itemId: nil, edgeId: nil, cursor: "2"))
+        try await eventually("the moved row was named") { updates.namedItems.contains("a") }
+        await copy.close()
+    }
+
     @Test func aCopyWhoseStreamTheCoreEndedStillHearsItsOwnWritesAndJoinsTheWatchAgainOnceACatchUpSucceeds()
         async throws
     {

@@ -191,6 +191,17 @@ struct ItemsOffline {
         await copy.close()
     }
 
+    /// A row saved here and not yet sent has no answer from the server, so it holds `false`.
+    @Test(arguments: CopyKind.allCases)
+    func anItemNoServerHasAnsweredIsNotReadOnly(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("saved here", in: copy)
+        #expect(try await copy.items.get(id)?.readOnly == false)
+        #expect(try await copy.items.list().map(\.readOnly) == [false])
+        #expect(try await copy.items.get([id]).rows.map(\.readOnly) == [false])
+        await copy.close()
+    }
+
     @Test(arguments: CopyKind.allCases)
     func theBinTimesAnItemAndOrdersTheBinNewestFirst(kind: CopyKind) async throws {
         let copy = try await kind.open()

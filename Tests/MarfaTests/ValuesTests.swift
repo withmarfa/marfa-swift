@@ -37,6 +37,23 @@ struct Values {
         #expect(Marfa.Status(core).lastSynced == nil, "a time with no zone claimed a sync")
     }
 
+    /// The core's record leaves `read_only` out of an answer that never carried it, as `false`.
+    @Test func anItemOfAnAnswerThatNeverCarriedReadOnlyIsNotReadOnly() {
+        let older = MarfaCore.Item(
+            id: "i", type: "core.note", properties: MarfaCore.JsonObject(members: []), state: .active, tier: nil,
+            version: 1, schemaVersion: 1, source: "s", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "",
+            tags: [])
+        #expect(!older.readOnly)
+        #expect(!Marfa.Item(older).readOnly)
+
+        var newer = older
+        newer.readOnly = true
+        let item = Marfa.Item(newer)
+        #expect(item.readOnly)
+        #expect(item.core.readOnly)
+        #expect(item.core == newer)
+    }
+
     /// A field the core adds with a default compiles on both sides and would be dropped by the conversion.
     @Test func recordsCarryEveryFieldTheCoreDeclares() {
         func same<T>(_ value: T, _ core: Any) -> Bool {
@@ -319,8 +336,10 @@ struct OwnValueTypes {
         #expect(
             !Marfa.HydrateReport(types: [], tier: .all, edgeTypes: [], items: 0, edges: 0, pages: 0, cursor: "").inPlace
         )
-        let caught = Marfa.CatchUpReport(applied: 1, skipped: 2, cursor: "c", catalogChanged: true)
+        let caught = Marfa.CatchUpReport(applied: 1, skipped: 2, cursor: "c", catalogChanged: true, readOnlyHeld: 4)
         #expect(Marfa.CatchUpReport(caught.core) == caught)
+        #expect(caught.core.readOnlyHeld == 4)
+        #expect(Marfa.CatchUpReport(applied: 0, skipped: 0, cursor: "c").readOnlyHeld == 0)
         let status = Marfa.Status(
             serverOrigin: "o", sliceTypes: ["t"], sliceTier: .library, sliceEdgeTypes: ["e"], pinned: ["p"],
             eventCursor: "c", hydration: .inProgress, items: 1, itemsExpected: 10, itemsListed: 4, edges: 2,

@@ -4606,6 +4606,10 @@ public func FfiConverterTypeBodyName_lower(_ value: BodyName) -> RustBuffer {
 public struct CatchUpReport: Equatable, Hashable {
     public var applied: UInt64
     public var skipped: UInt64
+    /**
+     * Rows a read of `read_only` changed, which no event brought.
+     */
+    public var readOnlyHeld: UInt64
     public var cursor: String
     /**
      * The catch-up changed the catalog the copy holds.
@@ -4614,12 +4618,16 @@ public struct CatchUpReport: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(applied: UInt64, skipped: UInt64, cursor: String, 
+    public init(applied: UInt64, skipped: UInt64, 
+        /**
+         * Rows a read of `read_only` changed, which no event brought.
+         */readOnlyHeld: UInt64, cursor: String, 
         /**
          * The catch-up changed the catalog the copy holds.
          */catalogChanged: Bool) {
         self.applied = applied
         self.skipped = skipped
+        self.readOnlyHeld = readOnlyHeld
         self.cursor = cursor
         self.catalogChanged = catalogChanged
     }
@@ -4642,6 +4650,7 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
             try CatchUpReport(
                 applied: FfiConverterUInt64.read(from: &buf), 
                 skipped: FfiConverterUInt64.read(from: &buf), 
+                readOnlyHeld: FfiConverterUInt64.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
                 catalogChanged: FfiConverterBool.read(from: &buf)
         )
@@ -4650,6 +4659,7 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
     public static func write(_ value: CatchUpReport, into buf: inout [UInt8]) {
         FfiConverterUInt64.write(value.applied, into: &buf)
         FfiConverterUInt64.write(value.skipped, into: &buf)
+        FfiConverterUInt64.write(value.readOnlyHeld, into: &buf)
         FfiConverterString.write(value.cursor, into: &buf)
         FfiConverterBool.write(value.catalogChanged, into: &buf)
     }
@@ -7885,6 +7895,12 @@ public struct Item: Equatable, Hashable {
      */
     public var trashedAt: String?
     /**
+     * Whether a connector holds the item read only, as the server last
+     * answered it, so an app can show it as not editable. A write to it is
+     * still taken and sent.
+     */
+    public var readOnly: Bool
+    /**
      * The text under the property the type's display hints name as its
      * title, or `title` where they name none; none where that holds no
      * string.
@@ -7919,6 +7935,11 @@ public struct Item: Equatable, Hashable {
          * archive restored to the bin without the time.
          */trashedAt: String? = nil, 
         /**
+         * Whether a connector holds the item read only, as the server last
+         * answered it, so an app can show it as not editable. A write to it is
+         * still taken and sent.
+         */readOnly: Bool = false, 
+        /**
          * The text under the property the type's display hints name as its
          * title, or `title` where they name none; none where that holds no
          * string.
@@ -7950,6 +7971,7 @@ public struct Item: Equatable, Hashable {
         self.captureLatitude = captureLatitude
         self.captureLongitude = captureLongitude
         self.trashedAt = trashedAt
+        self.readOnly = readOnly
         self.title = title
         self.body = body
         self.unreadableProperties = unreadableProperties
@@ -7987,6 +8009,7 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
                 captureLatitude: FfiConverterOptionDouble.read(from: &buf), 
                 captureLongitude: FfiConverterOptionDouble.read(from: &buf), 
                 trashedAt: FfiConverterOptionString.read(from: &buf), 
+                readOnly: FfiConverterBool.read(from: &buf), 
                 title: FfiConverterOptionString.read(from: &buf), 
                 body: FfiConverterOptionString.read(from: &buf), 
                 unreadableProperties: FfiConverterOptionString.read(from: &buf)
@@ -8010,6 +8033,7 @@ public struct FfiConverterTypeItem: FfiConverterRustBuffer {
         FfiConverterOptionDouble.write(value.captureLatitude, into: &buf)
         FfiConverterOptionDouble.write(value.captureLongitude, into: &buf)
         FfiConverterOptionString.write(value.trashedAt, into: &buf)
+        FfiConverterBool.write(value.readOnly, into: &buf)
         FfiConverterOptionString.write(value.title, into: &buf)
         FfiConverterOptionString.write(value.body, into: &buf)
         FfiConverterOptionString.write(value.unreadableProperties, into: &buf)

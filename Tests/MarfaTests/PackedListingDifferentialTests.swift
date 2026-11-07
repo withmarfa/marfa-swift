@@ -146,10 +146,10 @@ struct PackedListingDifferential {
             statements.append(
                 """
                 INSERT INTO items (id,type,state,tier,version,schema_version,source,source_id,occurred_at,created_at,
-                updated_at,properties,capture_latitude,capture_longitude) VALUES (\(Self.hex(id)),\(type),'\(state)',\(tier),
+                updated_at,properties,capture_latitude,capture_longitude,read_only) VALUES (\(Self.hex(id)),\(type),'\(state)',\(tier),
                 \(Int64(bitPattern: random.next())),\(random.pick([Int64.min, Int64.max, 0, -1, 2])),\(Self.hex(random.text())),
                 \(sourceId),\(at(&random)),\(at(&random)),\(at(&random)),\(Self.properties(&random)),\(Self.optionalReal(&random)),
-                \(Self.optionalReal(&random)))
+                \(Self.optionalReal(&random)),\(random.below(2)))
                 """)
             for tag in Set((0..<random.below(5)).map { _ in random.text(most: 6) }) {
                 statements.append("INSERT INTO tags (item_id, tag) VALUES (\(Self.hex(id)),\(Self.hex(tag)))")
@@ -174,6 +174,8 @@ struct PackedListingDifferential {
         let batch = try await reopened.items.get(listed.map(\.id), includingBin: true)
         #expect(batch.rows == listed.rows, "seed \(seed)")
         var unreadable = 0
+        let held = Set(listed.map(\.readOnly))
+        #expect(held == [false, true], "seed \(seed) made rows of only one read_only value")
         for item in listed {
             let alone = try #require(try await reopened.items.get(item.id), "seed \(seed), \(item.id)")
             #expect(alone == item, "seed \(seed), \(item.id)")
