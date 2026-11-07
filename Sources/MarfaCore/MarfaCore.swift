@@ -3354,7 +3354,7 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * sync waits. Asks a watch that holds the folder to let it go, as `add`
      * does.
      */
-    func confirm(dir: String) throws  -> ConfirmedRemoval
+    func confirm(dir: String) throws  -> ConfirmedFolder
     
     /**
      * Lets a folder's first sync go, at the next sync or watch. Answers
@@ -3522,8 +3522,8 @@ open func add(dir: String, folder: String)throws  -> AddedFolder  {
      * sync waits. Asks a watch that holds the folder to let it go, as `add`
      * does.
      */
-open func confirm(dir: String)throws  -> ConfirmedRemoval  {
-    return try  FfiConverterTypeConfirmedRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func confirm(dir: String)throws  -> ConfirmedFolder  {
+    return try  FfiConverterTypeConfirmedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_confirm(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
@@ -4095,6 +4095,75 @@ public func FfiConverterTypeAddedFolder_lower(_ value: AddedFolder) -> RustBuffe
 
 
 /**
+ * How large a drop of new files must be to wait for confirmation.
+ */
+public struct AdditionThreshold: Equatable, Hashable {
+    /**
+     * `None` is 50.
+     */
+    public var files: UInt64?
+    /**
+     * `None` is 0.25.
+     */
+    public var fraction: Double?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * `None` is 50.
+         */files: UInt64? = nil, 
+        /**
+         * `None` is 0.25.
+         */fraction: Double? = nil) {
+        self.files = files
+        self.fraction = fraction
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension AdditionThreshold: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeAdditionThreshold: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AdditionThreshold {
+        return
+            try AdditionThreshold(
+                files: FfiConverterOptionUInt64.read(from: &buf), 
+                fraction: FfiConverterOptionDouble.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: AdditionThreshold, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt64.write(value.files, into: &buf)
+        FfiConverterOptionDouble.write(value.fraction, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAdditionThreshold_lift(_ buf: RustBuffer) throws -> AdditionThreshold {
+    return try FfiConverterTypeAdditionThreshold.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeAdditionThreshold_lower(_ value: AdditionThreshold) -> RustBuffer {
+    return FfiConverterTypeAdditionThreshold.lower(value)
+}
+
+
+/**
  * The three writes an attachment is, in the order they go out, and the
  * text that embeds the file in the item's body.
  */
@@ -4603,9 +4672,9 @@ public func FfiConverterTypeCatchUpReport_lower(_ value: CatchUpReport) -> RustB
 
 
 /**
- * What letting a paused removal go did.
+ * What letting a folder's paused removal and paused new files go did.
  */
-public struct ConfirmedRemoval: Equatable, Hashable {
+public struct ConfirmedFolder: Equatable, Hashable {
     /**
      * Deletes queued, sent at the next sync.
      */
@@ -4618,6 +4687,11 @@ public struct ConfirmedRemoval: Equatable, Hashable {
      * Files taken away whose items left elsewhere.
      */
     public var removed: UInt64
+    /**
+     * New files held back by the addition threshold that the confirmation
+     * let go, queued as items.
+     */
+    public var added: UInt64
     /**
      * Files not let go, because the other folders could not all be read.
      */
@@ -4636,11 +4710,16 @@ public struct ConfirmedRemoval: Equatable, Hashable {
          * Files taken away whose items left elsewhere.
          */removed: UInt64, 
         /**
+         * New files held back by the addition threshold that the confirmation
+         * let go, queued as items.
+         */added: UInt64, 
+        /**
          * Files not let go, because the other folders could not all be read.
          */unsure: [UnsureFile]) {
         self.deleted = deleted
         self.moved = moved
         self.removed = removed
+        self.added = added
         self.unsure = unsure
     }
 
@@ -4650,27 +4729,29 @@ public struct ConfirmedRemoval: Equatable, Hashable {
 }
 
 #if compiler(>=6)
-extension ConfirmedRemoval: Sendable {}
+extension ConfirmedFolder: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeConfirmedRemoval: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ConfirmedRemoval {
+public struct FfiConverterTypeConfirmedFolder: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ConfirmedFolder {
         return
-            try ConfirmedRemoval(
+            try ConfirmedFolder(
                 deleted: FfiConverterUInt64.read(from: &buf), 
                 moved: FfiConverterUInt64.read(from: &buf), 
                 removed: FfiConverterUInt64.read(from: &buf), 
+                added: FfiConverterUInt64.read(from: &buf), 
                 unsure: FfiConverterSequenceTypeUnsureFile.read(from: &buf)
         )
     }
 
-    public static func write(_ value: ConfirmedRemoval, into buf: inout [UInt8]) {
+    public static func write(_ value: ConfirmedFolder, into buf: inout [UInt8]) {
         FfiConverterUInt64.write(value.deleted, into: &buf)
         FfiConverterUInt64.write(value.moved, into: &buf)
         FfiConverterUInt64.write(value.removed, into: &buf)
+        FfiConverterUInt64.write(value.added, into: &buf)
         FfiConverterSequenceTypeUnsureFile.write(value.unsure, into: &buf)
     }
 }
@@ -4679,15 +4760,15 @@ public struct FfiConverterTypeConfirmedRemoval: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeConfirmedRemoval_lift(_ buf: RustBuffer) throws -> ConfirmedRemoval {
-    return try FfiConverterTypeConfirmedRemoval.lift(buf)
+public func FfiConverterTypeConfirmedFolder_lift(_ buf: RustBuffer) throws -> ConfirmedFolder {
+    return try FfiConverterTypeConfirmedFolder.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeConfirmedRemoval_lower(_ value: ConfirmedRemoval) -> RustBuffer {
-    return FfiConverterTypeConfirmedRemoval.lower(value)
+public func FfiConverterTypeConfirmedFolder_lower(_ value: ConfirmedFolder) -> RustBuffer {
+    return FfiConverterTypeConfirmedFolder.lower(value)
 }
 
 
@@ -6512,6 +6593,100 @@ public func FfiConverterTypeFolderPass_lower(_ value: FolderPass) -> RustBuffer 
 }
 
 
+/**
+ * A large removal, or a large drop of new files, waiting for `confirm`; a
+ * removal can also be cancelled by `restore`.
+ */
+public struct FolderPaused: Equatable, Hashable {
+    /**
+     * Files gone from the disk whose deletes are not sent.
+     */
+    public var disk: UInt64
+    /**
+     * Files left in place whose items left the query elsewhere.
+     */
+    public var pull: UInt64
+    /**
+     * New files held back for being more than the folder's addition
+     * threshold lets in at once. `confirm` sends them.
+     */
+    public var additions: UInt64
+    /**
+     * New files held because the query would not hold them and the folder's
+     * `outside_query` is `hold`.
+     */
+    public var outsideQuery: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Files gone from the disk whose deletes are not sent.
+         */disk: UInt64, 
+        /**
+         * Files left in place whose items left the query elsewhere.
+         */pull: UInt64, 
+        /**
+         * New files held back for being more than the folder's addition
+         * threshold lets in at once. `confirm` sends them.
+         */additions: UInt64, 
+        /**
+         * New files held because the query would not hold them and the folder's
+         * `outside_query` is `hold`.
+         */outsideQuery: UInt64) {
+        self.disk = disk
+        self.pull = pull
+        self.additions = additions
+        self.outsideQuery = outsideQuery
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderPaused: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderPaused: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderPaused {
+        return
+            try FolderPaused(
+                disk: FfiConverterUInt64.read(from: &buf), 
+                pull: FfiConverterUInt64.read(from: &buf), 
+                additions: FfiConverterUInt64.read(from: &buf), 
+                outsideQuery: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderPaused, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.disk, into: &buf)
+        FfiConverterUInt64.write(value.pull, into: &buf)
+        FfiConverterUInt64.write(value.additions, into: &buf)
+        FfiConverterUInt64.write(value.outsideQuery, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderPaused_lift(_ buf: RustBuffer) throws -> FolderPaused {
+    return try FfiConverterTypeFolderPaused.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderPaused_lower(_ value: FolderPaused) -> RustBuffer {
+    return FfiConverterTypeFolderPaused.lower(value)
+}
+
+
 public struct FolderPull: Equatable, Hashable {
     public var written: UInt64
     public var rewritten: UInt64
@@ -6543,7 +6718,7 @@ public struct FolderPull: Equatable, Hashable {
      */
     public var unplaced: UInt64
     /**
-     * Files left in place whose items the query no longer matches.
+     * Files left in place whose items the query does not match.
      */
     public var unmatched: UInt64
     /**
@@ -6577,7 +6752,7 @@ public struct FolderPull: Equatable, Hashable {
          * Placements the server refused.
          */unplaced: UInt64, 
         /**
-         * Files left in place whose items the query no longer matches.
+         * Files left in place whose items the query does not match.
          */unmatched: UInt64, 
         /**
          * Files a large removal holds back.
@@ -6857,6 +7032,14 @@ public struct FolderScan: Equatable, Hashable {
      */
     public var paused: UInt64
     /**
+     * New files a large drop holds back, so they are not sent.
+     */
+    public var pausedAdditions: UInt64
+    /**
+     * New files held on the disk because the query would not hold them.
+     */
+    public var heldOutside: UInt64
+    /**
      * Files found in no folder on this machine, whose items were trashed.
      */
     public var trashed: [String]
@@ -6893,6 +7076,12 @@ public struct FolderScan: Equatable, Hashable {
          * Deletes a large removal holds back.
          */paused: UInt64, 
         /**
+         * New files a large drop holds back, so they are not sent.
+         */pausedAdditions: UInt64, 
+        /**
+         * New files held on the disk because the query would not hold them.
+         */heldOutside: UInt64, 
+        /**
          * Files found in no folder on this machine, whose items were trashed.
          */trashed: [String], 
         /**
@@ -6916,6 +7105,8 @@ public struct FolderScan: Equatable, Hashable {
         self.skipped = skipped
         self.movedAway = movedAway
         self.paused = paused
+        self.pausedAdditions = pausedAdditions
+        self.heldOutside = heldOutside
         self.trashed = trashed
         self.secrets = secrets
         self.warnings = warnings
@@ -6949,6 +7140,8 @@ public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
                 skipped: FfiConverterUInt64.read(from: &buf), 
                 movedAway: FfiConverterUInt64.read(from: &buf), 
                 paused: FfiConverterUInt64.read(from: &buf), 
+                pausedAdditions: FfiConverterUInt64.read(from: &buf), 
+                heldOutside: FfiConverterUInt64.read(from: &buf), 
                 trashed: FfiConverterSequenceString.read(from: &buf), 
                 secrets: FfiConverterSequenceString.read(from: &buf), 
                 warnings: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
@@ -6968,6 +7161,8 @@ public struct FfiConverterTypeFolderScan: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.skipped, into: &buf)
         FfiConverterUInt64.write(value.movedAway, into: &buf)
         FfiConverterUInt64.write(value.paused, into: &buf)
+        FfiConverterUInt64.write(value.pausedAdditions, into: &buf)
+        FfiConverterUInt64.write(value.heldOutside, into: &buf)
         FfiConverterSequenceString.write(value.trashed, into: &buf)
         FfiConverterSequenceString.write(value.secrets, into: &buf)
         FfiConverterSequenceTypeFlaggedFile.write(value.warnings, into: &buf)
@@ -7016,6 +7211,16 @@ public struct FolderSettings: Equatable, Hashable {
      */
     public var firstPlacement: [String: String]
     public var removalThreshold: RemovalThreshold
+    /**
+     * Seconds between the passes of a watch that read every file, from 60
+     * to 86400; `None` is 600.
+     */
+    public var fullPassIntervalSeconds: UInt64?
+    public var additionThreshold: AdditionThreshold
+    /**
+     * What the folder does with a new file its query would not hold.
+     */
+    public var outsideQuery: OutsideQuery
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -7031,7 +7236,14 @@ public struct FolderSettings: Equatable, Hashable {
         /**
          * Where an item of a type made elsewhere first appears, from type to
          * directory.
-         */firstPlacement: [String: String], removalThreshold: RemovalThreshold) {
+         */firstPlacement: [String: String], removalThreshold: RemovalThreshold, 
+        /**
+         * Seconds between the passes of a watch that read every file, from 60
+         * to 86400; `None` is 600.
+         */fullPassIntervalSeconds: UInt64? = nil, additionThreshold: AdditionThreshold, 
+        /**
+         * What the folder does with a new file its query would not hold.
+         */outsideQuery: OutsideQuery) {
         self.title = title
         self.query = query
         self.defaults = defaults
@@ -7039,6 +7251,9 @@ public struct FolderSettings: Equatable, Hashable {
         self.ignore = ignore
         self.firstPlacement = firstPlacement
         self.removalThreshold = removalThreshold
+        self.fullPassIntervalSeconds = fullPassIntervalSeconds
+        self.additionThreshold = additionThreshold
+        self.outsideQuery = outsideQuery
     }
 
     
@@ -7063,7 +7278,10 @@ public struct FfiConverterTypeFolderSettings: FfiConverterRustBuffer {
                 include: FfiConverterSequenceString.read(from: &buf), 
                 ignore: FfiConverterSequenceString.read(from: &buf), 
                 firstPlacement: FfiConverterDictionaryStringString.read(from: &buf), 
-                removalThreshold: FfiConverterTypeRemovalThreshold.read(from: &buf)
+                removalThreshold: FfiConverterTypeRemovalThreshold.read(from: &buf), 
+                fullPassIntervalSeconds: FfiConverterOptionUInt64.read(from: &buf), 
+                additionThreshold: FfiConverterTypeAdditionThreshold.read(from: &buf), 
+                outsideQuery: FfiConverterTypeOutsideQuery.read(from: &buf)
         )
     }
 
@@ -7075,6 +7293,9 @@ public struct FfiConverterTypeFolderSettings: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.ignore, into: &buf)
         FfiConverterDictionaryStringString.write(value.firstPlacement, into: &buf)
         FfiConverterTypeRemovalThreshold.write(value.removalThreshold, into: &buf)
+        FfiConverterOptionUInt64.write(value.fullPassIntervalSeconds, into: &buf)
+        FfiConverterTypeAdditionThreshold.write(value.additionThreshold, into: &buf)
+        FfiConverterTypeOutsideQuery.write(value.outsideQuery, into: &buf)
     }
 }
 
@@ -7105,10 +7326,13 @@ public struct FolderSettingsChange: Equatable, Hashable {
     public var ignore: [String]?
     public var firstPlacement: [String: String]?
     public var removalThreshold: RemovalThreshold?
+    public var fullPassIntervalSeconds: UInt64?
+    public var additionThreshold: AdditionThreshold?
+    public var outsideQuery: OutsideQuery?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(title: String? = nil, query: FolderQuery? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil, ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil) {
+    public init(title: String? = nil, query: FolderQuery? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil, ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil, fullPassIntervalSeconds: UInt64? = nil, additionThreshold: AdditionThreshold?, outsideQuery: OutsideQuery? = nil) {
         self.title = title
         self.query = query
         self.defaults = defaults
@@ -7116,6 +7340,9 @@ public struct FolderSettingsChange: Equatable, Hashable {
         self.ignore = ignore
         self.firstPlacement = firstPlacement
         self.removalThreshold = removalThreshold
+        self.fullPassIntervalSeconds = fullPassIntervalSeconds
+        self.additionThreshold = additionThreshold
+        self.outsideQuery = outsideQuery
     }
 
     
@@ -7140,7 +7367,10 @@ public struct FfiConverterTypeFolderSettingsChange: FfiConverterRustBuffer {
                 include: FfiConverterOptionSequenceString.read(from: &buf), 
                 ignore: FfiConverterOptionSequenceString.read(from: &buf), 
                 firstPlacement: FfiConverterOptionDictionaryStringString.read(from: &buf), 
-                removalThreshold: FfiConverterOptionTypeRemovalThreshold.read(from: &buf)
+                removalThreshold: FfiConverterOptionTypeRemovalThreshold.read(from: &buf), 
+                fullPassIntervalSeconds: FfiConverterOptionUInt64.read(from: &buf), 
+                additionThreshold: FfiConverterOptionTypeAdditionThreshold.read(from: &buf), 
+                outsideQuery: FfiConverterOptionTypeOutsideQuery.read(from: &buf)
         )
     }
 
@@ -7152,6 +7382,9 @@ public struct FfiConverterTypeFolderSettingsChange: FfiConverterRustBuffer {
         FfiConverterOptionSequenceString.write(value.ignore, into: &buf)
         FfiConverterOptionDictionaryStringString.write(value.firstPlacement, into: &buf)
         FfiConverterOptionTypeRemovalThreshold.write(value.removalThreshold, into: &buf)
+        FfiConverterOptionUInt64.write(value.fullPassIntervalSeconds, into: &buf)
+        FfiConverterOptionTypeAdditionThreshold.write(value.additionThreshold, into: &buf)
+        FfiConverterOptionTypeOutsideQuery.write(value.outsideQuery, into: &buf)
     }
 }
 
@@ -7174,7 +7407,7 @@ public func FfiConverterTypeFolderSettingsChange_lower(_ value: FolderSettingsCh
 public struct FolderStatus: Equatable, Hashable {
     public var directories: [FlaggedFile]
     public var files: [FileStatus]
-    public var paused: PausedRemoval
+    public var paused: FolderPaused
     /**
      * Set while the folder's first sync waits to be confirmed.
      */
@@ -7182,7 +7415,7 @@ public struct FolderStatus: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(directories: [FlaggedFile], files: [FileStatus], paused: PausedRemoval, 
+    public init(directories: [FlaggedFile], files: [FileStatus], paused: FolderPaused, 
         /**
          * Set while the folder's first sync waits to be confirmed.
          */firstSync: WaitingFirstSync?) {
@@ -7210,7 +7443,7 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
             try FolderStatus(
                 directories: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
                 files: FfiConverterSequenceTypeFileStatus.read(from: &buf), 
-                paused: FfiConverterTypePausedRemoval.read(from: &buf), 
+                paused: FfiConverterTypeFolderPaused.read(from: &buf), 
                 firstSync: FfiConverterOptionTypeWaitingFirstSync.read(from: &buf)
         )
     }
@@ -7218,7 +7451,7 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
     public static func write(_ value: FolderStatus, into buf: inout [UInt8]) {
         FfiConverterSequenceTypeFlaggedFile.write(value.directories, into: &buf)
         FfiConverterSequenceTypeFileStatus.write(value.files, into: &buf)
-        FfiConverterTypePausedRemoval.write(value.paused, into: &buf)
+        FfiConverterTypeFolderPaused.write(value.paused, into: &buf)
         FfiConverterOptionTypeWaitingFirstSync.write(value.firstSync, into: &buf)
     }
 }
@@ -8452,8 +8685,9 @@ public struct LinkParts: Equatable, Hashable {
     public var start: UInt64
     public var end: UInt64
     /**
-     * The text between the brackets, trimmed: what the link is bound by and
-     * what `link_candidates` takes.
+     * The text between the brackets, trimmed, with an escaped pipe in a table
+     * cell read as the bar: what the link is bound by and what
+     * `link_candidates` takes.
      */
     public var target: String
     /**
@@ -8470,8 +8704,9 @@ public struct LinkParts: Equatable, Hashable {
          * As it appears in the text, brackets included.
          */text: String, start: UInt64, end: UInt64, 
         /**
-         * The text between the brackets, trimmed: what the link is bound by and
-         * what `link_candidates` takes.
+         * The text between the brackets, trimmed, with an escaped pipe in a table
+         * cell read as the bar: what the link is bound by and what
+         * `link_candidates` takes.
          */target: String, 
         /**
          * What the link names. Empty for a link to a heading of the same text.
@@ -8959,75 +9194,6 @@ public func FfiConverterTypeNotHeld_lift(_ buf: RustBuffer) throws -> NotHeld {
 #endif
 public func FfiConverterTypeNotHeld_lower(_ value: NotHeld) -> RustBuffer {
     return FfiConverterTypeNotHeld.lower(value)
-}
-
-
-/**
- * A large removal waiting for `confirm` or `restore`.
- */
-public struct PausedRemoval: Equatable, Hashable {
-    /**
-     * Files gone from the disk whose deletes are not sent.
-     */
-    public var disk: UInt64
-    /**
-     * Files left in place whose items left the query elsewhere.
-     */
-    public var pull: UInt64
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        /**
-         * Files gone from the disk whose deletes are not sent.
-         */disk: UInt64, 
-        /**
-         * Files left in place whose items left the query elsewhere.
-         */pull: UInt64) {
-        self.disk = disk
-        self.pull = pull
-    }
-
-    
-
-    
-}
-
-#if compiler(>=6)
-extension PausedRemoval: Sendable {}
-#endif
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypePausedRemoval: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PausedRemoval {
-        return
-            try PausedRemoval(
-                disk: FfiConverterUInt64.read(from: &buf), 
-                pull: FfiConverterUInt64.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: PausedRemoval, into buf: inout [UInt8]) {
-        FfiConverterUInt64.write(value.disk, into: &buf)
-        FfiConverterUInt64.write(value.pull, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypePausedRemoval_lift(_ buf: RustBuffer) throws -> PausedRemoval {
-    return try FfiConverterTypePausedRemoval.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypePausedRemoval_lower(_ value: PausedRemoval) -> RustBuffer {
-    return FfiConverterTypePausedRemoval.lower(value)
 }
 
 
@@ -13639,6 +13805,84 @@ public func FfiConverterTypeNotHeldReason_lower(_ value: NotHeldReason) -> RustB
 }
 
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * What a folder does with a new file that its query would not hold. A file
+ * that already has an item is never affected.
+ */
+
+public enum OutsideQuery: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * Make it an item and keep it in the folder, flagged unmatched.
+     */
+    case send
+    /**
+     * Leave it on the disk, not sent and with no item, until it matches the
+     * query or the folder says `Send`.
+     */
+    case hold
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension OutsideQuery: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeOutsideQuery: FfiConverterRustBuffer {
+    typealias SwiftType = OutsideQuery
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> OutsideQuery {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .send
+        
+        case 2: return .hold
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: OutsideQuery, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .send:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .hold:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOutsideQuery_lift(_ buf: RustBuffer) throws -> OutsideQuery {
+    return try FfiConverterTypeOutsideQuery.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeOutsideQuery_lower(_ value: OutsideQuery) -> RustBuffer {
+    return FfiConverterTypeOutsideQuery.lower(value)
+}
+
+
 
 /**
  * Why an app's `CredentialRenewer` could not renew, so the core can tell a
@@ -14770,6 +15014,30 @@ fileprivate struct FfiConverterOptionTypeStop: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeAdditionThreshold: FfiConverterRustBuffer {
+    typealias SwiftType = AdditionThreshold?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeAdditionThreshold.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeAdditionThreshold.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeAttachments: FfiConverterRustBuffer {
     typealias SwiftType = Attachments?
 
@@ -15338,6 +15606,30 @@ fileprivate struct FfiConverterOptionTypeMarfaError: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeMarfaError.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeOutsideQuery: FfiConverterRustBuffer {
+    typealias SwiftType = OutsideQuery?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeOutsideQuery.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeOutsideQuery.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -16751,7 +17043,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 37317) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 15775) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 53432) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_confirm_first_sync() != 5573) {

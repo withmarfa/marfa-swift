@@ -171,11 +171,13 @@ import Testing
         }
     #expect(cause)
     let status = FolderStatus(
-        files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: PausedRemoval(disk: 2),
+        files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: FolderPaused(disk: 2),
         firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0, left: 0)))
     #expect(status.firstSync?.plan?.send == 2)
     #expect(status.paused.isPaused)
-    #expect(!PausedRemoval().isPaused)
+    #expect(!FolderPaused().isPaused)
+    #expect(FolderPaused(additions: 1).isPaused, "held new files wait for confirmation")
+    #expect(!FolderPaused(outsideQuery: 1).isPaused, "confirming does not release files held outside the query")
     let read: Bool =
         switch status.files[0].state {
         case .inStep, .waiting, .held, .unmatched, .unreached, .outside: true
