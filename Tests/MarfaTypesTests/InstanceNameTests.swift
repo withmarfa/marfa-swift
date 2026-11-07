@@ -10,6 +10,7 @@ func instanceDescriptionPreservesConfiguredName(name: String) throws {
         "instance_id": "instance-name-wire-test",
         "contract": 0,
         "features": ["items"],
+        "max_request_bytes": 1_048_576,
     ])
     let instance = try JSONDecoder().decode(Components.Schemas.InstanceDescription.self, from: body)
     let encoded = try JSONEncoder().encode(instance)
