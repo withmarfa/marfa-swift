@@ -30,10 +30,10 @@ public struct Item: Sendable, Hashable {
     /// Whether a person's connector holds the item read only, as the server last answered it.
     ///
     /// This is advice from the server, so an app can show the item as not editable. The server does not refuse a
-    /// write to the item, and neither does the copy. The value can be up to one refresh interval old: the copy asks
-    /// the server again at the end of a catch-up and when a held stream reaches the head, but not within 15 minutes of
-    /// its last ask, and a change to the connector sends no event. An item the server has not answered yet, such as
-    /// one saved here and not yet sent, holds `false`.
+    /// write to the item, and neither does the copy. The value can be older than 15 minutes: the copy asks the server
+    /// again only at the end of a catch-up and when a held stream reaches the head, and not within 15 minutes of its
+    /// last ask, and a change to the connector sends no event. An item the server has not answered yet, such as one
+    /// saved here and not yet sent, holds `false`.
     public var readOnly: Bool
     /// The text under the property the type's display hints name as its
     /// title, or `title` where they name none; none where that holds no
