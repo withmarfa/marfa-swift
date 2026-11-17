@@ -1,13 +1,13 @@
 import Foundation
 internal import MarfaCore
 
-/// What a count counts for each item.
+/// The links or table rows to count for each item.
 public enum Counted: Sendable, Hashable {
-    /// The active items that edges of the type leave each item for, as `backref[<edge type>]` selects them:
-    /// `parent-of` counts children.
+    /// Active items at the other end of outgoing edges, as selected by `backref[<edge type>]`.
+    /// For example, `parent-of` counts children.
     case backref(edgeType: String)
-    /// The active items that have an edge of the type to each item, as `edge[<edge type>]` selects them:
-    /// `in-collection` counts a collection's members.
+    /// Active items at the other end of incoming edges, as selected by `edge[<edge type>]`.
+    /// For example, `in-collection` counts a collection's members.
     case edge(edgeType: String)
     /// The rows each item holds in the table.
     case rows(table: String)
@@ -46,23 +46,19 @@ public struct StatusGroupCounts: Sendable, Hashable {
     }
 }
 
-/// What one item's count answered, and whether the copy answered it.
+/// A count for one item and the source of that count.
 public struct ItemCount: Sendable, Hashable, Identifiable {
     /// The item counted for.
     public var id: String
-    /// How many items, or rows, it links to or holds.
+    /// The number of matching items or rows.
     ///
-    /// An item that does not exist, or that the key cannot read,
-    /// counts 0, so a count never tells whether an item exists.
+    /// Incoming edges can contribute to the total even when the key cannot read their target.
     public var total: Int
-    /// The counted items in each status group; `nil` for a table's rows.
+    /// The counted items in each status group, or `nil` for table rows.
     ///
-    /// An item with no status, or a status word its
-    /// type does not declare, is in `total` and in no group, so the groups can add up to less than `total`.
+    /// An item with an absent or undeclared status contributes only to `total`.
     public var statusGroups: StatusGroupCounts?
-    /// The copy answered, so the count holds offline and shows a write that is still queued.
-    ///
-    /// Not set where the server answered.
+    /// `true` when the copy supplied this count from local data, including queued changes.
     public var held: Bool
 
     public init(id: String, total: Int, statusGroups: StatusGroupCounts? = nil, held: Bool) {

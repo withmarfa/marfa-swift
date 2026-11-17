@@ -421,9 +421,9 @@ public final class WorkingCopy: Sendable {
     /// sequence is held.
     ///
     /// The first update asks to read everything and says the copy's ``CopyConnection``. Each later one names what
-    /// changed since the one before: rows by ID, the queue, the views, the type catalog, or everything. Updates are
-    /// coalesced: however many changes arrive while the app reads, at most one update waits, holding all of them, and
-    /// more than 1,000 changed items or edges are delivered as ``Reread/everything``. An update can also carry no
+    /// changed since the one before, including items, edges, held tables, the queue, views, and the type catalog.
+    /// At most one update waits while the app reads. It includes all pending changes, or ``Reread/everything``
+    /// when more than 1,000 items, 1,000 edges, or 1,000 tables changed. An update can also carry no
     /// reread, when only its `connection`, `fill` or `lastSynced` changed. Iterate the sequence once; ask again for
     /// another consumer.
     ///

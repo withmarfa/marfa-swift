@@ -35,13 +35,13 @@ extension Edges {
 }
 
 extension WorkingCopy {
-    /// The items and edges that changed in the copy since `cursor`, and the cursor to pass next.
+    /// The items, edges, and held tables that changed since `cursor`, and the cursor to pass next.
     ///
     /// An app that keeps what it shows in memory reads it all once, then asks this after each change it hears on
     /// ``changes()`` and rereads only the rows it names. The answer is ``CopyChanges/everything(next:)`` with no
     /// cursor, with one from another store, from beyond what the copy recorded, from before a change to the types or
-    /// from before a removed edge the copy no longer records, and where more than `most` items or more than `most`
-    /// edges changed: then read the whole copy again.
+    /// from before a removed edge the copy no longer records, or when the number of changed items, edges, or tables
+    /// exceeds `most` in any one category. In those cases, read the whole copy again.
     ///
     /// An item is named where its row, its tags, an edge at either end of it, its pin or a write queued for it
     /// changed, so a name may change nothing on screen. One limit: an item whose body links read differently only
@@ -102,7 +102,7 @@ public enum CopyChanges: Sendable, Hashable {
     }
 }
 
-/// The rows ``CopyChanges/named(_:next:)`` names, each by ID.
+/// Changed items and edges by ID, and changed tables by item ID and table name.
 public struct ChangedRows: Sendable, Hashable {
     /// Each changed item the copy holds, in the bin or out.
     ///
