@@ -93,7 +93,7 @@ struct RequestLimitTests {
         ids.set(small.itemId)
         let report = try await copy.queue.drain()
         #expect(report.unsent == 0)
-        #expect(report.verdicts.first?.verdict == .accepted, "\(report)")
+        #expect(report.verdicts.first?.verdict == .accepted, "\(report) \(server.log.all.suffix(3).map { $0.prefix(60) })")
         await copy.close()
     }
 }
