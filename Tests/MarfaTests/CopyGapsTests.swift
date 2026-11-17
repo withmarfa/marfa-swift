@@ -184,7 +184,7 @@ struct ReplacedRefusedCopy {
         #expect(try OlderStore.count(store, "SELECT COUNT(*) FROM queue") == 1)
 
         // The way on, once the person has agreed to lose the write they were shown.
-        try await WorkingCopy.remove(store: store, unsent: 1)
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
         let fresh = try await WorkingCopy.open(store: store, ifRefused: .replace)
         #expect(try await fresh.queue.all().isEmpty)
         await fresh.close()
@@ -332,6 +332,15 @@ private final class HeldWriterLock {
 
 @Suite(.timeLimit(.minutes(1)))
 struct RemovedCopy {
+    /// Queues one more note in the closed store, and answers its id.
+    private static func queue(in store: URL, _ body: String) async throws -> String {
+        let copy = try await WorkingCopy.open(store: store)
+        let made = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string(body)]))
+        let id = try #require(made.itemId)
+        await copy.close()
+        return id
+    }
+
     private static func storeWithUnsent(_ count: Int) async throws -> URL {
         let store = temporaryStore()
         let copy = try await WorkingCopy.open(store: store)
@@ -342,11 +351,13 @@ struct RemovedCopy {
         return store
     }
 
-    @Test func aStoreWhoseUnsentCountMatchesIsRemoved() async throws {
+    @Test func aStoreWhoseUnsentWritesAreTheOnesShownIsRemoved() async throws {
         let store = try await Self.storeWithUnsent(2)
         #expect(FileManager.default.fileExists(atPath: store.path))
+        let shown = try await WorkingCopy.unsentWrites(in: store)
+        #expect(shown.writes.count == 2)
 
-        try await WorkingCopy.remove(store: store, unsent: 2)
+        try await WorkingCopy.remove(store: store, confirming: shown)
 
         #expect(!FileManager.default.fileExists(atPath: store.path))
         let fresh = try await WorkingCopy.open(store: store)
@@ -356,47 +367,68 @@ struct RemovedCopy {
 
     @Test func aRefusedStoreIsRemovedToo() async throws {
         let (store, _) = try await ReplacedRefusedCopy.refusedStore()
-        try await WorkingCopy.remove(store: store, unsent: 0)
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
         #expect(!FileManager.default.fileExists(atPath: store.path))
     }
 
     @Test func aMissingStoreIsRemovedWhenNoneAreUnsent() async throws {
         let store = temporaryStore()
         #expect(!FileManager.default.fileExists(atPath: store.path))
+        let shown = try await WorkingCopy.unsentWrites(in: store)
+        #expect(shown.writes.isEmpty)
 
-        try await WorkingCopy.remove(store: store, unsent: 0)
+        try await WorkingCopy.remove(store: store, confirming: shown)
 
         #expect(!FileManager.default.fileExists(atPath: store.path))
     }
 
-    @Test func aMissingStoreHasNoUnsentChangesToAgreeTo() async throws {
-        let store = temporaryStore()
+    @Test func aWriteQueuedAfterTheListWasReadRefusesTheRemovalAndKeepsTheStore() async throws {
+        let store = try await Self.storeWithUnsent(1)
+        let shown = try await WorkingCopy.unsentWrites(in: store)
+        let late = try await Self.queue(in: store, "queued after the list was read")
 
         await #expect {
-            try await WorkingCopy.remove(store: store, unsent: 1)
+            try await WorkingCopy.remove(store: store, confirming: shown)
         } throws: { error in
-            guard case .unsentDiffers(_, let unsent, let reported, _)? = error as? MarfaError else {
+            guard case .unsentDiffers(let path, let unsent, let message)? = error as? MarfaError else {
                 return false
             }
-            return unsent == 0 && reported == 1
-        }
-    }
-
-    @Test(arguments: [0, 1, 3] as [UInt64])
-    func aDifferentCountLeavesTheStoreAndSaysTheRealOne(agreed: UInt64) async throws {
-        let store = try await Self.storeWithUnsent(2)
-
-        await #expect {
-            try await WorkingCopy.remove(store: store, unsent: agreed)
-        } throws: { error in
-            guard case .unsentDiffers(let path, let unsent, let reported, let message)? = error as? MarfaError else {
-                return false
-            }
-            return path.hasSuffix(store.lastPathComponent) && unsent == 2 && reported == agreed && !message.isEmpty
+            return path.hasSuffix(store.lastPathComponent) && unsent == 2 && !message.isEmpty
         }
         let kept = try await WorkingCopy.open(store: store)
         #expect(try await kept.queue.all().count == 2)
         await kept.close()
+
+        // The new list is the one to show, and removing with it goes through.
+        let again = try await WorkingCopy.unsentWrites(in: store)
+        #expect(again.writes.contains { $0.itemId == late })
+        try await WorkingCopy.remove(store: store, confirming: again)
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func aConfirmationFromAnotherStoreRefusesTheRemoval() async throws {
+        let store = try await Self.storeWithUnsent(1)
+        let other = try await Self.storeWithUnsent(1)
+        let shownOfOther = try await WorkingCopy.unsentWrites(in: other)
+
+        await #expect {
+            try await WorkingCopy.remove(store: store, confirming: shownOfOther)
+        } throws: { error in
+            if case .unsentDiffers? = error as? MarfaError { true } else { false }
+        }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func aMissingStoreRefusesAConfirmationOfWrites() async throws {
+        let shown = try await WorkingCopy.unsentWrites(in: try await Self.storeWithUnsent(1))
+        let missing = temporaryStore()
+
+        await #expect {
+            try await WorkingCopy.remove(store: missing, confirming: shown)
+        } throws: { error in
+            guard case .unsentDiffers(_, let unsent, _)? = error as? MarfaError else { return false }
+            return unsent == 0
+        }
     }
 
     @Test func aStoreAnotherCopyHasOpenIsLeftAlone() async throws {
@@ -405,14 +437,14 @@ struct RemovedCopy {
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
 
         await #expect {
-            try await WorkingCopy.remove(store: store, unsent: 1)
+            try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
         } throws: { error in
             if case .readingHandle? = error as? MarfaError { true } else { false }
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
         #expect(try await copy.queue.all().count == 1)
         await copy.close()
-        try await WorkingCopy.remove(store: store, unsent: 1)
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
         #expect(!FileManager.default.fileExists(atPath: store.path))
     }
 
@@ -424,7 +456,7 @@ struct RemovedCopy {
         await writer.close()
         let reader = try await WorkingCopy.openReader(store: store)
 
-        try await WorkingCopy.remove(store: store, unsent: 1)
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
 
         #expect(try await reader.items.get(id) != nil)
         await reader.close()

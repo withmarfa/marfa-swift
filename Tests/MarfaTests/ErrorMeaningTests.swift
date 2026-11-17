@@ -61,7 +61,7 @@ import Testing
         (.noCatalog(message: "m"), .none),
         (.wrongSchema(path: "p", reason: "r", unsent: 0, message: "m"), .none),
         (.readingHandle(message: "m"), .none),
-        (.unsentDiffers(path: "p", unsent: 1, agreed: 0, message: "m"), .none),
+        (.unsentDiffers(path: "p", unsent: 1, message: "m"), .none),
         (.copyExpired(reason: "credential_ended", message: "m", server: nil), .keyRefusal),
         (.copyExpired(reason: "reach_changed", message: "m", server: nil), .hydration),
         (.copyExpired(reason: "catchup_too_old", message: "m", server: nil), .hydration),

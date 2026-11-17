@@ -902,7 +902,7 @@ final class Lifecycle: Sendable {
                     }
                 case .forgotten:
                     mark(&state) { $0.queue = true }
-                case .pinned, .unpinned, .purged, .folderWritten:
+                case .pinned, .unpinned, .purged, .folderWritten, .tables:
                     mark(&state) { $0.rows = true }
                 case .viewWritten:
                     mark(&state) { $0.views = true }

@@ -1478,6 +1478,48 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func getItems(ids: [String], includeBin: Bool) throws  -> Listing
     
+    /**
+     * Fills each table the copy holds that is not whole.
+     */
+    func fillTables(stop: Stop?) throws  -> TableFill
+    
+    func heldTables() throws  -> HeldTables
+    
+    /**
+     * Holds the table named `table` of every item of `type_id`, a pattern as
+     * a hydration reads it, and fills it, or leaves it to the follow or
+     * catch-up that holds the stream.
+     */
+    func holdTable(typeId: String, table: String, stop: Stop?) throws  -> TableHold
+    
+    /**
+     * Releases a choice, keeping the tables another choice holds; answers
+     * whether it was held.
+     */
+    func letGoTable(typeId: String, table: String) throws  -> Bool
+    
+    func tableRow(itemId: String, table: String, row: String) throws  -> JsonObject
+    
+    /**
+     * A page of rows, from the copy where it holds the table whole and from
+     * the server otherwise, with `held` saying which.
+     */
+    func tableRows(itemId: String, table: String, asked: RowsAsked?) throws  -> JsonObject
+    
+    func tableTotals(itemId: String, table: String, filter: String?) throws  -> JsonObject
+    
+    /**
+     * Queues an undo of a batch; no held row changes until the server's
+     * `rows.changed` arrives.
+     */
+    func undoRows(itemId: String, table: String, batch: String) throws  -> QueuedWrite
+    
+    /**
+     * Queues one batch of row operations, laid over the copy where it
+     * holds the table whole.
+     */
+    func writeRows(itemId: String, table: String, operations: [JsonObject]) throws  -> QueuedWrite
+    
     func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?) throws  -> ViewRow
     
     func createView(settings: JsonObject, idempotencyKey: String?) throws  -> ViewRow
@@ -2693,6 +2735,123 @@ open func getItems(ids: [String], includeBin: Bool)throws  -> Listing  {
             self.uniffiCloneHandle(),
         FfiConverterSequenceString.lower(ids),
         FfiConverterBool.lower(includeBin),$0
+    )
+})
+}
+    
+    /**
+     * Fills each table the copy holds that is not whole.
+     */
+open func fillTables(stop: Stop?)throws  -> TableFill  {
+    return try  FfiConverterTypeTableFill_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_fill_tables(
+            self.uniffiCloneHandle(),
+        FfiConverterOptionTypeStop.lower(stop),$0
+    )
+})
+}
+    
+open func heldTables()throws  -> HeldTables  {
+    return try  FfiConverterTypeHeldTables_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_held_tables(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
+     * Holds the table named `table` of every item of `type_id`, a pattern as
+     * a hydration reads it, and fills it, or leaves it to the follow or
+     * catch-up that holds the stream.
+     */
+open func holdTable(typeId: String, table: String, stop: Stop?)throws  -> TableHold  {
+    return try  FfiConverterTypeTableHold_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_hold_table(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(typeId),
+        FfiConverterString.lower(table),
+        FfiConverterOptionTypeStop.lower(stop),$0
+    )
+})
+}
+    
+    /**
+     * Releases a choice, keeping the tables another choice holds; answers
+     * whether it was held.
+     */
+open func letGoTable(typeId: String, table: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_let_go_table(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(typeId),
+        FfiConverterString.lower(table),$0
+    )
+})
+}
+    
+open func tableRow(itemId: String, table: String, row: String)throws  -> JsonObject  {
+    return try  FfiConverterTypeJsonObject_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_table_row(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(itemId),
+        FfiConverterString.lower(table),
+        FfiConverterString.lower(row),$0
+    )
+})
+}
+    
+    /**
+     * A page of rows, from the copy where it holds the table whole and from
+     * the server otherwise, with `held` saying which.
+     */
+open func tableRows(itemId: String, table: String, asked: RowsAsked? = nil)throws  -> JsonObject  {
+    return try  FfiConverterTypeJsonObject_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_table_rows(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(itemId),
+        FfiConverterString.lower(table),
+        FfiConverterOptionTypeRowsAsked.lower(asked),$0
+    )
+})
+}
+    
+open func tableTotals(itemId: String, table: String, filter: String? = nil)throws  -> JsonObject  {
+    return try  FfiConverterTypeJsonObject_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_table_totals(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(itemId),
+        FfiConverterString.lower(table),
+        FfiConverterOptionString.lower(filter),$0
+    )
+})
+}
+    
+    /**
+     * Queues an undo of a batch; no held row changes until the server's
+     * `rows.changed` arrives.
+     */
+open func undoRows(itemId: String, table: String, batch: String)throws  -> QueuedWrite  {
+    return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_undo_rows(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(itemId),
+        FfiConverterString.lower(table),
+        FfiConverterString.lower(batch),$0
+    )
+})
+}
+    
+    /**
+     * Queues one batch of row operations, laid over the copy where it
+     * holds the table whole.
+     */
+open func writeRows(itemId: String, table: String, operations: [JsonObject])throws  -> QueuedWrite  {
+    return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_write_rows(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(itemId),
+        FfiConverterString.lower(table),
+        FfiConverterSequenceTypeJsonObject.lower(operations),$0
     )
 })
 }
@@ -7611,6 +7770,122 @@ public func FfiConverterTypeFound_lower(_ value: Found) -> RustBuffer {
 }
 
 
+public struct HeldTable: Equatable, Hashable {
+    public var itemId: String
+    public var table: String
+    public var state: TableState
+    public var rows: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(itemId: String, table: String, state: TableState, rows: UInt64) {
+        self.itemId = itemId
+        self.table = table
+        self.state = state
+        self.rows = rows
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension HeldTable: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHeldTable: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HeldTable {
+        return
+            try HeldTable(
+                itemId: FfiConverterString.read(from: &buf), 
+                table: FfiConverterString.read(from: &buf), 
+                state: FfiConverterTypeTableState.read(from: &buf), 
+                rows: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: HeldTable, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.itemId, into: &buf)
+        FfiConverterString.write(value.table, into: &buf)
+        FfiConverterTypeTableState.write(value.state, into: &buf)
+        FfiConverterUInt64.write(value.rows, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHeldTable_lift(_ buf: RustBuffer) throws -> HeldTable {
+    return try FfiConverterTypeHeldTable.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHeldTable_lower(_ value: HeldTable) -> RustBuffer {
+    return FfiConverterTypeHeldTable.lower(value)
+}
+
+
+public struct HeldTables: Equatable, Hashable {
+    public var choices: [TableChoice]
+    public var tables: [HeldTable]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(choices: [TableChoice], tables: [HeldTable]) {
+        self.choices = choices
+        self.tables = tables
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension HeldTables: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHeldTables: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HeldTables {
+        return
+            try HeldTables(
+                choices: FfiConverterSequenceTypeTableChoice.read(from: &buf), 
+                tables: FfiConverterSequenceTypeHeldTable.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: HeldTables, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeTableChoice.write(value.choices, into: &buf)
+        FfiConverterSequenceTypeHeldTable.write(value.tables, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHeldTables_lift(_ buf: RustBuffer) throws -> HeldTables {
+    return try FfiConverterTypeHeldTables.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHeldTables_lower(_ value: HeldTables) -> RustBuffer {
+    return FfiConverterTypeHeldTables.lower(value)
+}
+
+
 public struct HydrateReport: Equatable, Hashable {
     public var types: [String]
     public var tier: SliceTier
@@ -9905,6 +10180,81 @@ public func FfiConverterTypeRowConflict_lower(_ value: RowConflict) -> RustBuffe
 
 
 /**
+ * A read of a table's rows, as `GET /items/{id}/tables/{table}/rows` takes it.
+ */
+public struct RowsAsked: Equatable, Hashable {
+    public var limit: UInt32?
+    public var cursor: String?
+    public var filter: String?
+    /**
+     * `id`, `updated_at` or a column's name.
+     */
+    public var sort: String?
+    public var direction: SortDirection?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(limit: UInt32? = nil, cursor: String? = nil, filter: String? = nil, 
+        /**
+         * `id`, `updated_at` or a column's name.
+         */sort: String? = nil, direction: SortDirection? = nil) {
+        self.limit = limit
+        self.cursor = cursor
+        self.filter = filter
+        self.sort = sort
+        self.direction = direction
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RowsAsked: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRowsAsked: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RowsAsked {
+        return
+            try RowsAsked(
+                limit: FfiConverterOptionUInt32.read(from: &buf), 
+                cursor: FfiConverterOptionString.read(from: &buf), 
+                filter: FfiConverterOptionString.read(from: &buf), 
+                sort: FfiConverterOptionString.read(from: &buf), 
+                direction: FfiConverterOptionTypeSortDirection.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RowsAsked, into buf: inout [UInt8]) {
+        FfiConverterOptionUInt32.write(value.limit, into: &buf)
+        FfiConverterOptionString.write(value.cursor, into: &buf)
+        FfiConverterOptionString.write(value.filter, into: &buf)
+        FfiConverterOptionString.write(value.sort, into: &buf)
+        FfiConverterOptionTypeSortDirection.write(value.direction, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRowsAsked_lift(_ buf: RustBuffer) throws -> RowsAsked {
+    return try FfiConverterTypeRowsAsked.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRowsAsked_lower(_ value: RowsAsked) -> RustBuffer {
+    return FfiConverterTypeRowsAsked.lower(value)
+}
+
+
+/**
  * Narrowing for a search: the states and types a list takes, tags, a
  * listing-grammar expression and `beneath`, each read as the list reads it.
  */
@@ -10679,6 +11029,235 @@ public func FfiConverterTypeStatus_lower(_ value: Status) -> RustBuffer {
 }
 
 
+public struct TableChoice: Equatable, Hashable {
+    public var type: String
+    public var table: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(type: String, table: String) {
+        self.type = type
+        self.table = table
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TableChoice: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTableChoice: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TableChoice {
+        return
+            try TableChoice(
+                type: FfiConverterString.read(from: &buf), 
+                table: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TableChoice, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.type, into: &buf)
+        FfiConverterString.write(value.table, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableChoice_lift(_ buf: RustBuffer) throws -> TableChoice {
+    return try FfiConverterTypeTableChoice.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableChoice_lower(_ value: TableChoice) -> RustBuffer {
+    return FfiConverterTypeTableChoice.lower(value)
+}
+
+
+/**
+ * What one pass over the tables not yet whole did.
+ */
+public struct TableFill: Equatable, Hashable {
+    /**
+     * Tables the pass left whole.
+     */
+    public var whole: UInt64
+    /**
+     * Tables past the cap, which are read from the server.
+     */
+    public var online: UInt64
+    /**
+     * Tables left still to fill, the failed among them.
+     */
+    public var unfilled: UInt64
+    public var pages: UInt64
+    public var rows: UInt64
+    /**
+     * Tables whose read failed, each left to the next pass.
+     */
+    public var failed: UInt64
+    /**
+     * The last of them, and why.
+     */
+    public var failure: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Tables the pass left whole.
+         */whole: UInt64, 
+        /**
+         * Tables past the cap, which are read from the server.
+         */online: UInt64, 
+        /**
+         * Tables left still to fill, the failed among them.
+         */unfilled: UInt64, pages: UInt64, rows: UInt64, 
+        /**
+         * Tables whose read failed, each left to the next pass.
+         */failed: UInt64, 
+        /**
+         * The last of them, and why.
+         */failure: String?) {
+        self.whole = whole
+        self.online = online
+        self.unfilled = unfilled
+        self.pages = pages
+        self.rows = rows
+        self.failed = failed
+        self.failure = failure
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TableFill: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTableFill: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TableFill {
+        return
+            try TableFill(
+                whole: FfiConverterUInt64.read(from: &buf), 
+                online: FfiConverterUInt64.read(from: &buf), 
+                unfilled: FfiConverterUInt64.read(from: &buf), 
+                pages: FfiConverterUInt64.read(from: &buf), 
+                rows: FfiConverterUInt64.read(from: &buf), 
+                failed: FfiConverterUInt64.read(from: &buf), 
+                failure: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TableFill, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.whole, into: &buf)
+        FfiConverterUInt64.write(value.online, into: &buf)
+        FfiConverterUInt64.write(value.unfilled, into: &buf)
+        FfiConverterUInt64.write(value.pages, into: &buf)
+        FfiConverterUInt64.write(value.rows, into: &buf)
+        FfiConverterUInt64.write(value.failed, into: &buf)
+        FfiConverterOptionString.write(value.failure, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableFill_lift(_ buf: RustBuffer) throws -> TableFill {
+    return try FfiConverterTypeTableFill.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableFill_lower(_ value: TableFill) -> RustBuffer {
+    return FfiConverterTypeTableFill.lower(value)
+}
+
+
+public struct TableHold: Equatable, Hashable {
+    public var type: String
+    public var table: String
+    public var wasHeld: Bool
+    /**
+     * `None` where another call holds the stream, whose fill takes it.
+     */
+    public var fill: TableFill?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(type: String, table: String, wasHeld: Bool, 
+        /**
+         * `None` where another call holds the stream, whose fill takes it.
+         */fill: TableFill?) {
+        self.type = type
+        self.table = table
+        self.wasHeld = wasHeld
+        self.fill = fill
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TableHold: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTableHold: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TableHold {
+        return
+            try TableHold(
+                type: FfiConverterString.read(from: &buf), 
+                table: FfiConverterString.read(from: &buf), 
+                wasHeld: FfiConverterBool.read(from: &buf), 
+                fill: FfiConverterOptionTypeTableFill.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TableHold, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.type, into: &buf)
+        FfiConverterString.write(value.table, into: &buf)
+        FfiConverterBool.write(value.wasHeld, into: &buf)
+        FfiConverterOptionTypeTableFill.write(value.fill, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableHold_lift(_ buf: RustBuffer) throws -> TableHold {
+    return try FfiConverterTypeTableHold.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableHold_lower(_ value: TableHold) -> RustBuffer {
+    return FfiConverterTypeTableHold.lower(value)
+}
+
+
 /**
  * An item's thumbnail: the image's type and its bytes.
  */
@@ -10992,6 +11571,76 @@ public func FfiConverterTypeUnsentWrite_lift(_ buf: RustBuffer) throws -> Unsent
 #endif
 public func FfiConverterTypeUnsentWrite_lower(_ value: UnsentWrite) -> RustBuffer {
     return FfiConverterTypeUnsentWrite.lower(value)
+}
+
+
+/**
+ * The writes a store holds that the server has not taken, and the
+ * confirmation `removeStore` takes to lose exactly these.
+ */
+public struct UnsentWrites: Equatable, Hashable {
+    /**
+     * In queue order.
+     */
+    public var writes: [UnsentWrite]
+    /**
+     * Opaque; pass it to `removeStore` unchanged.
+     */
+    public var confirmation: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * In queue order.
+         */writes: [UnsentWrite], 
+        /**
+         * Opaque; pass it to `removeStore` unchanged.
+         */confirmation: String) {
+        self.writes = writes
+        self.confirmation = confirmation
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnsentWrites: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnsentWrites: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnsentWrites {
+        return
+            try UnsentWrites(
+                writes: FfiConverterSequenceTypeUnsentWrite.read(from: &buf), 
+                confirmation: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnsentWrites, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeUnsentWrite.write(value.writes, into: &buf)
+        FfiConverterString.write(value.confirmation, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentWrites_lift(_ buf: RustBuffer) throws -> UnsentWrites {
+    return try FfiConverterTypeUnsentWrites.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentWrites_lower(_ value: UnsentWrites) -> RustBuffer {
+    return FfiConverterTypeUnsentWrites.lower(value)
 }
 
 
@@ -13712,14 +14361,15 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     )
     /**
      * A removal of a store was refused, leaving it as it was, because the
-     * writes it holds that the server has not taken are not the number the
-     * caller agreed to lose. Carried so an app can show the person the
-     * store's own count and ask again.
+     * writes it holds that the server has not taken are not those its
+     * confirmation was given with. An app reads them again with
+     * `readUnsent`, shows them to the person and asks again.
      */
     case UnsentDiffers(path: String, 
         /**
-         * The store's own count; `None` where it cannot be read.
-         */unsent: UInt64?, agreed: UInt64, message: String
+         * How many such writes the store holds; `None` where they cannot be
+         * read.
+         */unsent: UInt64?, message: String
     )
     /**
      * The copy can no longer be kept current from its cursor: a hydration
@@ -13924,7 +14574,6 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 25: return .UnsentDiffers(
             path: try FfiConverterString.read(from: &buf), 
             unsent: try FfiConverterOptionUInt64.read(from: &buf), 
-            agreed: try FfiConverterUInt64.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
         case 26: return .CopyExpired(
@@ -14135,11 +14784,10 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .UnsentDiffers(path,unsent,agreed,message):
+        case let .UnsentDiffers(path,unsent,message):
             writeInt(&buf, Int32(25))
             FfiConverterString.write(path, into: &buf)
             FfiConverterOptionUInt64.write(unsent, into: &buf)
-            FfiConverterUInt64.write(agreed, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
@@ -15011,6 +15659,93 @@ public func FfiConverterTypeSystemField_lift(_ buf: RustBuffer) throws -> System
 #endif
 public func FfiConverterTypeSystemField_lower(_ value: SystemField) -> RustBuffer {
     return FfiConverterTypeSystemField.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum TableState: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * Held, with no row read yet.
+     */
+    case owed
+    case filling
+    case whole
+    /**
+     * Past the cap, so its reads go to the server.
+     */
+    case online
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension TableState: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTableState: FfiConverterRustBuffer {
+    typealias SwiftType = TableState
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TableState {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .owed
+        
+        case 2: return .filling
+        
+        case 3: return .whole
+        
+        case 4: return .online
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TableState, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .owed:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .filling:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .whole:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .online:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableState_lift(_ buf: RustBuffer) throws -> TableState {
+    return try FfiConverterTypeTableState.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTableState_lower(_ value: TableState) -> RustBuffer {
+    return FfiConverterTypeTableState.lower(value)
 }
 
 
@@ -16012,6 +16747,30 @@ fileprivate struct FfiConverterOptionTypeRequestLimit: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeRowsAsked: FfiConverterRustBuffer {
+    typealias SwiftType = RowsAsked?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRowsAsked.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRowsAsked.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeServerAnswer: FfiConverterRustBuffer {
     typealias SwiftType = ServerAnswer?
 
@@ -16052,6 +16811,30 @@ fileprivate struct FfiConverterOptionTypeSort: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeSort.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeTableFill: FfiConverterRustBuffer {
+    typealias SwiftType = TableFill?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeTableFill.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeTableFill.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -16693,6 +17476,31 @@ fileprivate struct FfiConverterSequenceTypeFlaggedFile: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeHeldTable: FfiConverterRustBuffer {
+    typealias SwiftType = [HeldTable]
+
+    public static func write(_ value: [HeldTable], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeHeldTable.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [HeldTable] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [HeldTable]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeHeldTable.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
     typealias SwiftType = [Item]
 
@@ -17010,6 +17818,31 @@ fileprivate struct FfiConverterSequenceTypeSearchHit: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSearchHit.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTableChoice: FfiConverterRustBuffer {
+    typealias SwiftType = [TableChoice]
+
+    public static func write(_ value: [TableChoice], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTableChoice.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TableChoice] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TableChoice]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTableChoice.read(from: &buf))
         }
         return seq
     }
@@ -17343,10 +18176,11 @@ public func linkParts(text: String) -> [LinkParts]  {
 })
 }
 /**
- * Lists unsent writes from a refused store; see BINDINGS.md for refusals.
+ * Lists the unsent writes of a store of any build, a refused one included,
+ * with the confirmation `removeStore` takes; see BINDINGS.md for refusals.
  */
-public func readUnsent(path: String)throws  -> [UnsentWrite]  {
-    return try  FfiConverterSequenceTypeUnsentWrite.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+public func readUnsent(path: String)throws  -> UnsentWrites  {
+    return try  FfiConverterTypeUnsentWrites_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_func_read_unsent(
         FfiConverterString.lower(path),$0
     )
@@ -17359,28 +18193,29 @@ public func readUnsent(path: String)throws  -> [UnsentWrite]  {
  * removed, including one `open` refuses with `WrongSchema`. Drop every `Core`
  * on the store first.
  *
- * `unsent` is the number of writes the server has not taken that the person
- * agreed to lose. Throws `UnsentDiffers` with the store's own count, leaving
- * it as it was, unless that count equals `unsent`; the count is `nil` where
- * it cannot be read, and such a store is never removed. Throws
- * `ReadingHandle` while another process, or another `Core` in this one,
- * writes the store, and `Invalid` for a folder's store. With nothing at
- * `path`, removes what a removal stopped part way left there when `unsent`
- * is 0. A process that only reads the store does not stop the removal and
+ * `confirmation` is the one `readUnsent` gave with the writes the person was
+ * shown and agreed to lose. Throws `UnsentDiffers`, leaving the store as it
+ * was, unless the writes it holds that the server has not taken are those,
+ * with every field `readUnsent` shows unchanged; a store whose writes cannot
+ * be read is never removed. Throws `ReadingHandle` while another process,
+ * or another `Core` in this one, writes the store, and `Invalid` for a
+ * folder's store. With nothing at `path`, `readUnsent` shows no writes, and
+ * removing with its confirmation takes what a removal stopped part way left
+ * there. A process that only reads the store does not stop the removal and
  * keeps showing the old copy until it reopens.
  */
-public func removeStore(path: String, unsent: UInt64)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+public func removeStore(path: String, confirmation: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_func_remove_store(
         FfiConverterString.lower(path),
-        FfiConverterUInt64.lower(unsent),$0
+        FfiConverterString.lower(confirmation),$0
     )
 }
 }
 /**
  * Removes the store at `path` as `removeStore` does, agreeing to lose every
- * write it holds that the server has not taken, however many there are and
- * whether or not they can be counted, as for a store `open` refuses with
- * `StoreDamaged`. Throws as `removeStore` does but for the count.
+ * write it holds that the server has not taken, whatever they are and
+ * whether or not they can be read, as for a store `open` refuses with
+ * `StoreDamaged`. Throws as `removeStore` does but for the writes.
  */
 public func removeStoreLosingAll(path: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_func_remove_store_losing_all(
@@ -17468,13 +18303,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_func_link_parts() != 21360) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_func_read_unsent() != 231) {
+    if (uniffi_marfa_core_ffi_checksum_func_read_unsent() != 19889) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_func_remove_store() != 23704) {
+    if (uniffi_marfa_core_ffi_checksum_func_remove_store() != 56347) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_func_remove_store_losing_all() != 18814) {
+    if (uniffi_marfa_core_ffi_checksum_func_remove_store_losing_all() != 6871) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_func_set_aside_damaged() != 15762) {
@@ -17733,6 +18568,33 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_get_items() != 44104) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_fill_tables() != 56647) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_held_tables() != 55657) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_hold_table() != 37450) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_let_go_table() != 28521) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_table_row() != 11254) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_table_rows() != 23114) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_table_totals() != 2699) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_undo_rows() != 8536) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_write_rows() != 34686) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_change_view() != 11627) {

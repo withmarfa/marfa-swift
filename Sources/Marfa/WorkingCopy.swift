@@ -22,6 +22,7 @@ public final class WorkingCopy: Sendable {
     public let tags: Tags
     public let metadata: Metadata
     public let extensions: Extensions
+    public let tables: Tables
     public let blobs: Blobs
     public let queue: Queue
     public let catalog: Catalog
@@ -40,6 +41,7 @@ public final class WorkingCopy: Sendable {
         tags = Tags(holder: holder, feed: feed)
         metadata = Metadata(holder: holder, feed: feed)
         extensions = Extensions(holder: holder, feed: feed)
+        tables = Tables(holder: holder, feed: feed)
         blobs = Blobs(holder: holder, feed: feed)
         queue = Queue(holder: holder, feed: feed, lifecycle: lifecycle)
         catalog = Catalog(holder: holder)
@@ -90,8 +92,8 @@ public final class WorkingCopy: Sendable {
     /// one of this build's shape and opened. A store that opens as it is, or a path with none, is opened as with
     /// `.keep`. Unsent writes are never given up: a refused store that holds any, or whose count cannot be read,
     /// is left as it is and the open throws `wrongSchema` with the count. To give them up, show the person the
-    /// count, call ``remove(store:unsent:)`` with it, and open again. `.replace` also leaves the store as it is and
-    /// throws `readingHandle` while another process writes it.
+    /// writes, call ``remove(store:confirming:)`` with the ``unsentWrites(in:)`` it read, and open again.
+    /// `.replace` also leaves the store as it is and throws `readingHandle` while another process writes it.
     ///
     /// A store SQLite cannot read is refused with `MarfaError.storeDamaged`, which names the store and counts its unsent
     /// writes where the queue can be read. ``unsentWrites(in:)`` lists the writes of a refused store of either kind,
@@ -106,7 +108,8 @@ public final class WorkingCopy: Sendable {
     /// server. The first call that does, such as ``hydrate(types:tier:edgeTypes:)``, first asks which instance
     /// answers: where it is the one the store was made against, the store follows it to the new address, and
     /// otherwise the call throws `wrongServer` without sending its request. To start again on this server, read
-    /// `queue` for what would be lost, close the copy, and call ``remove(store:unsent:)``.
+    /// `queue` for what would be lost, close the copy, read ``unsentWrites(in:)`` and call
+    /// ``remove(store:confirming:)``.
     ///
     /// `fileBudget` chooses the budget of the cache of fetched files, as ``Blobs/setBudget(_:)`` does, trimming to
     /// it before this returns; left `nil`, the copy keeps the choice its store holds, which is the default
@@ -160,22 +163,25 @@ public final class WorkingCopy: Sendable {
     /// of any schema goes, including one ``open(store:server:fileBudget:ifRefused:)`` refuses with `wrongSchema`. A symbolic
     /// link at one of those names is unlinked, never what it leads to.
     ///
-    /// `unsent` is the number of writes the server has not taken that the person agreed to lose: the count they
-    /// were shown. The removal holds the store's writer lock throughout and checks the count under it, so no
-    /// write can arrive between the check and the removal. Close every copy of the store in this process
-    /// first.
+    /// `unsent` is what ``unsentWrites(in:)`` answered: the writes the server has not taken that the person was
+    /// shown and agreed to lose. The removal holds the store's writer lock throughout and reads the store's unsent
+    /// writes again under it, so no write can be queued, answered or changed between the check and the removal. Close
+    /// every copy of the store in this process first.
     ///
-    /// Leaves everything as it is and throws `unsentDiffers`, carrying the store's own count, unless that count
-    /// equals `unsent`; the count is `nil` where it cannot be read, and such a store is never removed. Show the
-    /// person the count and ask again. Throws `readingHandle` while another process, or another open copy in this
-    /// one, writes the store, and `invalid` for a folder's store, bound or not.
+    /// Leaves everything as it is and throws `unsentDiffers`, carrying how many the store holds now, unless those
+    /// writes are exactly the ones `unsent` was read with, in every field: a write added or answered, or one whose
+    /// body or verdict changed under the same id, refuses it, and so does a store whose writes cannot be read. Read
+    /// ``unsentWrites(in:)`` again, show the person the new writes and ask again. Throws `readingHandle` while
+    /// another process, or another open copy in this one, writes the store, and `invalid` for a folder's store,
+    /// bound or not.
     ///
     /// A reading helper, such as one opened with ``openReader(store:)``, does not stop the removal and keeps
-    /// showing the old copy until it reopens. With no store at `store`, removes what an interrupted removal left
-    /// there when `unsent` is 0, and throws `unsentDiffers` with a count of 0 otherwise.
-    public static func remove(store: URL, unsent: UInt64) async throws {
+    /// showing the old copy until it reopens. With no store at `store`, ``unsentWrites(in:)`` shows no writes, and
+    /// removing with its answer takes what an interrupted removal left there.
+    public static func remove(store: URL, confirming unsent: UnsentWrites) async throws {
         let path = store.path
-        try await background { try removeStore(path: path, unsent: unsent) }
+        let confirmation = unsent.confirmation
+        try await background { try removeStore(path: path, confirmation: confirmation) }
     }
 
     /// Sets the budget the app opened the copy with.
@@ -596,6 +602,9 @@ public struct Change: Sendable, Hashable {
         /// The app replaced its declarations, or a refresh read a changed
         /// item type or edge type catalog; read `catalog` again.
         case catalog
+        /// The tables the copy holds, or the rows it holds of them, changed through ``Tables/hold(_:ofType:)``,
+        /// ``Tables/letGo(_:ofType:)`` or ``Tables/fill()``; read ``Tables/held()`` and the rows again.
+        case tables
     }
 
     public let origin: Origin
