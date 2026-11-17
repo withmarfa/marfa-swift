@@ -72,7 +72,7 @@ extension Server {
 
     /// The source `code`.
     ///
-    /// Throws ``MarfaError/notFound(code:message:)`` for a source this key cannot see: not its own, not one it
+    /// Throws ``MarfaError/notFound(code:message:server:)`` for a source this key cannot see: not its own, not one it
     /// claims and carried by no item it can read, unless it holds `keys.manage`.
     public func source(_ code: String, timeout: Duration = Server.defaultTimeout) async throws(MarfaError) -> ItemSource
     {
@@ -87,11 +87,11 @@ extension Server {
     /// A change left `nil` is not sent, so the server keeps that field; ``SettingChange/clear`` removes it, so the
     /// source shows the name its app or key gives it, or its code. A name is trimmed and is 1 to 200 UTF-16 code units
     /// with no control or bidirectional formatting character; a mark is an Iconify ID from a set Marfa pins, as for ``setTypeIcon(_:ofType:expecting:timeout:)``.
-    /// The server refuses a name with ``MarfaError/validation(code:message:details:)`` and the code
+    /// The server refuses a name with ``MarfaError/validation(code:message:details:server:)`` and the code
     /// `validation_error`, and a mark with `invalid_schema`, changing neither field.
     ///
     /// A key may change its own source and those it claims; any other needs `keys.manage`, else the call throws
-    /// ``MarfaError/forbidden(code:message:)``.
+    /// ``MarfaError/forbidden(code:message:server:)``.
     @discardableResult
     public func updateSource(
         _ code: String, name: SettingChange<String>? = nil, mark: SettingChange<String>? = nil,

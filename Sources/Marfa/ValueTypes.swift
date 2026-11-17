@@ -582,7 +582,7 @@ public struct LastFailure: Sendable, Hashable {
 public struct DrainVerdict: Sendable, Hashable {
     public var id: String
     public var kind: WriteKind
-    /// An edge write's source; otherwise the row written to.
+    /// An edge write's from end; otherwise the row written to.
     public var itemId: String?
     public var edgeId: String?
     public var verdict: Verdict?

@@ -102,7 +102,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case unsentDiffers(path: String, unsent: UInt64?, agreed: UInt64, message: String)
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
     /// is an open string, such as `reach_changed`, `credential_ended` or `catchup_too_old`; another instance at
-    /// the server's address is ``instanceChanged(message:)`` instead. A stale copy
+    /// the server's address is ``instanceChanged(message:server:)`` instead. A stale copy
     /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
     /// The catch-up that first detects an aged-out cursor gives a descriptive reason; read `status().hydration`
     /// to distinguish `.stale` from other expired copies. A held `changes()` stream fills a stale copy again by
@@ -176,7 +176,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// Asking again later can clear it, with nothing changed: the rule the core's own follow waits out
     /// (`CoreError::is_environmental`), with `noConnection` and `keyChanging` added.
     ///
-    /// An ``unnamed(status:message:)`` answer is transient whatever its status, since a gateway's 401 is not the
+    /// An ``unnamed(status:message:server:)`` answer is transient whatever its status, since a gateway's 401 is not the
     /// server's word on the key.
     public var isTransient: Bool {
         switch self {

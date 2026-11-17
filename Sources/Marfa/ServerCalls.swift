@@ -219,7 +219,7 @@ extension Server {
     ///
     /// Pass the previous page's ``ItemSnapshotPage/next`` as `after` for the following page. `limit` is 1 to 200;
     /// the server's default applies when it is `nil`. The server answers an item it cannot read, in the trash or of
-    /// a type the key does not reach, with ``MarfaError/notFound(code:message:)``. Calls read the key this server
+    /// a type the key does not reach, with ``MarfaError/notFound(code:message:server:)``. Calls read the key this server
     /// holds, as a working copy does.
     ///
     /// A snapshot whose `created_at` this build cannot read makes the whole page throw
@@ -241,7 +241,7 @@ extension Server {
 
     /// The server's settings.
     ///
-    /// Needs the `config.manage` permission, else throws ``MarfaError/forbidden(code:message:)``.
+    /// Needs the `config.manage` permission, else throws ``MarfaError/forbidden(code:message:server:)``.
     public func config(timeout: Duration = Server.defaultTimeout) async throws(MarfaError) -> InstanceConfig {
         InstanceConfig(try decode(try await send("GET", "/config", timeout: timeout)) as InstanceConfigWire)
     }
@@ -249,7 +249,7 @@ extension Server {
     /// Changes the settings in `patch` and answers the settings as stored.
     ///
     /// Only the fields set on `patch` are sent. `instanceID`, from an earlier ``config(timeout:)``, makes the server
-    /// refuse the change with ``MarfaError/instanceChanged(message:)`` when the address now reaches another instance.
+    /// refuse the change with ``MarfaError/instanceChanged(message:server:)`` when the address now reaches another instance.
     public func updateConfig(
         _ patch: InstanceConfigPatch, expecting instanceID: String? = nil, timeout: Duration = Server.defaultTimeout
     ) async throws(MarfaError) -> InstanceConfig {
@@ -267,7 +267,7 @@ extension Server {
     /// The type can be one Marfa ships. Removing the owner's icon shows the author's again.
     ///
     /// `icon` is an Iconify ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open`, or `simple-icons:github`
-    /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:details:)`` and the code
+    /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:details:server:)`` and the code
     /// `invalid_schema`. Needs `schema.write` and write on the type. A working copy's `catalog` takes the change
     /// when its server stream next reopens, so another device shows it within about two minutes.
     @discardableResult

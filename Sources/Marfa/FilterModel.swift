@@ -178,9 +178,9 @@ public enum SystemField: Sendable, Hashable, CaseIterable {
 
 /// Which end of an edge the filtered item stands at.
 public enum EdgeDirection: Sendable, Hashable, CaseIterable {
-    /// The item is the edge's source.
+    /// The item is the edge's from end.
     case outbound
-    /// The item is the edge's target.
+    /// The item is the edge's to end.
     case backref
 
     init(_ core: MarfaCore.EdgeDirection) {

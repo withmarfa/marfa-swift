@@ -28,8 +28,8 @@ extension Client {
     /// With `force`, the type is deleted and the items, settings and column constraints that name it are kept; writes of
     /// new items of it fail until it is registered again. Without it, a type that items, a folder, a view, a webhook or a
     /// table column still names is refused with `MarfaError.server` of status 409 and the code `type_in_use`, and the
-    /// message lists each setting that names it. Move the items with ``startMove(ofType:to:properties:)``, which
-    /// rewrites those settings, or change the settings first.
+    /// error's `details` hold the `item_count`, the `settings` and the `columns` that name it. Move the items with
+    /// ``startMove(ofType:to:properties:)``, which rewrites those settings, or change the settings first.
     public func delete(itemType id: String, force: Bool = false) async throws {
         try await answer("deleteType") {
             _ = try await deleteType(path: .init(id: id), query: .init(force: force ? true : nil)).ok
