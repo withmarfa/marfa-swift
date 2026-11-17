@@ -30,10 +30,11 @@ public struct EventDates: Hashable, Sendable {
     /// Where the event starts: a day with no time for a whole-day event, or an instant for a timed one, shown in the
     /// event's `timezone`.
     public let start: ItemDate
-    /// Where the event ends, as exclusive as the contract places it: a whole-day event ends at midnight of the day
-    /// ``end`` names, which is the day after its last, and a timed event ends at the instant ``end`` names, shown in
-    /// `end_timezone`, or `timezone` where it has none. A timed event that states no end, or one before its start, ends
-    /// where it starts.
+    /// Where the event ends.
+    ///
+    /// A whole-day event ends at midnight of the day this names, which is the day after its last. A timed event ends at
+    /// the instant this names, shown in `end_timezone`, or `timezone` where it has none. A timed event that states no
+    /// end, or one before its start, ends where it starts.
     public let end: ItemDate
 
     /// Whether the event occupies whole days, so that ``start`` and ``end`` name days.

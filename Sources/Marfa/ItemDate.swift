@@ -34,7 +34,7 @@ public struct ItemDate: Hashable, Sendable {
             self.init(year: Int(year), month: Int(month), day: Int(day))
         }
 
-        /// The day's name in `text`'s form, `YYYY-MM-DD`.
+        /// The day as the contract writes it, `YYYY-MM-DD`.
         public var text: String { String(format: "%04ld-%02ld-%02ld", year, month, day) }
 
         var epochDay: Int64 { ItemDate.epochDay(year, month, day) }
