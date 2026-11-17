@@ -406,7 +406,7 @@ struct RemovedCopy {
         #expect(!FileManager.default.fileExists(atPath: store.path))
     }
 
-    @Test func aConfirmationFromAnotherStoreRefusesTheRemoval() async throws {
+    @Test func theWritesOfAnotherStoreRefuseTheRemoval() async throws {
         let store = try await Self.storeWithUnsent(1)
         let other = try await Self.storeWithUnsent(1)
         let shownOfOther = try await WorkingCopy.unsentWrites(in: other)

@@ -1,8 +1,8 @@
 import Foundation
 internal import MarfaCore
 
-/// A write the server has not taken, read from a store that ``WorkingCopy/open(store:server:fileBudget:ifRefused:)``
-/// refused, so a person can see what a removal would lose.
+/// A write the server has not taken, read from a store whole or refused, so a person can see what a removal would
+/// lose.
 public struct UnsentWrite: Sendable, Hashable {
     public var id: String
     /// The kind as the store names it, which may be one this build does not send.

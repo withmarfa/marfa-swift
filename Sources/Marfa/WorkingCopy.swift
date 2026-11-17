@@ -1128,8 +1128,10 @@ public struct Queue: Sendable {
         }
     }
 
-    /// Queues a blocked or dead write to go again, under a fresh key, on the
-    /// next drain.
+    /// Queues a blocked or dead write to go again on the next drain, under a fresh key.
+    ///
+    /// A row write is released with every other write of its batch, and the batch keeps the key it went under
+    /// unless it was blocked `keySpent`, `conflictUnresolved` or `ancestorUnavailable`.
     public func release(_ id: String) async throws -> Bool {
         try await holder.run { core in try core.release(id: id) }
     }
@@ -1206,7 +1208,7 @@ public struct Queue: Sendable {
     /// A create refused onto a row its natural key names that no read has
     /// found is taken even with writes waiting on it, and they are refused
     /// unsent. A create's discard first waits for a drain already running to
-    /// end.
+    /// end. A row write is taken with every other write of its batch.
     /// The copy's row already shows what the server holds.
     ///
     /// Tells every held stream `.refreshed(.forgotten)` when it took the

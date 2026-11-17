@@ -17,7 +17,8 @@ public struct Tables: Sendable {
     /// it. The copy keeps the choice and holds the table of an item that arrives later. The fill needs the server and
     /// runs where no other call holds the copy's stream; where one does, `fill` is `nil` and that call's own fill
     /// takes the table. Throws `invalid` for a table that no type `type` names declares. Tells every held stream
-    /// `.refreshed(.tables)`.
+    /// `.refreshed(.tables)` once the choice is kept; a fill that a held stream makes later is not announced, so read
+    /// ``held()`` to see the table whole.
     public func hold(_ table: String, ofType type: String) async throws -> TableHold {
         let hold = try await holder.runUntilCanceled { core, stop in
             TableHold(try core.holdTable(typeId: type, table: table, stop: stop))
@@ -115,8 +116,8 @@ public struct Tables: Sendable {
 }
 
 extension QueuedWrite {
-    /// The batch the server made of a row write it accepted, which ``Tables/undo(batch:in:of:)`` undoes; `nil` for
-    /// any other write and for a row write with no such answer.
+    /// The batch the server made of a row write or an undo it accepted, which ``Tables/undo(batch:in:of:)`` undoes;
+    /// `nil` for any other write, and for an undo the server made no batch of.
     public var rowBatch: String? {
         guard kind == .writeRows || kind == .undoRows, case .object(let answer)? = answer,
             case .string(let batch)? = answer["batch"]
