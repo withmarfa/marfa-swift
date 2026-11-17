@@ -5,8 +5,14 @@ import Testing
 
 @testable import Marfa
 
+/// The id the server answers a create with, which the test sets once its write is queued.
+private final class Answered: Sendable {
+    let ids = Answered()
+    func set(_ id: String?) { ids.withLock { $0 = [id ?? "none"] } }
+}
+
 /// A server whose root names a small `max_request_bytes`, and which answers every create it is sent.
-private func serverTaking(_ limit: Int, creating ids: borrowing Mutex<[String]>) async throws -> LocalServer {
+private func serverTaking(_ limit: Int, creating ids: Answered) async throws -> LocalServer {
     try await LocalServer.start(contract: marfaContractVersion) { method, path in
         switch (method, path) {
         case (_, "/"):
@@ -15,7 +21,7 @@ private func serverTaking(_ limit: Int, creating ids: borrowing Mutex<[String]>)
                 #"{"instance_id":"test-instance","contract":\#(marfaContractVersion),"max_request_bytes":\#(limit)}"#
             )
         case ("POST", "/items"):
-            let id = ids.withLock { $0.first } ?? "unknown"
+            let id = ids.ids.withLock { $0.first } ?? "unknown"
             return (
                 201, "application/json",
                 #"{"id":"\#(id)","type":"core.note","properties":{},"version":1,"state":"active"}"#
@@ -30,7 +36,7 @@ private func serverTaking(_ limit: Int, creating ids: borrowing Mutex<[String]>)
 @Suite(.timeLimit(.minutes(1)))
 struct RequestLimitTests {
     @Test func aSaveOverTheServersLimitIsHeldOnTheDeviceAndOtherWritesGoOn() async throws {
-        let sendable = Mutex<[String]>([])
+        let sendable = Answered()
         let server = try await serverTaking(1_500, creating: sendable)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
@@ -39,7 +45,7 @@ struct RequestLimitTests {
         let large = try await copy.items.create(
             Draft(type: "core.note", properties: ["title": .string(String(repeating: "é", count: 2_000))], tier: .feed))
         let small = try await copy.items.create(Draft(type: "core.note", properties: ["title": "short"], tier: .feed))
-        sendable.withLock { $0 = [small.itemId ?? "none"] }
+        sendable.set(small.itemId)
 
         let report = try await copy.queue.drain()
         #expect(report.unsent == 1, "\(report)")
@@ -76,13 +82,13 @@ struct RequestLimitTests {
     }
 
     @Test func aSaveAtTheLimitIsSent() async throws {
-        let ids = Mutex<[String]>([])
+        let ids = Answered()
         let server = try await serverTaking(1_500, creating: ids)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let small = try await copy.items.create(Draft(type: "core.note", properties: ["title": "short"], tier: .feed))
-        ids.withLock { $0 = [small.itemId ?? "none"] }
+        ids.set(small.itemId)
         let report = try await copy.queue.drain()
         #expect(report.unsent == 0)
         #expect(report.verdicts.first?.verdict == .accepted)
