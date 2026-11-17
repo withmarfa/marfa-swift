@@ -162,7 +162,7 @@ struct ServerTransportContractHeader {
             do {
                 _ = try await server.setTypeIcon("lucide:book-open", ofType: "core.note")
                 Issue.record("a 412 contract_mismatch was taken as success")
-            } catch {
+            } catch let error as MarfaError {
                 guard case .contractMismatch(let served, let expected, let status, let writeSent, _, let answer) = error
                 else {
                     Issue.record("expected contract_mismatch, got \(error)")
@@ -173,6 +173,8 @@ struct ServerTransportContractHeader {
                 #expect(status == 412)
                 #expect(!writeSent)
                 #expect(answer?.code == "contract_mismatch")
+            } catch {
+                Issue.record("expected a MarfaError, got \(error)")
             }
             let sent = try #require(scripted.requests(to: "/types/core.note/icon").first)
             #expect(sent.method == "PUT")
@@ -189,12 +191,14 @@ struct ServerTransportContractHeader {
             do {
                 _ = try await server.setTypeIcon("lucide:book-open", ofType: "core.note")
                 Issue.record("an answer on another contract was taken as success")
-            } catch {
+            } catch let error as MarfaError {
                 guard case .contractMismatch(_, _, _, let writeSent, _, _) = error else {
                     Issue.record("expected contract_mismatch, got \(error)")
                     return
                 }
                 #expect(writeSent)
+            } catch {
+                Issue.record("expected a MarfaError, got \(error)")
             }
         }
     }
