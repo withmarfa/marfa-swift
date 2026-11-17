@@ -775,6 +775,23 @@ public struct PinReport: Sendable, Hashable {
     }
 }
 
+/// A table of an item whose state or rows changed in the copy.
+public struct ChangedTable: Sendable, Hashable {
+    public var itemId: String
+    public var table: String
+
+    public init(itemId: String, table: String) {
+        self.itemId = itemId
+        self.table = table
+    }
+
+    init(_ core: MarfaCore.ChangedTable) {
+        self.init(itemId: core.itemId, table: core.table)
+    }
+
+    var core: MarfaCore.ChangedTable { MarfaCore.ChangedTable(itemId: itemId, table: table) }
+}
+
 public struct CatchUpReport: Sendable, Hashable {
     /// The server events the catch-up applied.
     public var applied: UInt64
@@ -787,27 +804,33 @@ public struct CatchUpReport: Sendable, Hashable {
     /// A catch-up with `applied` of 0 can still have changed the copy through these, such as the first one after an
     /// upgrade. Read the copy again; ``Change`` names no row for them.
     public var readOnlyHeld: UInt64
+    /// The tables whose state or rows the catch-up changed, fills included, so a table view reads them again.
+    ///
+    /// A catch-up with `applied` of 0 can still list a table, when it filled one the copy holds.
+    public var changedTables: [ChangedTable]
 
     public init(
-        applied: UInt64, skipped: UInt64, cursor: String, catalogChanged: Bool = false, readOnlyHeld: UInt64 = 0
+        applied: UInt64, skipped: UInt64, cursor: String, catalogChanged: Bool = false, readOnlyHeld: UInt64 = 0,
+        changedTables: [ChangedTable] = []
     ) {
         self.applied = applied
         self.skipped = skipped
         self.cursor = cursor
         self.catalogChanged = catalogChanged
         self.readOnlyHeld = readOnlyHeld
+        self.changedTables = changedTables
     }
 
     init(_ core: MarfaCore.CatchUpReport) {
         self.init(
             applied: core.applied, skipped: core.skipped, cursor: core.cursor, catalogChanged: core.catalogChanged,
-            readOnlyHeld: core.readOnlyHeld)
+            readOnlyHeld: core.readOnlyHeld, changedTables: core.changedTables.map(ChangedTable.init))
     }
 
     var core: MarfaCore.CatchUpReport {
         MarfaCore.CatchUpReport(
             applied: applied, skipped: skipped, readOnlyHeld: readOnlyHeld, cursor: cursor,
-            catalogChanged: catalogChanged)
+            catalogChanged: catalogChanged, changedTables: changedTables.map(\.core))
     }
 }
 

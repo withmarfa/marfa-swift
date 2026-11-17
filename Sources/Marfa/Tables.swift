@@ -17,8 +17,8 @@ public struct Tables: Sendable {
     /// it. The copy keeps the choice and holds the table of an item that arrives later. The fill needs the server and
     /// runs where no other call holds the copy's stream; where one does, `fill` is `nil` and that call's own fill
     /// takes the table. Throws `invalid` for a table that no type `type` names declares. Tells every held stream
-    /// `.refreshed(.tables)` once the choice is kept; a fill that a held stream makes later is not announced, so read
-    /// ``held()`` to see the table whole.
+    /// `.refreshed(.tables)` once the choice is kept; a fill that a held stream makes later is told with the catch-up that
+    /// made it, as `.refreshed(.tables)`, and named in ``CatchUpReport/changedTables``.
     public func hold(_ table: String, ofType type: String) async throws -> TableHold {
         let hold = try await holder.runUntilCanceled { core, stop in
             TableHold(try core.holdTable(typeId: type, table: table, stop: stop))

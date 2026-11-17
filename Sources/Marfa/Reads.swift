@@ -96,7 +96,8 @@ public enum CopyChanges: Sendable, Hashable {
         return .named(
             ChangedRows(
                 items: changes.items, removedItems: changes.removedItems, edges: changes.edges,
-                removedEdges: changes.removedEdges),
+                removedEdges: changes.removedEdges, tables: changes.tables.map(ChangedTable.init)
+            ),
             next: next)
     }
 }
@@ -116,14 +117,22 @@ public struct ChangedRows: Sendable, Hashable {
     public var edges: [String]
     /// Each changed edge the copy no longer holds.
     public var removedEdges: [String]
+    /// Each table held now or before whose state or rows changed, local writes and fills included: read them again.
+    public var tables: [ChangedTable]
 
-    public init(items: [String] = [], removedItems: [String] = [], edges: [String] = [], removedEdges: [String] = []) {
+    public init(
+        items: [String] = [], removedItems: [String] = [], edges: [String] = [], removedEdges: [String] = [],
+        tables: [ChangedTable] = []
+    ) {
         self.items = items
         self.removedItems = removedItems
         self.edges = edges
         self.removedEdges = removedEdges
+        self.tables = tables
     }
 
     /// Nothing changed since the cursor.
-    public var isEmpty: Bool { items.isEmpty && removedItems.isEmpty && edges.isEmpty && removedEdges.isEmpty }
+    public var isEmpty: Bool {
+        items.isEmpty && removedItems.isEmpty && edges.isEmpty && removedEdges.isEmpty && tables.isEmpty
+    }
 }

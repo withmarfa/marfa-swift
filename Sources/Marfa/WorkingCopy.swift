@@ -311,7 +311,7 @@ public final class WorkingCopy: Sendable {
     /// last hydration or catch-up.
     ///
     /// A catch-up that applied no event can still have moved rows, which `readOnlyHeld` counts; every held stream is
-    /// told `.refreshed(.caughtUp)` for either.
+    /// told `.refreshed(.caughtUp)` for either, and `.refreshed(.tables)` for a held table it filled or changed.
     ///
     /// A catch-up made while a hydration runs, such as the refill a held
     /// `changes()` stream starts, waits for it and then catches up from the
@@ -603,7 +603,8 @@ public struct Change: Sendable, Hashable {
         /// item type or edge type catalog; read `catalog` again.
         case catalog
         /// The tables the copy holds, or the rows it holds of them, changed through ``Tables/hold(_:ofType:)``,
-        /// ``Tables/letGo(_:ofType:)`` or ``Tables/fill()``; read ``Tables/held()`` and the rows again.
+        /// ``Tables/letGo(_:ofType:)`` or ``Tables/fill()``, or a catch-up filled or changed a held table, which
+        /// ``CatchUpReport/changedTables`` names; read ``Tables/held()`` and the rows again.
         case tables
     }
 
@@ -1256,6 +1257,9 @@ func caughtUp(
     let report = try caughtUp.get()
     if report.applied > 0 || report.readOnlyHeld > 0 {
         feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+    }
+    if !report.changedTables.isEmpty {
+        feed.announce(Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil))
     }
     return report
 }

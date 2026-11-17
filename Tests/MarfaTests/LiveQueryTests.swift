@@ -185,7 +185,7 @@ struct LiveQueries {
         let (core, copy) = Self.fake()
         core.state.withLock {
             $0.caughtUp = MarfaCore.CatchUpReport(
-                applied: 2, skipped: 0, readOnlyHeld: 0, cursor: "9", catalogChanged: false)
+                applied: 2, skipped: 0, readOnlyHeld: 0, cursor: "9", catalogChanged: false, changedTables: [])
         }
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))

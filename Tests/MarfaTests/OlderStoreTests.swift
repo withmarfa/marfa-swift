@@ -20,7 +20,7 @@ struct OlderStore {
         try Self.execute(
             store,
             """
-            PRAGMA user_version = 5;
+            PRAGMA user_version = 6;
             PRAGMA writable_schema = ON;
             UPDATE sqlite_master SET sql = replace(sql, '''undo_rows''', '''undo_rows'', ''merge_metadata''')
               WHERE type = 'table' AND name = 'queue';
@@ -34,7 +34,7 @@ struct OlderStore {
                 return false
             }
             return path.hasSuffix(store.lastPathComponent)
-                && reason.contains("it is at schema version 5, and this build reads schema version 6")
+                && reason.contains("it is at schema version 6, and this build reads schema version 7")
                 && reason.contains("its queue holds 1 write of kind merge_metadata, which this build cannot send")
                 && unsent == 2
                 && message.contains("It holds 2 writes the server has not taken")

@@ -140,7 +140,7 @@ final class FakeCore: Core, @unchecked Sendable {
         var places: [Place] = []
         var watchRefused: MarfaCore.MarfaError?
         var caughtUp = MarfaCore.CatchUpReport(
-            applied: 0, skipped: 0, readOnlyHeld: 0, cursor: "1", catalogChanged: false)
+            applied: 0, skipped: 0, readOnlyHeld: 0, cursor: "1", catalogChanged: false, changedTables: [])
         var drained = MarfaCore.DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
             unclaimedSources: [], retryAfterSeconds: nil)
@@ -304,17 +304,17 @@ final class FakeCore: Core, @unchecked Sendable {
         let next = String(changed.count)
         guard let cursor, let start = Int(cursor), start <= changed.count else {
             return MarfaCore.CopyChanges(
-                cursor: next, everything: true, items: [], removedItems: [], edges: [], removedEdges: [])
+                cursor: next, everything: true, items: [], removedItems: [], edges: [], removedEdges: [], tables: [])
         }
         var items: [String] = []
         var seen: Set<String> = []
         for id in changed[start...] where seen.insert(id).inserted { items.append(id) }
         guard items.count <= Int(most) else {
             return MarfaCore.CopyChanges(
-                cursor: next, everything: true, items: [], removedItems: [], edges: [], removedEdges: [])
+                cursor: next, everything: true, items: [], removedItems: [], edges: [], removedEdges: [], tables: [])
         }
         return MarfaCore.CopyChanges(
-            cursor: next, everything: false, items: items, removedItems: [], edges: [], removedEdges: [])
+            cursor: next, everything: false, items: items, removedItems: [], edges: [], removedEdges: [], tables: [])
     }
 
     override func hydrateWith(
@@ -574,7 +574,8 @@ final class DropProbe: Sendable {
 
 /// What a core that records no changes answers a copy's updates: read everything, at one cursor.
 func everythingChanged() -> MarfaCore.CopyChanges {
-    MarfaCore.CopyChanges(cursor: "0", everything: true, items: [], removedItems: [], edges: [], removedEdges: [])
+    MarfaCore.CopyChanges(
+        cursor: "0", everything: true, items: [], removedItems: [], edges: [], removedEdges: [], tables: [])
 }
 
 /// The status of an empty copy no hydration has filled, for a core that answers nothing else of it.

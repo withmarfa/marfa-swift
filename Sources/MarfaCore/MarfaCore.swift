@@ -1403,6 +1403,18 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func writeExtension(id: String, namespace: String, body: JsonObject) throws  -> QueuedWrite
     
     /**
+     * For each of up to 100 ids, once each in the order they first appear,
+     * how many active items an edge type links to it, by status group, or
+     * how many rows it holds in a table: what a list anchored on the item
+     * by the same `backref` or `edge` filter, naming no state, would list.
+     * Links are counted from the copy and throw `Invalid` where it does not
+     * hold the edge type whole or may lack an item the server counts that an
+     * edge reaches, so ask the server then. Rows come from the copy for a table held whole and from
+     * the server otherwise; `held` says which.
+     */
+    func counts(ids: [String], counted: Counted) throws  -> [ItemCount]
+    
+    /**
      * Sent as `create_folder` is, based on `version`. A setting changed
      * since `version` is `MarfaError.Server` with status 409 and the code
      * `version_conflict`; a revoked folder is `MarfaError.Validation` with
@@ -2570,6 +2582,26 @@ open func writeExtension(id: String, namespace: String, body: JsonObject)throws 
         FfiConverterString.lower(id),
         FfiConverterString.lower(namespace),
         FfiConverterTypeJsonObject_lower(body),$0
+    )
+})
+}
+    
+    /**
+     * For each of up to 100 ids, once each in the order they first appear,
+     * how many active items an edge type links to it, by status group, or
+     * how many rows it holds in a table: what a list anchored on the item
+     * by the same `backref` or `edge` filter, naming no state, would list.
+     * Links are counted from the copy and throw `Invalid` where it does not
+     * hold the edge type whole or may lack an item the server counts that an
+     * edge reaches, so ask the server then. Rows come from the copy for a table held whole and from
+     * the server otherwise; `held` says which.
+     */
+open func counts(ids: [String], counted: Counted)throws  -> [ItemCount]  {
+    return try  FfiConverterSequenceTypeItemCount.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_counts(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(ids),
+        FfiConverterTypeCounted_lower(counted),$0
     )
 })
 }
@@ -4770,6 +4802,10 @@ public struct CatchUpReport: Equatable, Hashable {
      * The catch-up changed the catalog the copy holds.
      */
     public var catalogChanged: Bool
+    /**
+     * Tables whose state or rows changed during catch-up, including fills.
+     */
+    public var changedTables: [ChangedTable]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -4779,12 +4815,16 @@ public struct CatchUpReport: Equatable, Hashable {
          */readOnlyHeld: UInt64, cursor: String, 
         /**
          * The catch-up changed the catalog the copy holds.
-         */catalogChanged: Bool) {
+         */catalogChanged: Bool, 
+        /**
+         * Tables whose state or rows changed during catch-up, including fills.
+         */changedTables: [ChangedTable]) {
         self.applied = applied
         self.skipped = skipped
         self.readOnlyHeld = readOnlyHeld
         self.cursor = cursor
         self.catalogChanged = catalogChanged
+        self.changedTables = changedTables
     }
 
     
@@ -4807,7 +4847,8 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
                 skipped: FfiConverterUInt64.read(from: &buf), 
                 readOnlyHeld: FfiConverterUInt64.read(from: &buf), 
                 cursor: FfiConverterString.read(from: &buf), 
-                catalogChanged: FfiConverterBool.read(from: &buf)
+                catalogChanged: FfiConverterBool.read(from: &buf), 
+                changedTables: FfiConverterSequenceTypeChangedTable.read(from: &buf)
         )
     }
 
@@ -4817,6 +4858,7 @@ public struct FfiConverterTypeCatchUpReport: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.readOnlyHeld, into: &buf)
         FfiConverterString.write(value.cursor, into: &buf)
         FfiConverterBool.write(value.catalogChanged, into: &buf)
+        FfiConverterSequenceTypeChangedTable.write(value.changedTables, into: &buf)
     }
 }
 
@@ -4833,6 +4875,63 @@ public func FfiConverterTypeCatchUpReport_lift(_ buf: RustBuffer) throws -> Catc
 #endif
 public func FfiConverterTypeCatchUpReport_lower(_ value: CatchUpReport) -> RustBuffer {
     return FfiConverterTypeCatchUpReport.lower(value)
+}
+
+
+/**
+ * A table the copy holds, or held, whose state or rows changed.
+ */
+public struct ChangedTable: Equatable, Hashable {
+    public var itemId: String
+    public var table: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(itemId: String, table: String) {
+        self.itemId = itemId
+        self.table = table
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ChangedTable: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeChangedTable: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ChangedTable {
+        return
+            try ChangedTable(
+                itemId: FfiConverterString.read(from: &buf), 
+                table: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ChangedTable, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.itemId, into: &buf)
+        FfiConverterString.write(value.table, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeChangedTable_lift(_ buf: RustBuffer) throws -> ChangedTable {
+    return try FfiConverterTypeChangedTable.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeChangedTable_lower(_ value: ChangedTable) -> RustBuffer {
+    return FfiConverterTypeChangedTable.lower(value)
 }
 
 
@@ -4946,7 +5045,7 @@ public struct CopyChanges: Equatable, Hashable {
      */
     public var cursor: String
     /**
-     * True where the changes cannot be named one by one, and the four lists
+     * True where the changes cannot be named one by one, and the five lists
      * are empty: read the whole copy again.
      */
     public var everything: Bool
@@ -4966,6 +5065,10 @@ public struct CopyChanges: Equatable, Hashable {
      * Each changed edge the copy no longer holds.
      */
     public var removedEdges: [String]
+    /**
+     * Tables held now or before whose state or rows changed, including local writes.
+     */
+    public var tables: [ChangedTable]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -4974,7 +5077,7 @@ public struct CopyChanges: Equatable, Hashable {
          * Where the next call starts from.
          */cursor: String, 
         /**
-         * True where the changes cannot be named one by one, and the four lists
+         * True where the changes cannot be named one by one, and the five lists
          * are empty: read the whole copy again.
          */everything: Bool, 
         /**
@@ -4988,13 +5091,17 @@ public struct CopyChanges: Equatable, Hashable {
          */edges: [String], 
         /**
          * Each changed edge the copy no longer holds.
-         */removedEdges: [String]) {
+         */removedEdges: [String], 
+        /**
+         * Tables held now or before whose state or rows changed, including local writes.
+         */tables: [ChangedTable]) {
         self.cursor = cursor
         self.everything = everything
         self.items = items
         self.removedItems = removedItems
         self.edges = edges
         self.removedEdges = removedEdges
+        self.tables = tables
     }
 
     
@@ -5018,7 +5125,8 @@ public struct FfiConverterTypeCopyChanges: FfiConverterRustBuffer {
                 items: FfiConverterSequenceString.read(from: &buf), 
                 removedItems: FfiConverterSequenceString.read(from: &buf), 
                 edges: FfiConverterSequenceString.read(from: &buf), 
-                removedEdges: FfiConverterSequenceString.read(from: &buf)
+                removedEdges: FfiConverterSequenceString.read(from: &buf), 
+                tables: FfiConverterSequenceTypeChangedTable.read(from: &buf)
         )
     }
 
@@ -5029,6 +5137,7 @@ public struct FfiConverterTypeCopyChanges: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.removedItems, into: &buf)
         FfiConverterSequenceString.write(value.edges, into: &buf)
         FfiConverterSequenceString.write(value.removedEdges, into: &buf)
+        FfiConverterSequenceTypeChangedTable.write(value.tables, into: &buf)
     }
 }
 
@@ -8324,6 +8433,85 @@ public func FfiConverterTypeItem_lower(_ value: Item) -> RustBuffer {
 
 
 /**
+ * One item's count.
+ */
+public struct ItemCount: Equatable, Hashable {
+    public var id: String
+    public var total: Int64
+    /**
+     * `nil` for a table's rows. An item with no status, or a status word
+     * its type does not declare, is in `total` and in no group.
+     */
+    public var statusGroups: StatusGroups?
+    /**
+     * `true` where the copy answered, `false` where the server did.
+     */
+    public var held: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, total: Int64, 
+        /**
+         * `nil` for a table's rows. An item with no status, or a status word
+         * its type does not declare, is in `total` and in no group.
+         */statusGroups: StatusGroups?, 
+        /**
+         * `true` where the copy answered, `false` where the server did.
+         */held: Bool) {
+        self.id = id
+        self.total = total
+        self.statusGroups = statusGroups
+        self.held = held
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ItemCount: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeItemCount: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ItemCount {
+        return
+            try ItemCount(
+                id: FfiConverterString.read(from: &buf), 
+                total: FfiConverterInt64.read(from: &buf), 
+                statusGroups: FfiConverterOptionTypeStatusGroups.read(from: &buf), 
+                held: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ItemCount, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterInt64.write(value.total, into: &buf)
+        FfiConverterOptionTypeStatusGroups.write(value.statusGroups, into: &buf)
+        FfiConverterBool.write(value.held, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemCount_lift(_ buf: RustBuffer) throws -> ItemCount {
+    return try FfiConverterTypeItemCount.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeItemCount_lower(_ value: ItemCount) -> RustBuffer {
+    return FfiConverterTypeItemCount.lower(value)
+}
+
+
+/**
  * How a device shows an item: its name and a line of preview text, each
  * none where the item has nothing to show.
  */
@@ -10187,7 +10375,7 @@ public struct RowsAsked: Equatable, Hashable {
     public var cursor: String?
     public var filter: String?
     /**
-     * `id`, `updated_at` or a column's name.
+     * `id`, `updated_at` or `values.<column>`.
      */
     public var sort: String?
     public var direction: SortDirection?
@@ -10196,7 +10384,7 @@ public struct RowsAsked: Equatable, Hashable {
     // declare one manually.
     public init(limit: UInt32? = nil, cursor: String? = nil, filter: String? = nil, 
         /**
-         * `id`, `updated_at` or a column's name.
+         * `id`, `updated_at` or `values.<column>`.
          */sort: String? = nil, direction: SortDirection? = nil) {
         self.limit = limit
         self.cursor = cursor
@@ -11026,6 +11214,71 @@ public func FfiConverterTypeStatus_lift(_ buf: RustBuffer) throws -> Status {
 #endif
 public func FfiConverterTypeStatus_lower(_ value: Status) -> RustBuffer {
     return FfiConverterTypeStatus.lower(value)
+}
+
+
+/**
+ * The counted items in each status group.
+ */
+public struct StatusGroups: Equatable, Hashable {
+    public var notStarted: Int64
+    public var inProgress: Int64
+    public var completed: Int64
+    public var canceled: Int64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(notStarted: Int64, inProgress: Int64, completed: Int64, canceled: Int64) {
+        self.notStarted = notStarted
+        self.inProgress = inProgress
+        self.completed = completed
+        self.canceled = canceled
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension StatusGroups: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStatusGroups: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StatusGroups {
+        return
+            try StatusGroups(
+                notStarted: FfiConverterInt64.read(from: &buf), 
+                inProgress: FfiConverterInt64.read(from: &buf), 
+                completed: FfiConverterInt64.read(from: &buf), 
+                canceled: FfiConverterInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StatusGroups, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.notStarted, into: &buf)
+        FfiConverterInt64.write(value.inProgress, into: &buf)
+        FfiConverterInt64.write(value.completed, into: &buf)
+        FfiConverterInt64.write(value.canceled, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStatusGroups_lift(_ buf: RustBuffer) throws -> StatusGroups {
+    return try FfiConverterTypeStatusGroups.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStatusGroups_lower(_ value: StatusGroups) -> RustBuffer {
+    return FfiConverterTypeStatusGroups.lower(value)
 }
 
 
@@ -12549,6 +12802,103 @@ public func FfiConverterTypeCompleteness_lift(_ buf: RustBuffer) throws -> Compl
 #endif
 public func FfiConverterTypeCompleteness_lower(_ value: Completeness) -> RustBuffer {
     return FfiConverterTypeCompleteness.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * What a count counts for each item.
+ */
+
+public enum Counted: Equatable, Hashable {
+    
+    /**
+     * The active items an edge of the type leaves each item for, such as
+     * the children `parent-of` gives.
+     */
+    case backref(edgeType: String
+    )
+    /**
+     * The active items with an edge of the type to each item, such as the
+     * members `in-collection` gives.
+     */
+    case edge(edgeType: String
+    )
+    /**
+     * The rows each item holds in the table.
+     */
+    case table(table: String
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension Counted: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCounted: FfiConverterRustBuffer {
+    typealias SwiftType = Counted
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Counted {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .backref(edgeType: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 2: return .edge(edgeType: try FfiConverterString.read(from: &buf)
+        )
+        
+        case 3: return .table(table: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: Counted, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case let .backref(edgeType):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(edgeType, into: &buf)
+            
+        
+        case let .edge(edgeType):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(edgeType, into: &buf)
+            
+        
+        case let .table(table):
+            writeInt(&buf, Int32(3))
+            FfiConverterString.write(table, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCounted_lift(_ buf: RustBuffer) throws -> Counted {
+    return try FfiConverterTypeCounted.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCounted_lower(_ value: Counted) -> RustBuffer {
+    return FfiConverterTypeCounted.lower(value)
 }
 
 
@@ -16819,6 +17169,30 @@ fileprivate struct FfiConverterOptionTypeSort: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeStatusGroups: FfiConverterRustBuffer {
+    typealias SwiftType = StatusGroups?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeStatusGroups.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeStatusGroups.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeTableFill: FfiConverterRustBuffer {
     typealias SwiftType = TableFill?
 
@@ -17301,6 +17675,31 @@ fileprivate struct FfiConverterSequenceTypeBodyName: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeChangedTable: FfiConverterRustBuffer {
+    typealias SwiftType = [ChangedTable]
+
+    public static func write(_ value: [ChangedTable], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeChangedTable.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ChangedTable] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ChangedTable]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeChangedTable.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeDrainVerdict: FfiConverterRustBuffer {
     typealias SwiftType = [DrainVerdict]
 
@@ -17518,6 +17917,31 @@ fileprivate struct FfiConverterSequenceTypeItem: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeItemCount: FfiConverterRustBuffer {
+    typealias SwiftType = [ItemCount]
+
+    public static func write(_ value: [ItemCount], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeItemCount.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ItemCount] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ItemCount]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeItemCount.read(from: &buf))
         }
         return seq
     }
@@ -18535,6 +18959,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_counts() != 65146) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_change_folder() != 57042) {

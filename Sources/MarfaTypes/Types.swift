@@ -109,6 +109,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /items/bulk-get`.
     /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)`.
     func bulkGetItems(_ input: Operations.BulkGetItems.Input) async throws -> Operations.BulkGetItems.Output
+    /// Count linked items and rows
+    ///
+    /// Returns, for each of up to 100 items, how many active items an edge type links to it, by status group, or how many rows it holds in one table. Name exactly one of `backref`, `edge` and `table`.
+    ///
+    /// - Remark: HTTP `POST /items/counts`.
+    /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)`.
+    func countItemLinks(_ input: Operations.CountItemLinks.Input) async throws -> Operations.CountItemLinks.Output
     /// Upsert items in bulk
     ///
     /// Creates or updates up to 5,000 items in one call, matching existing items on `(source, source_id)`. The batch is atomic by default: one failed entry rolls it all back. Returns each entry's outcome.
@@ -1345,6 +1352,21 @@ extension APIProtocol {
         body: Operations.BulkGetItems.Input.Body
     ) async throws -> Operations.BulkGetItems.Output {
         try await bulkGetItems(Operations.BulkGetItems.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Count linked items and rows
+    ///
+    /// Returns, for each of up to 100 items, how many active items an edge type links to it, by status group, or how many rows it holds in one table. Name exactly one of `backref`, `edge` and `table`.
+    ///
+    /// - Remark: HTTP `POST /items/counts`.
+    /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)`.
+    public func countItemLinks(
+        headers: Operations.CountItemLinks.Input.Headers = .init(),
+        body: Operations.CountItemLinks.Input.Body
+    ) async throws -> Operations.CountItemLinks.Output {
+        try await countItemLinks(Operations.CountItemLinks.Input(
             headers: headers,
             body: body
         ))
