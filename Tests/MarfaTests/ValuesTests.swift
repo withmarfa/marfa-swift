@@ -215,12 +215,12 @@ struct Errors {
         ),
         (.ReadingHandle(message: "m"), .readingHandle(message: "m")),
         (
-            .UnsentDiffers(path: "p", unsent: 2, agreed: 1, message: "m"),
-            .unsentDiffers(path: "p", unsent: 2, agreed: 1, message: "m")
+            .UnsentDiffers(path: "p", unsent: 2, message: "m"),
+            .unsentDiffers(path: "p", unsent: 2, message: "m")
         ),
         (
-            .UnsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m"),
-            .unsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m")
+            .UnsentDiffers(path: "p", unsent: nil, message: "m"),
+            .unsentDiffers(path: "p", unsent: nil, message: "m")
         ),
         (
             .CopyExpired(reason: "aged_out", message: "m", server: nil),

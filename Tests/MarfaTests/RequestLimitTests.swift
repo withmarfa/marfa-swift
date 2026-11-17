@@ -101,3 +101,73 @@ struct RequestLimitTests {
         await copy.close()
     }
 }
+
+/// A store removal is confirmed against the writes the person saw, so an answer that arrives after the list was read
+/// refuses it.
+@Suite(.timeLimit(.minutes(1)))
+struct RemovalAfterAnswers {
+    private static func isUnsentDiffers(_ error: any Error, holding count: UInt64) -> Bool {
+        guard case .unsentDiffers(_, let unsent, _)? = error as? MarfaError else { return false }
+        return unsent == count
+    }
+
+    /// A store holding one unsent create of `title`, closed, and the list the person was shown of it.
+    private static func storeShown(_ title: String, on server: LocalServer) async throws -> (
+        store: URL, id: String, shown: UnsentWrites
+    ) {
+        let store = temporaryStore()
+        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        let made = try await copy.items.create(
+            Draft(type: "core.note", properties: ["title": .string(title)], tier: .feed))
+        await copy.close()
+        return (store, try #require(made.itemId), try await WorkingCopy.unsentWrites(in: store))
+    }
+
+    @Test func aWriteTheServerTookAfterTheListWasReadRefusesTheRemoval() async throws {
+        let ids = CreateAnswer()
+        let server = try await serverTaking(1_500, creating: ids)
+        defer { server.stop() }
+        let (store, id, shown) = try await Self.storeShown("short", on: server)
+        ids.set(id)
+        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        let report = try await copy.queue.drain()
+        #expect(report.verdicts.first?.verdict == .accepted, "\(report)")
+        await copy.close()
+
+        await #expect {
+            try await WorkingCopy.remove(store: store, confirming: shown)
+        } throws: { Self.isUnsentDiffers($0, holding: 0) }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+
+        // The witness: what the store holds now, read again, is removed.
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func aWriteWhoseVerdictChangedUnderTheSameIdRefusesTheRemoval() async throws {
+        let server = try await serverTaking(1_500, creating: CreateAnswer())
+        defer { server.stop() }
+        let (store, id, shown) = try await Self.storeShown(String(repeating: "é", count: 1_000), on: server)
+        #expect(shown.writes.map(\.itemId) == [id])
+        #expect(shown.writes.first?.verdict == nil)
+        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        let report = try await copy.queue.drain()
+        #expect(report.unsent == 1, "the over-limit write stays unsent: \(report)")
+        await copy.close()
+
+        let now = try await WorkingCopy.unsentWrites(in: store)
+        #expect(now.writes.map(\.id) == shown.writes.map(\.id), "the same write")
+        #expect(now.writes.first?.verdict != nil)
+        #expect(now.confirmation != shown.confirmation)
+        await #expect {
+            try await WorkingCopy.remove(store: store, confirming: shown)
+        } throws: { Self.isUnsentDiffers($0, holding: 1) }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+
+        try await WorkingCopy.remove(store: store, confirming: now)
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+}

@@ -1,8 +1,8 @@
 import Foundation
 internal import MarfaCore
 
-/// A write the server has not taken, read from a store that ``WorkingCopy/open(store:server:fileBudget:ifRefused:)``
-/// refused, so a person can see what a removal would lose.
+/// A write the server has not taken, read from a store whole or refused, so a person can see what a removal would
+/// lose.
 public struct UnsentWrite: Sendable, Hashable {
     public var id: String
     /// The kind as the store names it, which may be one this build does not send.
@@ -23,6 +23,23 @@ public struct UnsentWrite: Sendable, Hashable {
 
     init(_ core: MarfaCore.UnsentWrite) {
         self.init(id: core.id, kind: core.kind, itemId: core.itemId, body: core.body, verdict: core.verdict)
+    }
+}
+
+/// The writes a store holds that the server has not taken, as the person is shown them, and the confirmation
+/// ``WorkingCopy/remove(store:confirming:)`` takes to lose exactly these.
+///
+/// Only ``WorkingCopy/unsentWrites(in:)`` makes one, so a removal always names what was read, never a count or a
+/// guess.
+public struct UnsentWrites: Sendable, Hashable {
+    /// In queue order.
+    public let writes: [UnsentWrite]
+    /// Stands for every field of every write in `writes`, in that order, and for nothing else.
+    public let confirmation: String
+
+    init(_ core: MarfaCore.UnsentWrites) {
+        writes = core.writes.map(UnsentWrite.init)
+        confirmation = core.confirmation
     }
 }
 
@@ -93,10 +110,13 @@ extension WorkingCopy {
     /// The writes the server has not taken that the store at `store` holds, whether the store is damaged, made by
     /// another build, or whole.
     ///
-    /// A kind or a verdict is as the store names it, which may be one this build does not know.
-    public static func unsentWrites(in store: URL) async throws -> [UnsentWrite] {
+    /// A kind or a verdict is as the store names it, which may be one this build does not know. A path with no store
+    /// lists no writes. Show the person the writes, then remove the store with ``remove(store:confirming:)``, which
+    /// refuses if the store's writes are no longer these. Reads the store with a read-only connection while holding
+    /// its writer lock, so it throws `readingHandle` while another process or open copy writes it.
+    public static func unsentWrites(in store: URL) async throws -> UnsentWrites {
         let path = store.path
-        return try await background { try readUnsent(path: path).map(UnsentWrite.init) }
+        return try await background { UnsentWrites(try readUnsent(path: path)) }
     }
 
     /// Keeps the damaged store at `store` beside itself and makes a new store at `store` that carries every write the
@@ -113,12 +133,12 @@ extension WorkingCopy {
         return try await background { SetAside(try MarfaCore.setAsideDamaged(path: path)) }
     }
 
-    /// Removes the store at `store` as ``remove(store:unsent:)`` does, agreeing to lose every write it holds that the
-    /// server has not taken, however many there are and whether or not they can be counted.
+    /// Removes the store at `store` as ``remove(store:confirming:)`` does, agreeing to lose every write it holds that the
+    /// server has not taken, whatever they are and whether or not they can be read.
     ///
     /// It is for a store `open` refuses with ``MarfaError/storeDamaged(path:reason:unsent:message:)``, whose
-    /// queue cannot always be counted. Show the person ``unsentWrites(in:)`` first. Throws as `remove` does, except
-    /// for the count.
+    /// queue cannot always be read. Show the person ``unsentWrites(in:)`` first. Throws as `remove` does, except
+    /// for the writes.
     public static func removeLosingAll(store: URL) async throws {
         let path = store.path
         try await background { try removeStoreLosingAll(path: path) }

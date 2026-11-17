@@ -51,9 +51,9 @@ struct StoreRecovery {
 
         // The person can see what is unsent before choosing.
         let unsent = try await WorkingCopy.unsentWrites(in: store)
-        #expect(unsent.count == 2)
-        #expect(unsent.allSatisfy { $0.itemId == id })
-        #expect(unsent.map(\.kind).sorted() == ["add_tag", "create_item"])
+        #expect(unsent.writes.count == 2)
+        #expect(unsent.writes.allSatisfy { $0.itemId == id })
+        #expect(unsent.writes.map(\.kind).sorted() == ["add_tag", "create_item"])
 
         let result = try await WorkingCopy.setAsideDamaged(store: store)
         #expect(result.carried > 0, "\(result)")
@@ -69,9 +69,9 @@ struct StoreRecovery {
         let (store, id) = try await Self.storeWithUnsentWrites()
         try await WorkingCopy.check(store: store)
         let unsent = try await WorkingCopy.unsentWrites(in: store)
-        #expect(unsent.count == 2)
-        #expect(unsent.allSatisfy { $0.itemId == id })
-        #expect(unsent.map(\.kind).sorted() == ["add_tag", "create_item"])
+        #expect(unsent.writes.count == 2)
+        #expect(unsent.writes.allSatisfy { $0.itemId == id })
+        #expect(unsent.writes.map(\.kind).sorted() == ["add_tag", "create_item"])
         try await WorkingCopy.removeLosingAll(store: store)
         #expect(!FileManager.default.fileExists(atPath: store.path))
     }

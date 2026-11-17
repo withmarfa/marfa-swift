@@ -95,6 +95,9 @@ import Synchronization
 ///   type does not admit, nesting under a flat edge type, an end in the bin, an edge of a triple it holds, an end
 ///   that already holds the one edge of the type it may, and a cycle through held edges (an edge an update moves is
 ///   left out of these). A retype is refused when an edge the item holds would no longer fit its new type.
+/// - It holds no table, since it has no server to fill one from: `tables.held()` answers none and `tables.letGo`
+///   answers `false`, and `tables.write` and `tables.undo` refuse an item it does not hold. Every other table call,
+///   `tables.write` and `tables.undo` for an item it holds included, throws ``FakeCopyError/unsupported(call:)``.
 /// - A search finds an item again once it is restored from the bin, as the contract says. A real copy does not
 ///   until it reads the row again (withmarfa/marfa#2526).
 ///

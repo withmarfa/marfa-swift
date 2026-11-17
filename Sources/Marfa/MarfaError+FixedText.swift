@@ -92,7 +92,8 @@ extension MarfaError {
             FixedErrorText(type: "reading_handle", sentence: "another process holds the working copy's writer handle")
         case .unsentDiffers:
             FixedErrorText(
-                type: "unsent_differs", sentence: "the working copy holds other writes than the ones agreed to lose")
+                type: "unsent_differs",
+                sentence: "the working copy holds other writes than the ones the person was shown")
         case .copyExpired:
             FixedErrorText(type: "copy_expired", sentence: "the working copy can no longer be kept current")
         case .streamIncomplete:
