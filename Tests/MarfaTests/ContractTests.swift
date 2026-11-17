@@ -13,7 +13,7 @@ struct ContractTests {
         do {
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
             Issue.record("a server on contract \(marfaContractVersion + 1) was not refused")
-        } catch let MarfaError.contractMismatch(served, expected, status, writeSent, _) {
+        } catch let MarfaError.contractMismatch(served, expected, status, writeSent, _, _) {
             #expect(served == String(marfaContractVersion + 1))
             #expect(expected == UInt64(marfaContractVersion))
             #expect(status == 200)
@@ -33,7 +33,7 @@ struct ContractTests {
         do {
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
             Issue.record("a redirect was accepted")
-        } catch let MarfaError.redirected(origin, status, destination, message) {
+        } catch let MarfaError.redirected(origin, status, destination, message, _) {
             #expect(origin == server.url.absoluteString)
             #expect(status == 307)
             #expect(destination == location)

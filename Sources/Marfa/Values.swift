@@ -12,7 +12,7 @@ internal import MarfaCore
 ///   `streamIncomplete` whose reason is `credential_ended`. It is never `true` for `forbidden`: the server answers
 ///   a revoked or expired key with 401, and every 403 means the key is valid but lacks a permission.
 /// - ``isTransient``: asking again later can clear it, with nothing changed. It is the rule the core's own
-///   follow waits out, with `noConnection` and `keyChanging` added. No error is both a key refusal and transient,
+///   follow waits out, with `noConnection`, `keyChanging` and `storeBusy` added. No error is both a key refusal and transient,
 ///   and every offline error is transient.
 /// - ``isHydrationNeeded``: the copy must be hydrated before it can be caught up or followed. Asking again cannot
 ///   clear it. It is `true` for `copyExpired` (unless its reason is `credential_ended`, which is a key refusal),
@@ -20,11 +20,11 @@ internal import MarfaCore
 ///   a transient error.
 public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The server has no such row, route or name (404).
-    case notFound(code: String, message: String)
+    case notFound(code: String, message: String, server: ServerAnswer?)
     /// The server does not accept the key or token (401). A revoked or expired key gets this refusal.
-    case unauthorized(code: String, message: String)
+    case unauthorized(code: String, message: String, server: ServerAnswer?)
     /// The key is valid but lacks the permission the call needs (403), such as `type_not_permitted`.
-    case forbidden(code: String, message: String)
+    case forbidden(code: String, message: String, server: ServerAnswer?)
     /// The server refused the values sent (400 or 422), or the copy refused them before sending, as the server
     /// would.
     ///
@@ -34,34 +34,42 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// reads it one way whichever refused:
     ///
     /// - `edge_constraint_violation` for an end of a type the edge type does not admit: `edge_type`,
-    ///   `source_type` or `target_type`, and `allowed`, the type constraints of that end.
-    /// - `edge_constraint_violation` for nesting under a flat edge type: `edge_type`, `source_id`, `source_type`
+    ///   `from_type` or `to_type`, and `allowed`, the type constraints of that end.
+    /// - `edge_constraint_violation` for nesting under a flat edge type: `edge_type`, `from_id`, `from_type`
     ///   and `constraint` `"nesting"`.
-    /// - `edge_constraint_violation` for an edge of the same type, source and target the copy already shows:
-    ///   `edge_type`, `source_id`, `target_id` and `constraint` `"duplicate"`.
+    /// - `edge_constraint_violation` for an edge of the same type, from end and to end the copy already shows:
+    ///   `edge_type`, `from_id`, `to_id` and `constraint` `"duplicate"`.
     /// - `edge_constraint_violation` for an end that already holds the one edge of the type it may: `edge_type`,
-    ///   `source_id` or `target_id` (the end that is full) and `constraint` `"cardinality"`.
-    /// - `edge_cycle`: `edge_type`, `source_id` and `target_id` for a longer cycle, and `edge_type` alone for an
+    ///   `from_id` or `to_id` (the end that is full) and `constraint` `"cardinality"`.
+    /// - `edge_cycle`: `edge_type`, `from_id` and `to_id` for a longer cycle, and `edge_type` alone for an
     ///   edge from an item to itself.
     ///
     /// It is `nil` for every other refusal, including one the server answers to a request sent to it directly.
-    case validation(code: String, message: String, details: JSONValue?)
+    case validation(code: String, message: String, details: JSONValue?, server: ServerAnswer?)
     /// The copy's type catalog holds no type of the name given.
-    case unknownType(message: String)
+    case unknownType(message: String, server: ServerAnswer?)
     /// The server asks the client to slow down (429), for `retryAfterSeconds` where it says.
-    case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?)
+    case rateLimited(code: String, message: String, retryAfterSeconds: UInt64?, server: ServerAnswer?)
     /// Another answer from the server, with its status and code. A status of 500 or more, or 408, is transient.
-    case server(status: UInt16, code: String, message: String)
+    case server(status: UInt16, code: String, message: String, details: JSONValue?, server: ServerAnswer?)
     /// Reading or writing a local file failed.
     case io(message: String)
     /// The request did not reach the server, or its answer did not come back in time.
     case network(message: String)
     /// A response from something in front of the server, without its contract.
-    case unnamed(status: UInt16, message: String)
+    case unnamed(status: UInt16, message: String, server: ServerAnswer?)
     /// An answer or a stored value could not be read.
     case decoding(message: String)
     /// The store could not be opened, read or written.
     case store(message: String)
+    /// Another process holds the store while this call needed it.
+    case storeBusy(message: String)
+    /// SQLite cannot read the store at `path`, or a set-aside of it stopped part way. `path` is empty where the
+    /// damage was met part way through a call, which does not know the path: ``WorkingCopy/check(store:)`` names it.
+    /// `unsent` counts the writes the server has not taken, `nil` where the queue cannot be read whole.
+    /// ``WorkingCopy/setAsideDamaged(store:)`` keeps the store and carries the writes it can read, and
+    /// ``WorkingCopy/unsentWrites(in:)`` lists them so the person can see what a removal would lose.
+    case storeDamaged(path: String, reason: String, unsent: UInt64?, message: String)
     /// The device has no room left to write the store.
     case storageFull(message: String)
     /// The keychain no longer holds a sign-in for `origin`, or the server ended it; sign in again.
@@ -69,7 +77,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The keychain cannot be used.
     case noKeychain(message: String)
     /// The server answered with a redirect, which is not followed, so the key goes nowhere else.
-    case redirected(origin: String, status: UInt16, location: String?, message: String)
+    case redirected(origin: String, status: UInt16, location: String?, message: String, server: ServerAnswer?)
     /// The call needs a server, and the copy was opened without one.
     case noServer(message: String)
     /// The copy holds no position in the server's events; hydrate first.
@@ -94,14 +102,14 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case unsentDiffers(path: String, unsent: UInt64?, agreed: UInt64, message: String)
     /// Hydration is needed to make the copy current; its queue is kept. `reason`
     /// is an open string, such as `reach_changed`, `credential_ended` or `catchup_too_old`; another instance at
-    /// the server's address is ``instanceChanged(message:)`` instead. A stale copy
+    /// the server's address is ``instanceChanged(message:server:)`` instead. A stale copy
     /// (`catchup_too_old`) refuses a drain and a catch-up this way until a hydration has filled it again.
     /// The catch-up that first detects an aged-out cursor gives a descriptive reason; read `status().hydration`
     /// to distinguish `.stale` from other expired copies. A held `changes()` stream fills a stale copy again by
     /// itself when its follow finds the cursor aged out, and is told this error where it does not.
-    case copyExpired(reason: String, message: String)
+    case copyExpired(reason: String, message: String, server: ServerAnswer?)
     /// The server ended the event stream early, for `reason`, such as `credential_ended`.
-    case streamIncomplete(reason: String, message: String)
+    case streamIncomplete(reason: String, message: String, server: ServerAnswer?)
     /// The store or file belongs to the server `expected`, not to `got`.
     case wrongServer(expected: String, got: String, message: String)
     /// The item is whole and its bytes are not here, nor can they be fetched.
@@ -114,7 +122,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// write, which may have taken effect: it stays queued, and goes again
     /// under its idempotency key once the app speaks the server's contract.
     /// `status` is nil when the failure carries no HTTP status.
-    case contractMismatch(served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String)
+    case contractMismatch(
+        served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String, server: ServerAnswer?)
     /// The caller canceled the call before it finished.
     case canceled(message: String)
     /// A folder's first sync waits for the person to confirm it, so the call that would write or send for it
@@ -132,10 +141,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case keyChanging(message: String)
     /// The server refused a write made against a version of the row that is no longer current (409
     /// `version_conflict`). Read the row again and decide what to write.
-    case versionConflict(message: String)
+    case versionConflict(message: String, server: ServerAnswer?)
     /// Another Marfa instance answers at the server's address (409 `instance_changed`), so the copy needs a
     /// hydration from it. Its queue is kept.
-    case instanceChanged(message: String)
+    case instanceChanged(message: String, server: ServerAnswer?)
     /// The working copy was closed, or failed to reopen its store with a new
     /// key; it is gone for good, and the app opens the store again.
     case closed(message: String)
@@ -159,20 +168,21 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     public var isKeyRefusal: Bool {
         switch self {
         case .unauthorized, .signedOut: true
-        case .copyExpired(let reason, _), .streamIncomplete(let reason, _): reason == "credential_ended"
+        case .copyExpired(let reason, _, _), .streamIncomplete(let reason, _, _): reason == "credential_ended"
         default: false
         }
     }
 
     /// Asking again later can clear it, with nothing changed: the rule the core's own follow waits out
-    /// (`CoreError::is_environmental`), with `noConnection` and `keyChanging` added.
+    /// (`CoreError::is_environmental`), with `noConnection`, `keyChanging` and `storeBusy` added: another program held
+    /// the store, and asking again later finds it free.
     ///
-    /// An ``unnamed(status:message:)`` answer is transient whatever its status, since a gateway's 401 is not the
+    /// An ``unnamed(status:message:server:)`` answer is transient whatever its status, since a gateway's 401 is not the
     /// server's word on the key.
     public var isTransient: Bool {
         switch self {
-        case .network, .noConnection, .io, .storageFull, .rateLimited, .unnamed, .keyChanging: true
-        case .server(let status, _, _): status >= 500 || status == 408
+        case .network, .noConnection, .io, .storageFull, .storeBusy, .rateLimited, .unnamed, .keyChanging: true
+        case .server(let status, _, _, _, _): status >= 500 || status == 408
         default: false
         }
     }
@@ -183,7 +193,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// `credential_ended` is a key refusal instead, which a new key clears.
     public var isHydrationNeeded: Bool {
         switch self {
-        case .copyExpired(let reason, _): reason != "credential_ended"
+        case .copyExpired(let reason, _, _): reason != "credential_ended"
         case .instanceChanged, .noCursor, .hydrationIncomplete, .firstSyncWaiting: true
         default: false
         }
@@ -192,21 +202,44 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// Fit to show a person.
     public var message: String {
         switch self {
-        case .notFound(_, let message), .unauthorized(_, let message), .forbidden(_, let message),
-            .validation(_, let message, _), .unknownType(let message), .rateLimited(_, let message, _),
-            .server(_, _, let message), .io(let message), .network(let message), .unnamed(_, let message),
+        case .notFound(_, let message, _), .unauthorized(_, let message, _), .forbidden(_, let message, _),
+            .validation(_, let message, _, _), .unknownType(let message, _), .rateLimited(_, let message, _, _),
+            .server(_, _, let message, _, _), .io(let message), .network(let message), .unnamed(_, let message, _),
             .decoding(let message),
-            .store(let message), .storageFull(let message), .signedOut(_, let message),
-            .noKeychain(let message), .redirected(_, _, _, let message),
+            .store(let message), .storeBusy(let message), .storeDamaged(_, _, _, let message),
+            .storageFull(let message), .signedOut(_, let message),
+            .noKeychain(let message), .redirected(_, _, _, let message, _),
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
             .wrongSchema(_, _, _, let message), .readingHandle(let message), .unsentDiffers(_, _, _, let message),
-            .copyExpired(_, let message),
-            .streamIncomplete(_, let message), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
+            .copyExpired(_, let message, _),
+            .streamIncomplete(_, let message, _), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .noRoom(_, _, _, let message),
-            .contractMismatch(_, _, _, _, let message), .canceled(let message), .firstSyncWaiting(let message),
-            .invalid(let message), .fault(let message), .keyChanging(let message), .versionConflict(let message),
-            .instanceChanged(let message), .closed(let message), .noConnection(let message):
+            .contractMismatch(_, _, _, _, let message, _), .canceled(let message), .firstSyncWaiting(let message),
+            .invalid(let message), .fault(let message), .keyChanging(let message),
+            .versionConflict(let message, _),
+            .instanceChanged(let message, _), .closed(let message), .noConnection(let message):
             message
+        }
+    }
+
+    /// What the server answered, where a server's answer is what failed the call.
+    ///
+    /// It is the answer's status, its refusal code and its `error.details`, as the server sent them. It is `nil` for
+    /// a failure the device met itself, and for an answer the call did not read.
+    public var server: ServerAnswer? {
+        switch self {
+        case .notFound(_, _, let server), .unauthorized(_, _, let server), .forbidden(_, _, let server),
+            .validation(_, _, _, let server), .unknownType(_, let server), .rateLimited(_, _, _, let server),
+            .server(_, _, _, _, let server), .unnamed(_, _, let server), .redirected(_, _, _, _, let server),
+            .copyExpired(_, _, let server), .streamIncomplete(_, _, let server),
+            .contractMismatch(_, _, _, _, _, let server), .versionConflict(_, let server),
+            .instanceChanged(_, let server):
+            server
+        case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
+            .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
+            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .fault, .keyChanging,
+            .closed, .noConnection:
+            nil
         }
     }
 
@@ -216,25 +249,36 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     public func code() -> String {
         let core: MarfaCore.MarfaError
         switch self {
-        case .notFound(let code, let message): core = .NotFound(code: code, message: message)
-        case .unauthorized(let code, let message): core = .Unauthorized(code: code, message: message)
-        case .forbidden(let code, let message): core = .Forbidden(code: code, message: message)
-        case .validation(let code, let message, let details):
-            core = .Validation(code: code, message: message, details: details?.core)
-        case .unknownType(let message): core = .UnknownType(message: message)
-        case .rateLimited(let code, let message, let retryAfterSeconds):
-            core = .RateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
-        case .server(let status, let code, let message): core = .Server(status: status, code: code, message: message)
+        case .notFound(let code, let message, let server):
+            core = .NotFound(code: code, message: message, server: server?.core)
+        case .unauthorized(let code, let message, let server):
+            core = .Unauthorized(code: code, message: message, server: server?.core)
+        case .forbidden(let code, let message, let server):
+            core = .Forbidden(code: code, message: message, server: server?.core)
+        case .validation(let code, let message, let details, let server):
+            core = .Validation(code: code, message: message, details: details?.core, server: server?.core)
+        case .unknownType(let message, let server): core = .UnknownType(message: message, server: server?.core)
+        case .rateLimited(let code, let message, let retryAfterSeconds, let server):
+            core = .RateLimited(
+                code: code, message: message, retryAfterSeconds: retryAfterSeconds, server: server?.core)
+        case .server(let status, let code, let message, let details, let server):
+            core = .Server(
+                status: status, code: code, message: message, details: details?.core, server: server?.core)
         case .io(let message): core = .Io(message: message)
         case .network(let message): core = .Network(message: message)
-        case .unnamed(let status, let message): core = .Unnamed(status: status, message: message)
+        case .unnamed(let status, let message, let server):
+            core = .Unnamed(status: status, message: message, server: server?.core)
         case .decoding(let message): core = .Decoding(message: message)
         case .store(let message): core = .Store(message: message)
+        case .storeBusy(let message): core = .StoreBusy(message: message)
+        case .storeDamaged(let path, let reason, let unsent, let message):
+            core = .StoreDamaged(path: path, reason: reason, unsent: unsent, message: message)
         case .storageFull(let message): core = .StorageFull(message: message)
         case .signedOut(let origin, let message): core = .SignedOut(origin: origin, message: message)
         case .noKeychain(let message): core = .NoKeychain(message: message)
-        case .redirected(let origin, let status, let location, let message):
-            core = .Redirected(origin: origin, status: status, location: location, message: message)
+        case .redirected(let origin, let status, let location, let message, let server):
+            core = .Redirected(
+                origin: origin, status: status, location: location, message: message, server: server?.core)
         case .noServer(let message): core = .NoServer(message: message)
         case .noCursor(let message): core = .NoCursor(message: message)
         case .hydrationIncomplete(let message): core = .HydrationIncomplete(message: message)
@@ -244,23 +288,30 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .readingHandle(let message): core = .ReadingHandle(message: message)
         case .unsentDiffers(let path, let unsent, let agreed, let message):
             core = .UnsentDiffers(path: path, unsent: unsent, agreed: agreed, message: message)
-        case .copyExpired(let reason, let message): core = .CopyExpired(reason: reason, message: message)
-        case .streamIncomplete(let reason, let message): core = .StreamIncomplete(reason: reason, message: message)
+        case .copyExpired(let reason, let message, let server):
+            core = .CopyExpired(reason: reason, message: message, server: server?.core)
+        case .streamIncomplete(let reason, let message, let server):
+            core = .StreamIncomplete(reason: reason, message: message, server: server?.core)
         case .wrongServer(let expected, let got, let message):
             core = .WrongServer(expected: expected, got: got, message: message)
         case .bytesAbsent(let hash, let reason, let message):
             core = .BytesAbsent(hash: hash, reason: reason, message: message)
         case .noRoom(let hash, let size, let free, let message):
             core = .NoRoom(hash: hash, size: size, free: free, message: message)
-        case .contractMismatch(let served, let expected, let status, let writeSent, let message):
+        case .contractMismatch(let served, let expected, let status, let writeSent, let message, let server):
             core = .ContractMismatch(
-                served: served, expected: expected, status: status, writeSent: writeSent, message: message)
+                served: served, expected: expected, status: status, writeSent: writeSent, message: message,
+                server: server?.core)
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
         case .fault(let message): core = .Fault(message: message)
-        case .versionConflict(let message): core = .Server(status: 409, code: "version_conflict", message: message)
-        case .instanceChanged(let message): core = .CopyExpired(reason: "instance_changed", message: message)
+        case .versionConflict(let message, let server):
+            core = .Server(
+                status: 409, code: "version_conflict", message: message, details: server?.details?.core,
+                server: server?.core)
+        case .instanceChanged(let message, let server):
+            core = .CopyExpired(reason: "instance_changed", message: message, server: server?.core)
         case .keyChanging: return "key_changing"
         case .closed: return "closed"
         case .noConnection: return "no_connection"
@@ -272,27 +323,46 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
 
     init(_ error: MarfaCore.MarfaError) {
         switch error {
-        case .NotFound(let code, let message): self = .notFound(code: code, message: message)
-        case .Unauthorized(let code, let message): self = .unauthorized(code: code, message: message)
-        case .Forbidden(let code, let message): self = .forbidden(code: code, message: message)
-        case .Validation(let code, let message, let details):
-            self = .validation(code: code, message: message, details: details.map(JSONValue.init))
-        case .UnknownType(let message): self = .unknownType(message: message)
-        case .RateLimited(let code, let message, let retryAfterSeconds):
-            self = .rateLimited(code: code, message: message, retryAfterSeconds: retryAfterSeconds)
-        case .Server(409, "version_conflict", let message): self = .versionConflict(message: message)
-        case .Server(409, "instance_changed", let message): self = .instanceChanged(message: message)
-        case .Server(let status, let code, let message): self = .server(status: status, code: code, message: message)
+        case .NotFound(let code, let message, let server):
+            self = .notFound(code: code, message: message, server: server.map(ServerAnswer.init))
+        case .Unauthorized(let code, let message, let server):
+            self = .unauthorized(code: code, message: message, server: server.map(ServerAnswer.init))
+        case .Forbidden(let code, let message, let server):
+            self = .forbidden(code: code, message: message, server: server.map(ServerAnswer.init))
+        case .Validation(let code, let message, let details, let server):
+            self = .validation(
+                code: code, message: message, details: details.map(JSONValue.init),
+                server: server.map(ServerAnswer.init))
+        case .UnknownType(let message, let server):
+            self = .unknownType(message: message, server: server.map(ServerAnswer.init))
+        case .RateLimited(let code, let message, let retryAfterSeconds, let server):
+            self = .rateLimited(
+                code: code, message: message, retryAfterSeconds: retryAfterSeconds,
+                server: server.map(ServerAnswer.init))
+        case .Server(409, "version_conflict", let message, _, let server):
+            self = .versionConflict(message: message, server: server.map(ServerAnswer.init))
+        case .Server(409, "instance_changed", let message, _, let server):
+            self = .instanceChanged(message: message, server: server.map(ServerAnswer.init))
+        case .Server(let status, let code, let message, let details, let server):
+            self = .server(
+                status: status, code: code, message: message, details: details.map(JSONValue.init),
+                server: server.map(ServerAnswer.init))
         case .Io(let message): self = .io(message: message)
         case .Network(let message): self = .network(message: message)
-        case .Unnamed(let status, let message): self = .unnamed(status: status, message: message)
+        case .Unnamed(let status, let message, let server):
+            self = .unnamed(status: status, message: message, server: server.map(ServerAnswer.init))
         case .Decoding(let message): self = .decoding(message: message)
         case .Store(let message): self = .store(message: message)
+        case .StoreBusy(let message): self = .storeBusy(message: message)
+        case .StoreDamaged(let path, let reason, let unsent, let message):
+            self = .storeDamaged(path: path, reason: reason, unsent: unsent, message: message)
         case .StorageFull(let message): self = .storageFull(message: message)
         case .SignedOut(let origin, let message): self = .signedOut(origin: origin, message: message)
         case .NoKeychain(let message): self = .noKeychain(message: message)
-        case .Redirected(let origin, let status, let location, let message):
-            self = .redirected(origin: origin, status: status, location: location, message: message)
+        case .Redirected(let origin, let status, let location, let message, let server):
+            self = .redirected(
+                origin: origin, status: status, location: location, message: message,
+                server: server.map(ServerAnswer.init))
         case .NoServer(let message): self = .noServer(message: message)
         case .NoCursor(let message): self = .noCursor(message: message)
         case .HydrationIncomplete(let message): self = .hydrationIncomplete(message: message)
@@ -302,23 +372,48 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .ReadingHandle(let message): self = .readingHandle(message: message)
         case .UnsentDiffers(let path, let unsent, let agreed, let message):
             self = .unsentDiffers(path: path, unsent: unsent, agreed: agreed, message: message)
-        case .CopyExpired("instance_changed", let message): self = .instanceChanged(message: message)
-        case .CopyExpired(let reason, let message): self = .copyExpired(reason: reason, message: message)
-        case .StreamIncomplete(let reason, let message): self = .streamIncomplete(reason: reason, message: message)
+        case .CopyExpired("instance_changed", let message, let server):
+            self = .instanceChanged(message: message, server: server.map(ServerAnswer.init))
+        case .CopyExpired(let reason, let message, let server):
+            self = .copyExpired(reason: reason, message: message, server: server.map(ServerAnswer.init))
+        case .StreamIncomplete(let reason, let message, let server):
+            self = .streamIncomplete(reason: reason, message: message, server: server.map(ServerAnswer.init))
         case .WrongServer(let expected, let got, let message):
             self = .wrongServer(expected: expected, got: got, message: message)
         case .BytesAbsent(let hash, let reason, let message):
             self = .bytesAbsent(hash: hash, reason: reason, message: message)
         case .NoRoom(let hash, let size, let free, let message):
             self = .noRoom(hash: hash, size: size, free: free, message: message)
-        case .ContractMismatch(let served, let expected, let status, let writeSent, let message):
+        case .ContractMismatch(let served, let expected, let status, let writeSent, let message, let server):
             self = .contractMismatch(
-                served: served, expected: expected, status: status, writeSent: writeSent, message: message)
+                served: served, expected: expected, status: status, writeSent: writeSent, message: message,
+                server: server.map(ServerAnswer.init))
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
         case .Invalid(let message): self = .invalid(message: message)
         case .Fault(let message): self = .fault(message: message)
         }
+    }
+}
+
+/// What a server answered to a request: its status, its refusal code and its `error.details`.
+public struct ServerAnswer: Sendable, Hashable {
+    public var status: UInt16
+    public var code: String?
+    public var details: JSONValue?
+
+    public init(status: UInt16, code: String?, details: JSONValue?) {
+        self.status = status
+        self.code = code
+        self.details = details
+    }
+
+    init(_ core: MarfaCore.ServerAnswer) {
+        self.init(status: core.status, code: core.code, details: core.details.map(JSONValue.init))
+    }
+
+    var core: MarfaCore.ServerAnswer {
+        MarfaCore.ServerAnswer(status: status, code: code, details: details?.core)
     }
 }
 
@@ -387,18 +482,18 @@ extension Edge: Identifiable {}
 /// through edges outside its slice, is queued and refused by the server, and
 /// its verdict says why.
 ///
-/// Once the server accepts a source move, the copy expires. The drain sends
+/// Once the server accepts a move of the from end, the copy expires. The drain sends
 /// the writes queued behind the move first, then throws
 /// `MarfaError.copyExpired` with the reason `reach_changed` once, after
 /// the last. The writes are answered, and the app hydrates again. A drain
 /// that ends with a wait, an unreachable server, a stopped credential or a
 /// write left undelivered returns its report instead, and the next call
-/// throws `copyExpired`. A target move does not expire the copy.
+/// throws `copyExpired`. A move of the to end does not expire the copy.
 public struct EdgeEdit: Sendable, Hashable {
     /// The end of an edge to move, and the item to move it to.
     public enum Move: Sendable, Hashable {
-        case source(String)
-        case target(String)
+        case from(String)
+        case to(String)
     }
 
     /// Each property given replaces its whole value; every other one stays as it is.
@@ -418,8 +513,8 @@ public struct EdgeEdit: Sendable, Hashable {
 
     static func coreMove(_ move: Move) -> MarfaCore.EdgeMove {
         switch move {
-        case .source(let id): MarfaCore.EdgeMove(end: .source, to: id)
-        case .target(let id): MarfaCore.EdgeMove(end: .target, to: id)
+        case .from(let id): MarfaCore.EdgeMove(end: .from, to: id)
+        case .to(let id): MarfaCore.EdgeMove(end: .to, to: id)
         }
     }
 }

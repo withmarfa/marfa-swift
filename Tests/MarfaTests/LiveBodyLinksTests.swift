@@ -56,7 +56,7 @@ extension LiveWorkingCopies {
 
             let fresh = try await WorkingCopy.open(store: Live.store(), server: Live.server)
             _ = try await fresh.hydrate(types: ["core.note"], tier: .feed, edgeTypes: ["attached-to"])
-            let edges = try await fresh.edges.to(hostId).filter { $0.sourceId == fileId }
+            let edges = try await fresh.edges.to(hostId).filter { $0.fromId == fileId }
             #expect(edges.count == 1, "the embed changed the attachment edges: \(edges)")
             await fresh.close()
             await copy.close()

@@ -58,13 +58,9 @@ struct ServerCatalogUnreachable {
 
 @Suite(.timeLimit(.minutes(1)))
 struct ReplacedRefusedCopy {
-    private static let refusingSQL = """
-        PRAGMA writable_schema = ON;
-        UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
-          WHERE type = 'table' AND name = 'queue';
-        """
+    private static let refusingSQL = "PRAGMA user_version = 5;"
 
-    /// A store whose queue table is not the shape this build reads, with the bytes of one file held beside it.
+    /// A store at an earlier schema version than this build reads, with the bytes of one file held beside it.
     static func refusedStore() async throws -> (store: URL, hash: String) {
         let store = temporaryStore()
         let copy = try await WorkingCopy.open(store: store)
@@ -237,7 +233,7 @@ struct ReplacedRefusedCopy {
             store,
             """
             DROP TABLE queue;
-            UPDATE meta SET value = '999' WHERE key = 'schema_version';
+            PRAGMA user_version = 999;
             """)
 
         for ifRefused in [WorkingCopy.IfRefused.keep, .replace] {

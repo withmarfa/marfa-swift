@@ -85,10 +85,11 @@ jobs:
           tar -xzf "${archive}" -C "${RUNNER_TEMP}" actionlint
           "${RUNNER_TEMP}/actionlint"
           shellcheck scripts/*.sh
-      - name: Test the retry and failure reports
+      - name: Test the retry, failure and release archive scripts
         run: |
           scripts/test-verdict.test.sh
           scripts/report-pin-bump-failure.test.sh
+          scripts/release-archive.test.sh
 
   # Not on a draft, and on a pull request not until `Lint Swift` has passed. A
   # push to `main` runs it whatever the lint said, so its verdict is the whole
@@ -101,8 +102,8 @@ jobs:
       && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false')
       && (github.event_name != 'pull_request' || needs.lint.result == 'success') }}
     runs-on: xcode-27
-    # Twice the 90th percentile of a run that builds the core (23 minutes).
-    timeout-minutes: 45
+    # About twice a run that builds the core: 20 minutes of core, 10 of tests, then both sample builds.
+    timeout-minutes: 75
     # Inside the workspace: actions/cache refuses a path with `..` in it.
     env:
       MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
@@ -188,35 +189,21 @@ jobs:
         with:
           path: ${{ github.workspace }}/.build/generator-build
           key: generator-${{ runner.os }}-${{ hashFiles('generator/Package.resolved') }}
-      - uses: pnpm/action-setup@v6
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
-          package_json_file: .build/marfa/package.json
+      # The generator is a Node script.
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: .build/marfa/pnpm-lock.yaml
       - name: Build the core at the pin
         if: ${{ steps.core.outputs.cache-hit != 'true' }}
         run: scripts/core.sh
 
-      # The folder tests hold the package's registry to the one `marfa folders list` reads. Its own target
-      # directory, so it never starts behind the core's. Only the binary is cached, like the core's output.
-      - name: Restore the command line the pin builds
-        id: cli
-        uses: actions/cache@v6
-        with:
-          path: .build/marfa-cli
-          key: marfa-cli-${{ runner.os }}-${{ hashFiles('core.pin') }}
-      - name: Build the command line at the pin
-        if: ${{ steps.cli.outputs.cache-hit != 'true' }}
+      # The live tests boot the server marfa released at the pin and the folder tests use the command line it released,
+      # so what they run against is what ships. The archive is checked against the release's checksums before it is
+      # unpacked.
+      - name: Fetch the release at the pin
         env:
-          CARGO_TARGET_DIR: ${{ github.workspace }}/.build/cli-target
-        run: |
-          cargo build --locked -p marfa-cli --manifest-path "${MARFA_MONOREPO}/core/Cargo.toml"
-          mkdir -p .build/marfa-cli
-          cp "${CARGO_TARGET_DIR}/debug/marfa" .build/marfa-cli/marfa
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/release-archive.sh "${RUNNER_TEMP}/marfa-release"
 
       - name: Test wire generation
         run: |
@@ -233,17 +220,11 @@ jobs:
             exit 1
           fi
 
-      # server-up.sh runs the server through tsx, which resolves
-      # @withmarfa/shared through its dist.
-      - name: Build the server at the pin
-        working-directory: .build/marfa
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm --filter "@withmarfa/server..." build
-
       - name: Build and test against a booted server
         env:
           MARFA_LIVE_REQUIRED: '1'
+          MARFA_SERVER_BIN: ${{ runner.temp }}/marfa-release/marfa-server
+          MARFA_CLI: ${{ runner.temp }}/marfa-release/marfa
         run: |
           set -euo pipefail
           # Before the boot: one that fails partway has already started a server.
@@ -253,7 +234,6 @@ jobs:
           server_env="$("${MARFA_MONOREPO}/core/scripts/server-up.sh")"
           eval "${server_env}"
           export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
-          export MARFA_CLI="${GITHUB_WORKSPACE}/.build/marfa-cli/marfa"
           swift build 2>&1 | tee "${RUNNER_TEMP}/swift-build.log"
           # What the package writes by hand builds without a warning. The generated wire types are out of
           # this check: their warnings come from the pinned generator, and `scripts/core.sh` rewrites them.
@@ -307,6 +287,8 @@ jobs:
           done
 
       - name: Run the sample's scenario offline and back
+        env:
+          MARFA_SERVER_BIN: ${{ runner.temp }}/marfa-release/marfa-server
         run: |
           set -euo pipefail
           sample="${RUNNER_TEMP}/marfa-sample/Build/Products/Debug/MarfaSample.app/Contents/MacOS/MarfaSample"

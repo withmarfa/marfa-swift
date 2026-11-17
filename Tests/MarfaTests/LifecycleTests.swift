@@ -147,7 +147,9 @@ struct ALifecycle {
     @Test func aRateLimitIsWaitedOutForAtLeastTheTimeItNames() async throws {
         let core = FakeCore.writer()
         core.state.withLock {
-            $0.catchUpFails = .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 120)
+            $0.catchUpFails = .RateLimited(
+                code: "rate_limited", message: "slow down", retryAfterSeconds: 120,
+                server: nil)
         }
         let clock = ManualClock()
         let copy = Self.copy(core, clock)
@@ -182,9 +184,13 @@ struct ALifecycle {
         let updates = Updates(copy.updates())
         try await eventually("following") { updates.connection == .following }
 
-        old.change(0, .watchFailed(reason: .Unauthorized(code: "unauthorized", message: "no"), cursor: "3"))
+        old.change(
+            0,
+            .watchFailed(
+                reason: .Unauthorized(code: "unauthorized", message: "no", server: nil),
+                cursor: "3"))
         try await eventually("key refused") {
-            updates.connection == .keyRefused(.unauthorized(code: "unauthorized", message: "no"))
+            updates.connection == .keyRefused(.unauthorized(code: "unauthorized", message: "no", server: nil))
         }
         #expect(clock.waiting == 0, "a refused key was asked again")
 
@@ -220,8 +226,16 @@ struct ALifecycle {
         let updates = Updates(copy.updates())
         try await eventually("following") { updates.connection == .following }
 
-        core.change(0, .watchFailed(reason: .Server(status: 400, code: "bad_request", message: "no"), cursor: "3"))
-        let stopped = CopyConnection.stopped(.server(status: 400, code: "bad_request", message: "no"))
+        core.change(
+            0,
+            .watchFailed(
+                reason: .Server(
+                    status: 400, code: "bad_request", message: "no", details: nil,
+                    server: nil), cursor: "3"))
+        let stopped = CopyConnection.stopped(
+            .server(
+                status: 400, code: "bad_request", message: "no", details: nil,
+                server: nil))
         try await eventually("stopped") { updates.connection == stopped }
         #expect(try await Self.wait(clock, after: 0) == .seconds(300))
 

@@ -74,7 +74,8 @@ extension InMemoryCore {
                     throw MarfaError.Server(
                         status: 409, code: "version_conflict",
                         message:
-                            "version_conflict: the view changed since version \(version): \(collided.joined(separator: ", "))"
+                            "version_conflict: the view changed since version \(version): \(collided.joined(separator: ", "))",
+                        details: nil, server: nil
                     )
                 }
             }
@@ -449,7 +450,7 @@ extension InMemoryCore {
             guard let reference = edgeReference(by) else { throw Refuse.invalid("unsupported view field \"\(by)\"") }
             var others: [String] = []
             for edge in state.edgesInOrder where edge.edgeType == reference.type {
-                let (own, other) = reference.backref ? (edge.targetId, edge.sourceId) : (edge.sourceId, edge.targetId)
+                let (own, other) = reference.backref ? (edge.toId, edge.fromId) : (edge.fromId, edge.toId)
                 if own == item.id && !others.contains(other) { others.append(other) }
             }
             return others.isEmpty ? [.null] : others.map { .string($0) }

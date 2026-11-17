@@ -19,9 +19,9 @@ struct EdgeChecksOffline {
         do {
             try await call()
             return nil
-        } catch MarfaError.validation(let code, let message, _) {
+        } catch MarfaError.validation(let code, let message, _, _) {
             return "\(code): \(normalised(message))"
-        } catch MarfaError.notFound(let code, let message) {
+        } catch MarfaError.notFound(let code, let message, _) {
             return "\(code): \(normalised(message))"
         } catch {
             return "\(error)"
@@ -37,10 +37,10 @@ struct EdgeChecksOffline {
     }
 
     static func noFolder(_ type: String) -> String {
-        "edge_constraint_violation: Edge \"in-folder\" does not allow target type \"\(type)\""
+        "edge_constraint_violation: Edge \"in-folder\" does not allow type \"\(type)\" at its to end"
     }
     static let nesting =
-        "edge_constraint_violation: Edge \"in-collection\" does not take a source its target constraints admit; use \"parent-of\" for hierarchy"
+        "edge_constraint_violation: Edge \"in-collection\" does not take a from item its to constraints admit; use \"parent-of\" for hierarchy"
     static let selfLoop = "edge_cycle: an edge from <id> to itself closes a cycle"
     static let cycle = "edge_cycle: Edge \"parent-of\" would close a cycle"
 
@@ -85,10 +85,10 @@ struct EdgeChecksOffline {
         _ = try await copy.items.delete(binned)
         #expect(
             try await Self.refusal(copy, from: source, to: binned, type: "references")
-                == "item_not_found: Edge target item not found: <id>")
+                == "item_not_found: Edge to item not found: <id>")
         #expect(
             try await Self.refusal(copy, from: binned, to: source, type: "references")
-                == "item_not_found: Edge source item not found: <id>")
+                == "item_not_found: Edge from item not found: <id>")
         await copy.close()
     }
 
@@ -136,7 +136,7 @@ struct EdgeChecksOffline {
         do {
             try await call()
             return nil
-        } catch MarfaError.validation(_, _, let details) {
+        } catch MarfaError.validation(_, _, let details, _) {
             return details
         } catch {
             return nil
@@ -148,9 +148,12 @@ struct EdgeChecksOffline {
     }
 
     static func full(_ type: String, _ cardinality: String, at end: String) -> String {
-        let direction = end == "source" ? "outbound" : "inbound"
-        return
-            "edge_constraint_violation: Edge \"\(type)\" is \(cardinality); \(end) already has an \(direction) edge of this type"
+        let direction = end == "from" ? "outbound" : "inbound"
+        let limit =
+            cardinality == "one-to-one"
+            ? "is one-to-one; the \(end) item already has one"
+            : "is \(cardinality) on the \(end) side; the \(end) item already has an"
+        return "edge_constraint_violation: Edge \"\(type)\" \(limit) \(direction) edge of this type"
     }
 
     @Test(arguments: CopyKind.allCases)
@@ -165,7 +168,7 @@ struct EdgeChecksOffline {
         #expect(
             details
                 == .object([
-                    "edge_type": "references", "source_id": .string(a), "target_id": .string(b),
+                    "edge_type": "references", "from_id": .string(a), "to_id": .string(b),
                     "constraint": "duplicate",
                 ]))
         #expect(try await Self.refusal(copy, from: b, to: a, type: "references") == nil, "the reverse is its own edge")
@@ -185,16 +188,16 @@ struct EdgeChecksOffline {
 
         #expect(
             try await Self.refusal(copy, from: other, to: old, type: "supersedes")
-                == Self.full("supersedes", "one-to-one", at: "target"))
+                == Self.full("supersedes", "one-to-one", at: "to"))
         #expect(
             await Self.details { try await copy.edges.check(from: other, to: old, type: "supersedes") }
-                == .object(["edge_type": "supersedes", "target_id": .string(old), "constraint": "cardinality"]))
+                == .object(["edge_type": "supersedes", "to_id": .string(old), "constraint": "cardinality"]))
         #expect(
             try await Self.refusal(copy, from: newer, to: other, type: "supersedes")
-                == Self.full("supersedes", "one-to-one", at: "source"))
+                == Self.full("supersedes", "one-to-one", at: "from"))
         #expect(
             await Self.details { try await copy.edges.check(from: newer, to: other, type: "supersedes") }
-                == .object(["edge_type": "supersedes", "source_id": .string(newer), "constraint": "cardinality"]))
+                == .object(["edge_type": "supersedes", "from_id": .string(newer), "constraint": "cardinality"]))
         #expect(
             try await Self.refusal(copy, from: newer, to: old, type: "supersedes") == Self.duplicate("supersedes"),
             "a duplicate is judged before cardinality")
@@ -205,7 +208,7 @@ struct EdgeChecksOffline {
         _ = try await copy.edges.create(from: parent, to: child, type: "parent-of")
         #expect(
             try await Self.refusal(copy, from: other, to: child, type: "parent-of")
-                == Self.full("parent-of", "one-to-many", at: "target"))
+                == Self.full("parent-of", "one-to-many", at: "to"))
         #expect(try await Self.refusal(copy, from: parent, to: other, type: "parent-of") == nil)
         await copy.close()
     }
@@ -220,11 +223,11 @@ struct EdgeChecksOffline {
         let draft = Draft(type: "core.note", properties: title, id: own, edges: ["supersedes": [first, second]])
 
         let both = try await Self.refusal(of: { _ = try await copy.items.create(draft) }, queued: copy)
-        #expect(both.0 == Self.full("supersedes", "one-to-one", at: "source"))
+        #expect(both.0 == Self.full("supersedes", "one-to-one", at: "from"))
         #expect(both.1 == 0, "a refused create queued a write")
         #expect(
             await Self.details { _ = try await copy.items.create(draft) }
-                == .object(["edge_type": "supersedes", "source_id": .string(own), "constraint": "cardinality"]))
+                == .object(["edge_type": "supersedes", "from_id": .string(own), "constraint": "cardinality"]))
 
         _ = try await copy.edges.create(from: second, to: first, type: "supersedes")
         let held = try await Self.refusal(
@@ -233,7 +236,7 @@ struct EdgeChecksOffline {
                     Draft(type: "core.note", properties: title, edges: ["supersedes": [first]]))
             },
             queued: copy)
-        #expect(held.0 == Self.full("supersedes", "one-to-one", at: "target"), "an edge the copy holds counts")
+        #expect(held.0 == Self.full("supersedes", "one-to-one", at: "to"), "an edge the copy holds counts")
         await copy.close()
     }
 
@@ -273,7 +276,7 @@ struct EdgeChecksOffline {
                     Draft(type: "core.note", properties: title, edges: ["references": [binned]]))
             },
             queued: copy)
-        #expect(inBin.0 == "item_not_found: Edge target item not found: <id>")
+        #expect(inBin.0 == "item_not_found: Edge to item not found: <id>")
         let own = "0190f3a0-0000-7000-8000-0000000000aa"
         let loop = try await Self.refusal(
             of: {
@@ -305,7 +308,7 @@ struct EdgeChecksOffline {
         let loose = try #require(try await copy.edges.create(from: d, to: a, type: "parent-of").edgeId)
         let held = try #require(try await copy.edges.get(loose))
         let closing = try await Self.refusal(
-            of: { _ = try await copy.edges.update(loose, EdgeEdit(baseVersion: held.version, move: .source(c))) },
+            of: { _ = try await copy.edges.update(loose, EdgeEdit(baseVersion: held.version, move: .from(c))) },
             queued: copy)
         #expect(closing.0 == Self.cycle)
         #expect(closing.1 == 0)
@@ -318,7 +321,7 @@ struct EdgeChecksOffline {
         let memberHeld = try #require(try await copy.edges.get(member))
         let cardinality = try await Self.refusal(
             of: {
-                _ = try await copy.edges.update(member, EdgeEdit(baseVersion: memberHeld.version, move: .source(inner)))
+                _ = try await copy.edges.update(member, EdgeEdit(baseVersion: memberHeld.version, move: .from(inner)))
             },
             queued: copy)
         #expect(
@@ -333,10 +336,10 @@ struct EdgeChecksOffline {
         let inBin = try await Self.refusal(
             of: {
                 _ = try await copy.edges.update(
-                    binnedHeld, EdgeEdit(baseVersion: spareHeld.version, move: .source(spare)))
+                    binnedHeld, EdgeEdit(baseVersion: spareHeld.version, move: .from(spare)))
             },
             queued: copy)
-        #expect(inBin.0 == "item_not_found: Edge target item not found: <id>")
+        #expect(inBin.0 == "item_not_found: Edge to item not found: <id>")
         await copy.close()
     }
 
@@ -357,7 +360,8 @@ struct EdgeChecksOffline {
             of: { _ = try await copy.items.update(outer, Edit(baseVersion: outerHeld.version, type: "core.note")) },
             queued: copy)
         #expect(
-            asNote.0 == "edge_constraint_violation: Edge \"in-collection\" does not allow target type \"core.note\"")
+            asNote.0
+                == "edge_constraint_violation: Edge \"in-collection\" does not allow type \"core.note\" at its to end")
         #expect(asNote.1 == 0)
         let held = try #require(try await copy.items.get(outer))
         #expect(held.type == "core.collection")

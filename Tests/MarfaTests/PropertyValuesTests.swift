@@ -118,6 +118,7 @@ struct PropertyValues {
         var database: OpaquePointer?
         try #require(sqlite3_open(store.path, &database) == SQLITE_OK)
         defer { sqlite3_close(database) }
-        try #require(sqlite3_exec(database, statement, nil, nil, nil) == SQLITE_OK)
+        let code = sqlite3_exec(database, statement, nil, nil, nil)
+        try #require(code == SQLITE_OK, "\(String(cString: sqlite3_errmsg(database)))")
     }
 }

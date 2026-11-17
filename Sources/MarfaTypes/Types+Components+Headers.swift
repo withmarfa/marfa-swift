@@ -28,19 +28,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/headers/X-Error-Code`.
         public typealias XErrorCode = Swift.String
-        /// How many requests this credential may make against this path group in the current window. Sent on every response, not only refusals, so a client can pace itself before it is refused. A second window bounds what one credential spends across every path group together, and a refusal from that one carries this trio unchanged, so a 429 may arrive with requests apparently left. Absent entirely on a deployment that does not enable rate limiting, along with the rest of the `X-RateLimit-*` trio.
-        ///
-        /// - Remark: Generated from `#/components/headers/X-RateLimit-Limit`.
-        public typealias XRateLimitLimit = Swift.Int
-        /// Requests left in this path group's window for this credential, floored at 0. A 429 from that window is the one that reads 0; a 429 from the credential-wide window described above can read more.
-        ///
-        /// - Remark: Generated from `#/components/headers/X-RateLimit-Remaining`.
-        public typealias XRateLimitRemaining = Swift.Int
-        /// Unix time in seconds at which the current window ends and `X-RateLimit-Remaining` returns to `X-RateLimit-Limit`.
-        ///
-        /// - Remark: Generated from `#/components/headers/X-RateLimit-Reset`.
-        public typealias XRateLimitReset = Swift.Int
-        /// Seconds to wait before retrying, sent with the rate limiter's refusal. Derived from the time left in the window rather than a fixed backoff, so a client that honors it needs no backoff of its own.
+        /// Whole seconds to wait before retrying, sent with a rate limit's refusal and with a write turned away while a restore runs. For a rate limit it is rounded up from the time left until the latest end among the limits that are spent, and never fewer than 1, so a client that honors it needs no backoff of its own. While a restore runs it is always 5.
         ///
         /// - Remark: Generated from `#/components/headers/Retry-After`.
         public typealias RetryAfter = Swift.Int
@@ -50,5 +38,9 @@ extension Components {
         @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
             case _true = "true"
         }
+        /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+        ///
+        /// - Remark: Generated from `#/components/headers/WWW-Authenticate`.
+        public typealias WWWAuthenticate = Swift.String
     }
 }

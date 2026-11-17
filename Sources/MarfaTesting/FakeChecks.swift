@@ -21,8 +21,8 @@ enum Checks {
                 problem = "A tag must not be blank"
             } else if tag == "." || tag == ".." {
                 problem = "A tag must not be \"\(tag)\", which a URL path cannot name"
-            } else if tag.utf16.count > 128 {
-                problem = "A tag must contain at most 128 UTF-16 code units"
+            } else if tag.unicodeScalars.count > 128 {
+                problem = "A tag must contain at most 128 characters"
             } else if tag.unicodeScalars.first.map(isSpace) == true || tag.unicodeScalars.last.map(isSpace) == true {
                 throw FakeCopyError.unsupported(call: "a tag with surrounding whitespace")
             } else {
@@ -56,7 +56,7 @@ enum Checks {
                 ": a folder is written through the folder operations, `device folders create`, `change` and `revoke` on the command line"
         }
         throw MarfaCore.MarfaError.Forbidden(
-            code: "type_not_permitted", message: "forbidden (type_not_permitted): \(message)")
+            code: "type_not_permitted", message: "forbidden (type_not_permitted): \(message)", server: nil)
     }
 
     /// The kind of each value against the field its type declares.
@@ -183,10 +183,12 @@ enum Checks {
         case ("number", .integer), ("number", .number): return nil
         case ("number", _): return "Expected number"
         case ("integer", .integer(let number)):
-            return (-9_007_199_254_740_991...9_007_199_254_740_991).contains(number) ? nil : "Expected safe integer"
+            return (-9_007_199_254_740_991...9_007_199_254_740_991).contains(number)
+                ? nil : "Expected a whole number from -9007199254740991 to 9007199254740991"
         case ("integer", .number(let number)):
-            return number.rounded() == number && abs(number) <= 9_007_199_254_740_991 ? nil : "Expected safe integer"
-        default: return "Expected safe integer"
+            return number.rounded() == number && abs(number) <= 9_007_199_254_740_991
+                ? nil : "Expected a whole number from -9007199254740991 to 9007199254740991"
+        default: return "Expected a whole number from -9007199254740991 to 9007199254740991"
         }
     }
 
@@ -306,7 +308,7 @@ enum Checks {
     /// Only the forms checked against the core are accepted.
     static func occurred(_ text: String) throws -> String {
         let form =
-            /(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?(Z|[+-]\d{2}:?\d{2}))?/
+            /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{3}))?(Z|[+-]\d{2}:\d{2})/
         guard let match = text.wholeMatch(of: form),
             let year = Int(match.1), let month = Int(match.2), let day = Int(match.3)
         else { throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)") }
@@ -314,14 +316,15 @@ enum Checks {
         parts.year = year
         parts.month = month
         parts.day = day
-        parts.hour = match.4.flatMap { Int($0) } ?? 0
-        parts.minute = match.5.flatMap { Int($0) } ?? 0
-        parts.second = match.6.flatMap { Int($0) } ?? 0
+        parts.hour = Int(match.4) ?? 0
+        parts.minute = Int(match.5) ?? 0
+        parts.second = Int(match.6) ?? 0
         if parts.hour.map({ $0 >= 24 }) == true {
             throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)")
         }
         var offset = 0
-        if let zone = match.8, zone != "Z" {
+        let zone = String(match.8)
+        if zone != "Z" {
             guard let hours = Int(zone.dropFirst().prefix(2)), let minutes = Int(zone.suffix(2)), minutes < 60,
                 hours * 60 + minutes <= 14 * 60
             else { throw FakeCopyError.unsupported(call: "an occurredAt of the form \(text)") }

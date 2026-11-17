@@ -130,8 +130,8 @@ public struct Item: Sendable, Hashable {
 /// An edge as the copy holds it.
 public struct Edge: Sendable, Hashable {
     public var id: String
-    public var sourceId: String
-    public var targetId: String
+    public var fromId: String
+    public var toId: String
     public var edgeType: String
     /// Empty where `unreadableProperties` is set.
     public var properties: JSONObject
@@ -143,12 +143,12 @@ public struct Edge: Sendable, Hashable {
     public var unreadableProperties: String?
 
     public init(
-        id: String, sourceId: String, targetId: String, edgeType: String, properties: JSONObject, version: Int64,
+        id: String, fromId: String, toId: String, edgeType: String, properties: JSONObject, version: Int64,
         createdAt: String, updatedAt: String, unreadableProperties: String? = nil
     ) {
         self.id = id
-        self.sourceId = sourceId
-        self.targetId = targetId
+        self.fromId = fromId
+        self.toId = toId
         self.edgeType = edgeType
         self.properties = properties
         self.version = version
@@ -159,8 +159,8 @@ public struct Edge: Sendable, Hashable {
 
     package init(_ core: MarfaCore.Edge) {
         id = core.id
-        sourceId = core.sourceId
-        targetId = core.targetId
+        fromId = core.fromId
+        toId = core.toId
         edgeType = core.edgeType
         properties = JSONObject(core.properties)
         version = core.version
@@ -172,8 +172,8 @@ public struct Edge: Sendable, Hashable {
     package var core: MarfaCore.Edge {
         MarfaCore.Edge(
             id: id,
-            sourceId: sourceId,
-            targetId: targetId,
+            fromId: fromId,
+            toId: toId,
             edgeType: edgeType,
             properties: properties.core,
             version: version,

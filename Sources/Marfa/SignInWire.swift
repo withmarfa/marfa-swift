@@ -29,6 +29,13 @@ struct SignInTransport: Sendable {
         configuration.urlCache = nil
         return SignInTransport(session: URLSession(configuration: configuration))
     }()
+
+    /// The request as it is sent: with the contract this build was made for.
+    func prepared(_ request: URLRequest) -> URLRequest {
+        var request = request
+        ContractHeader.apply(to: &request, path: request.url?.path ?? "")
+        return request
+    }
 }
 
 /// The device code grant's type, as RFC 8628 names it.
@@ -140,7 +147,7 @@ struct Discovery: Sendable, Decodable {
     /// RFC 8414 section 3.3: the document must name the server it was read from as its issuer, because the
     /// app is about to send a person's approval to the addresses it names.
     static func read(_ server: String, _ transport: SignInTransport) async throws(SignInError) -> Discovery {
-        guard let at = URL(string: "\(server)/.well-known/oauth-authorization-server/auth") else {
+        guard let at = URL(string: "\(server)/.well-known/oauth-authorization-server") else {
             throw .unreadable(message: "\(server) is not an address a sign-in can use")
         }
         let answer = try await send(URLRequest(url: at), transport)
@@ -216,7 +223,7 @@ func formRequest(_ url: String, _ fields: [(String, String)]) throws(SignInError
 
 func send(_ request: URLRequest, _ transport: SignInTransport) async throws(SignInError) -> Answer {
     do {
-        let (body, response) = try await transport.session.data(for: request)
+        let (body, response) = try await transport.session.data(for: transport.prepared(request))
         guard let http = response as? HTTPURLResponse else {
             throw SignInError.unreadable(message: "the server's answer is not HTTP")
         }

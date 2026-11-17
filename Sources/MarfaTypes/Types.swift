@@ -20,21 +20,21 @@ public protocol APIProtocol: Sendable {
     func listItems(_ input: Operations.ListItems.Input) async throws -> Operations.ListItems.Output
     /// Create an item
     ///
-    /// Creates an item. If `source_id` matches an existing item under the same source, updates that item instead. Repeating an `id` you already created returns the stored item with `acknowledged: true` and writes nothing.
+    /// Creates an item. If `source_id` matches an existing item under the same source, updates that item instead. A repeated `id`, or an update that leaves the item as it is, returns the stored item with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /items`.
     /// - Remark: Generated from `#/paths//items/post(createItem)`.
     func createItem(_ input: Operations.CreateItem.Input) async throws -> Operations.CreateItem.Output
     /// Get an item
     ///
-    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call.
+    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call. Use `state` to read an item in the trash.
     ///
     /// - Remark: HTTP `GET /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/get(getItem)`.
     func getItem(_ input: Operations.GetItem.Input) async throws -> Operations.GetItem.Output
     /// Update an item
     ///
-    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. To change its type, send `type` with `retype: true`.
+    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. A no-change update writes nothing. To change its type, send `type` with `retype: true`.
     ///
     /// - Remark: HTTP `PATCH /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)`.
@@ -118,14 +118,14 @@ public protocol APIProtocol: Sendable {
     func bulkUpsertItems(_ input: Operations.BulkUpsertItems.Input) async throws -> Operations.BulkUpsertItems.Output
     /// Get item counts
     ///
-    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
+    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
     func getItemStats(_ input: Operations.GetItemStats.Input) async throws -> Operations.GetItemStats.Output
     /// List item summaries
     ///
-    /// Returns item names, types, versions, sources and creation times, newest first. Only the owner or a local command can use this operation. Trashed and system items are excluded.
+    /// Returns item names, types, versions, sources and creation times, newest first, of the types you can read. Trashed and system items are excluded.
     ///
     /// - Remark: HTTP `GET /items/summaries`.
     /// - Remark: Generated from `#/paths//items/summaries/get(listItemSummaries)`.
@@ -139,42 +139,21 @@ public protocol APIProtocol: Sendable {
     func listOccurrences(_ input: Operations.ListOccurrences.Input) async throws -> Operations.ListOccurrences.Output
     /// Settle tombstones
     ///
-    /// Settles tombstones, moving their `settled_at` later, never earlier, and returns them. A connector calls it after changing the vendor's copy to carry out a purge, so that change doesn't bring the item back as a new row.
+    /// Settles tombstones, moving their `settled_at` later, never earlier, and returns them. A connector calls it after changing the vendor's copy to carry out a purge, so that change doesn't bring the item back as a new item.
     ///
     /// - Remark: HTTP `POST /items/tombstones`.
     /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)`.
     func settleTombstones(_ input: Operations.SettleTombstones.Input) async throws -> Operations.SettleTombstones.Output
     /// List the trash
     ///
-    /// Returns a page of trash summaries, newest creation first, without item content. Only the owner or a local command can use this operation.
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
     ///
     /// - Remark: HTTP `GET /trash`.
     /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
     func listTrash(_ input: Operations.ListTrash.Input) async throws -> Operations.ListTrash.Output
-    /// Trash an item by summary
-    ///
-    /// Moves the item and its cascading children to the trash. Returns only a summary. Requires the version from the listing.
-    ///
-    /// - Remark: HTTP `POST /items/summaries/{id}/trash`.
-    /// - Remark: Generated from `#/paths//items/summaries/{id}/trash/post(trashItemSummary)`.
-    func trashItemSummary(_ input: Operations.TrashItemSummary.Input) async throws -> Operations.TrashItemSummary.Output
-    /// Restore an item by summary
-    ///
-    /// Restores the item and the children its trash took. Returns only a summary. Requires the version from the listing.
-    ///
-    /// - Remark: HTTP `POST /items/summaries/{id}/restore`.
-    /// - Remark: Generated from `#/paths//items/summaries/{id}/restore/post(restoreItemSummary)`.
-    func restoreItemSummary(_ input: Operations.RestoreItemSummary.Input) async throws -> Operations.RestoreItemSummary.Output
-    /// Purge an item by summary
-    ///
-    /// Purges one item, deleting it permanently, if it is still in the trash at the listed version. Returns only a summary.
-    ///
-    /// - Remark: HTTP `POST /items/summaries/{id}/purge`.
-    /// - Remark: Generated from `#/paths//items/summaries/{id}/purge/post(purgeItemSummary)`.
-    func purgeItemSummary(_ input: Operations.PurgeItemSummary.Input) async throws -> Operations.PurgeItemSummary.Output
     /// Empty the trash
     ///
-    /// Empties one page of the trash: deletes up to 200 items permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed during the operation may remain.
+    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
     ///
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
@@ -200,30 +179,23 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /items/bulk-actions/jobs/{id}/cancel`.
     /// - Remark: Generated from `#/paths//items/bulk-actions/jobs/{id}/cancel/post(cancelBulkActionJob)`.
     func cancelBulkActionJob(_ input: Operations.CancelBulkActionJob.Input) async throws -> Operations.CancelBulkActionJob.Output
-    /// Get item metadata
-    ///
-    /// Returns an item's metadata: its tags and the extension namespaces you can read. To read metadata for many items, use `include=metadata` on `GET /items`.
-    ///
-    /// - Remark: HTTP `GET /items/{id}/metadata`.
-    /// - Remark: Generated from `#/paths//items/{id}/metadata/get(getItemMetadata)`.
-    func getItemMetadata(_ input: Operations.GetItemMetadata.Input) async throws -> Operations.GetItemMetadata.Output
-    /// Replace an item's tags
-    ///
-    /// Replaces the item's tags with the ones you send and returns its metadata. An empty list clears all tags.
-    ///
-    /// - Remark: HTTP `PUT /items/{id}/metadata`.
-    /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)`.
-    func replaceItemMetadata(_ input: Operations.ReplaceItemMetadata.Input) async throws -> Operations.ReplaceItemMetadata.Output
     /// Add tags to an item
     ///
-    /// Adds tags to the item and returns its metadata. A tag the item already has isn't added twice.
+    /// Adds tags to the item and returns its tags. A tag the item already has isn't added twice.
     ///
     /// - Remark: HTTP `POST /items/{id}/tags`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)`.
     func addItemTags(_ input: Operations.AddItemTags.Input) async throws -> Operations.AddItemTags.Output
+    /// Replace an item's tags
+    ///
+    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags.
+    ///
+    /// - Remark: HTTP `PUT /items/{id}/tags`.
+    /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)`.
+    func replaceItemTags(_ input: Operations.ReplaceItemTags.Input) async throws -> Operations.ReplaceItemTags.Output
     /// Remove a tag from an item
     ///
-    /// Removes one tag from the item and returns its metadata. Removing a tag the item doesn't have changes nothing and succeeds.
+    /// Removes one tag from the item and returns its tags. Removing a tag the item doesn't have changes nothing and succeeds.
     ///
     /// - Remark: HTTP `DELETE /items/{id}/tags/{tag}`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)`.
@@ -232,12 +204,12 @@ public protocol APIProtocol: Sendable {
     ///
     /// Returns every tag in use on the active items you can read, with the number of items that carry it. Sorted by count, highest first, then by tag.
     ///
-    /// - Remark: HTTP `GET /metadata/tags`.
-    /// - Remark: Generated from `#/paths//metadata/tags/get(listTags)`.
+    /// - Remark: HTTP `GET /tags`.
+    /// - Remark: Generated from `#/paths//tags/get(listTags)`.
     func listTags(_ input: Operations.ListTags.Input) async throws -> Operations.ListTags.Output
     /// Get an extension namespace
     ///
-    /// Returns the data in one extension namespace on the item, or `data: null` if the item has none there.
+    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
@@ -258,21 +230,70 @@ public protocol APIProtocol: Sendable {
     func deleteItemExtension(_ input: Operations.DeleteItemExtension.Input) async throws -> Operations.DeleteItemExtension.Output
     /// List extension namespaces
     ///
-    /// Returns the extension namespaces on the item that you can read, each with its data.
+    /// Returns the extension namespaces on the item that you can read, each with its document.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)`.
     func listItemExtensions(_ input: Operations.ListItemExtensions.Input) async throws -> Operations.ListItemExtensions.Output
+    /// List table rows
+    ///
+    /// Returns a page of a table's rows, in the table's `order` unless you name a sort, and by `id` for a table that names no `order`. A row without the sorted column comes last, and ties go by `id`.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/rows`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/get(listTableRows)`.
+    func listTableRows(_ input: Operations.ListTableRows.Input) async throws -> Operations.ListTableRows.Output
+    /// Write table rows
+    ///
+    /// Applies a batch of up to 1000 row operations to one table of an item, all of them or none. A batch that changes rows moves the item's `last_activity_at` to the batch's time, unless the item holds a later one, and sends one `rows.changed` event.
+    ///
+    /// - Remark: HTTP `POST /items/{id}/tables/{table}/rows`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/post(writeTableRows)`.
+    func writeTableRows(_ input: Operations.WriteTableRows.Input) async throws -> Operations.WriteTableRows.Output
+    /// Get a table row
+    ///
+    /// Returns one row of an item's table.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/rows/{row}`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/{row}/get(getTableRow)`.
+    func getTableRow(_ input: Operations.GetTableRow.Input) async throws -> Operations.GetTableRow.Output
+    /// List an item's tables
+    ///
+    /// Returns each table the item's type declares, with how many rows the item holds in it and when one last changed.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/get(listItemTables)`.
+    func listItemTables(_ input: Operations.ListItemTables.Input) async throws -> Operations.ListItemTables.Output
+    /// Get table totals
+    ///
+    /// Returns the total of each column that names `adds_up`, over the rows `filter` selects, or every row.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/totals`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/totals/get(getTableTotals)`.
+    func getTableTotals(_ input: Operations.GetTableTotals.Input) async throws -> Operations.GetTableTotals.Output
+    /// List table batches
+    ///
+    /// Returns the batches the table's change log holds, newest first, so you can find one to undo. The log keeps a batch for `row_log_retention_days`.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/batches`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/get(listTableBatches)`.
+    func listTableBatches(_ input: Operations.ListTableBatches.Input) async throws -> Operations.ListTableBatches.Output
+    /// Undo a table batch
+    ///
+    /// Puts back every row a batch changed as it was before the batch, as a new batch, all or none. Undo an undo to redo it. Sends one `rows.changed` event that names the undone batch in `undoes`.
+    ///
+    /// - Remark: HTTP `POST /items/{id}/tables/{table}/batches/{batch}/undo`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/{batch}/undo/post(undoTableBatch)`.
+    func undoTableBatch(_ input: Operations.UndoTableBatch.Input) async throws -> Operations.UndoTableBatch.Output
     /// List edges
     ///
-    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose source item `source_filter` leaves out.
+    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose from item `source_filter` leaves out.
     ///
     /// - Remark: HTTP `GET /edges`.
     /// - Remark: Generated from `#/paths//edges/get(listEdges)`.
     func listEdges(_ input: Operations.ListEdges.Input) async throws -> Operations.ListEdges.Output
     /// Create an edge
     ///
-    /// Creates an edge between two existing items. After any `source_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
+    /// Creates an edge between two existing items. After any `from_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
@@ -300,7 +321,7 @@ public protocol APIProtocol: Sendable {
     func deleteEdge(_ input: Operations.DeleteEdge.Input) async throws -> Operations.DeleteEdge.Output
     /// Upsert edges in bulk
     ///
-    /// Creates or updates up to 5,000 edges in one call, matching existing edges on `(source_id, target_id, edge_type)`. The batch is atomic by default: one failed entry rolls it all back. Returns each entry's outcome.
+    /// Creates or updates up to 5,000 edges in one call, matching existing edges on `(from_id, to_id, edge_type)`. The batch is atomic by default: one failed entry rolls it all back. Returns each entry's outcome.
     ///
     /// - Remark: HTTP `POST /edges/bulk`.
     /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)`.
@@ -314,14 +335,14 @@ public protocol APIProtocol: Sendable {
     func listItemEdges(_ input: Operations.ListItemEdges.Input) async throws -> Operations.ListItemEdges.Output
     /// List inbound edges
     ///
-    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose source item `source_filter` leaves out doesn't appear here, whatever the source of this item. `GET /items/{id}/edges` lists the edges that start at it.
+    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose from item `source_filter` leaves out doesn't appear here, whatever this item's source. `GET /items/{id}/edges` lists the edges that start at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/backrefs`.
     /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)`.
     func listItemBackrefs(_ input: Operations.ListItemBackrefs.Input) async throws -> Operations.ListItemBackrefs.Output
     /// Search items
     ///
-    /// Returns a page of the items you can read whose text properties or tags match `q`, best match first unless you give a `sort`. Items that tie come in ID order.
+    /// Returns a page of the items you can read whose text or tags match `q`, and of their table rows whose searchable columns match it, best first unless you give a `sort`. A row result names the row in `row`. Ties come in item ID order.
     ///
     /// - Remark: HTTP `GET /search`.
     /// - Remark: Generated from `#/paths//search/get(searchItems)`.
@@ -356,7 +377,7 @@ public protocol APIProtocol: Sendable {
     func replaceType(_ input: Operations.ReplaceType.Input) async throws -> Operations.ReplaceType.Output
     /// Delete a type
     ///
-    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
+    /// Deletes a type no item holds and no folder, view, webhook or table column names. With `force=true`, keeps the items, settings and column constraints; new item writes fail until the type is registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -419,14 +440,21 @@ public protocol APIProtocol: Sendable {
     func uploadBlob(_ input: Operations.UploadBlob.Input) async throws -> Operations.UploadBlob.Output
     /// Download a blob
     ///
-    /// Returns the bytes of a blob, from whichever store holds them, as a download. Send one `Range` to get part of it. `HEAD` returns the headers alone.
+    /// Returns the bytes of a blob, from whichever store holds them, as a download. Send one `Range` to get part of it.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)`.
     func downloadBlob(_ input: Operations.DownloadBlob.Input) async throws -> Operations.DownloadBlob.Output
+    /// Check a blob
+    ///
+    /// Returns the headers `GET /blobs/{hash}` sends and no body, so you can check that you can read a blob and learn its type and size. Send one `Range` as you would to download.
+    ///
+    /// - Remark: HTTP `HEAD /blobs/{hash}`.
+    /// - Remark: Generated from `#/paths//blobs/{hash}/head(checkBlob)`.
+    func checkBlob(_ input: Operations.CheckBlob.Input) async throws -> Operations.CheckBlob.Output
     /// Get a blob URL
     ///
-    /// Returns a URL that serves the blob's bytes without a credential, and `expires_in`, the seconds until it stops working. The URL keeps working for that time even if you revoke your credential.
+    /// Returns a URL that serves the blob's bytes without a credential, and `ttl_seconds`, the seconds until it stops working. The URL keeps working for that time even if you revoke your credential.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}/url`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)`.
@@ -461,14 +489,14 @@ public protocol APIProtocol: Sendable {
     func listBlobOrphans(_ input: Operations.ListBlobOrphans.Input) async throws -> Operations.ListBlobOrphans.Output
     /// Stream change events
     ///
-    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
+    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=true` to follow a working copy.
     ///
     /// - Remark: HTTP `GET /events`.
     /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
     func streamEvents(_ input: Operations.StreamEvents.Input) async throws -> Operations.StreamEvents.Output
     /// List webhooks
     ///
-    /// Returns webhooks and their makers, with secrets redacted. The owner's browser session and local command see every subscription; keys and apps see only their own.
+    /// Returns webhooks and their makers, with secrets redacted. The local command sees every subscription; keys and apps see only their own.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -482,7 +510,7 @@ public protocol APIProtocol: Sendable {
     func createWebhook(_ input: Operations.CreateWebhook.Input) async throws -> Operations.CreateWebhook.Output
     /// Get a webhook
     ///
-    /// Returns a webhook and its maker, with its secret redacted. The owner's browser session and local command can read any subscription; keys and apps can read only their own.
+    /// Returns a webhook and its maker, with its secret redacted. The local command can read any subscription; keys and apps can read only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -503,21 +531,21 @@ public protocol APIProtocol: Sendable {
     func deleteWebhook(_ input: Operations.DeleteWebhook.Input) async throws -> Operations.DeleteWebhook.Output
     /// List webhook deliveries
     ///
-    /// Returns delivery metadata without event payloads, newest first. The owner's browser session and local command can inspect any subscription; keys and apps can inspect only their own.
+    /// Returns delivery metadata without event payloads, newest first. The local command can inspect any subscription; keys and apps can inspect only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
     func listWebhookDeliveries(_ input: Operations.ListWebhookDeliveries.Input) async throws -> Operations.ListWebhookDeliveries.Output
     /// Redeliver a webhook delivery
     ///
-    /// Redelivers a failed delivery, queuing it again at the current URL. The owner's recently authenticated browser session or local command can retry any subscription; keys and apps can retry only their own.
+    /// Redelivers a failed delivery, queuing it again at the current URL. The local command can retry any subscription; keys and apps can retry only their own.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
     func redeliverWebhookDelivery(_ input: Operations.RedeliverWebhookDelivery.Input) async throws -> Operations.RedeliverWebhookDelivery.Output
     /// List folders
     ///
-    /// Returns active folder summaries, newest first, for the owner or a private local command. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
+    /// Returns active folder summaries, newest first. Requires read on `system.folder`. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
     ///
     /// - Remark: HTTP `GET /folders`.
     /// - Remark: Generated from `#/paths//folders/get(listFolders)`.
@@ -531,7 +559,7 @@ public protocol APIProtocol: Sendable {
     func createFolder(_ input: Operations.CreateFolder.Input) async throws -> Operations.CreateFolder.Output
     /// Update a folder
     ///
-    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay. Removes stored properties the folder type does not declare.
+    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay.
     ///
     /// - Remark: HTTP `PATCH /folders/{id}`.
     /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
@@ -545,14 +573,14 @@ public protocol APIProtocol: Sendable {
     func revokeFolder(_ input: Operations.RevokeFolder.Input) async throws -> Operations.RevokeFolder.Output
     /// Get a folder status
     ///
-    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. Historical reports remain visible.
+    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. A sign-in's reports stay as history until its key or app grant is removed.
     ///
     /// - Remark: HTTP `GET /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
     func getFolderStatus(_ input: Operations.GetFolderStatus.Input) async throws -> Operations.GetFolderStatus.Output
     /// Report a folder status
     ///
-    /// Reports your sign-in's status for one folder copy, replacing its earlier report, and returns the latest accepted sequence and receipt time. An equal or older sequence leaves the stored report unchanged.
+    /// Reports your sign-in's status for one folder copy and returns the latest accepted sequence and receipt time. An equal or older sequence changes nothing. A sign-in keeps at most 16 copies of a folder; a new copy past that replaces its oldest.
     ///
     /// - Remark: HTTP `PUT /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/put(reportFolderStatus)`.
@@ -615,7 +643,7 @@ public protocol APIProtocol: Sendable {
     func deleteConnector(_ input: Operations.DeleteConnector.Input) async throws -> Operations.DeleteConnector.Output
     /// Send a connector heartbeat
     ///
-    /// Sends a heartbeat, which sets the connector's `last_heartbeat_at` to the current time, and returns that time. Marfa takes no action when heartbeats stop.
+    /// Sends a heartbeat for the connector, which sets its `last_heartbeat_at` to the current time, and returns that time. Marfa takes no action when heartbeats stop.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/heartbeat`.
     /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(sendConnectorHeartbeat)`.
@@ -734,7 +762,7 @@ public protocol APIProtocol: Sendable {
     func markInboundDeliveriesHandled(_ input: Operations.MarkInboundDeliveriesHandled.Input) async throws -> Operations.MarkInboundDeliveriesHandled.Output
     /// List sources
     ///
-    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the owner see every source in use or named.
+    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the local command see every source in use or named.
     ///
     /// - Remark: HTTP `GET /sources`.
     /// - Remark: Generated from `#/paths//sources/get(listSources)`.
@@ -743,19 +771,19 @@ public protocol APIProtocol: Sendable {
     ///
     /// Returns a source's name and mark. A source needs no item or key to be read, but you see only your own, those you claim and those of items you can read, unless you hold `keys.manage`.
     ///
-    /// - Remark: HTTP `GET /source`.
-    /// - Remark: Generated from `#/paths//source/get(getSource)`.
+    /// - Remark: HTTP `GET /sources/{source}`.
+    /// - Remark: Generated from `#/paths//sources/{source}/get(getSource)`.
     func getSource(_ input: Operations.GetSource.Input) async throws -> Operations.GetSource.Output
     /// Name a source
     ///
     /// Sets or clears a source's name and mark, and returns the source. A field left out keeps its value. You can change your own source and those you claim; any other needs `keys.manage`.
     ///
-    /// - Remark: HTTP `PATCH /source`.
-    /// - Remark: Generated from `#/paths//source/patch(updateSource)`.
+    /// - Remark: HTTP `PATCH /sources/{source}`.
+    /// - Remark: Generated from `#/paths//sources/{source}/patch(updateSource)`.
     func updateSource(_ input: Operations.UpdateSource.Input) async throws -> Operations.UpdateSource.Output
     /// List API keys
     ///
-    /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Returns key metadata without plaintext. `keys.manage` and local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -776,53 +804,74 @@ public protocol APIProtocol: Sendable {
     func getCurrentKey(_ input: Operations.GetCurrentKey.Input) async throws -> Operations.GetCurrentKey.Output
     /// Update an API key
     ///
-    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
     func updateKey(_ input: Operations.UpdateKey.Input) async throws -> Operations.UpdateKey.Output
     /// Revoke an API key
     ///
-    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
+    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
     func revokeKey(_ input: Operations.RevokeKey.Input) async throws -> Operations.RevokeKey.Output
-    /// Register an OAuth client
+    /// Register an app
     ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    /// Registers an app as an OAuth client and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
-    /// - Remark: HTTP `POST /auth/oauth2/register`.
-    /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
+    /// - Remark: HTTP `POST /oauth/register`.
+    /// - Remark: Generated from `#/paths//oauth/register/post(registerOAuthClient)`.
     func registerOAuthClient(_ input: Operations.RegisterOAuthClient.Input) async throws -> Operations.RegisterOAuthClient.Output
     /// List app grants
     ///
-    /// Returns every active app grant in one page. Requires `grants.manage` or direct authority.
+    /// Returns every active app grant in one page. Requires `grants.manage`.
     ///
-    /// - Remark: HTTP `GET /auth/grants`.
-    /// - Remark: Generated from `#/paths//auth/grants/get(listAppGrants)`.
+    /// - Remark: HTTP `GET /grants`.
+    /// - Remark: Generated from `#/paths//grants/get(listAppGrants)`.
     func listAppGrants(_ input: Operations.ListAppGrants.Input) async throws -> Operations.ListAppGrants.Output
     /// Narrow an app grant
     ///
-    /// Narrows standing access. Requires a recent owner sign-in or private authority. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    /// Narrows an app's standing access. Requires `grants.manage`. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
     ///
-    /// - Remark: HTTP `PATCH /auth/grants/{id}`.
-    /// - Remark: Generated from `#/paths//auth/grants/{id}/patch(narrowAppGrant)`.
+    /// - Remark: HTTP `PATCH /grants/{id}`.
+    /// - Remark: Generated from `#/paths//grants/{id}/patch(narrowAppGrant)`.
     func narrowAppGrant(_ input: Operations.NarrowAppGrant.Input) async throws -> Operations.NarrowAppGrant.Output
     /// Revoke an app grant
     ///
-    /// Revokes the app's tokens and consent. Requires `grants.manage` or direct authority; an owner browser needs a sign-in within five minutes.
+    /// Revokes the app's tokens and consent. Requires `grants.manage`.
     ///
-    /// - Remark: HTTP `DELETE /auth/grants/{id}`.
-    /// - Remark: Generated from `#/paths//auth/grants/{id}/delete(revokeAppGrant)`.
+    /// - Remark: HTTP `DELETE /grants/{id}`.
+    /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
     func revokeAppGrant(_ input: Operations.RevokeAppGrant.Input) async throws -> Operations.RevokeAppGrant.Output
-    /// Get the owner
+    /// Authorize an app
     ///
-    /// Returns the owner of the claimed instance. Requires a direct owner sign-in or local process authority.
+    /// Starts an authorization with PKCE (RFC 6749 and RFC 7636) and redirects the browser: to sign in, to the consent screen, or to the app's redirect URI with a `code` or an `error`, and the `iss` of the issuer.
     ///
-    /// - Remark: HTTP `GET /owner`.
-    /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
-    func getOwner(_ input: Operations.GetOwner.Input) async throws -> Operations.GetOwner.Output
+    /// - Remark: HTTP `GET /oauth/authorize`.
+    /// - Remark: Generated from `#/paths//oauth/authorize/get(authorizeApp)`.
+    func authorizeApp(_ input: Operations.AuthorizeApp.Input) async throws -> Operations.AuthorizeApp.Output
+    /// Request a device code
+    ///
+    /// Returns a device code and a user code (RFC 8628). Show the person `verification_uri` and `user_code`, then poll `POST /oauth/token` with the device code until they approve or deny it.
+    ///
+    /// - Remark: HTTP `POST /oauth/device-authorization`.
+    /// - Remark: Generated from `#/paths//oauth/device-authorization/post(requestDeviceCode)`.
+    func requestDeviceCode(_ input: Operations.RequestDeviceCode.Input) async throws -> Operations.RequestDeviceCode.Output
+    /// Exchange a code for a token
+    ///
+    /// Returns an access token for an authorization code, a refresh token or an approved device code (RFC 6749 and RFC 8628). A refresh token can be spent once: the answer carries the next one.
+    ///
+    /// - Remark: HTTP `POST /oauth/token`.
+    /// - Remark: Generated from `#/paths//oauth/token/post(exchangeToken)`.
+    func exchangeToken(_ input: Operations.ExchangeToken.Input) async throws -> Operations.ExchangeToken.Output
+    /// Revoke a token
+    ///
+    /// Revokes an access token or a refresh token (RFC 7009). Revoking a refresh token ends the app's grant. A token Marfa doesn't know returns `200` too.
+    ///
+    /// - Remark: HTTP `POST /oauth/revoke`.
+    /// - Remark: Generated from `#/paths//oauth/revoke/post(revokeToken)`.
+    func revokeToken(_ input: Operations.RevokeToken.Input) async throws -> Operations.RevokeToken.Output
     /// Claim the instance
     ///
     /// Creates the one owner using a machine-issued setup code or setup-only browser session. A claimed instance never reopens setup. A claim from the instance's own origin, which the setup page sends, also signs the owner in with a session cookie.
@@ -830,86 +879,93 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /owner`.
     /// - Remark: Generated from `#/paths//owner/post(createOwner)`.
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
-    /// Update the owner
+    /// Get the owner's profile
     ///
-    /// Updates the owner's email or name, or removes the picture. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
     ///
-    /// - Remark: HTTP `PATCH /owner`.
-    /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
-    func updateOwner(_ input: Operations.UpdateOwner.Input) async throws -> Operations.UpdateOwner.Output
+    /// - Remark: HTTP `GET /profile`.
+    /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
+    func getProfile(_ input: Operations.GetProfile.Input) async throws -> Operations.GetProfile.Output
     /// Update the owner's profile
     ///
-    /// Updates the owner's name or removes the picture and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
     func updateProfile(_ input: Operations.UpdateProfile.Input) async throws -> Operations.UpdateProfile.Output
-    /// Get the owner's picture
+    /// Get the profile avatar
     ///
-    /// Returns the owner's picture as an image download. Requires an owner sign-in or a credential with profile read permission for the avatar. Send `If-None-Match` to revalidate.
+    /// Returns the owner's avatar as an image download. Requires profile read permission for the avatar. Send `If-None-Match` to revalidate.
     ///
-    /// - Remark: HTTP `GET /owner/picture`.
-    /// - Remark: Generated from `#/paths//owner/picture/get(getOwnerPicture)`.
-    func getOwnerPicture(_ input: Operations.GetOwnerPicture.Input) async throws -> Operations.GetOwnerPicture.Output
-    /// Replace the owner's picture
+    /// - Remark: HTTP `GET /profile/avatar`.
+    /// - Remark: Generated from `#/paths//profile/avatar/get(getProfileAvatar)`.
+    func getProfileAvatar(_ input: Operations.GetProfileAvatar.Input) async throws -> Operations.GetProfileAvatar.Output
+    /// Replace the avatar as an app
     ///
-    /// Stores the request body as the owner's picture and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority.
+    /// Stores the request body as the owner's avatar and returns the profile fields you can read. Requires profile write permission for the avatar.
     ///
-    /// - Remark: HTTP `PUT /owner/picture`.
-    /// - Remark: Generated from `#/paths//owner/picture/put(replaceOwnerPicture)`.
-    func replaceOwnerPicture(_ input: Operations.ReplaceOwnerPicture.Input) async throws -> Operations.ReplaceOwnerPicture.Output
-    /// Replace the picture as an app
-    ///
-    /// Stores the request body as the owner's picture and returns `ok: true`. Requires profile write permission for the avatar.
-    ///
-    /// - Remark: HTTP `PUT /profile/picture`.
-    /// - Remark: Generated from `#/paths//profile/picture/put(replaceProfilePicture)`.
-    func replaceProfilePicture(_ input: Operations.ReplaceProfilePicture.Input) async throws -> Operations.ReplaceProfilePicture.Output
+    /// - Remark: HTTP `PUT /profile/avatar`.
+    /// - Remark: Generated from `#/paths//profile/avatar/put(replaceProfileAvatar)`.
+    func replaceProfileAvatar(_ input: Operations.ReplaceProfileAvatar.Input) async throws -> Operations.ReplaceProfileAvatar.Output
     /// List sign-ins
     ///
-    /// Returns every browser, app and key that can reach Marfa, marking the browser that sent the request. Requires the owner's browser session or the local command.
+    /// Returns every browser, app and key that can reach Marfa. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `GET /owner/sign-ins`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/get(listSignIns)`.
     func listSignIns(_ input: Operations.ListSignIns.Input) async throws -> Operations.ListSignIns.Output
     /// Rename a sign-in
     ///
-    /// Renames an app or a key and returns the sign-in. A key's name is its `label`. Requires the owner's browser session, signed in within the last five minutes, or the local command.
+    /// Renames an app or a key and returns the sign-in. A key's name is its `label`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/patch(renameSignIn)`.
     func renameSignIn(_ input: Operations.RenameSignIn.Input) async throws -> Operations.RenameSignIn.Output
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't refresh or make another request. An app's keys stay unless `revoke_keys` is `true`. Needs the owner's browser session or the local command. A browser over five minutes old can end only itself, without `revoke_keys`.
+    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
     func endSignIn(_ input: Operations.EndSignIn.Input) async throws -> Operations.EndSignIn.Output
+    /// Replace the password
+    ///
+    /// Replaces the owner's password once `current_password` proves right, and ends every browser sign-in. Keys and apps keep their access. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `PUT /owner/password`.
+    /// - Remark: Generated from `#/paths//owner/password/put(replaceOwnerPassword)`.
+    func replaceOwnerPassword(_ input: Operations.ReplaceOwnerPassword.Input) async throws -> Operations.ReplaceOwnerPassword.Output
     /// List passkeys
     ///
-    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or private local authority.
+    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `GET /owner/passkeys`.
     /// - Remark: Generated from `#/paths//owner/passkeys/get(listOwnerPasskeys)`.
     func listOwnerPasskeys(_ input: Operations.ListOwnerPasskeys.Input) async throws -> Operations.ListOwnerPasskeys.Output
     /// Rename a passkey
     ///
-    /// Renames the passkey and returns its public details. Requires the owner's browser session authenticated within five minutes or private local authority.
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
     func renameOwnerPasskey(_ input: Operations.RenameOwnerPasskey.Input) async throws -> Operations.RenameOwnerPasskey.Output
     /// Delete a passkey
     ///
-    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session authenticated within five minutes or private local authority.
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
     func deleteOwnerPasskey(_ input: Operations.DeleteOwnerPasskey.Input) async throws -> Operations.DeleteOwnerPasskey.Output
+    /// Get the passkey add link
+    ///
+    /// Returns the address where the owner signs in and then adds a passkey in their browser. The link carries no credential. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `GET /owner/passkeys/add-url`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/add-url/get(getPasskeyAddUrl)`.
+    func getPasskeyAddUrl(_ input: Operations.GetPasskeyAddUrl.Input) async throws -> Operations.GetPasskeyAddUrl.Output
     /// Get the instance
     ///
-    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
+    /// Returns a description of the instance: its display name, `instance_id`, the release it runs, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -942,6 +998,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `PUT /config`.
     /// - Remark: Generated from `#/paths//config/put(replaceConfig)`.
     func replaceConfig(_ input: Operations.ReplaceConfig.Input) async throws -> Operations.ReplaceConfig.Output
+    /// List the settings
+    ///
+    /// Returns every stored setting with its value, default and rule, the rules across settings, and the settings only the environment sets. Requires `config.manage` or `instance.read`.
+    ///
+    /// - Remark: HTTP `GET /config/settings`.
+    /// - Remark: Generated from `#/paths//config/settings/get(listSettings)`.
+    func listSettings(_ input: Operations.ListSettings.Input) async throws -> Operations.ListSettings.Output
+    /// Check an address change
+    ///
+    /// Returns what changing the addresses would do, whether a write needs confirmation and whether a new sign-in address answers as this instance, and writes nothing. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `POST /config/address-check`.
+    /// - Remark: Generated from `#/paths//config/address-check/post(checkAddressChange)`.
+    func checkAddressChange(_ input: Operations.CheckAddressChange.Input) async throws -> Operations.CheckAddressChange.Output
     /// Get the instance's health
     ///
     /// Returns whether the instance is serving and the state of each component it depends on. Needs no credential.
@@ -951,14 +1021,14 @@ public protocol APIProtocol: Sendable {
     func getHealth(_ input: Operations.GetHealth.Input) async throws -> Operations.GetHealth.Output
     /// List attention items
     ///
-    /// Returns current concerns for the owner or a private local command. Failed or timed-out checks appear as unavailable items alongside known concerns. An empty list means every check completed without a concern.
+    /// Returns what needs the owner's attention. Requires `instance.read`. A check that fails or runs out of time appears as an unavailable item beside the known concerns. An empty list means every check completed without a concern.
     ///
     /// - Remark: HTTP `GET /attention`.
     /// - Remark: Generated from `#/paths//attention/get(listAttention)`.
     func listAttention(_ input: Operations.ListAttention.Input) async throws -> Operations.ListAttention.Output
     /// Get instance metrics
     ///
-    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
+    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. The counters are counted when you ask. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getInstanceMetrics)`.
@@ -984,34 +1054,69 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /housekeeping/{name}/run`.
     /// - Remark: Generated from `#/paths//housekeeping/{name}/run/post(runHousekeeping)`.
     func runHousekeeping(_ input: Operations.RunHousekeeping.Input) async throws -> Operations.RunHousekeeping.Output
-    /// List retired platform types
+    /// Confirm the clock
     ///
-    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Requires `instance.read`.
+    /// Takes the server's clock as right and returns the time it now trusts. While the clock reads more than 7 days later than the trusted time, the jobs that delete old records do nothing; this lets them run now. Requires `instance.maintain`.
     ///
-    /// - Remark: HTTP `GET /platform-types/retired`.
-    /// - Remark: Generated from `#/paths//platform-types/retired/get(listRetiredPlatformTypes)`.
-    func listRetiredPlatformTypes(_ input: Operations.ListRetiredPlatformTypes.Input) async throws -> Operations.ListRetiredPlatformTypes.Output
-    /// Delete a retired platform type
+    /// - Remark: HTTP `POST /clock/confirm`.
+    /// - Remark: Generated from `#/paths//clock/confirm/post(confirmClock)`.
+    func confirmClock(_ input: Operations.ConfirmClock.Input) async throws -> Operations.ConfirmClock.Output
+    /// Get the update status
     ///
-    /// Deletes one retired platform type: a type this build no longer ships. The type stops resolving at once. Requires `instance.maintain`.
+    /// Returns the release this server runs, the newest published release Marfa found, and how this server moves to it. Requires `instance.read`.
     ///
-    /// - Remark: HTTP `DELETE /platform-types/{id}`.
-    /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deleteRetiredPlatformType)`.
-    func deleteRetiredPlatformType(_ input: Operations.DeleteRetiredPlatformType.Input) async throws -> Operations.DeleteRetiredPlatformType.Output
+    /// - Remark: HTTP `GET /update`.
+    /// - Remark: Generated from `#/paths//update/get(getUpdate)`.
+    func getUpdate(_ input: Operations.GetUpdate.Input) async throws -> Operations.GetUpdate.Output
+    /// Start an update
+    ///
+    /// Starts an update to the newest release where Marfa installed this server as a service, and returns the update status. Marfa checks the download, swaps the programs, and restarts the server. Requires `instance.maintain`.
+    ///
+    /// - Remark: HTTP `POST /update`.
+    /// - Remark: Generated from `#/paths//update/post(startUpdate)`.
+    func startUpdate(_ input: Operations.StartUpdate.Input) async throws -> Operations.StartUpdate.Output
     /// Export an archive
     ///
-    /// Exports an archive of the items, metadata and edges you can read, excluding trash unless requested. The owner can use their browser session. An archive can be read by `POST /restore`.
+    /// Exports an archive of the items, metadata and edges you can read, excluding trash unless requested. An archive can be read by `POST /restore`.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportArchive)`.
     func exportArchive(_ input: Operations.ExportArchive.Input) async throws -> Operations.ExportArchive.Output
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes before the request starts.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage` and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
     func restoreArchive(_ input: Operations.RestoreArchive.Input) async throws -> Operations.RestoreArchive.Output
+    /// List backups
+    ///
+    /// Returns the backups in the instance's backup folder or object store, newest first, including those another instance took there, so a new instance can restore the one it replaces. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `GET /backups`.
+    /// - Remark: Generated from `#/paths//backups/get(listBackups)`.
+    func listBackups(_ input: Operations.ListBackups.Input) async throws -> Operations.ListBackups.Output
+    /// Take a backup
+    ///
+    /// Takes a backup now and puts it in the instance's backup folder or object store, whether or not anything changed since the last one, then deletes this instance's backups that thinning no longer keeps. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `POST /backups`.
+    /// - Remark: Generated from `#/paths//backups/post(runBackup)`.
+    func runBackup(_ input: Operations.RunBackup.Input) async throws -> Operations.RunBackup.Output
+    /// Adopt a backup folder
+    ///
+    /// Starts afresh on a disk that replaced the backup folder's disk, when the folder holds no store marker for this instance. Marfa forgets the backups and file copies of the old disk and changes no other store. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `POST /backups/folder/adopt`.
+    /// - Remark: Generated from `#/paths//backups/folder/adopt/post(adoptBackupFolder)`.
+    func adoptBackupFolder(_ input: Operations.AdoptBackupFolder.Input) async throws -> Operations.AdoptBackupFolder.Output
+    /// Restore a backup
+    ///
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage` and a sign-in from the last five minutes.
+    ///
+    /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
+    /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
+    func restoreBackup(_ input: Operations.RestoreBackup.Input) async throws -> Operations.RestoreBackup.Output
 }
 
 /// Convenience overloads for operation inputs.
@@ -1033,7 +1138,7 @@ extension APIProtocol {
     }
     /// Create an item
     ///
-    /// Creates an item. If `source_id` matches an existing item under the same source, updates that item instead. Repeating an `id` you already created returns the stored item with `acknowledged: true` and writes nothing.
+    /// Creates an item. If `source_id` matches an existing item under the same source, updates that item instead. A repeated `id`, or an update that leaves the item as it is, returns the stored item with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /items`.
     /// - Remark: Generated from `#/paths//items/post(createItem)`.
@@ -1048,7 +1153,7 @@ extension APIProtocol {
     }
     /// Get an item
     ///
-    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call.
+    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call. Use `state` to read an item in the trash.
     ///
     /// - Remark: HTTP `GET /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/get(getItem)`.
@@ -1065,7 +1170,7 @@ extension APIProtocol {
     }
     /// Update an item
     ///
-    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. To change its type, send `type` with `retype: true`.
+    /// Updates an item's properties, tier, own time, natural key or edges. Send the `version` you read; stale writes can merge unless `version_match` is `exact`. A no-change update writes nothing. To change its type, send `type` with `retype: true`.
     ///
     /// - Remark: HTTP `PATCH /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/patch(updateItem)`.
@@ -1137,10 +1242,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{id}/restore/post(restoreItem)`.
     public func restoreItem(
         path: Operations.RestoreItem.Input.Path,
+        query: Operations.RestoreItem.Input.Query = .init(),
         headers: Operations.RestoreItem.Input.Headers = .init()
     ) async throws -> Operations.RestoreItem.Output {
         try await restoreItem(Operations.RestoreItem.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1259,7 +1366,7 @@ extension APIProtocol {
     }
     /// Get item counts
     ///
-    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one. The owner can use their browser session.
+    /// Returns item counts by state, type or source using the filters of `GET /items`. Counts every state unless you name one.
     ///
     /// - Remark: HTTP `GET /items/stats`.
     /// - Remark: Generated from `#/paths//items/stats/get(getItemStats)`.
@@ -1274,7 +1381,7 @@ extension APIProtocol {
     }
     /// List item summaries
     ///
-    /// Returns item names, types, versions, sources and creation times, newest first. Only the owner or a local command can use this operation. Trashed and system items are excluded.
+    /// Returns item names, types, versions, sources and creation times, newest first, of the types you can read. Trashed and system items are excluded.
     ///
     /// - Remark: HTTP `GET /items/summaries`.
     /// - Remark: Generated from `#/paths//items/summaries/get(listItemSummaries)`.
@@ -1304,7 +1411,7 @@ extension APIProtocol {
     }
     /// Settle tombstones
     ///
-    /// Settles tombstones, moving their `settled_at` later, never earlier, and returns them. A connector calls it after changing the vendor's copy to carry out a purge, so that change doesn't bring the item back as a new row.
+    /// Settles tombstones, moving their `settled_at` later, never earlier, and returns them. A connector calls it after changing the vendor's copy to carry out a purge, so that change doesn't bring the item back as a new item.
     ///
     /// - Remark: HTTP `POST /items/tombstones`.
     /// - Remark: Generated from `#/paths//items/tombstones/post(settleTombstones)`.
@@ -1319,7 +1426,7 @@ extension APIProtocol {
     }
     /// List the trash
     ///
-    /// Returns a page of trash summaries, newest creation first, without item content. Only the owner or a local command can use this operation.
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
     ///
     /// - Remark: HTTP `GET /trash`.
     /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
@@ -1332,60 +1439,9 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Trash an item by summary
-    ///
-    /// Moves the item and its cascading children to the trash. Returns only a summary. Requires the version from the listing.
-    ///
-    /// - Remark: HTTP `POST /items/summaries/{id}/trash`.
-    /// - Remark: Generated from `#/paths//items/summaries/{id}/trash/post(trashItemSummary)`.
-    public func trashItemSummary(
-        path: Operations.TrashItemSummary.Input.Path,
-        query: Operations.TrashItemSummary.Input.Query,
-        headers: Operations.TrashItemSummary.Input.Headers = .init()
-    ) async throws -> Operations.TrashItemSummary.Output {
-        try await trashItemSummary(Operations.TrashItemSummary.Input(
-            path: path,
-            query: query,
-            headers: headers
-        ))
-    }
-    /// Restore an item by summary
-    ///
-    /// Restores the item and the children its trash took. Returns only a summary. Requires the version from the listing.
-    ///
-    /// - Remark: HTTP `POST /items/summaries/{id}/restore`.
-    /// - Remark: Generated from `#/paths//items/summaries/{id}/restore/post(restoreItemSummary)`.
-    public func restoreItemSummary(
-        path: Operations.RestoreItemSummary.Input.Path,
-        query: Operations.RestoreItemSummary.Input.Query,
-        headers: Operations.RestoreItemSummary.Input.Headers = .init()
-    ) async throws -> Operations.RestoreItemSummary.Output {
-        try await restoreItemSummary(Operations.RestoreItemSummary.Input(
-            path: path,
-            query: query,
-            headers: headers
-        ))
-    }
-    /// Purge an item by summary
-    ///
-    /// Purges one item, deleting it permanently, if it is still in the trash at the listed version. Returns only a summary.
-    ///
-    /// - Remark: HTTP `POST /items/summaries/{id}/purge`.
-    /// - Remark: Generated from `#/paths//items/summaries/{id}/purge/post(purgeItemSummary)`.
-    public func purgeItemSummary(
-        path: Operations.PurgeItemSummary.Input.Path,
-        query: Operations.PurgeItemSummary.Input.Query,
-        headers: Operations.PurgeItemSummary.Input.Headers = .init()
-    ) async throws -> Operations.PurgeItemSummary.Output {
-        try await purgeItemSummary(Operations.PurgeItemSummary.Input(
-            path: path,
-            query: query,
-            headers: headers
-        ))
-    }
     /// Empty the trash
     ///
-    /// Empties one page of the trash: deletes up to 200 items permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed during the operation may remain.
+    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
     ///
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
@@ -1443,41 +1499,9 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Get item metadata
-    ///
-    /// Returns an item's metadata: its tags and the extension namespaces you can read. To read metadata for many items, use `include=metadata` on `GET /items`.
-    ///
-    /// - Remark: HTTP `GET /items/{id}/metadata`.
-    /// - Remark: Generated from `#/paths//items/{id}/metadata/get(getItemMetadata)`.
-    public func getItemMetadata(
-        path: Operations.GetItemMetadata.Input.Path,
-        headers: Operations.GetItemMetadata.Input.Headers = .init()
-    ) async throws -> Operations.GetItemMetadata.Output {
-        try await getItemMetadata(Operations.GetItemMetadata.Input(
-            path: path,
-            headers: headers
-        ))
-    }
-    /// Replace an item's tags
-    ///
-    /// Replaces the item's tags with the ones you send and returns its metadata. An empty list clears all tags.
-    ///
-    /// - Remark: HTTP `PUT /items/{id}/metadata`.
-    /// - Remark: Generated from `#/paths//items/{id}/metadata/put(replaceItemMetadata)`.
-    public func replaceItemMetadata(
-        path: Operations.ReplaceItemMetadata.Input.Path,
-        headers: Operations.ReplaceItemMetadata.Input.Headers = .init(),
-        body: Operations.ReplaceItemMetadata.Input.Body
-    ) async throws -> Operations.ReplaceItemMetadata.Output {
-        try await replaceItemMetadata(Operations.ReplaceItemMetadata.Input(
-            path: path,
-            headers: headers,
-            body: body
-        ))
-    }
     /// Add tags to an item
     ///
-    /// Adds tags to the item and returns its metadata. A tag the item already has isn't added twice.
+    /// Adds tags to the item and returns its tags. A tag the item already has isn't added twice.
     ///
     /// - Remark: HTTP `POST /items/{id}/tags`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/post(addItemTags)`.
@@ -1494,9 +1518,26 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// Replace an item's tags
+    ///
+    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags.
+    ///
+    /// - Remark: HTTP `PUT /items/{id}/tags`.
+    /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)`.
+    public func replaceItemTags(
+        path: Operations.ReplaceItemTags.Input.Path,
+        headers: Operations.ReplaceItemTags.Input.Headers = .init(),
+        body: Operations.ReplaceItemTags.Input.Body
+    ) async throws -> Operations.ReplaceItemTags.Output {
+        try await replaceItemTags(Operations.ReplaceItemTags.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
     /// Remove a tag from an item
     ///
-    /// Removes one tag from the item and returns its metadata. Removing a tag the item doesn't have changes nothing and succeeds.
+    /// Removes one tag from the item and returns its tags. Removing a tag the item doesn't have changes nothing and succeeds.
     ///
     /// - Remark: HTTP `DELETE /items/{id}/tags/{tag}`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/{tag}/delete(removeItemTag)`.
@@ -1515,14 +1556,14 @@ extension APIProtocol {
     ///
     /// Returns every tag in use on the active items you can read, with the number of items that carry it. Sorted by count, highest first, then by tag.
     ///
-    /// - Remark: HTTP `GET /metadata/tags`.
-    /// - Remark: Generated from `#/paths//metadata/tags/get(listTags)`.
+    /// - Remark: HTTP `GET /tags`.
+    /// - Remark: Generated from `#/paths//tags/get(listTags)`.
     public func listTags(headers: Operations.ListTags.Input.Headers = .init()) async throws -> Operations.ListTags.Output {
         try await listTags(Operations.ListTags.Input(headers: headers))
     }
     /// Get an extension namespace
     ///
-    /// Returns the data in one extension namespace on the item, or `data: null` if the item has none there.
+    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
@@ -1569,7 +1610,7 @@ extension APIProtocol {
     }
     /// List extension namespaces
     ///
-    /// Returns the extension namespaces on the item that you can read, each with its data.
+    /// Returns the extension namespaces on the item that you can read, each with its document.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)`.
@@ -1582,9 +1623,122 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// List table rows
+    ///
+    /// Returns a page of a table's rows, in the table's `order` unless you name a sort, and by `id` for a table that names no `order`. A row without the sorted column comes last, and ties go by `id`.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/rows`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/get(listTableRows)`.
+    public func listTableRows(
+        path: Operations.ListTableRows.Input.Path,
+        query: Operations.ListTableRows.Input.Query = .init(),
+        headers: Operations.ListTableRows.Input.Headers = .init()
+    ) async throws -> Operations.ListTableRows.Output {
+        try await listTableRows(Operations.ListTableRows.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Write table rows
+    ///
+    /// Applies a batch of up to 1000 row operations to one table of an item, all of them or none. A batch that changes rows moves the item's `last_activity_at` to the batch's time, unless the item holds a later one, and sends one `rows.changed` event.
+    ///
+    /// - Remark: HTTP `POST /items/{id}/tables/{table}/rows`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/post(writeTableRows)`.
+    public func writeTableRows(
+        path: Operations.WriteTableRows.Input.Path,
+        headers: Operations.WriteTableRows.Input.Headers = .init(),
+        body: Operations.WriteTableRows.Input.Body
+    ) async throws -> Operations.WriteTableRows.Output {
+        try await writeTableRows(Operations.WriteTableRows.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a table row
+    ///
+    /// Returns one row of an item's table.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/rows/{row}`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/{row}/get(getTableRow)`.
+    public func getTableRow(
+        path: Operations.GetTableRow.Input.Path,
+        headers: Operations.GetTableRow.Input.Headers = .init()
+    ) async throws -> Operations.GetTableRow.Output {
+        try await getTableRow(Operations.GetTableRow.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List an item's tables
+    ///
+    /// Returns each table the item's type declares, with how many rows the item holds in it and when one last changed.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/get(listItemTables)`.
+    public func listItemTables(
+        path: Operations.ListItemTables.Input.Path,
+        headers: Operations.ListItemTables.Input.Headers = .init()
+    ) async throws -> Operations.ListItemTables.Output {
+        try await listItemTables(Operations.ListItemTables.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Get table totals
+    ///
+    /// Returns the total of each column that names `adds_up`, over the rows `filter` selects, or every row.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/totals`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/totals/get(getTableTotals)`.
+    public func getTableTotals(
+        path: Operations.GetTableTotals.Input.Path,
+        query: Operations.GetTableTotals.Input.Query = .init(),
+        headers: Operations.GetTableTotals.Input.Headers = .init()
+    ) async throws -> Operations.GetTableTotals.Output {
+        try await getTableTotals(Operations.GetTableTotals.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// List table batches
+    ///
+    /// Returns the batches the table's change log holds, newest first, so you can find one to undo. The log keeps a batch for `row_log_retention_days`.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/batches`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/get(listTableBatches)`.
+    public func listTableBatches(
+        path: Operations.ListTableBatches.Input.Path,
+        query: Operations.ListTableBatches.Input.Query = .init(),
+        headers: Operations.ListTableBatches.Input.Headers = .init()
+    ) async throws -> Operations.ListTableBatches.Output {
+        try await listTableBatches(Operations.ListTableBatches.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Undo a table batch
+    ///
+    /// Puts back every row a batch changed as it was before the batch, as a new batch, all or none. Undo an undo to redo it. Sends one `rows.changed` event that names the undone batch in `undoes`.
+    ///
+    /// - Remark: HTTP `POST /items/{id}/tables/{table}/batches/{batch}/undo`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/{batch}/undo/post(undoTableBatch)`.
+    public func undoTableBatch(
+        path: Operations.UndoTableBatch.Input.Path,
+        headers: Operations.UndoTableBatch.Input.Headers = .init()
+    ) async throws -> Operations.UndoTableBatch.Output {
+        try await undoTableBatch(Operations.UndoTableBatch.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// List edges
     ///
-    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose source item `source_filter` leaves out.
+    /// Returns the edges you can read, newest first, whether or not the items they join are in the trash. A deleted edge doesn't appear: `GET /events` reports deletions. Nor does an edge whose from item `source_filter` leaves out.
     ///
     /// - Remark: HTTP `GET /edges`.
     /// - Remark: Generated from `#/paths//edges/get(listEdges)`.
@@ -1599,7 +1753,7 @@ extension APIProtocol {
     }
     /// Create an edge
     ///
-    /// Creates an edge between two existing items. After any `source_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
+    /// Creates an edge between two existing items. After any `from_version` precondition passes, repeating an `id` you already created returns the stored edge with `acknowledged: true` and writes nothing.
     ///
     /// - Remark: HTTP `POST /edges`.
     /// - Remark: Generated from `#/paths//edges/post(createEdge)`.
@@ -1665,7 +1819,7 @@ extension APIProtocol {
     }
     /// Upsert edges in bulk
     ///
-    /// Creates or updates up to 5,000 edges in one call, matching existing edges on `(source_id, target_id, edge_type)`. The batch is atomic by default: one failed entry rolls it all back. Returns each entry's outcome.
+    /// Creates or updates up to 5,000 edges in one call, matching existing edges on `(from_id, to_id, edge_type)`. The batch is atomic by default: one failed entry rolls it all back. Returns each entry's outcome.
     ///
     /// - Remark: HTTP `POST /edges/bulk`.
     /// - Remark: Generated from `#/paths//edges/bulk/post(bulkUpsertEdges)`.
@@ -1697,7 +1851,7 @@ extension APIProtocol {
     }
     /// List inbound edges
     ///
-    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose source item `source_filter` leaves out doesn't appear here, whatever the source of this item. `GET /items/{id}/edges` lists the edges that start at it.
+    /// Returns the edges that point at an item. An item in the trash still lists its edges. An edge whose from item `source_filter` leaves out doesn't appear here, whatever this item's source. `GET /items/{id}/edges` lists the edges that start at it.
     ///
     /// - Remark: HTTP `GET /items/{id}/backrefs`.
     /// - Remark: Generated from `#/paths//items/{id}/backrefs/get(listItemBackrefs)`.
@@ -1714,7 +1868,7 @@ extension APIProtocol {
     }
     /// Search items
     ///
-    /// Returns a page of the items you can read whose text properties or tags match `q`, best match first unless you give a `sort`. Items that tie come in ID order.
+    /// Returns a page of the items you can read whose text or tags match `q`, and of their table rows whose searchable columns match it, best first unless you give a `sort`. A row result names the row in `row`. Ties come in item ID order.
     ///
     /// - Remark: HTTP `GET /search`.
     /// - Remark: Generated from `#/paths//search/get(searchItems)`.
@@ -1774,18 +1928,20 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)`.
     public func replaceType(
         path: Operations.ReplaceType.Input.Path,
+        query: Operations.ReplaceType.Input.Query = .init(),
         headers: Operations.ReplaceType.Input.Headers = .init(),
         body: Operations.ReplaceType.Input.Body
     ) async throws -> Operations.ReplaceType.Output {
         try await replaceType(Operations.ReplaceType.Input(
             path: path,
+            query: query,
             headers: headers,
             body: body
         ))
     }
     /// Delete a type
     ///
-    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
+    /// Deletes a type no item holds and no folder, view, webhook or table column names. With `force=true`, keeps the items, settings and column constraints; new item writes fail until the type is registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -1922,7 +2078,7 @@ extension APIProtocol {
     }
     /// Download a blob
     ///
-    /// Returns the bytes of a blob, from whichever store holds them, as a download. Send one `Range` to get part of it. `HEAD` returns the headers alone.
+    /// Returns the bytes of a blob, from whichever store holds them, as a download. Send one `Range` to get part of it.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/get(downloadBlob)`.
@@ -1935,9 +2091,18 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Check a blob
+    ///
+    /// Returns the headers `GET /blobs/{hash}` sends and no body, so you can check that you can read a blob and learn its type and size. Send one `Range` as you would to download.
+    ///
+    /// - Remark: HTTP `HEAD /blobs/{hash}`.
+    /// - Remark: Generated from `#/paths//blobs/{hash}/head(checkBlob)`.
+    public func checkBlob(path: Operations.CheckBlob.Input.Path) async throws -> Operations.CheckBlob.Output {
+        try await checkBlob(Operations.CheckBlob.Input(path: path))
+    }
     /// Get a blob URL
     ///
-    /// Returns a URL that serves the blob's bytes without a credential, and `expires_in`, the seconds until it stops working. The URL keeps working for that time even if you revoke your credential.
+    /// Returns a URL that serves the blob's bytes without a credential, and `ttl_seconds`, the seconds until it stops working. The URL keeps working for that time even if you revoke your credential.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}/url`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)`.
@@ -2002,7 +2167,7 @@ extension APIProtocol {
     }
     /// Stream change events
     ///
-    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=1` to follow a working copy.
+    /// Opens a Server-Sent Events stream of the changes to items and edges that you can read. Send `Last-Event-ID` to resume after a disconnect, or `copy=true` to follow a working copy.
     ///
     /// - Remark: HTTP `GET /events`.
     /// - Remark: Generated from `#/paths//events/get(streamEvents)`.
@@ -2017,7 +2182,7 @@ extension APIProtocol {
     }
     /// List webhooks
     ///
-    /// Returns webhooks and their makers, with secrets redacted. The owner's browser session and local command see every subscription; keys and apps see only their own.
+    /// Returns webhooks and their makers, with secrets redacted. The local command sees every subscription; keys and apps see only their own.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -2041,7 +2206,7 @@ extension APIProtocol {
     }
     /// Get a webhook
     ///
-    /// Returns a webhook and its maker, with its secret redacted. The owner's browser session and local command can read any subscription; keys and apps can read only their own.
+    /// Returns a webhook and its maker, with its secret redacted. The local command can read any subscription; keys and apps can read only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -2088,7 +2253,7 @@ extension APIProtocol {
     }
     /// List webhook deliveries
     ///
-    /// Returns delivery metadata without event payloads, newest first. The owner's browser session and local command can inspect any subscription; keys and apps can inspect only their own.
+    /// Returns delivery metadata without event payloads, newest first. The local command can inspect any subscription; keys and apps can inspect only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -2105,7 +2270,7 @@ extension APIProtocol {
     }
     /// Redeliver a webhook delivery
     ///
-    /// Redelivers a failed delivery, queuing it again at the current URL. The owner's recently authenticated browser session or local command can retry any subscription; keys and apps can retry only their own.
+    /// Redelivers a failed delivery, queuing it again at the current URL. The local command can retry any subscription; keys and apps can retry only their own.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -2120,7 +2285,7 @@ extension APIProtocol {
     }
     /// List folders
     ///
-    /// Returns active folder summaries, newest first, for the owner or a private local command. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
+    /// Returns active folder summaries, newest first. Requires read on `system.folder`. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
     ///
     /// - Remark: HTTP `GET /folders`.
     /// - Remark: Generated from `#/paths//folders/get(listFolders)`.
@@ -2150,7 +2315,7 @@ extension APIProtocol {
     }
     /// Update a folder
     ///
-    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay. Removes stored properties the folder type does not declare.
+    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay.
     ///
     /// - Remark: HTTP `PATCH /folders/{id}`.
     /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
@@ -2182,7 +2347,7 @@ extension APIProtocol {
     }
     /// Get a folder status
     ///
-    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. Historical reports remain visible.
+    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. A sign-in's reports stay as history until its key or app grant is removed.
     ///
     /// - Remark: HTTP `GET /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
@@ -2197,7 +2362,7 @@ extension APIProtocol {
     }
     /// Report a folder status
     ///
-    /// Reports your sign-in's status for one folder copy, replacing its earlier report, and returns the latest accepted sequence and receipt time. An equal or older sequence leaves the stored report unchanged.
+    /// Reports your sign-in's status for one folder copy and returns the latest accepted sequence and receipt time. An equal or older sequence changes nothing. A sign-in keeps at most 16 copies of a folder; a new copy past that replaces its oldest.
     ///
     /// - Remark: HTTP `PUT /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/put(reportFolderStatus)`.
@@ -2332,7 +2497,7 @@ extension APIProtocol {
     }
     /// Send a connector heartbeat
     ///
-    /// Sends a heartbeat, which sets the connector's `last_heartbeat_at` to the current time, and returns that time. Marfa takes no action when heartbeats stop.
+    /// Sends a heartbeat for the connector, which sets its `last_heartbeat_at` to the current time, and returns that time. Marfa takes no action when heartbeats stop.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/heartbeat`.
     /// - Remark: Generated from `#/paths//connectors/{id}/heartbeat/post(sendConnectorHeartbeat)`.
@@ -2609,7 +2774,7 @@ extension APIProtocol {
     }
     /// List sources
     ///
-    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the owner see every source in use or named.
+    /// Returns the sources you can see, each with its name and mark: your own, those you claim, and those of items you can read. `keys.manage` and the local command see every source in use or named.
     ///
     /// - Remark: HTTP `GET /sources`.
     /// - Remark: Generated from `#/paths//sources/get(listSources)`.
@@ -2620,14 +2785,14 @@ extension APIProtocol {
     ///
     /// Returns a source's name and mark. A source needs no item or key to be read, but you see only your own, those you claim and those of items you can read, unless you hold `keys.manage`.
     ///
-    /// - Remark: HTTP `GET /source`.
-    /// - Remark: Generated from `#/paths//source/get(getSource)`.
+    /// - Remark: HTTP `GET /sources/{source}`.
+    /// - Remark: Generated from `#/paths//sources/{source}/get(getSource)`.
     public func getSource(
-        query: Operations.GetSource.Input.Query,
+        path: Operations.GetSource.Input.Path,
         headers: Operations.GetSource.Input.Headers = .init()
     ) async throws -> Operations.GetSource.Output {
         try await getSource(Operations.GetSource.Input(
-            query: query,
+            path: path,
             headers: headers
         ))
     }
@@ -2635,22 +2800,22 @@ extension APIProtocol {
     ///
     /// Sets or clears a source's name and mark, and returns the source. A field left out keeps its value. You can change your own source and those you claim; any other needs `keys.manage`.
     ///
-    /// - Remark: HTTP `PATCH /source`.
-    /// - Remark: Generated from `#/paths//source/patch(updateSource)`.
+    /// - Remark: HTTP `PATCH /sources/{source}`.
+    /// - Remark: Generated from `#/paths//sources/{source}/patch(updateSource)`.
     public func updateSource(
-        query: Operations.UpdateSource.Input.Query,
+        path: Operations.UpdateSource.Input.Path,
         headers: Operations.UpdateSource.Input.Headers = .init(),
         body: Operations.UpdateSource.Input.Body
     ) async throws -> Operations.UpdateSource.Output {
         try await updateSource(Operations.UpdateSource.Input(
-            query: query,
+            path: path,
             headers: headers,
             body: body
         ))
     }
     /// List API keys
     ///
-    /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Returns key metadata without plaintext. `keys.manage` and local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -2683,7 +2848,7 @@ extension APIProtocol {
     }
     /// Update an API key
     ///
-    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -2700,7 +2865,7 @@ extension APIProtocol {
     }
     /// Revoke an API key
     ///
-    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
+    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -2713,12 +2878,12 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Register an OAuth client
+    /// Register an app
     ///
-    /// Registers an OAuth client for an app and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
+    /// Registers an app as an OAuth client and returns it with its `client_id`. Send no credential; a web page can call it from a browser on any origin. The `client_credentials` grant isn't available: a program that acts for no person uses an API key.
     ///
-    /// - Remark: HTTP `POST /auth/oauth2/register`.
-    /// - Remark: Generated from `#/paths//auth/oauth2/register/post(registerOAuthClient)`.
+    /// - Remark: HTTP `POST /oauth/register`.
+    /// - Remark: Generated from `#/paths//oauth/register/post(registerOAuthClient)`.
     public func registerOAuthClient(
         headers: Operations.RegisterOAuthClient.Input.Headers = .init(),
         body: Operations.RegisterOAuthClient.Input.Body
@@ -2730,19 +2895,19 @@ extension APIProtocol {
     }
     /// List app grants
     ///
-    /// Returns every active app grant in one page. Requires `grants.manage` or direct authority.
+    /// Returns every active app grant in one page. Requires `grants.manage`.
     ///
-    /// - Remark: HTTP `GET /auth/grants`.
-    /// - Remark: Generated from `#/paths//auth/grants/get(listAppGrants)`.
+    /// - Remark: HTTP `GET /grants`.
+    /// - Remark: Generated from `#/paths//grants/get(listAppGrants)`.
     public func listAppGrants(headers: Operations.ListAppGrants.Input.Headers = .init()) async throws -> Operations.ListAppGrants.Output {
         try await listAppGrants(Operations.ListAppGrants.Input(headers: headers))
     }
     /// Narrow an app grant
     ///
-    /// Narrows standing access. Requires a recent owner sign-in or private authority. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    /// Narrows an app's standing access. Requires `grants.manage`. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
     ///
-    /// - Remark: HTTP `PATCH /auth/grants/{id}`.
-    /// - Remark: Generated from `#/paths//auth/grants/{id}/patch(narrowAppGrant)`.
+    /// - Remark: HTTP `PATCH /grants/{id}`.
+    /// - Remark: Generated from `#/paths//grants/{id}/patch(narrowAppGrant)`.
     public func narrowAppGrant(
         path: Operations.NarrowAppGrant.Input.Path,
         headers: Operations.NarrowAppGrant.Input.Headers = .init(),
@@ -2756,10 +2921,10 @@ extension APIProtocol {
     }
     /// Revoke an app grant
     ///
-    /// Revokes the app's tokens and consent. Requires `grants.manage` or direct authority; an owner browser needs a sign-in within five minutes.
+    /// Revokes the app's tokens and consent. Requires `grants.manage`.
     ///
-    /// - Remark: HTTP `DELETE /auth/grants/{id}`.
-    /// - Remark: Generated from `#/paths//auth/grants/{id}/delete(revokeAppGrant)`.
+    /// - Remark: HTTP `DELETE /grants/{id}`.
+    /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
     public func revokeAppGrant(
         path: Operations.RevokeAppGrant.Input.Path,
         query: Operations.RevokeAppGrant.Input.Query = .init(),
@@ -2771,14 +2936,65 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// Get the owner
+    /// Authorize an app
     ///
-    /// Returns the owner of the claimed instance. Requires a direct owner sign-in or local process authority.
+    /// Starts an authorization with PKCE (RFC 6749 and RFC 7636) and redirects the browser: to sign in, to the consent screen, or to the app's redirect URI with a `code` or an `error`, and the `iss` of the issuer.
     ///
-    /// - Remark: HTTP `GET /owner`.
-    /// - Remark: Generated from `#/paths//owner/get(getOwner)`.
-    public func getOwner(headers: Operations.GetOwner.Input.Headers = .init()) async throws -> Operations.GetOwner.Output {
-        try await getOwner(Operations.GetOwner.Input(headers: headers))
+    /// - Remark: HTTP `GET /oauth/authorize`.
+    /// - Remark: Generated from `#/paths//oauth/authorize/get(authorizeApp)`.
+    public func authorizeApp(
+        query: Operations.AuthorizeApp.Input.Query,
+        headers: Operations.AuthorizeApp.Input.Headers = .init()
+    ) async throws -> Operations.AuthorizeApp.Output {
+        try await authorizeApp(Operations.AuthorizeApp.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Request a device code
+    ///
+    /// Returns a device code and a user code (RFC 8628). Show the person `verification_uri` and `user_code`, then poll `POST /oauth/token` with the device code until they approve or deny it.
+    ///
+    /// - Remark: HTTP `POST /oauth/device-authorization`.
+    /// - Remark: Generated from `#/paths//oauth/device-authorization/post(requestDeviceCode)`.
+    public func requestDeviceCode(
+        headers: Operations.RequestDeviceCode.Input.Headers = .init(),
+        body: Operations.RequestDeviceCode.Input.Body
+    ) async throws -> Operations.RequestDeviceCode.Output {
+        try await requestDeviceCode(Operations.RequestDeviceCode.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Exchange a code for a token
+    ///
+    /// Returns an access token for an authorization code, a refresh token or an approved device code (RFC 6749 and RFC 8628). A refresh token can be spent once: the answer carries the next one.
+    ///
+    /// - Remark: HTTP `POST /oauth/token`.
+    /// - Remark: Generated from `#/paths//oauth/token/post(exchangeToken)`.
+    public func exchangeToken(
+        headers: Operations.ExchangeToken.Input.Headers = .init(),
+        body: Operations.ExchangeToken.Input.Body
+    ) async throws -> Operations.ExchangeToken.Output {
+        try await exchangeToken(Operations.ExchangeToken.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Revoke a token
+    ///
+    /// Revokes an access token or a refresh token (RFC 7009). Revoking a refresh token ends the app's grant. A token Marfa doesn't know returns `200` too.
+    ///
+    /// - Remark: HTTP `POST /oauth/revoke`.
+    /// - Remark: Generated from `#/paths//oauth/revoke/post(revokeToken)`.
+    public func revokeToken(
+        headers: Operations.RevokeToken.Input.Headers = .init(),
+        body: Operations.RevokeToken.Input.Body
+    ) async throws -> Operations.RevokeToken.Output {
+        try await revokeToken(Operations.RevokeToken.Input(
+            headers: headers,
+            body: body
+        ))
     }
     /// Claim the instance
     ///
@@ -2795,24 +3011,18 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Update the owner
+    /// Get the owner's profile
     ///
-    /// Updates the owner's email or name, or removes the picture. Requires a direct owner sign-in within five minutes or private machine authority. Changing email needs no confirmation; credentials, sessions, and grants keep their identity.
+    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
     ///
-    /// - Remark: HTTP `PATCH /owner`.
-    /// - Remark: Generated from `#/paths//owner/patch(updateOwner)`.
-    public func updateOwner(
-        headers: Operations.UpdateOwner.Input.Headers = .init(),
-        body: Operations.UpdateOwner.Input.Body
-    ) async throws -> Operations.UpdateOwner.Output {
-        try await updateOwner(Operations.UpdateOwner.Input(
-            headers: headers,
-            body: body
-        ))
+    /// - Remark: HTTP `GET /profile`.
+    /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
+    public func getProfile(headers: Operations.GetProfile.Input.Headers = .init()) async throws -> Operations.GetProfile.Output {
+        try await getProfile(Operations.GetProfile.Input(headers: headers))
     }
     /// Update the owner's profile
     ///
-    /// Updates the owner's name or removes the picture and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -2825,48 +3035,33 @@ extension APIProtocol {
             body: body
         ))
     }
-    /// Get the owner's picture
+    /// Get the profile avatar
     ///
-    /// Returns the owner's picture as an image download. Requires an owner sign-in or a credential with profile read permission for the avatar. Send `If-None-Match` to revalidate.
+    /// Returns the owner's avatar as an image download. Requires profile read permission for the avatar. Send `If-None-Match` to revalidate.
     ///
-    /// - Remark: HTTP `GET /owner/picture`.
-    /// - Remark: Generated from `#/paths//owner/picture/get(getOwnerPicture)`.
-    public func getOwnerPicture(headers: Operations.GetOwnerPicture.Input.Headers = .init()) async throws -> Operations.GetOwnerPicture.Output {
-        try await getOwnerPicture(Operations.GetOwnerPicture.Input(headers: headers))
+    /// - Remark: HTTP `GET /profile/avatar`.
+    /// - Remark: Generated from `#/paths//profile/avatar/get(getProfileAvatar)`.
+    public func getProfileAvatar(headers: Operations.GetProfileAvatar.Input.Headers = .init()) async throws -> Operations.GetProfileAvatar.Output {
+        try await getProfileAvatar(Operations.GetProfileAvatar.Input(headers: headers))
     }
-    /// Replace the owner's picture
+    /// Replace the avatar as an app
     ///
-    /// Stores the request body as the owner's picture and returns the owner. Requires a direct owner sign-in within five minutes or private machine authority.
+    /// Stores the request body as the owner's avatar and returns the profile fields you can read. Requires profile write permission for the avatar.
     ///
-    /// - Remark: HTTP `PUT /owner/picture`.
-    /// - Remark: Generated from `#/paths//owner/picture/put(replaceOwnerPicture)`.
-    public func replaceOwnerPicture(
-        headers: Operations.ReplaceOwnerPicture.Input.Headers = .init(),
-        body: Operations.ReplaceOwnerPicture.Input.Body
-    ) async throws -> Operations.ReplaceOwnerPicture.Output {
-        try await replaceOwnerPicture(Operations.ReplaceOwnerPicture.Input(
-            headers: headers,
-            body: body
-        ))
-    }
-    /// Replace the picture as an app
-    ///
-    /// Stores the request body as the owner's picture and returns `ok: true`. Requires profile write permission for the avatar.
-    ///
-    /// - Remark: HTTP `PUT /profile/picture`.
-    /// - Remark: Generated from `#/paths//profile/picture/put(replaceProfilePicture)`.
-    public func replaceProfilePicture(
-        headers: Operations.ReplaceProfilePicture.Input.Headers = .init(),
-        body: Operations.ReplaceProfilePicture.Input.Body
-    ) async throws -> Operations.ReplaceProfilePicture.Output {
-        try await replaceProfilePicture(Operations.ReplaceProfilePicture.Input(
+    /// - Remark: HTTP `PUT /profile/avatar`.
+    /// - Remark: Generated from `#/paths//profile/avatar/put(replaceProfileAvatar)`.
+    public func replaceProfileAvatar(
+        headers: Operations.ReplaceProfileAvatar.Input.Headers = .init(),
+        body: Operations.ReplaceProfileAvatar.Input.Body
+    ) async throws -> Operations.ReplaceProfileAvatar.Output {
+        try await replaceProfileAvatar(Operations.ReplaceProfileAvatar.Input(
             headers: headers,
             body: body
         ))
     }
     /// List sign-ins
     ///
-    /// Returns every browser, app and key that can reach Marfa, marking the browser that sent the request. Requires the owner's browser session or the local command.
+    /// Returns every browser, app and key that can reach Marfa. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `GET /owner/sign-ins`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/get(listSignIns)`.
@@ -2875,7 +3070,7 @@ extension APIProtocol {
     }
     /// Rename a sign-in
     ///
-    /// Renames an app or a key and returns the sign-in. A key's name is its `label`. Requires the owner's browser session, signed in within the last five minutes, or the local command.
+    /// Renames an app or a key and returns the sign-in. A key's name is its `label`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/patch(renameSignIn)`.
@@ -2892,7 +3087,7 @@ extension APIProtocol {
     }
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't refresh or make another request. An app's keys stay unless `revoke_keys` is `true`. Needs the owner's browser session or the local command. A browser over five minutes old can end only itself, without `revoke_keys`.
+    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
@@ -2907,9 +3102,24 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Replace the password
+    ///
+    /// Replaces the owner's password once `current_password` proves right, and ends every browser sign-in. Keys and apps keep their access. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `PUT /owner/password`.
+    /// - Remark: Generated from `#/paths//owner/password/put(replaceOwnerPassword)`.
+    public func replaceOwnerPassword(
+        headers: Operations.ReplaceOwnerPassword.Input.Headers = .init(),
+        body: Operations.ReplaceOwnerPassword.Input.Body
+    ) async throws -> Operations.ReplaceOwnerPassword.Output {
+        try await replaceOwnerPassword(Operations.ReplaceOwnerPassword.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// List passkeys
     ///
-    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or private local authority.
+    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `GET /owner/passkeys`.
     /// - Remark: Generated from `#/paths//owner/passkeys/get(listOwnerPasskeys)`.
@@ -2918,7 +3128,7 @@ extension APIProtocol {
     }
     /// Rename a passkey
     ///
-    /// Renames the passkey and returns its public details. Requires the owner's browser session authenticated within five minutes or private local authority.
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
@@ -2935,7 +3145,7 @@ extension APIProtocol {
     }
     /// Delete a passkey
     ///
-    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session authenticated within five minutes or private local authority.
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
@@ -2948,9 +3158,18 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// Get the passkey add link
+    ///
+    /// Returns the address where the owner signs in and then adds a passkey in their browser. The link carries no credential. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `GET /owner/passkeys/add-url`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/add-url/get(getPasskeyAddUrl)`.
+    public func getPasskeyAddUrl(headers: Operations.GetPasskeyAddUrl.Input.Headers = .init()) async throws -> Operations.GetPasskeyAddUrl.Output {
+        try await getPasskeyAddUrl(Operations.GetPasskeyAddUrl.Input(headers: headers))
+    }
     /// Get the instance
     ///
-    /// Returns a description of the instance: its display name, `instance_id`, the build it runs, the release it was made as when it is one, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
+    /// Returns a description of the instance: its display name, `instance_id`, the release it runs, the contract version it speaks, the features it serves and the largest request body it takes. Needs no credential.
     ///
     /// - Remark: HTTP `GET /`.
     /// - Remark: Generated from `#/paths///get(getInstance)`.
@@ -3005,6 +3224,30 @@ extension APIProtocol {
             body: body
         ))
     }
+    /// List the settings
+    ///
+    /// Returns every stored setting with its value, default and rule, the rules across settings, and the settings only the environment sets. Requires `config.manage` or `instance.read`.
+    ///
+    /// - Remark: HTTP `GET /config/settings`.
+    /// - Remark: Generated from `#/paths//config/settings/get(listSettings)`.
+    public func listSettings(headers: Operations.ListSettings.Input.Headers = .init()) async throws -> Operations.ListSettings.Output {
+        try await listSettings(Operations.ListSettings.Input(headers: headers))
+    }
+    /// Check an address change
+    ///
+    /// Returns what changing the addresses would do, whether a write needs confirmation and whether a new sign-in address answers as this instance, and writes nothing. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `POST /config/address-check`.
+    /// - Remark: Generated from `#/paths//config/address-check/post(checkAddressChange)`.
+    public func checkAddressChange(
+        headers: Operations.CheckAddressChange.Input.Headers = .init(),
+        body: Operations.CheckAddressChange.Input.Body
+    ) async throws -> Operations.CheckAddressChange.Output {
+        try await checkAddressChange(Operations.CheckAddressChange.Input(
+            headers: headers,
+            body: body
+        ))
+    }
     /// Get the instance's health
     ///
     /// Returns whether the instance is serving and the state of each component it depends on. Needs no credential.
@@ -3016,7 +3259,7 @@ extension APIProtocol {
     }
     /// List attention items
     ///
-    /// Returns current concerns for the owner or a private local command. Failed or timed-out checks appear as unavailable items alongside known concerns. An empty list means every check completed without a concern.
+    /// Returns what needs the owner's attention. Requires `instance.read`. A check that fails or runs out of time appears as an unavailable item beside the known concerns. An empty list means every check completed without a concern.
     ///
     /// - Remark: HTTP `GET /attention`.
     /// - Remark: Generated from `#/paths//attention/get(listAttention)`.
@@ -3025,7 +3268,7 @@ extension APIProtocol {
     }
     /// Get instance metrics
     ///
-    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
+    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. The counters are counted when you ask. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getInstanceMetrics)`.
@@ -3071,33 +3314,36 @@ extension APIProtocol {
             headers: headers
         ))
     }
-    /// List retired platform types
+    /// Confirm the clock
     ///
-    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Requires `instance.read`.
+    /// Takes the server's clock as right and returns the time it now trusts. While the clock reads more than 7 days later than the trusted time, the jobs that delete old records do nothing; this lets them run now. Requires `instance.maintain`.
     ///
-    /// - Remark: HTTP `GET /platform-types/retired`.
-    /// - Remark: Generated from `#/paths//platform-types/retired/get(listRetiredPlatformTypes)`.
-    public func listRetiredPlatformTypes(headers: Operations.ListRetiredPlatformTypes.Input.Headers = .init()) async throws -> Operations.ListRetiredPlatformTypes.Output {
-        try await listRetiredPlatformTypes(Operations.ListRetiredPlatformTypes.Input(headers: headers))
+    /// - Remark: HTTP `POST /clock/confirm`.
+    /// - Remark: Generated from `#/paths//clock/confirm/post(confirmClock)`.
+    public func confirmClock(headers: Operations.ConfirmClock.Input.Headers = .init()) async throws -> Operations.ConfirmClock.Output {
+        try await confirmClock(Operations.ConfirmClock.Input(headers: headers))
     }
-    /// Delete a retired platform type
+    /// Get the update status
     ///
-    /// Deletes one retired platform type: a type this build no longer ships. The type stops resolving at once. Requires `instance.maintain`.
+    /// Returns the release this server runs, the newest published release Marfa found, and how this server moves to it. Requires `instance.read`.
     ///
-    /// - Remark: HTTP `DELETE /platform-types/{id}`.
-    /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deleteRetiredPlatformType)`.
-    public func deleteRetiredPlatformType(
-        path: Operations.DeleteRetiredPlatformType.Input.Path,
-        headers: Operations.DeleteRetiredPlatformType.Input.Headers = .init()
-    ) async throws -> Operations.DeleteRetiredPlatformType.Output {
-        try await deleteRetiredPlatformType(Operations.DeleteRetiredPlatformType.Input(
-            path: path,
-            headers: headers
-        ))
+    /// - Remark: HTTP `GET /update`.
+    /// - Remark: Generated from `#/paths//update/get(getUpdate)`.
+    public func getUpdate(headers: Operations.GetUpdate.Input.Headers = .init()) async throws -> Operations.GetUpdate.Output {
+        try await getUpdate(Operations.GetUpdate.Input(headers: headers))
+    }
+    /// Start an update
+    ///
+    /// Starts an update to the newest release where Marfa installed this server as a service, and returns the update status. Marfa checks the download, swaps the programs, and restarts the server. Requires `instance.maintain`.
+    ///
+    /// - Remark: HTTP `POST /update`.
+    /// - Remark: Generated from `#/paths//update/post(startUpdate)`.
+    public func startUpdate(headers: Operations.StartUpdate.Input.Headers = .init()) async throws -> Operations.StartUpdate.Output {
+        try await startUpdate(Operations.StartUpdate.Input(headers: headers))
     }
     /// Export an archive
     ///
-    /// Exports an archive of the items, metadata and edges you can read, excluding trash unless requested. The owner can use their browser session. An archive can be read by `POST /restore`.
+    /// Exports an archive of the items, metadata and edges you can read, excluding trash unless requested. An archive can be read by `POST /restore`.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportArchive)`.
@@ -3112,7 +3358,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. Other writes wait until it finishes. Requires local authority or the owner, authenticated within five minutes before the request starts.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage` and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -3123,6 +3369,50 @@ extension APIProtocol {
         try await restoreArchive(Operations.RestoreArchive.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// List backups
+    ///
+    /// Returns the backups in the instance's backup folder or object store, newest first, including those another instance took there, so a new instance can restore the one it replaces. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `GET /backups`.
+    /// - Remark: Generated from `#/paths//backups/get(listBackups)`.
+    public func listBackups(headers: Operations.ListBackups.Input.Headers = .init()) async throws -> Operations.ListBackups.Output {
+        try await listBackups(Operations.ListBackups.Input(headers: headers))
+    }
+    /// Take a backup
+    ///
+    /// Takes a backup now and puts it in the instance's backup folder or object store, whether or not anything changed since the last one, then deletes this instance's backups that thinning no longer keeps. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `POST /backups`.
+    /// - Remark: Generated from `#/paths//backups/post(runBackup)`.
+    public func runBackup(headers: Operations.RunBackup.Input.Headers = .init()) async throws -> Operations.RunBackup.Output {
+        try await runBackup(Operations.RunBackup.Input(headers: headers))
+    }
+    /// Adopt a backup folder
+    ///
+    /// Starts afresh on a disk that replaced the backup folder's disk, when the folder holds no store marker for this instance. Marfa forgets the backups and file copies of the old disk and changes no other store. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `POST /backups/folder/adopt`.
+    /// - Remark: Generated from `#/paths//backups/folder/adopt/post(adoptBackupFolder)`.
+    public func adoptBackupFolder(headers: Operations.AdoptBackupFolder.Input.Headers = .init()) async throws -> Operations.AdoptBackupFolder.Output {
+        try await adoptBackupFolder(Operations.AdoptBackupFolder.Input(headers: headers))
+    }
+    /// Restore a backup
+    ///
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage` and a sign-in from the last five minutes.
+    ///
+    /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
+    /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
+    public func restoreBackup(
+        path: Operations.RestoreBackup.Input.Path,
+        query: Operations.RestoreBackup.Input.Query = .init(),
+        headers: Operations.RestoreBackup.Input.Headers = .init()
+    ) async throws -> Operations.RestoreBackup.Output {
+        try await restoreBackup(Operations.RestoreBackup.Input(
+            path: path,
+            query: query,
+            headers: headers
         ))
     }
 }

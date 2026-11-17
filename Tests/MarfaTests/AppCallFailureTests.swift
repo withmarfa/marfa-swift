@@ -16,8 +16,8 @@ struct AnAppCallThatFails {
         (.Decoding(message: "garbled"), .decoding(message: "garbled")),
         (.NoCatalog(message: "none"), .noCatalog(message: "none")),
         (
-            .Server(status: 400, code: "bad_request", message: "no"),
-            .server(status: 400, code: "bad_request", message: "no")
+            .Server(status: 400, code: "bad_request", message: "no", details: nil, server: nil),
+            .server(status: 400, code: "bad_request", message: "no", details: nil, server: nil)
         ),
         (
             .WrongServer(expected: "a", got: "b", message: "m"),
@@ -137,8 +137,8 @@ struct AnAppCallThatFails {
 
     @Test(arguments: [
         Marfa.MarfaError.keyChanging(message: "m"), .canceled(message: "m"), .closed(message: "m"),
-        .invalid(message: "m"), .unknownType(message: "m"),
-        .validation(code: "validation_error", message: "m", details: nil),
+        .invalid(message: "m"), .unknownType(message: "m", server: nil),
+        .validation(code: "validation_error", message: "m", details: nil, server: nil),
     ])
     func changesNothingForAnErrorThatProvesNothingOfTheServerOrTheCopy(error: Marfa.MarfaError) async throws {
         let core = FakeCore.writer()
@@ -156,8 +156,12 @@ struct AnAppCallThatFails {
     @Test func leavesARefusedKeyAlone() async throws {
         let core = FakeCore.writer()
         let (copy, updates) = try await followingCopy(core, ManualClock())
-        let refusal = Marfa.MarfaError.unauthorized(code: "unauthorized", message: "no")
-        core.change(0, .watchFailed(reason: .Unauthorized(code: "unauthorized", message: "no"), cursor: "3"))
+        let refusal = Marfa.MarfaError.unauthorized(code: "unauthorized", message: "no", server: nil)
+        core.change(
+            0,
+            .watchFailed(
+                reason: .Unauthorized(code: "unauthorized", message: "no", server: nil),
+                cursor: "3"))
         try await eventually("key refused") { updates.connection == .keyRefused(refusal) }
 
         copy.lifecycle.failed(Marfa.MarfaError.store(message: "damaged"))
@@ -279,7 +283,9 @@ struct AnAppCallThatFails {
         let (copy, updates) = try await copyWithoutAHydration(core, clock)
 
         core.state.withLock {
-            $0.hydrateFails = .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 60)
+            $0.hydrateFails = .RateLimited(
+                code: "rate_limited", message: "slow down", retryAfterSeconds: 60,
+                server: nil)
         }
         await #expect(throws: (any Error).self) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
         try await eventually("offline") { Self.isOffline(updates.connection) }
@@ -297,8 +303,12 @@ struct AnAppCallThatFails {
     @Test func anExpiredCopyThatFailsToHydrateOnTheNetworkIsOfflineThenNeedsItsHydrationAgain() async throws {
         let core = FakeCore.writer()
         let clock = ManualClock()
-        let expired = Marfa.MarfaError.copyExpired(reason: "catchup_too_old", message: "refill")
-        core.state.withLock { $0.catchUpFails = .CopyExpired(reason: "catchup_too_old", message: "refill") }
+        let expired = Marfa.MarfaError.copyExpired(reason: "catchup_too_old", message: "refill", server: nil)
+        core.state.withLock {
+            $0.catchUpFails = .CopyExpired(
+                reason: "catchup_too_old", message: "refill",
+                server: nil)
+        }
         let copy = ALifecycle.copy(core, clock)
         let updates = Updates(copy.updates())
         try await eventually("needs a hydration, and why") { updates.connection == .needsHydration(expired) }
@@ -419,7 +429,7 @@ struct AnAppCallThatFails {
 
     @Test(arguments: [
         MarfaCore.MarfaError.Store(message: "old core"),
-        .Unauthorized(code: "unauthorized", message: "old key"),
+        .Unauthorized(code: "unauthorized", message: "old key", server: nil),
     ])
     func aCallThatBeganBeforeAKeyChangeSaysNothingOfTheNewKeysCopy(fault: MarfaCore.MarfaError) async throws {
         let core = FakeCore.writer()

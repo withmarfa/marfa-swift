@@ -25,8 +25,8 @@ private func signedIn(_ scripted: ScriptedAuthServer, _ keychain: Keychain) thro
         KeptSignIn(
             clientId: "client-1", grantTypes: ["refresh_token"], redirect: nil, accessToken: "at-1",
             refreshToken: "rt-1", scope: "core.note:read offline_access",
-            tokenEndpoint: "\(scripted.origin)/auth/oauth2/token",
-            revocationEndpoint: "\(scripted.origin)/auth/oauth2/revoke"))
+            tokenEndpoint: "\(scripted.origin)/oauth/token",
+            revocationEndpoint: "\(scripted.origin)/oauth/revoke"))
     return try Server(url: scripted.url, credential: #require(try authorization.credential()))
 }
 
@@ -171,7 +171,7 @@ struct ServerCallsTests {
             let renewal = Hold()
             defer { renewal.release() }
             let scripted = ScriptedAuthServer { request in
-                request.path == "/auth/oauth2/token"
+                request.path == "/oauth/token"
                     ? .held(
                         renewal, .json(200, ["access_token": "at-2", "refresh_token": "rt-2", "token_type": "Bearer"]))
                     : refused(401, "unauthorized")
@@ -189,7 +189,7 @@ struct ServerCallsTests {
             let scripted = ScriptedAuthServer { _ in refused(404, "item_not_found") }
             let server = try signedIn(scripted, keychain)
             let error = await failure { try await server.snapshots(ofItem: "gone") }
-            guard case .notFound(let code, _)? = error else {
+            guard case .notFound(let code, _, _)? = error else {
                 Issue.record("expected notFound, got \(String(describing: error))")
                 return
             }
@@ -211,7 +211,7 @@ struct ServerCallsTests {
             let scripted = ScriptedAuthServer()
             scripted.answer { request in
                 switch (request.path, request.headers["Authorization"]) {
-                case ("/auth/oauth2/token", _):
+                case ("/oauth/token", _):
                     .json(200, ["access_token": "at-2", "refresh_token": "rt-2", "token_type": "Bearer"])
                 case (_, "Bearer at-2"): reply(#"{"instance_id": "x"}"#)
                 default: refused(401, "unauthorized")
@@ -253,7 +253,7 @@ struct ServerCallsTests {
                     """
                     {"instance_id": "inst", "name": "Home", "trash_retention_days": 30, "version_recent_days": 7,
                      "version_daily_snapshot_days": 30, "version_weekly_snapshot_days": 90, "version_max_versions": 50,
-                     "enrichment_enabled": true, "inbound_handled_retention_days": 14,
+                     "enrichment_enabled": true, "event_log_retention_days": 21, "inbound_handled_retention_days": 14,
                      "inbound_pending_retention_days": 0, "enforcement": {"strict_mode": {"types": ["a"]}}}
                     """)
             }
@@ -263,6 +263,7 @@ struct ServerCallsTests {
             #expect(config.versionDailySnapshotDays == 30 && config.versionWeeklySnapshotDays == 90)
             #expect(config.versionMaxVersions == 50 && config.enrichmentEnabled == true)
             #expect(config.inboundHandledRetentionDays == 14 && config.inboundPendingRetentionDays == 0)
+            #expect(config.eventLogRetentionDays == 21)
             #expect(config.heartbeatEnabled == nil && config.grantInactivityDays == nil)
         }
     }
@@ -277,6 +278,7 @@ struct ServerCallsTests {
             patch.enrichmentEnabled = .set(false)
             patch.inboundHandledRetentionDays = .set(30)
             patch.inboundPendingRetentionDays = .clear
+            patch.eventLogRetentionDays = .set(60)
             let stored = try await server.updateConfig(patch, expecting: "inst")
             #expect(stored.name == "Renamed")
             let request = try #require(scripted.requests(to: "/config").first)
@@ -287,9 +289,10 @@ struct ServerCallsTests {
             #expect(
                 Set(body.keys) == [
                     "name", "version_max_versions", "enrichment_enabled", "inbound_handled_retention_days",
-                    "inbound_pending_retention_days",
+                    "inbound_pending_retention_days", "event_log_retention_days",
                 ])
             #expect(body["inbound_handled_retention_days"] as? Int == 30)
+            #expect(body["event_log_retention_days"] as? Int == 60)
             #expect(body["inbound_pending_retention_days"] is NSNull)
             #expect(body["name"] as? String == "Renamed")
             #expect(body["version_max_versions"] is NSNull)
@@ -326,8 +329,8 @@ struct ServerCallsTests {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { request in
                 request.method == "PUT"
-                    ? reply(#"{"type": {"id": "t", "display_hints": {"icon": "lucide:book-open"}}}"#)
-                    : reply(#"{"type": {"id": "t"}}"#)
+                    ? reply(#"{"id": "t", "version": 0, "fields": {}, "display_hints": {"icon": "lucide:book-open"}}"#)
+                    : reply(#"{"id": "t", "version": 0, "fields": {}}"#)
             }
             let server = try signedIn(scripted, keychain)
             let set = try await server.setTypeIcon("lucide:book-open", ofType: "app.x.t", expecting: "inst")
@@ -347,7 +350,7 @@ struct ServerCallsTests {
             let scripted = ScriptedAuthServer { _ in refused(400, "invalid_schema") }
             let server = try signedIn(scripted, keychain)
             let error = await failure { try await server.setTypeIcon("book-open", ofType: "t") }
-            guard case .validation("invalid_schema", _, _)? = error else {
+            guard case .validation("invalid_schema", _, _, _)? = error else {
                 Issue.record("expected validation, got \(String(describing: error))")
                 return
             }

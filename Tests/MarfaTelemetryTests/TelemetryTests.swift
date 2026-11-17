@@ -9,7 +9,9 @@ struct Reports {
     @Test func anExceptionHasTheShapeTheCommandLinePosts() async throws {
         let recorder = Recorder()
         let telemetry = try configured(recorder)
-        let error = MarfaError.notFound(code: "item_not_found", message: "Note \"My secret diary\" in /Users/x/notes")
+        let error = MarfaError.notFound(
+            code: "item_not_found", message: "Note \"My secret diary\" in /Users/x/notes",
+            server: nil)
         #expect(error.message.contains("secret"))
 
         telemetry.report(error, during: "drain")
@@ -67,10 +69,10 @@ struct Reports {
     }
 
     @Test func aServerCodeIsSentOnlyWhenItHasTheShapeOfOne() {
-        let shaped = MarfaError.server(status: 500, code: "internal_error", message: "")
+        let shaped = MarfaError.server(status: 500, code: "internal_error", message: "", details: nil, server: nil)
         #expect(shaped.fixedText.code == "internal_error")
         for code in ["Note abc 123", "01a1648c-0824", "", String(repeating: "a", count: 49), "/Users/x"] {
-            let text = MarfaError.validation(code: code, message: "", details: nil).fixedText
+            let text = MarfaError.validation(code: code, message: "", details: nil, server: nil).fixedText
             #expect(text.code == "validation", "\(code)")
         }
         #expect(MarfaError.closed(message: "/Users/x").fixedText.code == "closed")

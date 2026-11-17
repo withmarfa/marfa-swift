@@ -37,7 +37,7 @@ struct BodyLinksOffline {
         #expect(found.links.isEmpty)
         #expect(found.embeds == [BodyName(text: "![[\(name)]]", name: name, target: .item(id: file))])
         #expect(try await copy.items.embedText(of: file, in: host) == embedded.embed)
-        let edges = try await copy.edges.to(host).filter { $0.sourceId == file }
+        let edges = try await copy.edges.to(host).filter { $0.fromId == file }
         #expect(edges.count == 1, "the embed made a second edge: \(edges)")
         await copy.close()
     }

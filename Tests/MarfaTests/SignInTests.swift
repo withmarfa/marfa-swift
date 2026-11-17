@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import MarfaCore
+import MarfaTypes
 import Synchronization
 import Testing
 
@@ -17,8 +18,8 @@ private func marfa(
     let discovery = server.discovery()
     server.answer { request in
         switch request.path {
-        case "/.well-known/oauth-authorization-server/auth": discovery
-        case "/auth/oauth2/register": .json(201, ["client_id": "client-1"])
+        case "/.well-known/oauth-authorization-server": discovery
+        case "/oauth/register": .json(201, ["client_id": "client-1"])
         default: rest(request)
         }
     }
@@ -49,8 +50,8 @@ private func signedIn(
             clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
             redirect: client.redirect?.absoluteString, accessToken: access,
             refreshToken: refresh, scope: "core.note:read offline_access",
-            tokenEndpoint: "\(server.origin)/auth/oauth2/token",
-            revocationEndpoint: "\(server.origin)/auth/oauth2/revoke"))
+            tokenEndpoint: "\(server.origin)/oauth/token",
+            revocationEndpoint: "\(server.origin)/oauth/revoke"))
     return (authorization, try #require(try authorization.credential()))
 }
 
@@ -123,7 +124,7 @@ struct BrowserSignIn {
     @Test func sendsAnS256ChallengeAndStateAndRedeemsTheCodeWithItsVerifier() async throws {
         let server = ScriptedAuthServer()
         marfa(server) { request in
-            request.path == "/auth/oauth2/token" ? tokens("at-1", "rt-1") : .json(404, [:])
+            request.path == "/oauth/token" ? tokens("at-1", "rt-1") : .json(404, [:])
         }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let authorization = try Authorization(
@@ -141,7 +142,7 @@ struct BrowserSignIn {
             let query = try #require(
                 asked.withLock { $0 }.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
             func value(_ name: String) -> String? { query.queryItems?.first { $0.name == name }?.value }
-            #expect(query.path == "/auth/oauth2/authorize")
+            #expect(query.path == "/oauth/authorize")
             #expect(value("response_type") == "code")
             #expect(value("client_id") == "client-1")
             #expect(value("redirect_uri") == "so.marfa.tests:/signed-in")
@@ -149,7 +150,7 @@ struct BrowserSignIn {
             #expect(value("code_challenge_method") == "S256")
             #expect((value("state") ?? "").count >= 43)
 
-            let registered = try #require(server.requests(to: "/auth/oauth2/register").first).json
+            let registered = try #require(server.requests(to: "/oauth/register").first).json
             #expect(registered["application_type"] as? String == "native")
             #expect(registered["token_endpoint_auth_method"] as? String == "none")
             // marfa lists a client that holds the device grant as a command-line tool.
@@ -157,7 +158,7 @@ struct BrowserSignIn {
             #expect(registered["response_types"] as? [String] == ["code"])
             #expect(registered["redirect_uris"] as? [String] == ["so.marfa.tests:/signed-in"])
 
-            let exchange = try #require(server.requests(to: "/auth/oauth2/token").first).form
+            let exchange = try #require(server.requests(to: "/oauth/token").first).form
             #expect(exchange["grant_type"] == "authorization_code")
             #expect(exchange["code"] == "the-code")
             #expect(exchange["client_id"] == "client-1")
@@ -178,8 +179,8 @@ struct BrowserSignIn {
         let origin = server.origin
         marfa(server) { request in
             switch request.path {
-            case "/auth/oauth2/token": tokens("at-1", "rt-1")
-            case "/auth/device/code":
+            case "/oauth/token": tokens("at-1", "rt-1")
+            case "/oauth/device-authorization":
                 .json(
                     200,
                     [
@@ -201,18 +202,18 @@ struct BrowserSignIn {
             }
             _ = try await authorization.signIn(browser: approve)
             _ = try await authorization.signIn(browser: approve)
-            #expect(server.requests(to: "/auth/oauth2/register").count == 1)
+            #expect(server.requests(to: "/oauth/register").count == 1)
 
             _ = try await authorization.startDeviceSignIn().credential()
-            let registered = server.requests(to: "/auth/oauth2/register").map(\.json)
+            let registered = server.requests(to: "/oauth/register").map(\.json)
             #expect(registered.count == 2)
             #expect(registered.last?["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
             #expect(registered.last?["redirect_uris"] == nil)
             _ = try await authorization.startDeviceSignIn().credential()
-            #expect(server.requests(to: "/auth/oauth2/register").count == 2)
+            #expect(server.requests(to: "/oauth/register").count == 2)
 
             _ = try await authorization.signIn(browser: approve)
-            #expect(server.requests(to: "/auth/oauth2/register").count == 3)
+            #expect(server.requests(to: "/oauth/register").count == 3)
         }
     }
 
@@ -231,7 +232,7 @@ struct BrowserSignIn {
                     try await authorization.signIn { _, _ in URL(string: returned)! }
                 }
             }
-            #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
             #expect(try authorization.credential() == nil)
         }
     }
@@ -251,7 +252,7 @@ struct BrowserSignIn {
                     return URL(string: "so.marfa.tests:/signed-in?error=access_denied&state=\(state)")!
                 }
             }
-            #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
         }
     }
 
@@ -269,7 +270,7 @@ struct BrowserSignIn {
                 guard case SignInError.unreadable = error else { return false }
                 return true
             }
-            #expect(server.requests(to: "/auth/oauth2/register").isEmpty)
+            #expect(server.requests(to: "/oauth/register").isEmpty)
         }
     }
 }
@@ -284,7 +285,7 @@ struct DeviceSignInPolling {
         let origin = server.origin
         marfa(server) { request in
             switch request.path {
-            case "/auth/device/code":
+            case "/oauth/device-authorization":
                 return .json(
                     200,
                     [
@@ -293,9 +294,9 @@ struct DeviceSignInPolling {
                         "verification_uri_complete": "\(origin)/auth/device?user_code=ABCD-EFGH",
                         "expires_in": expiresIn, "interval": 5,
                     ])
-            case "/auth/oauth2/revoke":
+            case "/oauth/revoke":
                 return .json(200, [:])
-            case "/auth/oauth2/token":
+            case "/oauth/token":
                 return polls(
                     count.withLock {
                         $0 += 1
@@ -330,14 +331,14 @@ struct DeviceSignInPolling {
 
             let credential = try await started.credential()
             #expect(clock.pauses == [.seconds(5), .seconds(5), .seconds(10), .seconds(10)])
-            let polls = server.requests(to: "/auth/oauth2/token").map(\.form)
+            let polls = server.requests(to: "/oauth/token").map(\.form)
             #expect(polls.count == 4)
             #expect(polls.allSatisfy { $0["grant_type"] == "urn:ietf:params:oauth:grant-type:device_code" })
             #expect(polls.allSatisfy { $0["device_code"] == "device-1" && $0["client_id"] == "client-1" })
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
             #expect(credential.server == server.url)
 
-            let registered = try #require(server.requests(to: "/auth/oauth2/register").first).json
+            let registered = try #require(server.requests(to: "/oauth/register").first).json
             #expect(registered["redirect_uris"] == nil)
             #expect(registered["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
         }
@@ -356,7 +357,7 @@ struct DeviceSignInPolling {
             defer { held.release() }
             await #expect(throws: SignInError.heldElsewhere) { try await started.credential() }
             #expect(try authorization.place.read() == nil)
-            let revoked = try #require(server.requests(to: "/auth/oauth2/revoke").first).form
+            let revoked = try #require(server.requests(to: "/oauth/revoke").first).form
             #expect(revoked == ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"])
         }
     }
@@ -394,7 +395,7 @@ struct DeviceSignInPolling {
             let started = try await authorization.startDeviceSignIn()
             await #expect(throws: SignInError.expired) { try await started.credential() }
             #expect(clock.pauses == [.seconds(5), .seconds(10), .seconds(15)])
-            #expect(server.requests(to: "/auth/oauth2/token").count == 3)
+            #expect(server.requests(to: "/oauth/token").count == 3)
         }
     }
 
@@ -424,7 +425,7 @@ struct DeviceSignInPolling {
             let started = try await authorization.startDeviceSignIn()
             await #expect(throws: SignInError.expired) { try await started.credential() }
             #expect(clock.pauses == [.seconds(5), .seconds(5), .seconds(2)])
-            #expect(server.requests(to: "/auth/oauth2/token").count == 3)
+            #expect(server.requests(to: "/oauth/token").count == 3)
         }
     }
 
@@ -439,7 +440,7 @@ struct DeviceSignInPolling {
             let waiting = Task { try await started.credential() }
             waiting.cancel()
             await #expect(throws: CancellationError.self) { try await waiting.value }
-            #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
         }
     }
 }
@@ -452,7 +453,7 @@ struct TokenRenewal {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
             #expect(try await renew(credential, refused: "at-1") == "at-2")
-            let asked = try #require(server.requests(to: "/auth/oauth2/token").first).form
+            let asked = try #require(server.requests(to: "/oauth/token").first).form
             #expect(asked == ["grant_type": "refresh_token", "refresh_token": "rt-1", "client_id": "client-1"])
             let kept = try #require(try authorization.place.read())
             #expect(kept.accessToken == "at-2")
@@ -467,7 +468,7 @@ struct TokenRenewal {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (_, credential) = try signedIn(server, keychain, transport: server.transport(), access: "at-2")
             #expect(try await renew(credential, refused: "at-1") == "at-2")
-            #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
         }
     }
 
@@ -485,7 +486,7 @@ struct TokenRenewal {
                 return try await group.reduce(into: []) { $0.append($1) }
             }
             #expect(renewed == ["at-2", "at-2", "at-2", "at-2"])
-            #expect(server.requests(to: "/auth/oauth2/token").count == 1)
+            #expect(server.requests(to: "/oauth/token").count == 1)
         }
     }
 
@@ -557,7 +558,7 @@ struct TokenRenewal {
             let renewed = Task { try await renew(other, refused: "at-1") }
             answer.release()
             #expect(try await renewed.value == "at-2")
-            #expect(server.requests(to: "/auth/oauth2/token").map { $0.form["refresh_token"] } == ["rt-1"])
+            #expect(server.requests(to: "/oauth/token").map { $0.form["refresh_token"] } == ["rt-1"])
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
         }
     }
@@ -787,7 +788,7 @@ struct TokenRenewal {
                     return true
                 }
             }
-            #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
         }
     }
 
@@ -833,7 +834,7 @@ struct TokenRenewal {
                 guard case RenewalError.Unavailable = error else { return false }
                 return true
             }
-            #expect(server.requests(to: "/auth/oauth2/token").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
             #expect(try held.whileHeld { true } == true)
             held.release()
 
@@ -886,22 +887,22 @@ private func replacingServer(
     let issued = Mutex((clients: 1, tokens: 1))
     server.answer { request in
         switch request.path {
-        case "/.well-known/oauth-authorization-server/auth": return discovery
-        case "/auth/oauth2/register", "/auth/oauth2/token":
-            let registering = request.path == "/auth/oauth2/register"
+        case "/.well-known/oauth-authorization-server": return discovery
+        case "/oauth/register", "/oauth/token":
+            let registering = request.path == "/oauth/register"
             let count = issued.withLock { issued in
                 if registering { issued.clients += 1 } else { issued.tokens += 1 }
                 return registering ? issued.clients : issued.tokens
             }
             return registering ? .json(201, ["client_id": "client-\(count)"]) : tokens("at-\(count)", "rt-\(count)")
-        case "/auth/device/code":
+        case "/oauth/device-authorization":
             return .json(
                 200,
                 [
                     "device_code": "device-1", "user_code": "ABCD-EFGH", "verification_uri": "\(origin)/auth/device",
                     "expires_in": 600, "interval": 5,
                 ])
-        case "/auth/oauth2/revoke": return revocation(request)
+        case "/oauth/revoke": return revocation(request)
         default: return .json(404, [:])
         }
     }
@@ -933,7 +934,7 @@ struct SigningInAgain {
 
             #expect(!credential.replacedGrantStands)
             #expect(try authorization.place.read()?.clientId == "client-2")
-            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
             #expect(keptWhenRevoked.withLock { $0 } == ["rt-2"])
         }
@@ -946,9 +947,9 @@ struct SigningInAgain {
             let credential = try await authorization.signIn(browser: approveAtOnce)
 
             #expect(!credential.replacedGrantStands)
-            #expect(server.requests(to: "/auth/oauth2/register").isEmpty)
+            #expect(server.requests(to: "/oauth/register").isEmpty)
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
-            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "at-1", "token_type_hint": "access_token", "client_id": "client-1"]])
         }
     }
@@ -963,7 +964,7 @@ struct SigningInAgain {
             #expect(credential.replacedGrantStands)
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
             #expect(try authorization.credential()?.replacedGrantStands == false)
-            #expect(server.requests(to: "/auth/oauth2/revoke").map { $0.form["token"] } == ["rt-1"])
+            #expect(server.requests(to: "/oauth/revoke").map { $0.form["token"] } == ["rt-1"])
         }
     }
 
@@ -976,7 +977,7 @@ struct SigningInAgain {
             let credential = try await authorization.startDeviceSignIn().credential()
 
             #expect(!credential.replacedGrantStands)
-            #expect(server.requests(to: "/auth/oauth2/revoke").isEmpty)
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
         }
     }
 
@@ -992,7 +993,7 @@ struct SigningInAgain {
             _ = try await authorization.startDeviceSignIn().credential()
 
             #expect(first.requests.isEmpty)
-            #expect(other.requests(to: "/auth/oauth2/revoke").isEmpty)
+            #expect(other.requests(to: "/oauth/revoke").isEmpty)
             #expect(try kept.place.read()?.refreshToken == "rt-1")
         }
     }
@@ -1009,7 +1010,7 @@ struct SigningInAgain {
             try authorization.place.keep(meanwhile)
             _ = try await started.credential()
 
-            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "rt-9", "token_type_hint": "refresh_token", "client_id": "client-9"]])
         }
     }
@@ -1027,7 +1028,7 @@ struct SigningInAgain {
             }
 
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
-            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
         }
     }
@@ -1046,7 +1047,7 @@ struct SigningInAgain {
             fault.stop()
 
             #expect(try kept.place.read()?.refreshToken == "rt-1")
-            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]])
         }
     }
@@ -1067,9 +1068,9 @@ struct SigningInAgain {
             }
             fault.stop()
 
-            #expect(server.requests(to: "/auth/oauth2/register").isEmpty)
+            #expect(server.requests(to: "/oauth/register").isEmpty)
             #expect(try kept.place.read()?.refreshToken == "rt-1")
-            let revoked = server.requests(to: "/auth/oauth2/revoke").map(\.form)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
         }
     }
@@ -1083,7 +1084,7 @@ struct SigningOut {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport(), refresh: nil)
             #expect(try await authorization.signOut() == false)
-            let revoked = try #require(server.requests(to: "/auth/oauth2/revoke").first).form
+            let revoked = try #require(server.requests(to: "/oauth/revoke").first).form
             #expect(revoked == ["token": "at-1", "token_type_hint": "access_token", "client_id": "client-1"])
         }
     }
@@ -1095,7 +1096,7 @@ struct SigningOut {
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
             #expect(try await authorization.signOut())
             #expect(try authorization.place.read() == nil)
-            let revoked = try #require(server.requests(to: "/auth/oauth2/revoke").first).form
+            let revoked = try #require(server.requests(to: "/oauth/revoke").first).form
             #expect(revoked == ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"])
         }
     }
@@ -1111,7 +1112,7 @@ struct SigningOut {
             defer { held.release() }
             await #expect(throws: SignInError.heldElsewhere) { try await authorization.signOut() }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
-            #expect(server.requests(to: "/auth/oauth2/revoke").isEmpty)
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
         }
     }
 
@@ -1191,5 +1192,73 @@ struct UntidyAddresses {
             }
             #expect(server.requests.isEmpty)
         }
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct SignInContractHeader {
+    private let contract = String(marfaContractVersion)
+
+    @Test func everyRequestOfABrowserSignInNamesTheContract() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in
+            request.path == "/oauth/token" ? tokens("at-1", "rt-1") : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            _ = try await authorization.signIn { url, _ in
+                let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first { $0.name == "state" }?.value
+                return URL(string: "so.marfa.tests:/signed-in?code=the-code&state=\(state ?? "")")!
+            }
+        }
+        let paths = Set(server.requests.map(\.path))
+        #expect(
+            paths == ["/.well-known/oauth-authorization-server", "/oauth/register", "/oauth/token"], "\(paths)")
+        for request in server.requests {
+            #expect(request.headers["X-Marfa-Contract"] == contract, "\(request.path)")
+        }
+    }
+
+    @Test func everyRequestOfADeviceSignInNamesTheContract() async throws {
+        let server = ScriptedAuthServer()
+        let origin = server.origin
+        marfa(server) { request in
+            switch request.path {
+            case "/oauth/device-authorization":
+                .json(
+                    200,
+                    [
+                        "device_code": "device-1", "user_code": "ABCD-EFGH",
+                        "verification_uri": "\(origin)/auth/device", "expires_in": 600, "interval": 5,
+                    ])
+            case "/oauth/token": tokens("at-1", "rt-1")
+            default: .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: server.transport())
+            _ = try await authorization.startDeviceSignIn().credential()
+        }
+        #expect(server.requests(to: "/oauth/device-authorization").count == 1)
+        #expect(server.requests(to: "/oauth/token").count == 1)
+        for request in server.requests {
+            #expect(request.headers["X-Marfa-Contract"] == contract, "\(request.path)")
+        }
+    }
+
+    @Test func aTokenRenewalNamesTheContract() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in tokens("at-2", "rt-2") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (_, credential) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await renew(credential, refused: "at-1") == "at-2")
+        }
+        let renewal = try #require(server.requests(to: "/oauth/token").first)
+        #expect(renewal.headers["X-Marfa-Contract"] == contract)
     }
 }

@@ -13,7 +13,6 @@ import Testing
             let instance: InstanceDescription = try await server.instanceDescription()
             #expect(instance.name == name)
             #expect(instance.version == "build-test")
-            #expect(instance.release == "0.0.14")
             #expect(instance.instanceId == "019a1950-3b30-7000-8000-000000000001")
             #expect(instance.contract == 0)
             #expect(instance.features == ["items", "webhooks"])
@@ -22,13 +21,6 @@ import Testing
             #expect(sent.contains("accept: application/json\r\n"))
             #expect(!sent.contains("authorization:"))
         }
-    }
-
-    @Test func readsABuildWithoutARelease() async throws {
-        let (url, request) = try rootServer(body: description(name: "Marfa", release: nil))
-        let instance = try await Server(url: url, key: "").instanceDescription()
-        #expect(instance.release == nil)
-        _ = try await request.value
     }
 
     @Test(arguments: ["{}", "<html>page</html>", "{\"name\":false}"])
@@ -52,13 +44,12 @@ import Testing
         _ = try await request.value
     }
 
-    private func description(name: String, release: String? = "0.0.14") throws -> String {
-        var fields: [String: Any] = [
+    private func description(name: String) throws -> String {
+        let fields: [String: Any] = [
             "name": name, "version": "build-test",
             "instance_id": "019a1950-3b30-7000-8000-000000000001", "contract": 0,
             "features": ["items", "webhooks"],
         ]
-        if let release { fields["release"] = release }
         return String(decoding: try JSONSerialization.data(withJSONObject: fields), as: UTF8.self)
     }
 }

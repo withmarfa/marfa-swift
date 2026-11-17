@@ -327,7 +327,7 @@ final class Feed: Sendable {
             case .serverReachable: stream.unreachable = false
             case .watchFailed(let reason, _):
                 // An aged-out cursor expires the copy as well, so which it was is read from the store.
-                if case .CopyExpired(let why, _) = reason {
+                if case .CopyExpired(let why, _, _) = reason {
                     state.refill.waiting.insert(token)
                     state.refill.reason = MarfaError(reason)
                     // The core refuses a copy that was stale already with this reason, asking the server nothing.
@@ -523,7 +523,7 @@ final class Feed: Sendable {
             } catch let error as MarfaError where error.isTransient {
                 let observer = locked { state in
                     state.refill.waiting.formUnion(next.owed)
-                    if case .rateLimited(_, _, let seconds?) = error {
+                    if case .rateLimited(_, _, let seconds?, _) = error {
                         state.refill.retryAfter = min(.seconds(seconds), Lifecycle.longestWait)
                     }
                     return state.observer
@@ -551,7 +551,7 @@ final class Feed: Sendable {
     private func refillOnce() async throws -> MarfaError? {
         let suspensions = locked { $0.suspensions }
         let status = try await holder.run { try $0.status() }
-        let reason = locked { $0.refill.reason } ?? .copyExpired(reason: "catchup_too_old", message: "")
+        let reason = locked { $0.refill.reason } ?? .copyExpired(reason: "catchup_too_old", message: "", server: nil)
         switch status.hydration {
         // The app's hydration, or an earlier refill, mended it; a later aged-out cursor halts the follow again.
         case .complete:

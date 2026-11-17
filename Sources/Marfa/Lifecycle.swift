@@ -769,7 +769,7 @@ final class Lifecycle: Sendable {
     }
 
     private static func retryAfter(_ error: MarfaError) -> Duration {
-        guard case .rateLimited(_, _, let seconds?) = error else { return .zero }
+        guard case .rateLimited(_, _, let seconds?, _) = error else { return .zero }
         return min(.seconds(seconds), longestWait)
     }
 
@@ -970,7 +970,7 @@ final class Lifecycle: Sendable {
                 cancelDrain(&state)
                 cancelRetry(&state)
                 let refusal = MarfaError.unauthorized(
-                    code: stopped, message: "The server refused the key the queue was sent with.")
+                    code: stopped, message: "The server refused the key the queue was sent with.", server: nil)
                 set(&state, .keyRefused(refusal))
                 return
             }

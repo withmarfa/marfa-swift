@@ -29,10 +29,10 @@ struct FakeViews {
     static let e = note(5, "e", state: .trashed, at: 5)
     static let task = note(6, "t", type: "core.task", at: 6)
     static let parent = Edge(
-        id: "01a1500d-78bd-73f0-8c55-2a4160c5ffe1", sourceId: a.id, targetId: b.id, edgeType: "parent-of",
+        id: "01a1500d-78bd-73f0-8c55-2a4160c5ffe1", fromId: a.id, toId: b.id, edgeType: "parent-of",
         properties: [:], version: 1, createdAt: a.createdAt, updatedAt: a.createdAt)
     static let nested = Edge(
-        id: "01a1500d-78bd-73f0-8c55-2a4160c5ffe2", sourceId: b.id, targetId: c.id, edgeType: "parent-of",
+        id: "01a1500d-78bd-73f0-8c55-2a4160c5ffe2", fromId: b.id, toId: c.id, edgeType: "parent-of",
         properties: [:], version: 1, createdAt: a.createdAt, updatedAt: a.createdAt)
 
     static func fake(views: [SavedView] = []) -> FakeCopy {
@@ -124,7 +124,7 @@ struct FakeViews {
             await #expect {
                 _ = try await copy.createView(refused)
             } throws: { error in
-                guard case .validation(let code, _, _)? = error as? MarfaError else { return false }
+                guard case .validation(let code, _, _, _)? = error as? MarfaError else { return false }
                 return code == "validation_error"
             }
         }
@@ -151,7 +151,7 @@ struct FakeViews {
             await #expect {
                 try await copy.changeView(id, ViewSettingsChange(title: "x"), baseVersion: 1)
             } throws: { error in
-                guard case .notFound(let code, _)? = error as? MarfaError else { return false }
+                guard case .notFound(let code, _, _)? = error as? MarfaError else { return false }
                 return code == "item_not_found"
             }
             await #expect(throws: MarfaError.self) { try await copy.deleteView(id) }
@@ -268,7 +268,7 @@ struct FakeViews {
         await #expect {
             _ = try await copy.changeView(revoked.id, ViewSettingsChange(title: "x"), baseVersion: 2)
         } throws: { error in
-            guard case .validation(let code, _, _)? = error as? MarfaError else { return false }
+            guard case .validation(let code, _, _, _)? = error as? MarfaError else { return false }
             return code == "invalid_transition"
         }
         try await copy.deleteView(revoked.id)
@@ -276,7 +276,7 @@ struct FakeViews {
         await #expect {
             _ = try await copy.items.list(inView: "01a1500d-78bd-73f0-8c55-2a4160c5ff99")
         } throws: { error in
-            guard case .notFound(let code, _)? = error as? MarfaError else { return false }
+            guard case .notFound(let code, _, _)? = error as? MarfaError else { return false }
             return code == "not_held"
         }
     }
@@ -316,7 +316,7 @@ struct FakeViews {
         await #expect(
             performing: { _ = try await copy.search("a", inView: "absent") },
             throws: { error in
-                guard case .notFound(let code, _)? = error as? MarfaError else { return false }
+                guard case .notFound(let code, _, _)? = error as? MarfaError else { return false }
                 return code == "not_held"
             }
         )

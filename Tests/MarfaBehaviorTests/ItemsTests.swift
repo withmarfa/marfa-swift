@@ -26,7 +26,7 @@ struct ItemsOffline {
 
     static func notFound(_ code: String) -> (any Error) -> Bool {
         { error in
-            if case .notFound(let given, _)? = error as? MarfaError { given == code } else { false }
+            if case .notFound(let given, _, _)? = error as? MarfaError { given == code } else { false }
         }
     }
 
@@ -56,7 +56,7 @@ struct ItemsOffline {
         #expect(held.version == 0)
         #expect(held.schemaVersion == 1)
         #expect(held.source == "device")
-        #expect(held.tags == ["x", "y"])
+        #expect(held.tags == ["y", "x"])
         #expect(held.title == "A")
         #expect(held.body == "text")
         #expect(held.properties == ["body": "text", "title": "A"])
@@ -88,7 +88,7 @@ struct ItemsOffline {
         await #expect {
             _ = try await copy.items.create(Draft(type: "core.task", properties: ["notes": "no title"]))
         } throws: { error in
-            if case .validation("invalid_properties", let message, _)? = error as? MarfaError {
+            if case .validation("invalid_properties", let message, _, _)? = error as? MarfaError {
                 message.contains("title")
             } else {
                 false
@@ -97,7 +97,7 @@ struct ItemsOffline {
         await #expect {
             _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "b"], id: "not-an-id"))
         } throws: { error in
-            if case .validation("invalid_id", _, _)? = error as? MarfaError { true } else { false }
+            if case .validation("invalid_id", _, _, _)? = error as? MarfaError { true } else { false }
         }
         #expect(try await copy.queue.all().isEmpty)
         let id = "01a1500d-78bd-73f0-8c55-2a4160c5ff99"
@@ -172,7 +172,7 @@ struct ItemsOffline {
         _ = try await Self.note("held", in: copy)
         func unknown(_ name: String) -> (any Error) -> Bool {
             { error in
-                if case .unknownType(let message)? = error as? MarfaError {
+                if case .unknownType(let message, _)? = error as? MarfaError {
                     message == "Unknown type: \(name)"
                 } else {
                     false
@@ -284,7 +284,7 @@ struct ItemsOffline {
         #expect(try await copy.items.get(id)?.tags == ["y", "z"])
 
         let replaced = try await copy.metadata.replaceTags(of: id, with: ["q"])
-        #expect(replaced.kind == .replaceMetadata && replaced.body == ["tags": ["q"]])
+        #expect(replaced.kind == .replaceTags && replaced.body == ["tags": ["q"]])
         #expect(try await copy.items.get(id)?.tags == ["q"])
         await #expect {
             _ = try await copy.tags.add("z", to: "absent")
@@ -343,7 +343,7 @@ struct ItemsOffline {
         await #expect {
             _ = try await copy.items.list(several)
         } throws: { error in
-            if case .validation("validation_error", _, _)? = error as? MarfaError { true } else { false }
+            if case .validation("validation_error", _, _, _)? = error as? MarfaError { true } else { false }
         }
         #expect(try await copy.items.list(ListFilters(tags: ["a"]), sort: ascending).map(\.id) == [first, second])
         #expect(try await copy.items.list(ListFilters(tags: ["a", "b"]), sort: ascending).map(\.id) == [second])
@@ -354,17 +354,17 @@ struct ItemsOffline {
         await #expect {
             _ = try await copy.items.list(ListFilters(types: ["Not A Type"]))
         } throws: { error in
-            if case .validation("validation_error", _, _)? = error as? MarfaError { true } else { false }
+            if case .validation("validation_error", _, _, _)? = error as? MarfaError { true } else { false }
         }
         await #expect {
             _ = try await copy.items.list(ListFilters(types: ["*"]))
         } throws: { error in
-            if case .validation("validation_error", _, _)? = error as? MarfaError { true } else { false }
+            if case .validation("validation_error", _, _, _)? = error as? MarfaError { true } else { false }
         }
         await #expect {
             _ = try await copy.items.list(ListFilters(states: [.archived], allStates: true))
         } throws: { error in
-            if case .validation("validation_error", _, _)? = error as? MarfaError { true } else { false }
+            if case .validation("validation_error", _, _, _)? = error as? MarfaError { true } else { false }
         }
         await copy.close()
     }
@@ -397,12 +397,12 @@ struct ItemsOffline {
         let write = try await copy.edges.create(from: source, to: target, type: "references", properties: ["n": 1])
         let edgeId = try #require(write.edgeId)
 
-        #expect(write.kind == .createEdge && write.itemId == source && write.targetId == target)
+        #expect(write.kind == .createEdge && write.itemId == source && write.toId == target)
         #expect(write.dependsOn == creates && write.follows == nil)
         #expect(write.body["edge_type"] == "references" && write.body["id"] == .string(edgeId))
-        #expect(write.body["source_id"] == .string(source) && write.body["target_id"] == .string(target))
+        #expect(write.body["from_id"] == .string(source) && write.body["to_id"] == .string(target))
         let held = try #require(try await copy.edges.from(source).first)
-        #expect(held.id == edgeId && held.targetId == target && held.edgeType == "references")
+        #expect(held.id == edgeId && held.toId == target && held.edgeType == "references")
         #expect(held.properties == ["n": 1] && held.version == 0)
         #expect(try await copy.edges.to(target).map(\.id) == [edgeId])
         #expect(try await copy.edges.ofType("references").map(\.id) == [edgeId])
@@ -425,7 +425,7 @@ struct ItemsOffline {
         await #expect {
             _ = try await copy.edges.create(from: held, to: held, type: "about")
         } throws: { error in
-            if case .validation("edge_cycle", _, _)? = error as? MarfaError { true } else { false }
+            if case .validation("edge_cycle", _, _, _)? = error as? MarfaError { true } else { false }
         }
         await #expect {
             _ = try await copy.edges.delete("absent")
@@ -441,7 +441,7 @@ struct ItemsOffline {
         let write = try #require(try await copy.queue.all().first)
         #expect(write.itemId == id)
 
-        #expect(try await copy.queue.withdraw(write.id) == false)
+        #expect(try await copy.queue.withdraw(write.id) == [])
         #expect(try await copy.queue.discard(write.id) == false)
         #expect(try await copy.queue.forgetAnswered() == 0)
         #expect(try await copy.queue.forgetAnswered(ids: [write.id]) == 0)
@@ -483,7 +483,7 @@ struct ItemsOffline {
         #expect(ids == ids.sorted() && ids.contains("core.note"))
         let parentOf = try await copy.catalog.edgeType("parent-of")
         #expect(parentOf.cardinality == "one-to-many" && parentOf.reverseName == "child-of")
-        #expect(parentOf.writtenAt == .target)
+        #expect(parentOf.writtenFrom == .to)
         let edgeIds = try await copy.catalog.edgeTypes().map(\.id)
         #expect(edgeIds == edgeIds.sorted() && edgeIds.contains("references"))
         await #expect {
@@ -530,7 +530,7 @@ struct ItemsOffline {
     static func refused(_ code: String, containing text: String) -> (any Error) -> Bool {
         { error in
             switch error as? MarfaError {
-            case .validation(let given, let message, _)?, .forbidden(let given, let message)?:
+            case .validation(let given, let message, _, _)?, .forbidden(let given, let message, _)?:
                 given == code && message.contains(text)
             default: false
             }
@@ -571,7 +571,7 @@ struct ItemsOffline {
         }
         await #expect {
             _ = try await copy.tags.add(String(repeating: "a", count: 129), to: id)
-        } throws: { Self.refused("validation_error", containing: "at most 128 UTF-16 code units")($0) }
+        } throws: { Self.refused("validation_error", containing: "at most 128 characters")($0) }
         #expect(try await copy.queue.all() == before)
         await copy.close()
     }
@@ -640,10 +640,7 @@ struct ItemsOffline {
         } throws: { Self.notFound("item_not_found")($0) }
         await #expect {
             _ = try await copy.items.transition(live, to: .revoked)
-        } throws: { error in
-            guard case .invalid(let message)? = error as? MarfaError else { return false }
-            return message.contains("revoked state")
-        }
+        } throws: { Self.refused("validation_error", containing: "state: a device cannot move")($0) }
         #expect(try await copy.queue.all() == before)
         _ = try await copy.tags.add("still", to: trashed)
         await copy.close()
@@ -667,9 +664,9 @@ struct ItemsOffline {
     @Test(
         arguments: CopyKind.allCases,
         [
-            ("2026-01-01T01:00:00.500+0100", "2026-01-01T00:00:00.500Z"), ("2026-01-01", "2026-01-01T00:00:00.000Z"),
+            ("2026-01-01T01:00:00.500+01:00", "2026-01-01T00:00:00.500Z"),
             ("2026-01-01T00:00:00Z", "2026-01-01T00:00:00.000Z"),
-            ("2026-03-01T00:30:00.250-0200", "2026-03-01T02:30:00.250Z"),
+            ("2026-03-01T00:30:00.250-02:00", "2026-03-01T02:30:00.250Z"),
         ])
     func aTimeAnItemIsGivenIsHeldInUTCToTheMillisecond(kind: CopyKind, times: (String, String)) async throws {
         let copy = try await kind.open()

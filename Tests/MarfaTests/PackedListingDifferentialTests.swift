@@ -151,8 +151,9 @@ struct PackedListingDifferential {
                 \(sourceId),\(at(&random)),\(at(&random)),\(at(&random)),\(Self.properties(&random)),\(Self.optionalReal(&random)),
                 \(Self.optionalReal(&random)),\(random.below(2)))
                 """)
-            for tag in Set((0..<random.below(5)).map { _ in random.text(most: 6) }) {
-                statements.append("INSERT INTO tags (item_id, tag) VALUES (\(Self.hex(id)),\(Self.hex(tag)))")
+            for (position, tag) in Set((0..<random.below(5)).map { _ in random.text(most: 6) }).enumerated() {
+                statements.append(
+                    "INSERT INTO tags (item_id, tag, position) VALUES (\(Self.hex(id)),\(Self.hex(tag)),\(position))")
             }
         }
         return "BEGIN;" + statements.joined(separator: ";\n") + ";COMMIT;"

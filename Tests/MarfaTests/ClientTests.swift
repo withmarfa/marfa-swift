@@ -29,8 +29,8 @@ private func signedIn(_ scripted: ScriptedAuthServer, _ keychain: Keychain) thro
         KeptSignIn(
             clientId: "client-1", grantTypes: ["refresh_token"], redirect: nil, accessToken: "at-1",
             refreshToken: "rt-1", scope: "core.note:read offline_access",
-            tokenEndpoint: "\(scripted.origin)/auth/oauth2/token",
-            revocationEndpoint: "\(scripted.origin)/auth/oauth2/revoke"))
+            tokenEndpoint: "\(scripted.origin)/oauth/token",
+            revocationEndpoint: "\(scripted.origin)/oauth/revoke"))
     let credential = try #require(try authorization.credential())
     let server = try Server(url: scripted.url, credential: credential)
     return (Client(server, through: nil, timeout: .seconds(30)), authorization)
@@ -58,7 +58,7 @@ struct ClientTests {
             let scripted = ScriptedAuthServer()
             scripted.answer { request in
                 switch (request.path, request.headers["Authorization"]) {
-                case ("/auth/oauth2/token", _):
+                case ("/oauth/token", _):
                     .json(200, ["access_token": "at-2", "refresh_token": "rt-2", "token_type": "Bearer"])
                 case (_, "Bearer at-2"): tags
                 default: refused(401, "unauthorized")
@@ -68,7 +68,7 @@ struct ClientTests {
             let page = try await api.listTags().ok.body.json
             #expect(page.data.map(\.tag) == ["reading"])
             #expect(
-                scripted.requests(to: "/metadata/tags").map { $0.headers["Authorization"] } == [
+                scripted.requests(to: "/tags").map { $0.headers["Authorization"] } == [
                     "Bearer at-1", "Bearer at-2",
                 ])
             #expect(try authorization.credential()?.accessToken() == "at-2")
@@ -78,7 +78,7 @@ struct ClientTests {
     @Test func aSignInTheServerEndedThrowsSignedOut() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { request in
-                request.path == "/auth/oauth2/token"
+                request.path == "/oauth/token"
                     ? .json(400, ["error": "invalid_grant", "error_description": "revoked"])
                     : refused(401, "unauthorized")
             }
@@ -127,7 +127,7 @@ struct ClientTests {
         let target = ScriptedAuthServer { _ in tags }
         let scripted = ScriptedAuthServer { _ in .raw(302, Data(), headers: ["Location": target.url.absoluteString]) }
         let error = await failure { try await client(scripted).listTags() }
-        guard case .redirected(let origin, let status, let location, _)? = error else {
+        guard case .redirected(let origin, let status, let location, _, _)? = error else {
             Issue.record("\(String(describing: error))")
             return
         }
@@ -138,9 +138,24 @@ struct ClientTests {
 
     @Test func aConflictAndAnotherInstanceArriveAsTheWorkingCopyNamesThem() async {
         let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
-            (refused(409, "version_conflict"), .versionConflict(message: "scripted version_conflict")),
-            (refused(409, "instance_changed"), .instanceChanged(message: "scripted instance_changed")),
-            (refused(409, "conflict"), .server(status: 409, code: "conflict", message: "scripted conflict")),
+            (
+                refused(409, "version_conflict"),
+                .versionConflict(
+                    message: "scripted version_conflict",
+                    server: ServerAnswer(status: 409, code: "version_conflict", details: nil))
+            ),
+            (
+                refused(409, "instance_changed"),
+                .instanceChanged(
+                    message: "scripted instance_changed",
+                    server: ServerAnswer(status: 409, code: "instance_changed", details: nil))
+            ),
+            (
+                refused(409, "conflict"),
+                .server(
+                    status: 409, code: "conflict", message: "scripted conflict", details: nil,
+                    server: ServerAnswer(status: 409, code: "conflict", details: nil))
+            ),
         ]
         for (reply, expected) in answers {
             let scripted = ScriptedAuthServer { _ in reply }
@@ -152,26 +167,27 @@ struct ClientTests {
         let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
             (
                 .raw(500, Data("<html>oops</html>".utf8), headers: contract),
-                .server(status: 500, code: "unknown", message: "<html>oops</html>")
+                .server(status: 500, code: "unknown", message: "<html>oops</html>", details: nil, server: nil)
             ),
-            (.raw(404, Data(), headers: contract), .notFound(code: "unknown", message: "")),
+            (.raw(404, Data(), headers: contract), .notFound(code: "unknown", message: "", server: nil)),
             (
                 .raw(422, Data("{\"error\": 3}".utf8), headers: contract),
-                .validation(code: "unknown", message: "", details: nil)
+                .validation(code: "unknown", message: "", details: nil, server: nil)
             ),
             (
                 refused(403, "type_not_permitted"),
-                .forbidden(code: "type_not_permitted", message: "scripted type_not_permitted")
+                .forbidden(code: "type_not_permitted", message: "scripted type_not_permitted", server: nil)
             ),
-            (.raw(502, Data("bad gateway".utf8)), .unnamed(status: 502, message: "")),
+            (.raw(502, Data("bad gateway".utf8)), .unnamed(status: 502, message: "", server: nil)),
             (
                 .raw(302, Data(), headers: ["Location": "https://elsewhere.example/"]),
-                .redirected(origin: "", status: 302, location: "https://elsewhere.example/", message: "")
+                .redirected(origin: "", status: 302, location: "https://elsewhere.example/", message: "", server: nil)
             ),
             (
                 .raw(200, Data("{}".utf8), headers: ["X-Marfa-Contract": "999"]),
                 .contractMismatch(
-                    served: "999", expected: UInt64(marfaContractVersion), status: 200, writeSent: false, message: "")
+                    served: "999", expected: UInt64(marfaContractVersion), status: 200, writeSent: false, message: "",
+                    server: nil)
             ),
         ]
         for (reply, expected) in answers {
@@ -179,14 +195,14 @@ struct ClientTests {
             let error = await failure { try await client(scripted).listTags() }
             switch (error, expected) {
             case (
-                .server(let status, let code, let message)?,
-                .server(status: let wanted, code: let wantedCode, message: let wantedMessage)
+                .server(let status, let code, let message, _, _)?,
+                .server(status: let wanted, code: let wantedCode, message: let wantedMessage, _, _)
             ):
                 #expect((status, code, message) == (wanted, wantedCode, wantedMessage))
-            case (.notFound(let code, let message)?, .notFound(let wantedCode, _)):
+            case (.notFound(let code, let message, _)?, .notFound(let wantedCode, _, _)):
                 #expect(code == wantedCode)
                 #expect(message == "\(scripted.origin) answered 404")
-            case (.redirected(let origin, _, let location, _)?, .redirected(_, _, let wanted, _)):
+            case (.redirected(let origin, _, let location, _, _)?, .redirected(_, _, let wanted, _, _)):
                 #expect(origin == scripted.origin)
                 #expect(location == wanted)
             default:

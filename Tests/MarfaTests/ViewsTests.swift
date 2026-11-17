@@ -95,7 +95,7 @@ import Testing
             await #expect {
                 try await read()
             } throws: { error in
-                if case .notFound(let code, _) = error as? Marfa.MarfaError { code == "not_held" } else { false }
+                if case .notFound(let code, _, _) = error as? Marfa.MarfaError { code == "not_held" } else { false }
             }
         }
         await copy.close()

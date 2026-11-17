@@ -432,7 +432,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
   for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "replaceConfig"]) assert.ok(client.has(kept), kept);
   for (const left of [
-    "createItem", "applyBulkAction", "registerConnector", "getOwner", "getInstance", "listItemVersions", "getConfig",
+    "createItem", "applyBulkAction", "registerConnector", "createOwner", "getInstance", "listItemVersions", "getConfig",
     "updateConfig", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
   ]) {
     assert.ok(wire.has(left), left);

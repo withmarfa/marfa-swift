@@ -97,8 +97,8 @@ enum Scenario {
                 }
                 expect(first.tags.contains("favorite"), "the edit lost its tag")
                 let links = try await copy.edges.from(first.id).filter { $0.edgeType == "references" }
-                print("links from the first note: \(links.map(\.targetId))")
-                expect(links.map(\.targetId) == [second.id], "the link does not run from the first note to the second")
+                print("links from the first note: \(links.map(\.toId))")
+                expect(links.map(\.toId) == [second.id], "the link does not run from the first note to the second")
                 try await checkAttachment(on: first, in: copy, expect)
                 let kept = notes.filter { $0.title == "Sample kept" }
                 print("the kept note: \(kept.map { "\($0.properties["body"]?.string ?? "-") v\($0.version)" })")
@@ -164,7 +164,7 @@ enum Scenario {
             expect(false, "the attached file is not held with its bytes named: \(files.map(\.title))")
             return
         }
-        let attachedTo = try await copy.edges.from(file.id).filter { $0.edgeType == "attached-to" }.map(\.targetId)
+        let attachedTo = try await copy.edges.from(file.id).filter { $0.edgeType == "attached-to" }.map(\.toId)
         print("the file is attached to: \(attachedTo)")
         expect(attachedTo == [note.id], "the file is not attached to the first note")
         let bytes = try await copy.blobs.withFile(hash) { try Data(contentsOf: $0) }

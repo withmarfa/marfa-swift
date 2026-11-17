@@ -121,7 +121,7 @@ public struct InstanceConfig: Sendable, Hashable {
     public var versionMaxVersions: Int?
     public var grantInactivityDays: Int?
     public var auditRetentionDays: Int?
-    public var eventLogRetentionHours: Int?
+    public var eventLogRetentionDays: Int?
     /// Days the server keeps inbound webhook deliveries a connector has marked handled; `0` keeps them with no age
     /// limit.
     public var inboundHandledRetentionDays: Int?
@@ -136,7 +136,7 @@ public struct InstanceConfig: Sendable, Hashable {
     public init(
         instanceID: String, name: String? = nil, trashRetentionDays: Int? = nil, versionRecentDays: Int? = nil,
         versionDailySnapshotDays: Int? = nil, versionWeeklySnapshotDays: Int? = nil, versionMaxVersions: Int? = nil,
-        grantInactivityDays: Int? = nil, auditRetentionDays: Int? = nil, eventLogRetentionHours: Int? = nil,
+        grantInactivityDays: Int? = nil, auditRetentionDays: Int? = nil, eventLogRetentionDays: Int? = nil,
         inboundHandledRetentionDays: Int? = nil, inboundPendingRetentionDays: Int? = nil,
         enrichmentEnabled: Bool? = nil, enrichmentOCREnabled: Bool? = nil, errorReportingEnabled: Bool? = nil,
         heartbeatEnabled: Bool? = nil
@@ -150,7 +150,7 @@ public struct InstanceConfig: Sendable, Hashable {
         self.versionMaxVersions = versionMaxVersions
         self.grantInactivityDays = grantInactivityDays
         self.auditRetentionDays = auditRetentionDays
-        self.eventLogRetentionHours = eventLogRetentionHours
+        self.eventLogRetentionDays = eventLogRetentionDays
         self.inboundHandledRetentionDays = inboundHandledRetentionDays
         self.inboundPendingRetentionDays = inboundPendingRetentionDays
         self.enrichmentEnabled = enrichmentEnabled
@@ -170,7 +170,7 @@ public struct InstanceConfigPatch: Sendable, Hashable {
     public var versionMaxVersions: SettingChange<Int>?
     public var grantInactivityDays: SettingChange<Int>?
     public var auditRetentionDays: SettingChange<Int>?
-    public var eventLogRetentionHours: SettingChange<Int>?
+    public var eventLogRetentionDays: SettingChange<Int>?
     public var inboundHandledRetentionDays: SettingChange<Int>?
     public var inboundPendingRetentionDays: SettingChange<Int>?
     public var enrichmentEnabled: SettingChange<Bool>?
@@ -197,7 +197,7 @@ public struct InstanceConfigPatch: Sendable, Hashable {
         put("version_max_versions", versionMaxVersions)
         put("grant_inactivity_days", grantInactivityDays)
         put("audit_retention_days", auditRetentionDays)
-        put("event_log_retention_hours", eventLogRetentionHours)
+        put("event_log_retention_days", eventLogRetentionDays)
         put("inbound_handled_retention_days", inboundHandledRetentionDays)
         put("inbound_pending_retention_days", inboundPendingRetentionDays)
         put("enrichment_enabled", enrichmentEnabled)
@@ -219,7 +219,7 @@ extension Server {
     ///
     /// Pass the previous page's ``ItemSnapshotPage/next`` as `after` for the following page. `limit` is 1 to 200;
     /// the server's default applies when it is `nil`. The server answers an item it cannot read, in the trash or of
-    /// a type the key does not reach, with ``MarfaError/notFound(code:message:)``. Calls read the key this server
+    /// a type the key does not reach, with ``MarfaError/notFound(code:message:server:)``. Calls read the key this server
     /// holds, as a working copy does.
     ///
     /// A snapshot whose `created_at` this build cannot read makes the whole page throw
@@ -241,7 +241,7 @@ extension Server {
 
     /// The server's settings.
     ///
-    /// Needs the `config.manage` permission, else throws ``MarfaError/forbidden(code:message:)``.
+    /// Needs the `config.manage` permission, else throws ``MarfaError/forbidden(code:message:server:)``.
     public func config(timeout: Duration = Server.defaultTimeout) async throws(MarfaError) -> InstanceConfig {
         InstanceConfig(try decode(try await send("GET", "/config", timeout: timeout)) as InstanceConfigWire)
     }
@@ -249,7 +249,7 @@ extension Server {
     /// Changes the settings in `patch` and answers the settings as stored.
     ///
     /// Only the fields set on `patch` are sent. `instanceID`, from an earlier ``config(timeout:)``, makes the server
-    /// refuse the change with ``MarfaError/instanceChanged(message:)`` when the address now reaches another instance.
+    /// refuse the change with ``MarfaError/instanceChanged(message:server:)`` when the address now reaches another instance.
     public func updateConfig(
         _ patch: InstanceConfigPatch, expecting instanceID: String? = nil, timeout: Duration = Server.defaultTimeout
     ) async throws(MarfaError) -> InstanceConfig {
@@ -267,7 +267,7 @@ extension Server {
     /// The type can be one Marfa ships. Removing the owner's icon shows the author's again.
     ///
     /// `icon` is an Iconify ID, `<set>:<name>`, from a set Marfa pins: `lucide:book-open`, or `simple-icons:github`
-    /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:details:)`` and the code
+    /// for a brand mark. The server refuses any other with ``MarfaError/validation(code:message:details:server:)`` and the code
     /// `invalid_schema`. Needs `schema.write` and write on the type. A working copy's `catalog` takes the change
     /// when its server stream next reopens, so another device shows it within about two minutes.
     @discardableResult
@@ -287,7 +287,7 @@ extension Server {
             data = try await send("DELETE", path, headers: headers, timeout: timeout)
         }
         let answer: TypeWire = try decode(data)
-        return answer.type.displayHints?.icon
+        return answer.displayHints?.icon
     }
 
     func decode<T: Decodable>(_ data: Data) throws(MarfaError) -> T {
@@ -346,12 +346,9 @@ private struct SnapshotWire: Decodable {
 }
 
 private struct TypeWire: Decodable {
-    struct Definition: Decodable {
-        struct Hints: Decodable { let icon: String? }
-        let displayHints: Hints?
-        enum CodingKeys: String, CodingKey { case displayHints = "display_hints" }
-    }
-    let type: Definition
+    struct Hints: Decodable { let icon: String? }
+    let displayHints: Hints?
+    enum CodingKeys: String, CodingKey { case displayHints = "display_hints" }
 }
 
 private struct InstanceConfigWire: Decodable {
@@ -364,7 +361,7 @@ private struct InstanceConfigWire: Decodable {
     let versionMaxVersions: Int?
     let grantInactivityDays: Int?
     let auditRetentionDays: Int?
-    let eventLogRetentionHours: Int?
+    let eventLogRetentionDays: Int?
     let inboundHandledRetentionDays: Int?
     let inboundPendingRetentionDays: Int?
     let enrichmentEnabled: Bool?
@@ -381,7 +378,7 @@ private struct InstanceConfigWire: Decodable {
         case versionMaxVersions = "version_max_versions"
         case grantInactivityDays = "grant_inactivity_days"
         case auditRetentionDays = "audit_retention_days"
-        case eventLogRetentionHours = "event_log_retention_hours"
+        case eventLogRetentionDays = "event_log_retention_days"
         case inboundHandledRetentionDays = "inbound_handled_retention_days"
         case inboundPendingRetentionDays = "inbound_pending_retention_days"
         case enrichmentEnabled = "enrichment_enabled"
@@ -398,7 +395,7 @@ extension InstanceConfig {
             versionRecentDays: wire.versionRecentDays, versionDailySnapshotDays: wire.versionDailySnapshotDays,
             versionWeeklySnapshotDays: wire.versionWeeklySnapshotDays, versionMaxVersions: wire.versionMaxVersions,
             grantInactivityDays: wire.grantInactivityDays, auditRetentionDays: wire.auditRetentionDays,
-            eventLogRetentionHours: wire.eventLogRetentionHours,
+            eventLogRetentionDays: wire.eventLogRetentionDays,
             inboundHandledRetentionDays: wire.inboundHandledRetentionDays,
             inboundPendingRetentionDays: wire.inboundPendingRetentionDays, enrichmentEnabled: wire.enrichmentEnabled,
             enrichmentOCREnabled: wire.enrichmentOcrEnabled, errorReportingEnabled: wire.errorReportingEnabled,

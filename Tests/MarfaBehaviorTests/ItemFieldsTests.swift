@@ -17,7 +17,7 @@ struct ItemFieldsOffline {
 
     static func refused(_ code: String) -> (any Error) -> Bool {
         { error in
-            if case .validation(let given, _, _)? = error as? MarfaError { given == code } else { false }
+            if case .validation(let given, _, _, _)? = error as? MarfaError { given == code } else { false }
         }
     }
 
@@ -34,7 +34,7 @@ struct ItemFieldsOffline {
         #expect(made.state == .archived)
         #expect(made.captureLatitude == 51.5 && made.captureLongitude == -0.12)
         let shown = try await copy.edges.from(made.id)
-        #expect(shown.map(\.targetId) == [target.id] && shown.map(\.edgeType) == ["references"])
+        #expect(shown.map(\.toId) == [target.id] && shown.map(\.edgeType) == ["references"])
         let creates = try await copy.queue.all().filter { $0.itemId == made.id }
         #expect(creates.map(\.kind) == [.createItem])
         #expect(creates[0].body["state"] == "archived")

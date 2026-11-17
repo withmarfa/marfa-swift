@@ -307,9 +307,9 @@ struct Changes {
         let heard = Heard(copy.changes())
         core.state.withLock {
             $0.catchUpChangesCatalog = true
-            $0.catchUpFails = .CopyExpired(reason: "aged_out", message: "m")
+            $0.catchUpFails = .CopyExpired(reason: "aged_out", message: "m", server: nil)
         }
-        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m")) {
+        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m", server: nil)) {
             _ = try await bounded("the catch-up") { try await copy.catchUp() }
         }
         try await eventually("the catalog change was told") { !heard.all.isEmpty }
@@ -324,8 +324,8 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
-        core.state.withLock { $0.catchUpFails = .CopyExpired(reason: "aged_out", message: "m") }
-        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m")) {
+        core.state.withLock { $0.catchUpFails = .CopyExpired(reason: "aged_out", message: "m", server: nil) }
+        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "aged_out", message: "m", server: nil)) {
             _ = try await bounded("the catch-up") { try await copy.catchUp() }
         }
         core.state.withLock { $0.catchUpChangesCatalog = true }
@@ -362,7 +362,8 @@ struct Changes {
         _ = try await copy.queue.drain()
         let refusal = MarfaCore.Refusal(
             reason: "validation_error", code: "validation_error", message: "m",
-            fields: [MarfaCore.FieldRefusal(field: "title", message: "too long")], trashed: false, grant: nil)
+            fields: [MarfaCore.FieldRefusal(field: "title", message: "too long")], trashed: false, grant: nil,
+            requestLimit: nil)
         core.state.withLock {
             $0.drained.verdicts = [
                 MarfaCore.DrainVerdict(
@@ -427,12 +428,16 @@ struct Changes {
         core.change(
             0,
             MarfaCore.Change.queueNotDrained(
-                error: .RateLimited(code: "rate_limited", message: "slow", retryAfterSeconds: 4), cursor: "3"))
+                error: .RateLimited(code: "rate_limited", message: "slow", retryAfterSeconds: 4, server: nil),
+                cursor: "3"))
         try await eventually("the stop was told") { heard.all.count == 1 }
         #expect(
             heard.all == [
                 Marfa.Change(
-                    origin: .queueNotDrained(.rateLimited(code: "rate_limited", message: "slow", retryAfterSeconds: 4)),
+                    origin: .queueNotDrained(
+                        .rateLimited(
+                            code: "rate_limited", message: "slow", retryAfterSeconds: 4,
+                            server: nil)),
                     itemId: nil, edgeId: nil)
             ])
         #expect(!core.places[0].ended, "a drain that stopped ended the place in the watch")
@@ -444,9 +449,9 @@ struct Changes {
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         let heard = Heard(copy.changes())
         core.state.withLock { $0.withdrawable = ["q"] }
-        #expect(try await copy.queue.withdraw("other") == false)
-        #expect(try await copy.queue.withdraw("q"))
-        #expect(try await copy.queue.withdraw("q") == false)
+        #expect(try await copy.queue.withdraw("other") == [])
+        #expect(try await copy.queue.withdraw("q") == ["q"])
+        #expect(try await copy.queue.withdraw("q") == [])
         try await eventually("the withdraw was told") { heard.all == [refreshed(.withdrawn)] }
         try await Task.sleep(for: .milliseconds(200))
         #expect(heard.all == [refreshed(.withdrawn)])
@@ -541,7 +546,8 @@ struct Changes {
 struct ARefill {
     static let pace = Feed.RefillPace(first: .milliseconds(100), most: .milliseconds(400), settle: .seconds(5))
     static let agedOut = MarfaCore.MarfaError.CopyExpired(
-        reason: "the event log no longer holds the cursor 3 (oldest retained id 9)", message: "rebuild the copy")
+        reason: "the event log no longer holds the cursor 3 (oldest retained id 9)", message: "rebuild the copy",
+        server: nil)
 
     static func stale() -> FakeCore {
         let core = FakeCore.writer()
@@ -622,7 +628,9 @@ struct ARefill {
     @Test func aRateLimitLongerThanTheLongestRefillWaitIsWaitedOutInFull() async throws {
         let core = Self.stale()
         core.state.withLock {
-            $0.hydrateFails = .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 600)
+            $0.hydrateFails = .RateLimited(
+                code: "rate_limited", message: "slow down", retryAfterSeconds: 600,
+                server: nil)
             $0.hydrateFailsFirst = 1
         }
         let clock = ManualClock()
@@ -681,30 +689,36 @@ struct ARefill {
     }
 
     static let agedOutTold = Marfa.MarfaError.copyExpired(
-        reason: "the event log no longer holds the cursor 3 (oldest retained id 9)", message: "rebuild the copy")
+        reason: "the event log no longer holds the cursor 3 (oldest retained id 9)", message: "rebuild the copy",
+        server: nil)
 
     static let needThePerson: [(MarfaCore.Hydration, MarfaCore.MarfaError?, Marfa.MarfaError)] = [
         // An expired copy must be replaced, which is the app's decision.
         (.expired, nil, agedOutTold),
         // The refill itself is refused: signed out.
-        (.stale, .Unauthorized(code: "invalid_key", message: "no"), .unauthorized(code: "invalid_key", message: "no")),
+        (
+            .stale, .Unauthorized(code: "invalid_key", message: "no", server: nil),
+            .unauthorized(
+                code: "invalid_key",
+                message: "no", server: nil)
+        ),
         // The core refuses to fill in place, before it changes anything, and says why, as for another instance at
         // the address, a changed reach or slice, a server restored to an earlier point or a copy not waiting.
         (
-            .stale, .CopyExpired(reason: "instance_changed", message: "another instance answers"),
-            .instanceChanged(message: "another instance answers")
+            .stale, .CopyExpired(reason: "instance_changed", message: "another instance answers", server: nil),
+            .instanceChanged(message: "another instance answers", server: nil)
         ),
         (
-            .stale, .CopyExpired(reason: "reach_changed", message: "the reach changed"),
-            .copyExpired(reason: "reach_changed", message: "the reach changed")
+            .stale, .CopyExpired(reason: "reach_changed", message: "the reach changed", server: nil),
+            .copyExpired(reason: "reach_changed", message: "the reach changed", server: nil)
         ),
         (
-            .stale, .CopyExpired(reason: "slice_changed", message: "the slice changed"),
-            .copyExpired(reason: "slice_changed", message: "the slice changed")
+            .stale, .CopyExpired(reason: "slice_changed", message: "the slice changed", server: nil),
+            .copyExpired(reason: "slice_changed", message: "the slice changed", server: nil)
         ),
         (
-            .stale, .CopyExpired(reason: "head_past_log", message: "the server was restored"),
-            .copyExpired(reason: "head_past_log", message: "the server was restored")
+            .stale, .CopyExpired(reason: "head_past_log", message: "the server was restored", server: nil),
+            .copyExpired(reason: "head_past_log", message: "the server was restored", server: nil)
         ),
     ]
 
@@ -733,10 +747,12 @@ struct ARefill {
         let core = Self.stale()
         let copy = Self.copy(core)
         let heard = Heard(copy.changes())
-        let refused = MarfaCore.MarfaError.CopyExpired(reason: "catchup_too_old", message: "refill the copy")
+        let refused = MarfaCore.MarfaError.CopyExpired(
+            reason: "catchup_too_old", message: "refill the copy",
+            server: nil)
         core.change(0, .watchFailed(reason: refused, cursor: "3"))
         try await eventually("the stop reached the app") {
-            heard.stops == [stopped(.copyExpired(reason: "catchup_too_old", message: "refill the copy"))]
+            heard.stops == [stopped(.copyExpired(reason: "catchup_too_old", message: "refill the copy", server: nil))]
         }
         try await Task.sleep(for: .milliseconds(300))
         #expect(core.state.withLock { $0.hydrations.isEmpty })
@@ -879,7 +895,7 @@ struct ARefill {
     @Test func aRefillAfterAStopStartsAtOnce() async throws {
         let core = Self.stale()
         core.state.withLock {
-            $0.hydrateFails = .Unauthorized(code: "invalid_key", message: "no")
+            $0.hydrateFails = .Unauthorized(code: "invalid_key", message: "no", server: nil)
             $0.hydrateFailsFirst = 1
         }
         let copy = Self.copy(core, pace: .init(first: .seconds(60), most: .seconds(60), settle: .seconds(30)))
@@ -906,7 +922,7 @@ struct ARefill {
         core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill is running") { Self.gated(core) }
         let later = MarfaCore.MarfaError.CopyExpired(
-            reason: "the event log no longer holds the cursor 5 (oldest retained id 12)", message: "later")
+            reason: "the event log no longer holds the cursor 5 (oldest retained id 12)", message: "later", server: nil)
         core.change(0, .watchFailed(reason: later, cursor: "5"))
         core.state.withLock { $0.hydration = .expired }
         gate.signal()
@@ -915,7 +931,8 @@ struct ARefill {
             heard.stops == [
                 stopped(
                     .copyExpired(
-                        reason: "the event log no longer holds the cursor 5 (oldest retained id 12)", message: "later"))
+                        reason: "the event log no longer holds the cursor 5 (oldest retained id 12)", message: "later",
+                        server: nil))
             ])
         await copy.close()
     }

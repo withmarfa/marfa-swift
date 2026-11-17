@@ -84,17 +84,17 @@ final class ScriptedAuthServer: Sendable {
         return transport
     }
 
-    /// What `/.well-known/oauth-authorization-server/auth` answers, naming this server.
+    /// What `/.well-known/oauth-authorization-server` answers, naming this server.
     func discovery(issuer: String? = nil) -> Reply {
         .json(
             200,
             [
-                "issuer": issuer ?? "\(origin)/auth",
-                "authorization_endpoint": "\(origin)/auth/oauth2/authorize",
-                "token_endpoint": "\(origin)/auth/oauth2/token",
-                "device_authorization_endpoint": "\(origin)/auth/device/code",
-                "registration_endpoint": "\(origin)/auth/oauth2/register",
-                "revocation_endpoint": "\(origin)/auth/oauth2/revoke",
+                "issuer": issuer ?? origin,
+                "authorization_endpoint": "\(origin)/oauth/authorize",
+                "token_endpoint": "\(origin)/oauth/token",
+                "device_authorization_endpoint": "\(origin)/oauth/device-authorization",
+                "registration_endpoint": "\(origin)/oauth/register",
+                "revocation_endpoint": "\(origin)/oauth/revoke",
             ])
     }
 

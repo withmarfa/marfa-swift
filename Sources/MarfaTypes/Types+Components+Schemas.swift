@@ -20,11 +20,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/id`.
             public var id: Swift.String
-            /// The name an app shows on the source end of an edge of this type, such as `Children` on a parent. Not the `reverse_name`, which is the code name a file writes.
+            /// The name an app shows on the from end of an edge of this type, such as `Children` on a parent. Not the `reverse_name`, which is the code name a file writes.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/label`.
             public var label: Swift.String
-            /// The name an app shows on the target end, such as `Parent` on a child. It is the same text as `label` when the relation is two-way, and an app then shows both directions as one list.
+            /// The name an app shows on the to end, such as `Parent` on a child. It is the same text as `label` when the relation is two-way, and an app then shows both directions as one list.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_label`.
             public var reverseLabel: Swift.String
@@ -32,7 +32,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/description`.
             public var description: Swift.String?
-            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            /// How many edges of the type an item can hold. `one-to-one`: each item at either end holds one. `one-to-many`: each item at the to end holds one. `many-to-one`: each item at the from end holds one. `many-to-many`: no limit.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
             @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -41,19 +41,19 @@ extension Components {
                 case manyToOne = "many-to-one"
                 case manyToMany = "many-to-many"
             }
-            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            /// How many edges of the type an item can hold. `one-to-one`: each item at either end holds one. `one-to-many`: each item at the to end holds one. `many-to-one`: each item at the from end holds one. `many-to-many`: no limit.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cardinality`.
             public var cardinality: Components.Schemas.EdgeType.CardinalityPayload
-            /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
+            /// The types the item an edge points from can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/source_type_constraints`.
-            public var sourceTypeConstraints: [Swift.String]
-            /// The types an edge's target item can have, in the same form as `source_type_constraints`.
+            /// - Remark: Generated from `#/components/schemas/EdgeType/from_type_constraints`.
+            public var fromTypeConstraints: [Swift.String]
+            /// The types the item an edge points to can have, in the same form as `from_type_constraints`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/target_type_constraints`.
-            public var targetTypeConstraints: [Swift.String]
-            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any.
+            /// - Remark: Generated from `#/components/schemas/EdgeType/to_type_constraints`.
+            public var toTypeConstraints: [Swift.String]
+            /// What deleting an edge's end does. `cascade`: deleting the from item trashes the to item. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the from item is trashed with its last to item, restored with any.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -62,7 +62,7 @@ extension Components {
                 case block = "block"
                 case withHosts = "with-hosts"
             }
-            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any.
+            /// What deleting an edge's end does. `cascade`: deleting the from item trashes the to item. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the from item is trashed with its last to item, restored with any.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload
@@ -90,22 +90,22 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/property_schema`.
             public var propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload
-            /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
+            /// The name the edge goes by when read from its to end, such as `child-of` for `parent-of`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/reverse_name`.
             public var reverseName: Swift.String?
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
+            /// The end of an edge whose file writes it in a folder: `from`, or `to` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
-            @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case source = "source"
-                case target = "target"
+            /// - Remark: Generated from `#/components/schemas/EdgeType/written_from`.
+            @frozen public enum WrittenFromPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case from = "from"
+                case to = "to"
                 case none = "none"
             }
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
+            /// The end of an edge whose file writes it in a folder: `from`, or `to` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeType/written_at`.
-            public var writtenAt: Components.Schemas.EdgeType.WrittenAtPayload
+            /// - Remark: Generated from `#/components/schemas/EdgeType/written_from`.
+            public var writtenFrom: Components.Schemas.EdgeType.WrittenFromPayload
             /// `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/shipped`.
@@ -114,7 +114,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/acyclic`.
             public var acyclic: Swift.Bool
-            /// `true` if the server refuses an edge of this type whose source type its `target_type_constraints` admit, so an item that can be a target is never a source.
+            /// `true` if the server refuses an edge of this type from an item whose type its `to_type_constraints` admit, so an item that an edge of the type can point to never points from one.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeType/flat`.
             public var flat: Swift.Bool
@@ -122,31 +122,31 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the edge type.
-            ///   - label: The name an app shows on the source end of an edge of this type, such as `Children` on a parent. Not the `reverse_name`, which is the code name a file writes.
-            ///   - reverseLabel: The name an app shows on the target end, such as `Parent` on a child. It is the same text as `label` when the relation is two-way, and an app then shows both directions as one list.
+            ///   - label: The name an app shows on the from end of an edge of this type, such as `Children` on a parent. Not the `reverse_name`, which is the code name a file writes.
+            ///   - reverseLabel: The name an app shows on the to end, such as `Parent` on a child. It is the same text as `label` when the relation is two-way, and an app then shows both directions as one list.
             ///   - description: What the edge type is for.
-            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
-            ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
-            ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`.
-            ///   - cascadeOnDelete: What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any.
+            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each item at either end holds one. `one-to-many`: each item at the to end holds one. `many-to-one`: each item at the from end holds one. `many-to-many`: no limit.
+            ///   - fromTypeConstraints: The types the item an edge points from can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes.
+            ///   - toTypeConstraints: The types the item an edge points to can have, in the same form as `from_type_constraints`.
+            ///   - cascadeOnDelete: What deleting an edge's end does. `cascade`: deleting the from item trashes the to item. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the from item is trashed with its last to item, restored with any.
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list.
-            ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`.
-            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it.
+            ///   - reverseName: The name the edge goes by when read from its to end, such as `child-of` for `parent-of`.
+            ///   - writtenFrom: The end of an edge whose file writes it in a folder: `from`, or `to` under the reverse name. `none` means no file writes it, so a folder never renders it.
             ///   - shipped: `true` if Marfa ships the edge type: it exists on every instance, and you can't register or delete it. `false` for one registered through `POST /edge-types`.
             ///   - acyclic: `true` if the server refuses an edge of this type that closes a cycle through other edges of the type. Every edge type refuses an edge from an item to itself.
-            ///   - flat: `true` if the server refuses an edge of this type whose source type its `target_type_constraints` admit, so an item that can be a target is never a source.
+            ///   - flat: `true` if the server refuses an edge of this type from an item whose type its `to_type_constraints` admit, so an item that an edge of the type can point to never points from one.
             public init(
                 id: Swift.String,
                 label: Swift.String,
                 reverseLabel: Swift.String,
                 description: Swift.String? = nil,
                 cardinality: Components.Schemas.EdgeType.CardinalityPayload,
-                sourceTypeConstraints: [Swift.String],
-                targetTypeConstraints: [Swift.String],
+                fromTypeConstraints: [Swift.String],
+                toTypeConstraints: [Swift.String],
                 cascadeOnDelete: Components.Schemas.EdgeType.CascadeOnDeletePayload,
                 propertySchema: Components.Schemas.EdgeType.PropertySchemaPayload,
                 reverseName: Swift.String? = nil,
-                writtenAt: Components.Schemas.EdgeType.WrittenAtPayload,
+                writtenFrom: Components.Schemas.EdgeType.WrittenFromPayload,
                 shipped: Swift.Bool,
                 acyclic: Swift.Bool,
                 flat: Swift.Bool
@@ -156,12 +156,12 @@ extension Components {
                 self.reverseLabel = reverseLabel
                 self.description = description
                 self.cardinality = cardinality
-                self.sourceTypeConstraints = sourceTypeConstraints
-                self.targetTypeConstraints = targetTypeConstraints
+                self.fromTypeConstraints = fromTypeConstraints
+                self.toTypeConstraints = toTypeConstraints
                 self.cascadeOnDelete = cascadeOnDelete
                 self.propertySchema = propertySchema
                 self.reverseName = reverseName
-                self.writtenAt = writtenAt
+                self.writtenFrom = writtenFrom
                 self.shipped = shipped
                 self.acyclic = acyclic
                 self.flat = flat
@@ -172,12 +172,12 @@ extension Components {
                 case reverseLabel = "reverse_label"
                 case description
                 case cardinality
-                case sourceTypeConstraints = "source_type_constraints"
-                case targetTypeConstraints = "target_type_constraints"
+                case fromTypeConstraints = "from_type_constraints"
+                case toTypeConstraints = "to_type_constraints"
                 case cascadeOnDelete = "cascade_on_delete"
                 case propertySchema = "property_schema"
                 case reverseName = "reverse_name"
-                case writtenAt = "written_at"
+                case writtenFrom = "written_from"
                 case shipped
                 case acyclic
                 case flat
@@ -207,7 +207,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/items_type`.
             public var itemsType: Swift.String?
-            /// A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it, and `currency` limits it to three capital letters. It can't be `thumbnail`.
+            /// A refinement of a `string` property. `url`, `email` and `date` store it as that type. `bcp47` and `iso3166` only label it, and `currency` limits it to three capital letters. It can't be `thumbnail`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePropertyDefinition/format`.
             public var format: Swift.String?
@@ -219,7 +219,7 @@ extension Components {
             ///   - required: `true` if every edge of the type must have the property.
             ///   - enumValues: The values an `enum` property takes.
             ///   - itemsType: The type of each element of an `array` property. A write is refused if an element is not a value of that type. It can't be `thumbnail`.
-            ///   - format: A refinement of a `string` property. `url`, `email`, `date` and `datetime` store it as that type. `bcp47` and `iso3166` only label it, and `currency` limits it to three capital letters. It can't be `thumbnail`.
+            ///   - format: A refinement of a `string` property. `url`, `email` and `date` store it as that type. `bcp47` and `iso3166` only label it, and `currency` limits it to three capital letters. It can't be `thumbnail`.
             public init(
                 _type: Swift.String,
                 description: Swift.String? = nil,
@@ -402,18 +402,18 @@ extension Components {
                 case sourceFilter = "source_filter"
             }
         }
-        /// Profile field permissions. Only the owner can change email.
+        /// Profile field permissions.
         ///
         /// - Remark: Generated from `#/components/schemas/ProfilePermissions`.
         public struct ProfilePermissions: Codable, Hashable, Sendable {
-            /// Access to every profile field. write changes only name and avatar.
+            /// Access to every profile field, except that `write` changes only the name and the avatar. Changing the email address takes `email` at `write`.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/*`.
             @frozen public enum _ast_Payload: String, Codable, Hashable, Sendable, CaseIterable {
                 case read = "read"
                 case write = "write"
             }
-            /// Access to every profile field. write changes only name and avatar.
+            /// Access to every profile field, except that `write` changes only the name and the avatar. Changing the email address takes `email` at `write`.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/*`.
             public var _ast_: Components.Schemas.ProfilePermissions._ast_Payload?
@@ -428,34 +428,35 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/name`.
             public var name: Components.Schemas.ProfilePermissions.NamePayload?
-            /// Read access to the owner's email address.
+            /// Access to the owner's email address, which password sign-in matches. Only this entry at `write` lets a credential change it.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
             @frozen public enum EmailPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case read = "read"
+                case write = "write"
             }
-            /// Read access to the owner's email address.
+            /// Access to the owner's email address, which password sign-in matches. Only this entry at `write` lets a credential change it.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
             public var email: Components.Schemas.ProfilePermissions.EmailPayload?
-            /// Access to the owner's profile picture.
+            /// Access to the owner's profile avatar.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/avatar`.
             @frozen public enum AvatarPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case read = "read"
                 case write = "write"
             }
-            /// Access to the owner's profile picture.
+            /// Access to the owner's profile avatar.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/avatar`.
             public var avatar: Components.Schemas.ProfilePermissions.AvatarPayload?
             /// Creates a new `ProfilePermissions`.
             ///
             /// - Parameters:
-            ///   - _ast_: Access to every profile field. write changes only name and avatar.
+            ///   - _ast_: Access to every profile field, except that `write` changes only the name and the avatar. Changing the email address takes `email` at `write`.
             ///   - name: Access to the owner's name.
-            ///   - email: Read access to the owner's email address.
-            ///   - avatar: Access to the owner's profile picture.
+            ///   - email: Access to the owner's email address, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            ///   - avatar: Access to the owner's profile avatar.
             public init(
                 _ast_: Components.Schemas.ProfilePermissions._ast_Payload? = nil,
                 name: Components.Schemas.ProfilePermissions.NamePayload? = nil,
@@ -499,7 +500,7 @@ extension Components {
                 ])
             }
         }
-        /// Stored profile levels by field. Only name and avatar permit writes.
+        /// Stored profile levels by field.
         ///
         /// - Remark: Generated from `#/components/schemas/StoredProfilePermissions`.
         public struct StoredProfilePermissions: Codable, Hashable, Sendable {
@@ -542,7 +543,7 @@ extension Components {
             case library = "library"
             case feed = "feed"
         }
-        /// An edge is a typed, directed relationship from a source item to a target item.
+        /// An edge is a typed, directed relationship from one item to another: `from_id` names the item it points from and `to_id` the item it points to.
         ///
         /// - Remark: Generated from `#/components/schemas/Edge`.
         public struct Edge: Codable, Hashable, Sendable {
@@ -552,12 +553,12 @@ extension Components {
             public var id: Swift.String
             /// The ID of the item the edge starts from.
             ///
-            /// - Remark: Generated from `#/components/schemas/Edge/source_id`.
-            public var sourceId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Edge/from_id`.
+            public var fromId: Swift.String
             /// The ID of the item the edge points to.
             ///
-            /// - Remark: Generated from `#/components/schemas/Edge/target_id`.
-            public var targetId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/Edge/to_id`.
+            public var toId: Swift.String
             /// The identifier of the edge type, such as `parent-of`.
             ///
             /// - Remark: Generated from `#/components/schemas/Edge/edge_type`.
@@ -602,8 +603,8 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the edge.
-            ///   - sourceId: The ID of the item the edge starts from.
-            ///   - targetId: The ID of the item the edge points to.
+            ///   - fromId: The ID of the item the edge starts from.
+            ///   - toId: The ID of the item the edge points to.
             ///   - edgeType: The identifier of the edge type, such as `parent-of`.
             ///   - properties: The edge's properties, by name.
             ///   - createdAt: When the edge was created, in UTC.
@@ -611,8 +612,8 @@ extension Components {
             ///   - version: The edge's version. It goes up by one on every update, including one that changes nothing.
             public init(
                 id: Swift.String,
-                sourceId: Swift.String,
-                targetId: Swift.String,
+                fromId: Swift.String,
+                toId: Swift.String,
                 edgeType: Swift.String,
                 properties: Components.Schemas.Edge.PropertiesPayload,
                 createdAt: Swift.String,
@@ -620,8 +621,8 @@ extension Components {
                 version: Swift.Int
             ) {
                 self.id = id
-                self.sourceId = sourceId
-                self.targetId = targetId
+                self.fromId = fromId
+                self.toId = toId
                 self.edgeType = edgeType
                 self.properties = properties
                 self.createdAt = createdAt
@@ -630,8 +631,8 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case id
-                case sourceId = "source_id"
-                case targetId = "target_id"
+                case fromId = "from_id"
+                case toId = "to_id"
                 case edgeType = "edge_type"
                 case properties
                 case createdAt = "created_at"
@@ -723,6 +724,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/updated_at`.
             public var updatedAt: Swift.String
+            /// When the item or one of its rows last changed, in UTC. A row change moves it and leaves `updated_at` and `version` alone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/last_activity_at`.
+            public var lastActivityAt: Swift.String
             /// When the item went to the trash, in UTC, or when a `system.*` item was revoked. A later write to the item leaves it as it is, and a restore clears it. `null` for an item outside the trash, and for one an archive restored to the trash without a time.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/trashed_at`.
@@ -819,6 +824,7 @@ extension Components {
             ///   - occurredAt: When the item happened, in UTC. Defaults to when it was created.
             ///   - createdAt: When the item was created, in UTC.
             ///   - updatedAt: When the item was last written, in UTC. A tag or extension write moves it too.
+            ///   - lastActivityAt: When the item or one of its rows last changed, in UTC. A row change moves it and leaves `updated_at` and `version` alone.
             ///   - trashedAt: When the item went to the trash, in UTC, or when a `system.*` item was revoked. A later write to the item leaves it as it is, and a restore clears it. `null` for an item outside the trash, and for one an archive restored to the trash without a time.
             ///   - trashedByCascade: Always `true` where present: the item went to the trash with another item, through a cascading edge such as `parent-of`. Present while it stays in the trash. Absent on an item trashed on its own.
             ///   - trashedWith: The ID of the item whose trash took this one into the trash, beside `trashed_by_cascade`, whatever became of that item since. Present only if you can read that item's type.
@@ -840,6 +846,7 @@ extension Components {
                 occurredAt: Swift.String,
                 createdAt: Swift.String,
                 updatedAt: Swift.String,
+                lastActivityAt: Swift.String,
                 trashedAt: Swift.String? = nil,
                 trashedByCascade: Swift.Bool? = nil,
                 trashedWith: Swift.String? = nil,
@@ -861,6 +868,7 @@ extension Components {
                 self.occurredAt = occurredAt
                 self.createdAt = createdAt
                 self.updatedAt = updatedAt
+                self.lastActivityAt = lastActivityAt
                 self.trashedAt = trashedAt
                 self.trashedByCascade = trashedByCascade
                 self.trashedWith = trashedWith
@@ -883,6 +891,7 @@ extension Components {
                 case occurredAt = "occurred_at"
                 case createdAt = "created_at"
                 case updatedAt = "updated_at"
+                case lastActivityAt = "last_activity_at"
                 case trashedAt = "trashed_at"
                 case trashedByCascade = "trashed_by_cascade"
                 case trashedWith = "trashed_with"
@@ -1096,10 +1105,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/VersionConflictError/code`.
             public var code: Components.Schemas.VersionConflictError.CodePayload
-            /// The HTTP status, always `409`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/VersionConflictError/status`.
-            public var status: Swift.Double
             /// A description of the error for a person to read. It can change, so don't match on it.
             ///
             /// - Remark: Generated from `#/components/schemas/VersionConflictError/message`.
@@ -1108,20 +1113,16 @@ extension Components {
             ///
             /// - Parameters:
             ///   - code: A machine-readable code for the error. Use it in your logic.
-            ///   - status: The HTTP status, always `409`.
             ///   - message: A description of the error for a person to read. It can change, so don't match on it.
             public init(
                 code: Components.Schemas.VersionConflictError.CodePayload,
-                status: Swift.Double,
                 message: Swift.String
             ) {
                 self.code = code
-                self.status = status
                 self.message = message
             }
             public enum CodingKeys: String, CodingKey {
                 case code
-                case status
                 case message
             }
         }
@@ -1139,10 +1140,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AncestorUnavailableError/code`.
             public var code: Components.Schemas.AncestorUnavailableError.CodePayload
-            /// The HTTP status, always `409`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/AncestorUnavailableError/status`.
-            public var status: Swift.Double
             /// A description of the error for a person to read. It can change, so don't match on it.
             ///
             /// - Remark: Generated from `#/components/schemas/AncestorUnavailableError/message`.
@@ -1151,20 +1148,16 @@ extension Components {
             ///
             /// - Parameters:
             ///   - code: A machine-readable code for the error. Use it in your logic.
-            ///   - status: The HTTP status, always `409`.
             ///   - message: A description of the error for a person to read. It can change, so don't match on it.
             public init(
                 code: Components.Schemas.AncestorUnavailableError.CodePayload,
-                status: Swift.Double,
                 message: Swift.String
             ) {
                 self.code = code
-                self.status = status
                 self.message = message
             }
             public enum CodingKeys: String, CodingKey {
                 case code
-                case status
                 case message
             }
         }
@@ -1237,7 +1230,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Version/properties`.
             public var properties: Components.Schemas.Version.PropertiesPayload
-            /// The type the row had at this version, which a row moved since no longer has. A snapshot is answered only to a credential that may read it.
+            /// The type the item had at this version, which an item moved since no longer has. A snapshot is answered only to a credential that may read it.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/type`.
             public var _type: Swift.String
@@ -1314,7 +1307,7 @@ extension Components {
             ///   - itemId: The ID of the item.
             ///   - version: The item version the snapshot records.
             ///   - properties: The item's properties at this version.
-            ///   - _type: The type the row had at this version, which a row moved since no longer has. A snapshot is answered only to a credential that may read it.
+            ///   - _type: The type the item had at this version, which an item moved since no longer has. A snapshot is answered only to a credential that may read it.
             ///   - tier: The item's tier at this version.
             ///   - occurredAt: When the item happened, in UTC, at this version.
             ///   - sourceId: The item's `source_id` at this version, or `null` if it had none.
@@ -1564,7 +1557,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/title_field`.
             public var titleField: Swift.String?
-            /// The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `maxLength` says otherwise.
+            /// The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `max_length` says otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
@@ -1582,7 +1575,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
-            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `maxLength` says otherwise.
+            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `max_length` says otherwise.
             ///   - nameFromBody: Whether an item with no title is named by the first line of its body. `false` where the body is not a name, such as a highlight's passage: such an item is named after what it comes from, or `Untitled`. Defaults to `true`.
             ///   - icon: The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///   - additionalProperties: A container of undocumented properties.
@@ -1658,34 +1651,34 @@ extension Components {
             /// How many days back Marfa keeps every version of an item. Counts from now.
             ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/recent_days`.
-            public var recentDays: Swift.Double?
-            /// How many days back Marfa keeps one version per day, after the recent window.
+            public var recentDays: Swift.Int?
+            /// How many days back Marfa keeps one version per day, after the recent window. A day is a UTC calendar day.
             ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/daily_snapshot_days`.
-            public var dailySnapshotDays: Swift.Double?
-            /// How many days back Marfa keeps one version per week, after the daily window. Marfa deletes older versions, but always keeps the latest.
+            public var dailySnapshotDays: Swift.Int?
+            /// How many days back Marfa keeps one version per week, after the daily window. A week is an ISO week. Marfa deletes older versions, but always keeps the latest. 0 deletes no version for its age once it is past the daily window.
             ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/weekly_snapshot_days`.
-            public var weeklySnapshotDays: Swift.Double?
+            public var weeklySnapshotDays: Swift.Int?
             /// The most versions Marfa keeps for an item. Past it, Marfa drops the oldest first.
             ///
             /// - Remark: Generated from `#/components/schemas/VersionPolicy/max_versions`.
-            public var maxVersions: Swift.Double?
+            public var maxVersions: Swift.Int?
             /// A container of undocumented properties.
             public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
             /// Creates a new `VersionPolicy`.
             ///
             /// - Parameters:
             ///   - recentDays: How many days back Marfa keeps every version of an item. Counts from now.
-            ///   - dailySnapshotDays: How many days back Marfa keeps one version per day, after the recent window.
-            ///   - weeklySnapshotDays: How many days back Marfa keeps one version per week, after the daily window. Marfa deletes older versions, but always keeps the latest.
+            ///   - dailySnapshotDays: How many days back Marfa keeps one version per day, after the recent window. A day is a UTC calendar day.
+            ///   - weeklySnapshotDays: How many days back Marfa keeps one version per week, after the daily window. A week is an ISO week. Marfa deletes older versions, but always keeps the latest. 0 deletes no version for its age once it is past the daily window.
             ///   - maxVersions: The most versions Marfa keeps for an item. Past it, Marfa drops the oldest first.
             ///   - additionalProperties: A container of undocumented properties.
             public init(
-                recentDays: Swift.Double? = nil,
-                dailySnapshotDays: Swift.Double? = nil,
-                weeklySnapshotDays: Swift.Double? = nil,
-                maxVersions: Swift.Double? = nil,
+                recentDays: Swift.Int? = nil,
+                dailySnapshotDays: Swift.Int? = nil,
+                weeklySnapshotDays: Swift.Int? = nil,
+                maxVersions: Swift.Int? = nil,
                 additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
             ) {
                 self.recentDays = recentDays
@@ -1703,19 +1696,19 @@ extension Components {
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 self.recentDays = try container.decodeIfPresent(
-                    Swift.Double.self,
+                    Swift.Int.self,
                     forKey: .recentDays
                 )
                 self.dailySnapshotDays = try container.decodeIfPresent(
-                    Swift.Double.self,
+                    Swift.Int.self,
                     forKey: .dailySnapshotDays
                 )
                 self.weeklySnapshotDays = try container.decodeIfPresent(
-                    Swift.Double.self,
+                    Swift.Int.self,
                     forKey: .weeklySnapshotDays
                 )
                 self.maxVersions = try container.decodeIfPresent(
-                    Swift.Double.self,
+                    Swift.Int.self,
                     forKey: .maxVersions
                 )
                 additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
@@ -1873,7 +1866,7 @@ extension Components {
                 case createdBy = "created_by"
             }
         }
-        /// The source's current problems, by opaque key. Each message is at most 500 UTF-16 code units. The map has at most 200 entries and 512 KiB serialized as UTF-8. An empty map means no current problems.
+        /// The source's current problems, by opaque key. Each message is at most 500 characters. The map has at most 200 entries and 512 KiB serialized as UTF-8. An empty map means no current problems.
         ///
         /// - Remark: Generated from `#/components/schemas/ConnectorProblems`.
         public struct ConnectorProblems: Codable, Hashable, Sendable {
@@ -1951,10 +1944,71 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BulkActionResult/remaining_hidden`.
             public var remainingHidden: Swift.Bool?
-            /// On a type move, `true` if Marfa rewrote `settings` to name the new type. `false` if an item of the old type remains, counted in `remaining` or `remaining_hidden`, or a setting has a `reason`: Marfa then rewrote none of them. Absent otherwise.
+            /// On a type move, `true` if Marfa rewrote `settings` to name the new type. `false` if an item of the old type remains, a setting has a `reason`, or `settings_error` names a refusal; then none was rewritten. Absent otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_rewritten`.
             public var settingsRewritten: Swift.Bool?
+            /// On a type move, why Marfa rewrote none of `settings` once no item of the old type remained: the new type is gone, or a folder or view would refuse its rewrite. Change the setting or register the type, then run the move again. Absent otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_error`.
+            public struct SettingsErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the refusal. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_error/code`.
+                public var code: Swift.String
+                /// A description of the refusal for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_error/message`.
+                public var message: Swift.String
+                /// More about the refusal, as the setting's own operation gives it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the refusal, as the setting's own operation gives it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_error/details`.
+                public var details: Components.Schemas.BulkActionResult.SettingsErrorPayload.DetailsPayload?
+                /// Creates a new `SettingsErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the refusal. Use it in your logic.
+                ///   - message: A description of the refusal for a person to read. It can change, so don't match on it.
+                ///   - details: More about the refusal, as the setting's own operation gives it.
+                public init(
+                    code: Swift.String,
+                    message: Swift.String,
+                    details: Components.Schemas.BulkActionResult.SettingsErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// On a type move, why Marfa rewrote none of `settings` once no item of the old type remained: the new type is gone, or a folder or view would refuse its rewrite. Change the setting or register the type, then run the move again. Absent otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkActionResult/settings_error`.
+            public var settingsError: Components.Schemas.BulkActionResult.SettingsErrorPayload?
             /// Creates a new `BulkActionResult`.
             ///
             /// - Parameters:
@@ -1969,7 +2023,8 @@ extension Components {
             ///   - settings: On a type move, every folder, view and webhook setting that named the old type when the job finished. Absent otherwise.
             ///   - remaining: On a type move, how many items you can see are still of the old type when the job finished, in any state: those it left unchanged and any written since the move began. Absent otherwise.
             ///   - remainingHidden: On a type move, `true` if items your source filter hides are still of the old type. A move takes only items you can see. Absent otherwise.
-            ///   - settingsRewritten: On a type move, `true` if Marfa rewrote `settings` to name the new type. `false` if an item of the old type remains, counted in `remaining` or `remaining_hidden`, or a setting has a `reason`: Marfa then rewrote none of them. Absent otherwise.
+            ///   - settingsRewritten: On a type move, `true` if Marfa rewrote `settings` to name the new type. `false` if an item of the old type remains, a setting has a `reason`, or `settings_error` names a refusal; then none was rewritten. Absent otherwise.
+            ///   - settingsError: On a type move, why Marfa rewrote none of `settings` once no item of the old type remained: the new type is gone, or a folder or view would refuse its rewrite. Change the setting or register the type, then run the move again. Absent otherwise.
             public init(
                 action: Swift.String,
                 matched: Swift.Int,
@@ -1982,7 +2037,8 @@ extension Components {
                 settings: [Components.Schemas.TypeSetting]? = nil,
                 remaining: Swift.Int? = nil,
                 remainingHidden: Swift.Bool? = nil,
-                settingsRewritten: Swift.Bool? = nil
+                settingsRewritten: Swift.Bool? = nil,
+                settingsError: Components.Schemas.BulkActionResult.SettingsErrorPayload? = nil
             ) {
                 self.action = action
                 self.matched = matched
@@ -1996,6 +2052,7 @@ extension Components {
                 self.remaining = remaining
                 self.remainingHidden = remainingHidden
                 self.settingsRewritten = settingsRewritten
+                self.settingsError = settingsError
             }
             public enum CodingKeys: String, CodingKey {
                 case action
@@ -2010,6 +2067,7 @@ extension Components {
                 case remaining
                 case remainingHidden = "remaining_hidden"
                 case settingsRewritten = "settings_rewritten"
+                case settingsError = "settings_error"
             }
         }
         /// An item a bulk action left unchanged, and why.
@@ -2147,7 +2205,7 @@ extension Components {
                 case message
             }
         }
-        /// A field: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier`, `tags`) or `properties.<name>`.
+        /// A field: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `last_activity_at`, `type`, `state`, `tier`, `tags`) or `properties.<name>`.
         ///
         /// - Remark: Generated from `#/components/schemas/ViewField`.
         public typealias ViewField = Swift.String
@@ -2214,7 +2272,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/ViewGroup`.
         public struct ViewGroup: Codable, Hashable, Sendable {
-            /// The field to group by: a field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            /// The field to group by: a field other than `last_activity_at`, which only a sort takes, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/by`.
             public var by: Swift.String
@@ -2242,7 +2300,7 @@ extension Components {
             /// Creates a new `ViewGroup`.
             ///
             /// - Parameters:
-            ///   - by: The field to group by: a field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            ///   - by: The field to group by: a field other than `last_activity_at`, which only a sort takes, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
             ///   - bucket: For a date field, the span each group covers. Absent groups by the value.
             ///   - order: The values whose groups come first, in this order. Other groups follow.
             ///   - hidden: The values whose groups the view leaves out.
@@ -2297,14 +2355,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/name`.
             public var name: Swift.String
-            /// The build the instance runs.
+            /// The release the instance runs, such as `0.0.14`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/version`.
             public var version: Swift.String
-            /// The release the build was made as, such as `0.0.14`. Absent for a build that is not a release.
-            ///
-            /// - Remark: Generated from `#/components/schemas/InstanceDescription/release`.
-            public var release: Swift.String?
             /// Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceDescription/instance_id`.
@@ -2325,8 +2379,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - name: The instance's display name. Defaults to `Marfa`.
-            ///   - version: The build the instance runs.
-            ///   - release: The release the build was made as, such as `0.0.14`. Absent for a build that is not a release.
+            ///   - version: The release the instance runs, such as `0.0.14`.
             ///   - instanceId: Unique identifier for the instance. `GET /config` and an archive's manifest show the same value.
             ///   - contract: The contract version, the same number as this document's `info.version`. It stays at `0` until the first public release.
             ///   - features: The features the instance serves, such as `items` and `webhooks`.
@@ -2334,7 +2387,6 @@ extension Components {
             public init(
                 name: Swift.String,
                 version: Swift.String,
-                release: Swift.String? = nil,
                 instanceId: Swift.String,
                 contract: Swift.Int,
                 features: [Swift.String],
@@ -2342,7 +2394,6 @@ extension Components {
             ) {
                 self.name = name
                 self.version = version
-                self.release = release
                 self.instanceId = instanceId
                 self.contract = contract
                 self.features = features
@@ -2351,7 +2402,6 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case name
                 case version
-                case release
                 case instanceId = "instance_id"
                 case contract
                 case features
@@ -2685,62 +2735,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Health/components`.
             public var components: Components.Schemas.Health.ComponentsPayload
-            /// The platform types this build no longer ships.
-            ///
-            /// - Remark: Generated from `#/components/schemas/Health/platform_types`.
-            public struct PlatformTypesPayload: Codable, Hashable, Sendable {
-                /// How many platform types the instance holds that this build no longer ships.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Health/platform_types/retired`.
-                public var retired: Swift.Int
-                /// Creates a new `PlatformTypesPayload`.
-                ///
-                /// - Parameters:
-                ///   - retired: How many platform types the instance holds that this build no longer ships.
-                public init(retired: Swift.Int) {
-                    self.retired = retired
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case retired
-                }
-            }
-            /// The platform types this build no longer ships.
-            ///
-            /// - Remark: Generated from `#/components/schemas/Health/platform_types`.
-            public var platformTypes: Components.Schemas.Health.PlatformTypesPayload
-            /// Stored values this build does not recognize.
-            ///
-            /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values`.
-            public struct UnrecognizedStoredValuesPayload: Codable, Hashable, Sendable {
-                /// How many stored rows hold a value this build does not recognize.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values/rows`.
-                public var rows: Swift.Int
-                /// `true` if the scan for such rows ran. `false` means `rows` is unknown.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values/scanned`.
-                public var scanned: Swift.Bool
-                /// Creates a new `UnrecognizedStoredValuesPayload`.
-                ///
-                /// - Parameters:
-                ///   - rows: How many stored rows hold a value this build does not recognize.
-                ///   - scanned: `true` if the scan for such rows ran. `false` means `rows` is unknown.
-                public init(
-                    rows: Swift.Int,
-                    scanned: Swift.Bool
-                ) {
-                    self.rows = rows
-                    self.scanned = scanned
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case rows
-                    case scanned
-                }
-            }
-            /// Stored values this build does not recognize.
-            ///
-            /// - Remark: Generated from `#/components/schemas/Health/unrecognized_stored_values`.
-            public var unrecognizedStoredValues: Components.Schemas.Health.UnrecognizedStoredValuesPayload
             /// Where the server runs. Present only when it is configured.
             ///
             /// - Remark: Generated from `#/components/schemas/Health/placement`.
@@ -2786,37 +2780,307 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Health/version`.
             public var version: Swift.String?
+            /// Whether Marfa backs itself up to its backup folder or object store, how the last backup went, and whether the place it backs up to is taking copies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/backups`.
+            public struct BackupsPayload: Codable, Hashable, Sendable {
+                /// `ok`: on schedule, with the last backup whole. `incomplete`: files it names have no recorded copy. `failing`: a run failed or lost files, a store refuses copies, or a part is damaged, so overall `status` is at least `degraded`. `off`: none scheduled.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/status`.
+                @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case ok = "ok"
+                    case incomplete = "incomplete"
+                    case failing = "failing"
+                    case off = "off"
+                }
+                /// `ok`: on schedule, with the last backup whole. `incomplete`: files it names have no recorded copy. `failing`: a run failed or lost files, a store refuses copies, or a part is damaged, so overall `status` is at least `degraded`. `off`: none scheduled.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/status`.
+                public var status: Components.Schemas.Health.BackupsPayload.StatusPayload
+                /// Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/reason`.
+                @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case noBackupDestination = "no_backup_destination"
+                    case turnedOff = "turned_off"
+                    case destinationUnusable = "destination_unusable"
+                }
+                /// Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/reason`.
+                public var reason: Components.Schemas.Health.BackupsPayload.ReasonPayload?
+                /// Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when one is in use.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/destination`.
+                @frozen public enum DestinationPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case folder = "folder"
+                    case bucket = "bucket"
+                }
+                /// Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when one is in use.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/destination`.
+                public var destination: Components.Schemas.Health.BackupsPayload.DestinationPayload?
+                /// The name of the last backup Marfa put. Present only for a caller that holds `instance.read`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/last_backup`.
+                public var lastBackup: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
+                /// When Marfa took the last backup it put. Present only for a caller that holds `instance.read`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/last_backup_at`.
+                public var lastBackupAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd?
+                /// How many backup runs in a row have failed or lost files. Present only for a caller that holds `instance.read`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/failures`.
+                public var failures: Swift.Int?
+                /// What went wrong in the last failed run, or which files the last backup was put without. Present only for a caller that holds `instance.read`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/last_error`.
+                public var lastError: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
+                /// When the last failed run ended. Present only for a caller that holds `instance.read`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/last_failed_at`.
+                public var lastFailedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd?
+                /// How many files waited for their copy in the object store or backup folder when `blob-replicate` last ran. Present only for a caller that holds `instance.read`, and only when a destination is set.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/copies_waiting`.
+                public var copiesWaiting: Swift.Int?
+                /// How many files the last backup names with no recorded copy in the destination, or `null` when unknown. `blob-integrity` keeps the record true. Present only for a caller that holds `instance.read`, and only when a destination is set.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/last_backup_files_waiting`.
+                public var lastBackupFilesWaiting: Components.Schemas.MarfaNullableMarfaInline0d3ac1e9e006c011?
+                /// Why the object store or backup folder isn't taking copies, or `null` while it does. It covers a backup folder whose disk isn't there and a destination that can't be used. Present only for a caller that holds `instance.read`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/store_error`.
+                public var storeError: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
+                /// How many parts a check found altered or, in a backup folder, unreadable, and not since stored again or found whole, or `null` when unknown. Present only for a caller that holds `instance.read`, and only when a destination is set.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/backups/damaged_parts`.
+                public var damagedParts: Components.Schemas.MarfaNullableMarfaInline0d3ac1e9e006c011?
+                /// Creates a new `BackupsPayload`.
+                ///
+                /// - Parameters:
+                ///   - status: `ok`: on schedule, with the last backup whole. `incomplete`: files it names have no recorded copy. `failing`: a run failed or lost files, a store refuses copies, or a part is damaged, so overall `status` is at least `degraded`. `off`: none scheduled.
+                ///   - reason: Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
+                ///   - destination: Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when one is in use.
+                ///   - lastBackup: The name of the last backup Marfa put. Present only for a caller that holds `instance.read`.
+                ///   - lastBackupAt: When Marfa took the last backup it put. Present only for a caller that holds `instance.read`.
+                ///   - failures: How many backup runs in a row have failed or lost files. Present only for a caller that holds `instance.read`.
+                ///   - lastError: What went wrong in the last failed run, or which files the last backup was put without. Present only for a caller that holds `instance.read`.
+                ///   - lastFailedAt: When the last failed run ended. Present only for a caller that holds `instance.read`.
+                ///   - copiesWaiting: How many files waited for their copy in the object store or backup folder when `blob-replicate` last ran. Present only for a caller that holds `instance.read`, and only when a destination is set.
+                ///   - lastBackupFilesWaiting: How many files the last backup names with no recorded copy in the destination, or `null` when unknown. `blob-integrity` keeps the record true. Present only for a caller that holds `instance.read`, and only when a destination is set.
+                ///   - storeError: Why the object store or backup folder isn't taking copies, or `null` while it does. It covers a backup folder whose disk isn't there and a destination that can't be used. Present only for a caller that holds `instance.read`.
+                ///   - damagedParts: How many parts a check found altered or, in a backup folder, unreadable, and not since stored again or found whole, or `null` when unknown. Present only for a caller that holds `instance.read`, and only when a destination is set.
+                public init(
+                    status: Components.Schemas.Health.BackupsPayload.StatusPayload,
+                    reason: Components.Schemas.Health.BackupsPayload.ReasonPayload? = nil,
+                    destination: Components.Schemas.Health.BackupsPayload.DestinationPayload? = nil,
+                    lastBackup: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
+                    lastBackupAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd? = nil,
+                    failures: Swift.Int? = nil,
+                    lastError: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
+                    lastFailedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd? = nil,
+                    copiesWaiting: Swift.Int? = nil,
+                    lastBackupFilesWaiting: Components.Schemas.MarfaNullableMarfaInline0d3ac1e9e006c011? = nil,
+                    storeError: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
+                    damagedParts: Components.Schemas.MarfaNullableMarfaInline0d3ac1e9e006c011? = nil
+                ) {
+                    self.status = status
+                    self.reason = reason
+                    self.destination = destination
+                    self.lastBackup = lastBackup
+                    self.lastBackupAt = lastBackupAt
+                    self.failures = failures
+                    self.lastError = lastError
+                    self.lastFailedAt = lastFailedAt
+                    self.copiesWaiting = copiesWaiting
+                    self.lastBackupFilesWaiting = lastBackupFilesWaiting
+                    self.storeError = storeError
+                    self.damagedParts = damagedParts
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case status
+                    case reason
+                    case destination
+                    case lastBackup = "last_backup"
+                    case lastBackupAt = "last_backup_at"
+                    case failures
+                    case lastError = "last_error"
+                    case lastFailedAt = "last_failed_at"
+                    case copiesWaiting = "copies_waiting"
+                    case lastBackupFilesWaiting = "last_backup_files_waiting"
+                    case storeError = "store_error"
+                    case damagedParts = "damaged_parts"
+                }
+            }
+            /// Whether Marfa backs itself up to its backup folder or object store, how the last backup went, and whether the place it backs up to is taking copies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/backups`.
+            public var backups: Components.Schemas.Health.BackupsPayload
+            /// What needs attention in the background work. Present only for a caller that holds `instance.read`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/housekeeping`.
+            public struct HousekeepingPayload: Codable, Hashable, Sendable {
+                /// A housekeeping job whose last run failed.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/housekeeping/FailedPayload`.
+                public struct FailedPayloadPayload: Codable, Hashable, Sendable {
+                    /// The job's name.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/FailedPayload/name`.
+                    public var name: Swift.String
+                    /// When the failed run finished, in UTC.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/FailedPayload/at`.
+                    public var at: Swift.String?
+                    /// The error the run hit.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/FailedPayload/error`.
+                    public var error: Swift.String?
+                    /// Creates a new `FailedPayloadPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - name: The job's name.
+                    ///   - at: When the failed run finished, in UTC.
+                    ///   - error: The error the run hit.
+                    public init(
+                        name: Swift.String,
+                        at: Swift.String? = nil,
+                        error: Swift.String? = nil
+                    ) {
+                        self.name = name
+                        self.at = at
+                        self.error = error
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case name
+                        case at
+                        case error
+                    }
+                }
+                /// Every job here whose last run failed, or `null` if the schedule can't be read in time.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/housekeeping/failed`.
+                public typealias FailedPayload = [Components.Schemas.Health.HousekeepingPayload.FailedPayloadPayload]
+                /// Every job here whose last run failed, or `null` if the schedule can't be read in time.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/housekeeping/failed`.
+                public var failed: Components.Schemas.Health.HousekeepingPayload.FailedPayload?
+                /// The keys of stored settings that no longer read, which Marfa runs on their defaults.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/housekeeping/unreadable_settings`.
+                public var unreadableSettings: [Swift.String]
+                /// Why the jobs that delete old records do nothing, or `null` if they run.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held`.
+                public struct HeldPayload: Codable, Hashable, Sendable {
+                    /// Why the jobs that delete are held. `clock_ahead`: the server's clock is more than 7 days later than the trusted time.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held/reason`.
+                    @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case clockAhead = "clock_ahead"
+                    }
+                    /// Why the jobs that delete are held. `clock_ahead`: the server's clock is more than 7 days later than the trusted time.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held/reason`.
+                    public var reason: Components.Schemas.Health.HousekeepingPayload.HeldPayload.ReasonPayload
+                    /// What the server's clock reads, in UTC.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held/clock_at`.
+                    public var clockAt: Swift.String
+                    /// The trusted time, in UTC: the time last confirmed or, if later, the latest time the server's clock read since while clean-up was not held.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held/trusted_at`.
+                    public var trustedAt: Swift.String
+                    /// When the hold ends if the clock runs without jumping until then, in UTC. `marfa housekeeping confirm-clock` on the server ends it at once.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held/ends_at`.
+                    public var endsAt: Swift.String
+                    /// Creates a new `HeldPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - reason: Why the jobs that delete are held. `clock_ahead`: the server's clock is more than 7 days later than the trusted time.
+                    ///   - clockAt: What the server's clock reads, in UTC.
+                    ///   - trustedAt: The trusted time, in UTC: the time last confirmed or, if later, the latest time the server's clock read since while clean-up was not held.
+                    ///   - endsAt: When the hold ends if the clock runs without jumping until then, in UTC. `marfa housekeeping confirm-clock` on the server ends it at once.
+                    public init(
+                        reason: Components.Schemas.Health.HousekeepingPayload.HeldPayload.ReasonPayload,
+                        clockAt: Swift.String,
+                        trustedAt: Swift.String,
+                        endsAt: Swift.String
+                    ) {
+                        self.reason = reason
+                        self.clockAt = clockAt
+                        self.trustedAt = trustedAt
+                        self.endsAt = endsAt
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case reason
+                        case clockAt = "clock_at"
+                        case trustedAt = "trusted_at"
+                        case endsAt = "ends_at"
+                    }
+                }
+                /// Why the jobs that delete old records do nothing, or `null` if they run.
+                ///
+                /// - Remark: Generated from `#/components/schemas/Health/housekeeping/held`.
+                public var held: Components.Schemas.Health.HousekeepingPayload.HeldPayload?
+                /// Creates a new `HousekeepingPayload`.
+                ///
+                /// - Parameters:
+                ///   - failed: Every job here whose last run failed, or `null` if the schedule can't be read in time.
+                ///   - unreadableSettings: The keys of stored settings that no longer read, which Marfa runs on their defaults.
+                ///   - held: Why the jobs that delete old records do nothing, or `null` if they run.
+                public init(
+                    failed: Components.Schemas.Health.HousekeepingPayload.FailedPayload? = nil,
+                    unreadableSettings: [Swift.String],
+                    held: Components.Schemas.Health.HousekeepingPayload.HeldPayload? = nil
+                ) {
+                    self.failed = failed
+                    self.unreadableSettings = unreadableSettings
+                    self.held = held
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case failed
+                    case unreadableSettings = "unreadable_settings"
+                    case held
+                }
+            }
+            /// What needs attention in the background work. Present only for a caller that holds `instance.read`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/housekeeping`.
+            public var housekeeping: Components.Schemas.Health.HousekeepingPayload?
             /// Creates a new `Health`.
             ///
             /// - Parameters:
             ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
             ///   - components: Each component checked: reading and writing the database, free disk space and the blob store.
-            ///   - platformTypes: The platform types this build no longer ships.
-            ///   - unrecognizedStoredValues: Stored values this build does not recognize.
             ///   - placement: Where the server runs. Present only when it is configured.
             ///   - version: The build the instance runs, when it is known.
+            ///   - backups: Whether Marfa backs itself up to its backup folder or object store, how the last backup went, and whether the place it backs up to is taking copies.
+            ///   - housekeeping: What needs attention in the background work. Present only for a caller that holds `instance.read`.
             public init(
                 status: Components.Schemas.Health.StatusPayload,
                 components: Components.Schemas.Health.ComponentsPayload,
-                platformTypes: Components.Schemas.Health.PlatformTypesPayload,
-                unrecognizedStoredValues: Components.Schemas.Health.UnrecognizedStoredValuesPayload,
                 placement: Components.Schemas.Health.PlacementPayload? = nil,
-                version: Swift.String? = nil
+                version: Swift.String? = nil,
+                backups: Components.Schemas.Health.BackupsPayload,
+                housekeeping: Components.Schemas.Health.HousekeepingPayload? = nil
             ) {
                 self.status = status
                 self.components = components
-                self.platformTypes = platformTypes
-                self.unrecognizedStoredValues = unrecognizedStoredValues
                 self.placement = placement
                 self.version = version
+                self.backups = backups
+                self.housekeeping = housekeeping
             }
             public enum CodingKeys: String, CodingKey {
                 case status
                 case components
-                case platformTypes = "platform_types"
-                case unrecognizedStoredValues = "unrecognized_stored_values"
                 case placement
                 case version
+                case backups
+                case housekeeping
             }
         }
         /// A page of trashed item summaries.
@@ -3565,7 +3829,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemWithMetadata/metadata`.
             public var metadata: Components.Schemas.Metadata
-            /// `true` when Marfa accepted a create and wrote nothing: it repeats an `id` you already created, or its natural key matches an item in the trash. Absent otherwise.
+            /// `true` when Marfa accepted a write and stored nothing: a create repeats an `id` you already created, its natural key matches a trashed item, or an update or upsert leaves the item as it is, so `item` is at the version it holds. Absent otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemWithMetadata/acknowledged`.
             public var acknowledged: Swift.Bool?
@@ -3574,7 +3838,7 @@ extension Components {
             /// - Parameters:
             ///   - item: The item.
             ///   - metadata: The item's metadata.
-            ///   - acknowledged: `true` when Marfa accepted a create and wrote nothing: it repeats an `id` you already created, or its natural key matches an item in the trash. Absent otherwise.
+            ///   - acknowledged: `true` when Marfa accepted a write and stored nothing: a create repeats an `id` you already created, its natural key matches a trashed item, or an update or upsert leaves the item as it is, so `item` is at the version it holds. Absent otherwise.
             public init(
                 item: Components.Schemas.Item,
                 metadata: Components.Schemas.Metadata,
@@ -3772,7 +4036,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgePermissionDenied = "edge_permission_denied"
+                    case edgeTypeNotPermitted = "edge_type_not_permitted"
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
@@ -4020,17 +4284,16 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal`.
-        public struct ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal`.
+        public struct IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case conflict = "conflict"
                     case idReused = "id_reused"
                     case itemExists = "item_exists"
                     case linkTaken = "link_taken"
@@ -4038,15 +4301,15 @@ extension Components {
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/code`.
-                public var code: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/code`.
+                public var code: Components.Schemas.IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -4066,8 +4329,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/details`.
-                public var details: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error/details`.
+                public var details: Components.Schemas.IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -4075,9 +4338,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -4091,13 +4354,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error`.
-            public var error: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload
-            /// Creates a new `ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal`.
+            /// - Remark: Generated from `#/components/schemas/IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal/error`.
+            public var error: Components.Schemas.IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload
+            /// Creates a new `IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.ConflictOrIdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.IdReusedOrItemExistsOrLinkTakenOrTypeMismatchRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -4199,7 +4462,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgePermissionDenied = "edge_permission_denied"
+                    case edgeTypeNotPermitted = "edge_type_not_permitted"
                     case typeNotPermitted = "type_not_permitted"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
@@ -4299,7 +4562,7 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
-        /// An `Item`, or, when `include` names `metadata`, an `ItemReadWithMetadata`; every row of one page is the same shape.
+        /// An `Item`, or, when `include` names `metadata`, an `ItemReadWithMetadata`; every item of one page is the same shape.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemListRow`.
         @frozen public enum ItemListRow: Codable, Hashable, Sendable {
@@ -4478,7 +4741,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/metadata`.
             public var metadata: Components.Schemas.Metadata
-            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
+            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose from item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/backrefs`.
             public struct BackrefsPayload: Codable, Hashable, Sendable {
@@ -4498,7 +4761,7 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
+            /// The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose from item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/backrefs`.
             public var backrefs: Components.Schemas.ItemDetail.BackrefsPayload?
@@ -4527,7 +4790,7 @@ extension Components {
             /// - Parameters:
             ///   - item: The item, with its outbound edges.
             ///   - metadata: The item's metadata.
-            ///   - backrefs: The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose source item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
+            ///   - backrefs: The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose from item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Reach`.
             ///   - neighbors: The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
             ///   - neighborsTruncated: `true` if this answer's edges reach more than 100 items, so `neighbors` leaves some out. Page `GET /items/{id}/edges` and `GET /items/{id}/backrefs` for the rest. Present with `include=neighbors`.
@@ -4926,13 +5189,11 @@ extension Components {
                 case error
             }
         }
-        /// Who resolves a version conflict. `auto` has Marfa resolve it by the type's merge policy. `manual` and `callback` return the conflict for you to resolve. Defaults to `manual`.
+        /// Who resolves a version conflict. `auto` has Marfa resolve it by the type's merge policy. Leave it out and Marfa returns the conflict for you to resolve.
         ///
         /// - Remark: Generated from `#/components/schemas/ConflictMode`.
         @frozen public enum ConflictMode: String, Codable, Hashable, Sendable, CaseIterable {
             case auto = "auto"
-            case manual = "manual"
-            case callback = "callback"
         }
         /// Confirms that the request succeeded.
         ///
@@ -4951,6 +5212,63 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case ok
+            }
+        }
+        /// The owner's profile, as far as your credential can read it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Profile`.
+        public struct Profile: Codable, Hashable, Sendable {
+            /// The owner's name. Present with `profile.name:read`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Profile/name`.
+            public var name: Swift.String?
+            /// The owner's sign-in email address. Present with `profile.email:read`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Profile/email`.
+            public var email: Swift.String?
+            /// The address of the owner's avatar, or `null` when there is none. Present with `profile.avatar:read`. Fetch it with `GET /profile/avatar`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Profile/avatar`.
+            public var avatar: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+            /// Creates a new `Profile`.
+            ///
+            /// - Parameters:
+            ///   - name: The owner's name. Present with `profile.name:read`.
+            ///   - email: The owner's sign-in email address. Present with `profile.email:read`.
+            ///   - avatar: The address of the owner's avatar, or `null` when there is none. Present with `profile.avatar:read`. Fetch it with `GET /profile/avatar`.
+            public init(
+                name: Swift.String? = nil,
+                email: Swift.String? = nil,
+                avatar: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil
+            ) {
+                self.name = name
+                self.email = email
+                self.avatar = avatar
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case email
+                case avatar
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.email = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .email
+                )
+                self.avatar = try container.decodeIfPresent(
+                    Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
+                    forKey: .avatar
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "email",
+                    "avatar"
+                ])
             }
         }
         /// An error response.
@@ -5508,6 +5826,91 @@ extension Components {
         }
         /// An error response.
         ///
+        /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal`.
+        public struct InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case invalidId = "invalid_id"
+                    case invalidTransition = "invalid_transition"
+                    case missingRequiredField = "missing_required_field"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal`.
         public struct EdgeConstraintViolationOrInvalidIdOrInvalidTransitionOrMissingRequiredFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -5590,25 +5993,6 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case error
-            }
-        }
-        /// An item's metadata.
-        ///
-        /// - Remark: Generated from `#/components/schemas/MetadataResponse`.
-        public struct MetadataResponse: Codable, Hashable, Sendable {
-            /// The item's metadata.
-            ///
-            /// - Remark: Generated from `#/components/schemas/MetadataResponse/metadata`.
-            public var metadata: Components.Schemas.Metadata
-            /// Creates a new `MetadataResponse`.
-            ///
-            /// - Parameters:
-            ///   - metadata: The item's metadata.
-            public init(metadata: Components.Schemas.Metadata) {
-                self.metadata = metadata
-            }
-            public enum CodingKeys: String, CodingKey {
-                case metadata
             }
         }
         /// An error response.
@@ -5819,11 +6203,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/outcome`.
             public var outcome: Components.Schemas.BulkResultOutcome
-            /// The id of what the entry wrote or resolved. Absent where an item entry's natural key resolved a row of a type the credential may not read: the entry learns that its key is taken and nothing of the row.
+            /// The id of what the entry wrote or resolved. Absent where an item entry's natural key resolved an item of a type the credential may not read: the entry learns that its key is taken and nothing of the item.
             ///
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/id`.
             public var id: Swift.String?
-            /// Why a `skipped` entry wrote nothing. Under `create_only`, a match exists: `duplicate_source` by natural key, `duplicate_id` by `id`, `duplicate_edge` by source, target and edge type. Under `upsert`, `trashed`: the natural key matches a trashed item.
+            /// Why a `skipped` entry wrote nothing. Under `create_only`, a match exists: `duplicate_source` by natural key, `duplicate_id` by `id`, `duplicate_edge` by its ends and edge type. Under `upsert`: `trashed`, a trashed item matches, or `unchanged`.
             ///
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/reason`.
             @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -5831,8 +6215,9 @@ extension Components {
                 case duplicateId = "duplicate_id"
                 case duplicateSource = "duplicate_source"
                 case trashed = "trashed"
+                case unchanged = "unchanged"
             }
-            /// Why a `skipped` entry wrote nothing. Under `create_only`, a match exists: `duplicate_source` by natural key, `duplicate_id` by `id`, `duplicate_edge` by source, target and edge type. Under `upsert`, `trashed`: the natural key matches a trashed item.
+            /// Why a `skipped` entry wrote nothing. Under `create_only`, a match exists: `duplicate_source` by natural key, `duplicate_id` by `id`, `duplicate_edge` by its ends and edge type. Under `upsert`: `trashed`, a trashed item matches, or `unchanged`.
             ///
             /// - Remark: Generated from `#/components/schemas/BulkResultEntry/reason`.
             public var reason: Components.Schemas.BulkResultEntry.ReasonPayload?
@@ -5845,8 +6230,8 @@ extension Components {
             /// - Parameters:
             ///   - index: The entry's position in the request, counting from 0.
             ///   - outcome: What happened to the entry.
-            ///   - id: The id of what the entry wrote or resolved. Absent where an item entry's natural key resolved a row of a type the credential may not read: the entry learns that its key is taken and nothing of the row.
-            ///   - reason: Why a `skipped` entry wrote nothing. Under `create_only`, a match exists: `duplicate_source` by natural key, `duplicate_id` by `id`, `duplicate_edge` by source, target and edge type. Under `upsert`, `trashed`: the natural key matches a trashed item.
+            ///   - id: The id of what the entry wrote or resolved. Absent where an item entry's natural key resolved an item of a type the credential may not read: the entry learns that its key is taken and nothing of the item.
+            ///   - reason: Why a `skipped` entry wrote nothing. Under `create_only`, a match exists: `duplicate_source` by natural key, `duplicate_id` by `id`, `duplicate_edge` by its ends and edge type. Under `upsert`: `trashed`, a trashed item matches, or `unchanged`.
             ///   - error: Why the entry was refused. Present when `outcome` is `errored`.
             public init(
                 index: Swift.Int,
@@ -6519,7 +6904,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Tombstone/key`.
             public var key: Swift.String
-            /// When the row holding the key was purged.
+            /// When the item holding the key was purged.
             ///
             /// - Remark: Generated from `#/components/schemas/Tombstone/purged_at`.
             public var purgedAt: Swift.String
@@ -6531,7 +6916,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - key: The link value, or the natural key's `source_id`.
-            ///   - purgedAt: When the row holding the key was purged.
+            ///   - purgedAt: When the item holding the key was purged.
             ///   - settledAt: When the purge happened, or the later time of the vendor's change a connector made to carry it out. Set with `POST /items/tombstones`. A vendor change after this time is a new item.
             public init(
                 key: Swift.String,
@@ -6761,39 +7146,25 @@ extension Components {
                 case error
             }
         }
-        /// An item's extension namespaces that you can read.
+        /// One extension namespace on an item, with its document.
         ///
-        /// - Remark: Generated from `#/components/schemas/ExtensionsResponse`.
-        public struct ExtensionsResponse: Codable, Hashable, Sendable {
-            /// The item's extension namespaces that you can read, each mapped to its data.
+        /// - Remark: Generated from `#/components/schemas/Extension`.
+        public struct Extension: Codable, Hashable, Sendable {
+            /// The extension namespace.
             ///
-            /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions`.
-            public struct ExtensionsPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions/additionalProperties`.
-                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `AdditionalPropertiesPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
+            /// - Remark: Generated from `#/components/schemas/Extension/namespace`.
+            public var namespace: Swift.String
+            /// The data the item holds in the namespace, or `null` if it holds none there.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Extension/document`.
+            public struct DocumentPayload: Codable, Hashable, Sendable {
                 /// A container of undocumented properties.
-                public var additionalProperties: [String: Components.Schemas.ExtensionsResponse.ExtensionsPayload.AdditionalPropertiesPayload]
-                /// Creates a new `ExtensionsPayload`.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `DocumentPayload`.
                 ///
                 /// - Parameters:
                 ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: Components.Schemas.ExtensionsResponse.ExtensionsPayload.AdditionalPropertiesPayload] = .init()) {
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
                     self.additionalProperties = additionalProperties
                 }
                 public init(from decoder: any Swift.Decoder) throws {
@@ -6803,19 +7174,44 @@ extension Components {
                     try encoder.encodeAdditionalProperties(additionalProperties)
                 }
             }
-            /// The item's extension namespaces that you can read, each mapped to its data.
+            /// The data the item holds in the namespace, or `null` if it holds none there.
             ///
-            /// - Remark: Generated from `#/components/schemas/ExtensionsResponse/extensions`.
-            public var extensions: Components.Schemas.ExtensionsResponse.ExtensionsPayload
-            /// Creates a new `ExtensionsResponse`.
+            /// - Remark: Generated from `#/components/schemas/Extension/document`.
+            public var document: Components.Schemas.Extension.DocumentPayload?
+            /// Creates a new `Extension`.
             ///
             /// - Parameters:
-            ///   - extensions: The item's extension namespaces that you can read, each mapped to its data.
-            public init(extensions: Components.Schemas.ExtensionsResponse.ExtensionsPayload) {
-                self.extensions = extensions
+            ///   - namespace: The extension namespace.
+            ///   - document: The data the item holds in the namespace, or `null` if it holds none there.
+            public init(
+                namespace: Swift.String,
+                document: Components.Schemas.Extension.DocumentPayload? = nil
+            ) {
+                self.namespace = namespace
+                self.document = document
             }
             public enum CodingKeys: String, CodingKey {
-                case extensions
+                case namespace
+                case document
+            }
+        }
+        /// An item's extension namespaces that you can read.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ExtensionPage`.
+        public struct ExtensionPage: Codable, Hashable, Sendable {
+            /// The extension namespaces on the item that you can read, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ExtensionPage/data`.
+            public var data: [Components.Schemas.Extension]
+            /// Creates a new `ExtensionPage`.
+            ///
+            /// - Parameters:
+            ///   - data: The extension namespaces on the item that you can read, by name.
+            public init(data: [Components.Schemas.Extension]) {
+                self.data = data
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
             }
         }
         /// An error response.
@@ -7382,7 +7778,7 @@ extension Components {
                 /// - Remark: Generated from `#/components/schemas/BulkAtomicRollbackOrEdgePermissionDeniedOrForbiddenOrTypeNotPermittedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case bulkAtomicRollback = "bulk_atomic_rollback"
-                    case edgePermissionDenied = "edge_permission_denied"
+                    case edgeTypeNotPermitted = "edge_type_not_permitted"
                     case forbidden = "forbidden"
                     case typeNotPermitted = "type_not_permitted"
                 }
@@ -7452,25 +7848,6 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case error
-            }
-        }
-        /// One registered edge type.
-        ///
-        /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationResponse`.
-        public struct EdgeTypeRegistrationResponse: Codable, Hashable, Sendable {
-            /// The edge type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationResponse/edge_type`.
-            public var edgeType: Components.Schemas.EdgeType
-            /// Creates a new `EdgeTypeRegistrationResponse`.
-            ///
-            /// - Parameters:
-            ///   - edgeType: The edge type.
-            public init(edgeType: Components.Schemas.EdgeType) {
-                self.edgeType = edgeType
-            }
-            public enum CodingKeys: String, CodingKey {
-                case edgeType = "edge_type"
             }
         }
         /// An error response.
@@ -7569,7 +7946,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/EdgePermissionDeniedOrForbiddenRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case edgePermissionDenied = "edge_permission_denied"
+                    case edgeTypeNotPermitted = "edge_type_not_permitted"
                     case forbidden = "forbidden"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
@@ -7812,11 +8189,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/id`.
             public var id: Swift.String
-            /// The name an app shows on the source end, such as `Children` on a parent. Leave it out and the last segment of the `id` makes it, such as `List Member`. On a change, leaving it out keeps the stored one.
+            /// The name an app shows on the from end, such as `Children` on a parent. Leave it out and the last segment of the `id` makes it, such as `List Member`. On a change, leaving it out keeps the stored one.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/label`.
             public var label: Swift.String?
-            /// The name an app shows on the target end, such as `Parent` on a child. Leave it out and `label` names both ends. On a change, leaving it out keeps the stored one; send the `label` to make a type two-way.
+            /// The name an app shows on the to end, such as `Parent` on a child. Leave it out and `label` names both ends. On a change, leaving it out keeps the stored one; send the `label` to make a type two-way.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/reverse_label`.
             public var reverseLabel: Swift.String?
@@ -7824,7 +8201,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/description`.
             public var description: Swift.String?
-            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            /// How many edges of the type an item can hold. `one-to-one`: each item at either end holds one. `one-to-many`: each item at the to end holds one. `many-to-one`: each item at the from end holds one. `many-to-many`: no limit.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cardinality`.
             @frozen public enum CardinalityPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -7833,19 +8210,19 @@ extension Components {
                 case manyToOne = "many-to-one"
                 case manyToMany = "many-to-many"
             }
-            /// How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
+            /// How many edges of the type an item can hold. `one-to-one`: each item at either end holds one. `one-to-many`: each item at the to end holds one. `many-to-one`: each item at the from end holds one. `many-to-many`: no limit.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cardinality`.
             public var cardinality: Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload
-            /// The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
+            /// The types the item an edge points from can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/source_type_constraints`.
-            public var sourceTypeConstraints: [Swift.String]?
-            /// The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/from_type_constraints`.
+            public var fromTypeConstraints: [Swift.String]?
+            /// The types the item an edge points to can have, in the same form as `from_type_constraints`. Leave it out to allow any type.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/target_type_constraints`.
-            public var targetTypeConstraints: [Swift.String]?
-            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any. Leave it out for `orphan`.
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/to_type_constraints`.
+            public var toTypeConstraints: [Swift.String]?
+            /// What deleting an edge's end does. `cascade`: deleting the from item trashes the to item. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the from item is trashed with its last to item, restored with any. Leave it out for `orphan`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cascade_on_delete`.
             @frozen public enum CascadeOnDeletePayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -7854,7 +8231,7 @@ extension Components {
                 case block = "block"
                 case withHosts = "with-hosts"
             }
-            /// What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any. Leave it out for `orphan`.
+            /// What deleting an edge's end does. `cascade`: deleting the from item trashes the to item. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the from item is trashed with its last to item, restored with any. Leave it out for `orphan`.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/cascade_on_delete`.
             public var cascadeOnDelete: Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload?
@@ -7882,22 +8259,22 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/property_schema`.
             public var propertySchema: Components.Schemas.EdgeTypeRegistrationRequest.PropertySchemaPayload?
-            /// The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
+            /// The name the edge goes by when read from its to end, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/reverse_name`.
             public var reverseName: Swift.String?
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
+            /// The end of an edge whose file writes it in a folder: `from`, or `to` under the reverse name. `none` means no file writes it, so a folder never renders it. `to` needs a `reverse_name`. Leave it out for `from`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
-            @frozen public enum WrittenAtPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case source = "source"
-                case target = "target"
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_from`.
+            @frozen public enum WrittenFromPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case from = "from"
+                case to = "to"
                 case none = "none"
             }
-            /// The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
+            /// The end of an edge whose file writes it in a folder: `from`, or `to` under the reverse name. `none` means no file writes it, so a folder never renders it. `to` needs a `reverse_name`. Leave it out for `from`.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_at`.
-            public var writtenAt: Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload?
+            /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/written_from`.
+            public var writtenFrom: Components.Schemas.EdgeTypeRegistrationRequest.WrittenFromPayload?
             /// `true` updates a registered type in place: widen its endpoints (keep every constraint token, or allow all types with `[]` or `*`) and change its labels. Other members stay unchanged. Omit or `false` to register a new type. Not stored.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypeRegistrationRequest/evolve_constraints`.
@@ -7906,16 +8283,16 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: The identifier of the edge type, such as `acme.list-member`.
-            ///   - label: The name an app shows on the source end, such as `Children` on a parent. Leave it out and the last segment of the `id` makes it, such as `List Member`. On a change, leaving it out keeps the stored one.
-            ///   - reverseLabel: The name an app shows on the target end, such as `Parent` on a child. Leave it out and `label` names both ends. On a change, leaving it out keeps the stored one; send the `label` to make a type two-way.
+            ///   - label: The name an app shows on the from end, such as `Children` on a parent. Leave it out and the last segment of the `id` makes it, such as `List Member`. On a change, leaving it out keeps the stored one.
+            ///   - reverseLabel: The name an app shows on the to end, such as `Parent` on a child. Leave it out and `label` names both ends. On a change, leaving it out keeps the stored one; send the `label` to make a type two-way.
             ///   - description: What the edge type is for.
-            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each source and each target holds one. `one-to-many`: each target holds one. `many-to-one`: each source holds one. `many-to-many`: no limit.
-            ///   - sourceTypeConstraints: The types an edge's source item can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
-            ///   - targetTypeConstraints: The types an edge's target item can have, in the same form as `source_type_constraints`. Leave it out to allow any type.
-            ///   - cascadeOnDelete: What deleting an item an edge joins does. `cascade`: the source's delete trashes the target. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the source is trashed with its last target, restored with any. Leave it out for `orphan`.
+            ///   - cardinality: How many edges of the type an item can hold. `one-to-one`: each item at either end holds one. `one-to-many`: each item at the to end holds one. `many-to-one`: each item at the from end holds one. `many-to-many`: no limit.
+            ///   - fromTypeConstraints: The types the item an edge points from can have: `*`, a type identifier or `role:<name>`. A type matches its subtypes. Leave it out to allow any type.
+            ///   - toTypeConstraints: The types the item an edge points to can have, in the same form as `from_type_constraints`. Leave it out to allow any type.
+            ///   - cascadeOnDelete: What deleting an edge's end does. `cascade`: deleting the from item trashes the to item. `orphan`: the other stays. `block`: the delete fails. `with-hosts`: the from item is trashed with its last to item, restored with any. Leave it out for `orphan`.
             ///   - propertySchema: The properties an edge of the type can carry, by name. Marfa checks an edge's properties against it each time the edge is written, and accepts a property it doesn't list. Leave it out for none.
-            ///   - reverseName: The name the edge goes by when read from its target, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
-            ///   - writtenAt: The end of an edge whose file writes it in a folder: `source`, or `target` under the reverse name. `none` means no file writes it, so a folder never renders it. `target` needs a `reverse_name`. Leave it out for `source`.
+            ///   - reverseName: The name the edge goes by when read from its to end, such as `child-of` for `parent-of`. No other edge type can use it as an ID or reverse name.
+            ///   - writtenFrom: The end of an edge whose file writes it in a folder: `from`, or `to` under the reverse name. `none` means no file writes it, so a folder never renders it. `to` needs a `reverse_name`. Leave it out for `from`.
             ///   - evolveConstraints: `true` updates a registered type in place: widen its endpoints (keep every constraint token, or allow all types with `[]` or `*`) and change its labels. Other members stay unchanged. Omit or `false` to register a new type. Not stored.
             public init(
                 id: Swift.String,
@@ -7923,12 +8300,12 @@ extension Components {
                 reverseLabel: Swift.String? = nil,
                 description: Swift.String? = nil,
                 cardinality: Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload,
-                sourceTypeConstraints: [Swift.String]? = nil,
-                targetTypeConstraints: [Swift.String]? = nil,
+                fromTypeConstraints: [Swift.String]? = nil,
+                toTypeConstraints: [Swift.String]? = nil,
                 cascadeOnDelete: Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload? = nil,
                 propertySchema: Components.Schemas.EdgeTypeRegistrationRequest.PropertySchemaPayload? = nil,
                 reverseName: Swift.String? = nil,
-                writtenAt: Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload? = nil,
+                writtenFrom: Components.Schemas.EdgeTypeRegistrationRequest.WrittenFromPayload? = nil,
                 evolveConstraints: Swift.Bool? = nil
             ) {
                 self.id = id
@@ -7936,12 +8313,12 @@ extension Components {
                 self.reverseLabel = reverseLabel
                 self.description = description
                 self.cardinality = cardinality
-                self.sourceTypeConstraints = sourceTypeConstraints
-                self.targetTypeConstraints = targetTypeConstraints
+                self.fromTypeConstraints = fromTypeConstraints
+                self.toTypeConstraints = toTypeConstraints
                 self.cascadeOnDelete = cascadeOnDelete
                 self.propertySchema = propertySchema
                 self.reverseName = reverseName
-                self.writtenAt = writtenAt
+                self.writtenFrom = writtenFrom
                 self.evolveConstraints = evolveConstraints
             }
             public enum CodingKeys: String, CodingKey {
@@ -7950,12 +8327,12 @@ extension Components {
                 case reverseLabel = "reverse_label"
                 case description
                 case cardinality
-                case sourceTypeConstraints = "source_type_constraints"
-                case targetTypeConstraints = "target_type_constraints"
+                case fromTypeConstraints = "from_type_constraints"
+                case toTypeConstraints = "to_type_constraints"
                 case cascadeOnDelete = "cascade_on_delete"
                 case propertySchema = "property_schema"
                 case reverseName = "reverse_name"
-                case writtenAt = "written_at"
+                case writtenFrom = "written_from"
                 case evolveConstraints = "evolve_constraints"
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -7980,13 +8357,13 @@ extension Components {
                     Components.Schemas.EdgeTypeRegistrationRequest.CardinalityPayload.self,
                     forKey: .cardinality
                 )
-                self.sourceTypeConstraints = try container.decodeIfPresent(
+                self.fromTypeConstraints = try container.decodeIfPresent(
                     [Swift.String].self,
-                    forKey: .sourceTypeConstraints
+                    forKey: .fromTypeConstraints
                 )
-                self.targetTypeConstraints = try container.decodeIfPresent(
+                self.toTypeConstraints = try container.decodeIfPresent(
                     [Swift.String].self,
-                    forKey: .targetTypeConstraints
+                    forKey: .toTypeConstraints
                 )
                 self.cascadeOnDelete = try container.decodeIfPresent(
                     Components.Schemas.EdgeTypeRegistrationRequest.CascadeOnDeletePayload.self,
@@ -8000,9 +8377,9 @@ extension Components {
                     Swift.String.self,
                     forKey: .reverseName
                 )
-                self.writtenAt = try container.decodeIfPresent(
-                    Components.Schemas.EdgeTypeRegistrationRequest.WrittenAtPayload.self,
-                    forKey: .writtenAt
+                self.writtenFrom = try container.decodeIfPresent(
+                    Components.Schemas.EdgeTypeRegistrationRequest.WrittenFromPayload.self,
+                    forKey: .writtenFrom
                 )
                 self.evolveConstraints = try container.decodeIfPresent(
                     Swift.Bool.self,
@@ -8014,12 +8391,12 @@ extension Components {
                     "reverse_label",
                     "description",
                     "cardinality",
-                    "source_type_constraints",
-                    "target_type_constraints",
+                    "from_type_constraints",
+                    "to_type_constraints",
                     "cascade_on_delete",
                     "property_schema",
                     "reverse_name",
-                    "written_at",
+                    "written_from",
                     "evolve_constraints"
                 ])
             }
@@ -8228,7 +8605,7 @@ extension Components {
                 try self.value2.encode(to: encoder)
             }
         }
-        /// A structural role a type plays. `container`: the type can be the target of an `in-collection` edge.
+        /// A structural role a type plays. `container`: the type can be the item an `in-collection` edge points to.
         ///
         /// - Remark: Generated from `#/components/schemas/TypeRole`.
         @frozen public enum TypeRole: String, Codable, Hashable, Sendable, CaseIterable {
@@ -8308,13 +8685,12 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/items_fields`.
             public var itemsFields: Components.Schemas.FieldDefinition.ItemsFieldsPayload?
-            /// Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
+            /// Refines a `string` field or an array of strings. `url`, `email`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
             @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case url = "url"
                 case email = "email"
-                case datetime = "datetime"
                 case date = "date"
                 case thumbnail = "thumbnail"
                 case bcp47 = "bcp47"
@@ -8322,7 +8698,7 @@ extension Components {
                 case currency = "currency"
                 case phone = "phone"
             }
-            /// Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
+            /// Refines a `string` field or an array of strings. `url`, `email`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/format`.
             public var format: Components.Schemas.FieldDefinition.FormatPayload?
@@ -8332,11 +8708,11 @@ extension Components {
             public var searchable: Swift.Bool?
             /// The longest value a `string` or `enum` field allows, in UTF-16 code units. Defaults to 1,000,000 on the `string` field `display_hints.body_field` names, and to 100,000 on any other.
             ///
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxLength`.
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/max_length`.
             public var maxLength: Swift.Int?
             /// The most elements an `array` field allows.
             ///
-            /// - Remark: Generated from `#/components/schemas/FieldDefinition/maxItems`.
+            /// - Remark: Generated from `#/components/schemas/FieldDefinition/max_items`.
             public var maxItems: Swift.Int?
             /// The lowest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may raise it, never lower or drop it.
             ///
@@ -8359,7 +8735,7 @@ extension Components {
             ///   - statusValues: The words a `status` field takes, each in a group: `not_started`, `in_progress`, `completed` or `canceled`. A subtype lists only the words it adds. A type read answers every word, inherited first; the type list answers the type's own.
             ///   - itemsType: The type of each element of an `array` field. A write is refused if an element is not a value of that type.
             ///   - itemsFields: The members of each entry of an `array` field whose `items_type` is `object`, by name. A write is refused if an entry has another member, lacks a required one, holds a value a member does not take, or has none.
-            ///   - format: Refines a `string` field or an array of strings. `url`, `email`, `datetime`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
+            ///   - format: Refines a `string` field or an array of strings. `url`, `email`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///   - searchable: `false` if full-text search should skip the field. Items still return it.
             ///   - maxLength: The longest value a `string` or `enum` field allows, in UTF-16 code units. Defaults to 1,000,000 on the `string` field `display_hints.body_field` names, and to 100,000 on any other.
             ///   - maxItems: The most elements an `array` field allows.
@@ -8410,8 +8786,8 @@ extension Components {
                 case itemsFields = "items_fields"
                 case format
                 case searchable
-                case maxLength
-                case maxItems
+                case maxLength = "max_length"
+                case maxItems = "max_items"
                 case minimum
                 case maximum
             }
@@ -8484,8 +8860,8 @@ extension Components {
                     "items_fields",
                     "format",
                     "searchable",
-                    "maxLength",
-                    "maxItems",
+                    "max_length",
+                    "max_items",
                     "minimum",
                     "maximum"
                 ])
@@ -8637,7 +9013,6 @@ extension Components {
             @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case url = "url"
                 case email = "email"
-                case datetime = "datetime"
                 case date = "date"
                 case thumbnail = "thumbnail"
                 case bcp47 = "bcp47"
@@ -8651,7 +9026,7 @@ extension Components {
             public var format: Components.Schemas.EntryMember.FormatPayload?
             /// The longest value a `string` or `enum` member allows.
             ///
-            /// - Remark: Generated from `#/components/schemas/EntryMember/maxLength`.
+            /// - Remark: Generated from `#/components/schemas/EntryMember/max_length`.
             public var maxLength: Swift.Int?
             /// The lowest value the member allows, itself included. Only a `number` or `integer` member takes it.
             ///
@@ -8706,7 +9081,7 @@ extension Components {
                 case required
                 case enumValues = "enum_values"
                 case format
-                case maxLength
+                case maxLength = "max_length"
                 case minimum
                 case maximum
             }
@@ -8755,7 +9130,7 @@ extension Components {
                     "required",
                     "enum_values",
                     "format",
-                    "maxLength",
+                    "max_length",
                     "minimum",
                     "maximum"
                 ])
@@ -8910,6 +9285,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/fields`.
             public var fields: Components.Schemas.TypeDefinition.FieldsPayload
+            /// The type's own tables, by name. `GET /types/{id}` adds the tables it inherits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/tables`.
+            public struct TablesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.TableDefinition]
+                /// Creates a new `TablesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.TableDefinition] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The type's own tables, by name. `GET /types/{id}` adds the tables it inherits.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/tables`.
+            public var tables: Components.Schemas.TypeDefinition.TablesPayload?
             /// The version number the type was last saved with.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/version`.
@@ -8945,6 +9344,7 @@ extension Components {
             ///   - compatibleWith: The types this one is a structural superset of.
             ///   - roles: The structural roles the type plays, including those it inherits.
             ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
+            ///   - tables: The type's own tables, by name. `GET /types/{id}` adds the tables it inherits.
             ///   - version: The version number the type was last saved with.
             ///   - displayHints: How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
@@ -8960,6 +9360,7 @@ extension Components {
                 compatibleWith: [Swift.String]? = nil,
                 roles: [Components.Schemas.TypeRole]? = nil,
                 fields: Components.Schemas.TypeDefinition.FieldsPayload,
+                tables: Components.Schemas.TypeDefinition.TablesPayload? = nil,
                 version: Swift.Int,
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
@@ -8975,6 +9376,7 @@ extension Components {
                 self.compatibleWith = compatibleWith
                 self.roles = roles
                 self.fields = fields
+                self.tables = tables
                 self.version = version
                 self.displayHints = displayHints
                 self.linkField = linkField
@@ -8991,6 +9393,7 @@ extension Components {
                 case compatibleWith = "compatible_with"
                 case roles
                 case fields
+                case tables
                 case version
                 case displayHints = "display_hints"
                 case linkField = "link_field"
@@ -9452,6 +9855,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/fields`.
             public var fields: Components.Schemas.TypeDefinitionInput.FieldsPayload
+            /// The type's own tables, by name: at most 32, each named by a lowercase letter, then up to 63 lowercase letters, digits and underscores. A subtype gets its parents' tables and declares only its own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/tables`.
+            public struct TablesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.TableDefinition]
+                /// Creates a new `TablesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.TableDefinition] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The type's own tables, by name: at most 32, each named by a lowercase letter, then up to 63 lowercase letters, digits and underscores. A subtype gets its parents' tables and declares only its own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/tables`.
+            public var tables: Components.Schemas.TypeDefinitionInput.TablesPayload?
             /// A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/version`.
@@ -9561,6 +9988,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - fields: The type's own fields, by name.
+            ///   - tables: The type's own tables, by name: at most 32, each named by a lowercase letter, then up to 63 lowercase letters, digits and underscores. A subtype gets its parents' tables and declares only its own.
             ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
             ///   - label: A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
@@ -9577,6 +10005,7 @@ extension Components {
             ///   - id: The type's identifier, such as `acme.deal` or `user.recipe`.
             public init(
                 fields: Components.Schemas.TypeDefinitionInput.FieldsPayload,
+                tables: Components.Schemas.TypeDefinitionInput.TablesPayload? = nil,
                 version: Swift.Int? = nil,
                 parent: Swift.String? = nil,
                 label: Swift.String? = nil,
@@ -9593,6 +10022,7 @@ extension Components {
                 id: Swift.String
             ) {
                 self.fields = fields
+                self.tables = tables
                 self.version = version
                 self.parent = parent
                 self.label = label
@@ -9610,6 +10040,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case fields
+                case tables
                 case version
                 case parent
                 case label
@@ -9630,6 +10061,10 @@ extension Components {
                 self.fields = try container.decode(
                     Components.Schemas.TypeDefinitionInput.FieldsPayload.self,
                     forKey: .fields
+                )
+                self.tables = try container.decodeIfPresent(
+                    Components.Schemas.TypeDefinitionInput.TablesPayload.self,
+                    forKey: .tables
                 )
                 self.version = try container.decodeIfPresent(
                     Swift.Int.self,
@@ -9689,6 +10124,7 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "fields",
+                    "tables",
                     "version",
                     "parent",
                     "label",
@@ -9706,25 +10142,6 @@ extension Components {
                 ])
             }
         }
-        /// One type.
-        ///
-        /// - Remark: Generated from `#/components/schemas/TypeResponse`.
-        public struct TypeResponse: Codable, Hashable, Sendable {
-            /// The type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeResponse/type`.
-            public var _type: Components.Schemas.RegisteredType
-            /// Creates a new `TypeResponse`.
-            ///
-            /// - Parameters:
-            ///   - _type: The type.
-            public init(_type: Components.Schemas.RegisteredType) {
-                self._type = _type
-            }
-            public enum CodingKeys: String, CodingKey {
-                case _type = "type"
-            }
-        }
         /// An error response.
         ///
         /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal`.
@@ -9738,7 +10155,7 @@ extension Components {
                 /// - Remark: Generated from `#/components/schemas/LinkTakenOrTypeAlreadyExistsRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case linkTaken = "link_taken"
-                    case typeAlreadyExists = "type_already_exists"
+                    case typeExists = "type_exists"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
@@ -10002,6 +10419,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/fields`.
             public var fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload
+            /// The type's own tables, by name, as on registration. Tables you leave out are removed, which needs `schema.write`, as removing a field does.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/tables`.
+            public struct TablesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.TableDefinition]
+                /// Creates a new `TablesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.TableDefinition] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The type's own tables, by name, as on registration. Tables you leave out are removed, which needs `schema.write`, as removing a field does.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/tables`.
+            public var tables: Components.Schemas.TypeDefinitionUpdate.TablesPayload?
             /// A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/version`.
@@ -10115,6 +10556,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - fields: The type's own fields, by name.
+            ///   - tables: The type's own tables, by name, as on registration. Tables you leave out are removed, which needs `schema.write`, as removing a field does.
             ///   - version: A number for you to track changes to the type. Marfa never changes it. Leave it out for 0.
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
             ///   - label: A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
@@ -10132,6 +10574,7 @@ extension Components {
             ///   - id: The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             public init(
                 fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload,
+                tables: Components.Schemas.TypeDefinitionUpdate.TablesPayload? = nil,
                 version: Swift.Int? = nil,
                 parent: Swift.String? = nil,
                 label: Swift.String? = nil,
@@ -10149,6 +10592,7 @@ extension Components {
                 id: Swift.String? = nil
             ) {
                 self.fields = fields
+                self.tables = tables
                 self.version = version
                 self.parent = parent
                 self.label = label
@@ -10167,6 +10611,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case fields
+                case tables
                 case version
                 case parent
                 case label
@@ -10188,6 +10633,10 @@ extension Components {
                 self.fields = try container.decode(
                     Components.Schemas.TypeDefinitionUpdate.FieldsPayload.self,
                     forKey: .fields
+                )
+                self.tables = try container.decodeIfPresent(
+                    Components.Schemas.TypeDefinitionUpdate.TablesPayload.self,
+                    forKey: .tables
                 )
                 self.version = try container.decodeIfPresent(
                     Swift.Int.self,
@@ -10251,6 +10700,7 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "fields",
+                    "tables",
                     "version",
                     "parent",
                     "label",
@@ -10579,91 +11029,6 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
-        public struct BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case bulkCapExceeded = "bulk_cap_exceeded"
-                    case missingRequiredField = "missing_required_field"
-                    case unknownType = "unknown_type"
-                    case validationError = "validation_error"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.BulkCapExceededOrMissingRequiredFieldOrUnknownTypeOrValidationErrorRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
-        /// An error response.
-        ///
         /// - Remark: Generated from `#/components/schemas/CoreTypeImmutableOrTypeNotPermittedRefusal`.
         public struct CoreTypeImmutableOrTypeNotPermittedRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -10856,11 +11221,11 @@ extension Components {
                 case nextCursor = "next_cursor"
             }
         }
-        /// A search result is an item that matches the query, with its metadata and how well it matches.
+        /// A search result is an item that matches the query, or a row of an item's table that matches it, with the item's metadata and how well it matches.
         ///
         /// - Remark: Generated from `#/components/schemas/SearchResult`.
         public struct SearchResult: Codable, Hashable, Sendable {
-            /// The matching item.
+            /// The matching item, or the item whose table row matches.
             ///
             /// - Remark: Generated from `#/components/schemas/SearchResult/item`.
             public var item: Components.Schemas.Item
@@ -10868,7 +11233,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SearchResult/metadata`.
             public var metadata: Components.Schemas.Metadata
-            /// How well the item matches `q`: the absolute value of its BM25 score, so higher is better. Scores depend on the rows indexed, so compare them only within one search.
+            /// How well the result matches `q`, from its BM25 score over the items and rows your key can read, so higher is better. Compare scores only within one search.
             ///
             /// - Remark: Generated from `#/components/schemas/SearchResult/relevance_score`.
             public var relevanceScore: Swift.Double
@@ -10876,32 +11241,77 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SearchResult/snippet_html`.
             public var snippetHtml: Swift.String?
+            /// The table row that matches, for a result that is a row. Absent for a result that matches the item's own text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SearchResult/row`.
+            public struct RowPayload: Codable, Hashable, Sendable {
+                /// The table that holds the row.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SearchResult/row/table`.
+                public var table: Swift.String
+                /// The row's ID.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SearchResult/row/id`.
+                public var id: Swift.String
+                /// The searchable column `snippet_html` is drawn from.
+                ///
+                /// - Remark: Generated from `#/components/schemas/SearchResult/row/column`.
+                public var column: Swift.String
+                /// Creates a new `RowPayload`.
+                ///
+                /// - Parameters:
+                ///   - table: The table that holds the row.
+                ///   - id: The row's ID.
+                ///   - column: The searchable column `snippet_html` is drawn from.
+                public init(
+                    table: Swift.String,
+                    id: Swift.String,
+                    column: Swift.String
+                ) {
+                    self.table = table
+                    self.id = id
+                    self.column = column
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case table
+                    case id
+                    case column
+                }
+            }
+            /// The table row that matches, for a result that is a row. Absent for a result that matches the item's own text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SearchResult/row`.
+            public var row: Components.Schemas.SearchResult.RowPayload?
             /// Creates a new `SearchResult`.
             ///
             /// - Parameters:
-            ///   - item: The matching item.
+            ///   - item: The matching item, or the item whose table row matches.
             ///   - metadata: The item's tags and the extensions you can read.
-            ///   - relevanceScore: How well the item matches `q`: the absolute value of its BM25 score, so higher is better. Scores depend on the rows indexed, so compare them only within one search.
+            ///   - relevanceScore: How well the result matches `q`, from its BM25 score over the items and rows your key can read, so higher is better. Compare scores only within one search.
             ///   - snippetHtml: An excerpt of at most 32 words from the text that matches best, as escaped HTML with each matched word in `<mark>` tags and `...` where the text is cut. Absent if there is none.
+            ///   - row: The table row that matches, for a result that is a row. Absent for a result that matches the item's own text.
             public init(
                 item: Components.Schemas.Item,
                 metadata: Components.Schemas.Metadata,
                 relevanceScore: Swift.Double,
-                snippetHtml: Swift.String? = nil
+                snippetHtml: Swift.String? = nil,
+                row: Components.Schemas.SearchResult.RowPayload? = nil
             ) {
                 self.item = item
                 self.metadata = metadata
                 self.relevanceScore = relevanceScore
                 self.snippetHtml = snippetHtml
+                self.row = row
             }
             public enum CodingKeys: String, CodingKey {
                 case item
                 case metadata
                 case relevanceScore = "relevance_score"
                 case snippetHtml = "snippet_html"
+                case row
             }
         }
-        /// The occurrences in a time window, with what reading them cost and any rules Marfa couldn't apply.
+        /// The occurrences in a time window, with any rules Marfa couldn't apply.
         ///
         /// - Remark: Generated from `#/components/schemas/OccurrencePage`.
         public struct OccurrencePage: Codable, Hashable, Sendable {
@@ -10946,84 +11356,36 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/window`.
             public var window: Components.Schemas.OccurrencePage.WindowPayload
-            /// What this read cost, and the limits that would stop it.
+            /// How many rules Marfa couldn't apply or finish.
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan`.
             public struct ScanPayload: Codable, Hashable, Sendable {
-                /// How many event items this request read. It grows with the size of the calendar more than with the window.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/events_read`.
-                public var eventsRead: Swift.Int
-                /// How many occurrences `data` holds.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/occurrences`.
-                public var occurrences: Swift.Int
-                /// The most occurrences a window may hold; a window with more is refused. Compare it with `occurrences` to see a calendar approaching it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/max_occurrences`.
-                public var maxOccurrences: Swift.Int
                 /// How many failures Marfa found in the recurrence rules this request read, as entries of `series_errors`, including any the list leaves out. It covers only the event types read, so `0` says nothing of the rest.
                 ///
                 /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/series_errors`.
                 public var seriesErrors: Swift.Int
-                /// The most entries `series_errors` holds. Past it, the list stops and `series_errors_truncated` is `true`; the read still succeeds.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/max_series_errors`.
-                public var maxSeriesErrors: Swift.Int
-                /// How many rule iterations this request spent on expansions that returned no occurrence, such as a rule that ended before the window. A rule that fails before it iterates adds nothing here.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/unproductive_iterations`.
-                public var unproductiveIterations: Swift.Int
-                /// The most `unproductive_iterations` a request spends before it stops expanding. Iterations that return occurrences don't count, so a busy calendar doesn't reach it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/max_unproductive_iterations`.
-                public var maxUnproductiveIterations: Swift.Int
-                /// How many series didn't finish expanding: stopped by their own bound, and listed in `series_errors`, or never reached once `max_unproductive_iterations` was spent. Above `0`, `expansion_incomplete` is `true`.
+                /// How many series didn't finish expanding: stopped by their own bound, and listed in `series_errors`, or never reached once the series that produced nothing had used up the request's share of work. Above `0`, `expansion_incomplete` is `true`.
                 ///
                 /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan/series_unexpanded`.
                 public var seriesUnexpanded: Swift.Int
                 /// Creates a new `ScanPayload`.
                 ///
                 /// - Parameters:
-                ///   - eventsRead: How many event items this request read. It grows with the size of the calendar more than with the window.
-                ///   - occurrences: How many occurrences `data` holds.
-                ///   - maxOccurrences: The most occurrences a window may hold; a window with more is refused. Compare it with `occurrences` to see a calendar approaching it.
                 ///   - seriesErrors: How many failures Marfa found in the recurrence rules this request read, as entries of `series_errors`, including any the list leaves out. It covers only the event types read, so `0` says nothing of the rest.
-                ///   - maxSeriesErrors: The most entries `series_errors` holds. Past it, the list stops and `series_errors_truncated` is `true`; the read still succeeds.
-                ///   - unproductiveIterations: How many rule iterations this request spent on expansions that returned no occurrence, such as a rule that ended before the window. A rule that fails before it iterates adds nothing here.
-                ///   - maxUnproductiveIterations: The most `unproductive_iterations` a request spends before it stops expanding. Iterations that return occurrences don't count, so a busy calendar doesn't reach it.
-                ///   - seriesUnexpanded: How many series didn't finish expanding: stopped by their own bound, and listed in `series_errors`, or never reached once `max_unproductive_iterations` was spent. Above `0`, `expansion_incomplete` is `true`.
+                ///   - seriesUnexpanded: How many series didn't finish expanding: stopped by their own bound, and listed in `series_errors`, or never reached once the series that produced nothing had used up the request's share of work. Above `0`, `expansion_incomplete` is `true`.
                 public init(
-                    eventsRead: Swift.Int,
-                    occurrences: Swift.Int,
-                    maxOccurrences: Swift.Int,
                     seriesErrors: Swift.Int,
-                    maxSeriesErrors: Swift.Int,
-                    unproductiveIterations: Swift.Int,
-                    maxUnproductiveIterations: Swift.Int,
                     seriesUnexpanded: Swift.Int
                 ) {
-                    self.eventsRead = eventsRead
-                    self.occurrences = occurrences
-                    self.maxOccurrences = maxOccurrences
                     self.seriesErrors = seriesErrors
-                    self.maxSeriesErrors = maxSeriesErrors
-                    self.unproductiveIterations = unproductiveIterations
-                    self.maxUnproductiveIterations = maxUnproductiveIterations
                     self.seriesUnexpanded = seriesUnexpanded
                 }
                 public enum CodingKeys: String, CodingKey {
-                    case eventsRead = "events_read"
-                    case occurrences
-                    case maxOccurrences = "max_occurrences"
                     case seriesErrors = "series_errors"
-                    case maxSeriesErrors = "max_series_errors"
-                    case unproductiveIterations = "unproductive_iterations"
-                    case maxUnproductiveIterations = "max_unproductive_iterations"
                     case seriesUnexpanded = "series_unexpanded"
                 }
             }
-            /// What this read cost, and the limits that would stop it.
+            /// How many rules Marfa couldn't apply or finish.
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/scan`.
             public var scan: Components.Schemas.OccurrencePage.ScanPayload
@@ -11062,7 +11424,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/series_errors`.
             public var seriesErrors: Components.Schemas.OccurrencePage.SeriesErrorsPayload?
-            /// `true` when `series_errors` stops at `scan.max_series_errors` entries and leaves failures out. `scan.series_errors` has the total. Absent otherwise.
+            /// `true` when `series_errors` stops at 500 entries and leaves failures out. `scan.series_errors` has the total. Absent otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/series_errors_truncated`.
             public var seriesErrorsTruncated: Swift.Bool?
@@ -11076,9 +11438,9 @@ extension Components {
             ///   - data: The occurrences that overlap the window, by start time.
             ///   - nextCursor: Always `null`: Marfa returns every occurrence in the window in one page.
             ///   - window: The window you asked for, in UTC.
-            ///   - scan: What this read cost, and the limits that would stop it.
+            ///   - scan: How many rules Marfa couldn't apply or finish.
             ///   - seriesErrors: One entry per failure found in a recurrence rule, such as a line Marfa can't read or a timezone that doesn't resolve. One event can have several entries and still appear in `data`. Absent when there were none.
-            ///   - seriesErrorsTruncated: `true` when `series_errors` stops at `scan.max_series_errors` entries and leaves failures out. `scan.series_errors` has the total. Absent otherwise.
+            ///   - seriesErrorsTruncated: `true` when `series_errors` stops at 500 entries and leaves failures out. `scan.series_errors` has the total. Absent otherwise.
             ///   - expansionIncomplete: `true` when a series didn't finish expanding, so `data` may be missing occurrences; `scan.series_unexpanded` counts them. If a series has too many in the window, narrow the window; else narrow by `type` or fix the rules. Absent otherwise.
             public init(
                 data: [Components.Schemas.Occurrence],
@@ -11230,33 +11592,25 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/Overview/instance/name`.
                 public var name: Swift.String
-                /// The build the instance runs.
+                /// The release the instance runs.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Overview/instance/version`.
                 public var version: Swift.String
-                /// The release the build was made as. Absent for a build that is not a release.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Overview/instance/release`.
-                public var release: Swift.String?
                 /// Creates a new `InstancePayload`.
                 ///
                 /// - Parameters:
                 ///   - name: The instance's display name.
-                ///   - version: The build the instance runs.
-                ///   - release: The release the build was made as. Absent for a build that is not a release.
+                ///   - version: The release the instance runs.
                 public init(
                     name: Swift.String,
-                    version: Swift.String,
-                    release: Swift.String? = nil
+                    version: Swift.String
                 ) {
                     self.name = name
                     self.version = version
-                    self.release = release
                 }
                 public enum CodingKeys: String, CodingKey {
                     case name
                     case version
-                    case release
                 }
             }
             /// The instance's name and the build it runs.
@@ -11449,7 +11803,7 @@ extension Components {
                 case truncated
             }
         }
-        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists and revokes other apps' access; `instance.read` reads health, metrics, housekeeping, retired platform types, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, removes retired platform types and cancels bulk jobs; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; and `blobs.manage` manages every blob.
+        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` lists and empties the trash and purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`; `audit.read` reads the audit log; `grants.manage` lists, narrows and revokes other apps' access; `instance.read` reads health, what needs attention, metrics, housekeeping, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, cancels bulk jobs and confirms the clock; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; `blobs.manage` manages every blob; `backups.manage` lists, takes and adopts backups; and `sign_ins.manage` lists, renames and ends sign-ins and manages the owner's passkeys.
         ///
         /// - Remark: Generated from `#/components/schemas/Permission`.
         @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {
@@ -11464,6 +11818,8 @@ extension Components {
             case instance_maintain = "instance.maintain"
             case connectors_manage = "connectors.manage"
             case blobs_manage = "blobs.manage"
+            case backups_manage = "backups.manage"
+            case signIns_manage = "sign_ins.manage"
             case keys_manage = "keys.manage"
         }
         /// A type you can read, and how many active items it has.
@@ -11515,7 +11871,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/description`.
             public var description: Swift.String?
-            /// `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of its source item.
+            /// `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of the item it points from.
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/access`.
             public var access: Components.Schemas.PermissionLevel
@@ -11524,7 +11880,7 @@ extension Components {
             /// - Parameters:
             ///   - id: The edge type's identifier.
             ///   - description: What the edge type means, cut at 100 characters. Absent when it has none.
-            ///   - access: `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of its source item.
+            ///   - access: `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of the item it points from.
             public init(
                 id: Swift.String,
                 description: Swift.String? = nil,
@@ -11882,14 +12238,15 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/id`.
             public var id: Swift.String
-            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            /// The kind of store: `disk` for the disk beside the server, `folder` for the files area of the backup folder, `s3` for an S3-compatible bucket.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case disk = "disk"
+                case folder = "folder"
                 case s3 = "s3"
             }
-            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            /// The kind of store: `disk` for the disk beside the server, `folder` for the files area of the backup folder, `s3` for an S3-compatible bucket.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/kind`.
             public var kind: Components.Schemas.BlobStore.KindPayload
@@ -11897,10 +12254,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/locator`.
             public var locator: Swift.String
-            /// Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
-            ///
-            /// - Remark: Generated from `#/components/schemas/BlobStore/policy`.
-            public var policy: Swift.String
             /// When the instance first attached the store, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/attached_at`.
@@ -11913,23 +12266,20 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the store.
-            ///   - kind: The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            ///   - kind: The kind of store: `disk` for the disk beside the server, `folder` for the files area of the backup folder, `s3` for an S3-compatible bucket.
             ///   - locator: Where the store is: its directory for a `disk` store, `s3://<bucket>/<prefix>` for an `s3` store.
-            ///   - policy: Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
             ///   - attachedAt: When the instance first attached the store, in UTC.
             ///   - detachedAt: When the instance's configuration stopped naming the store, in UTC, or `null` while it names it.
             public init(
                 id: Swift.String,
                 kind: Components.Schemas.BlobStore.KindPayload,
                 locator: Swift.String,
-                policy: Swift.String,
                 attachedAt: Swift.String,
                 detachedAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
                 self.locator = locator
-                self.policy = policy
                 self.attachedAt = attachedAt
                 self.detachedAt = detachedAt
             }
@@ -11937,7 +12287,6 @@ extension Components {
                 case id
                 case kind
                 case locator
-                case policy
                 case attachedAt = "attached_at"
                 case detachedAt = "detached_at"
             }
@@ -12143,21 +12492,18 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BlobCopy/store_id`.
             public var storeId: Swift.String
-            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            /// The kind of store: `disk` for the disk beside the server, `folder` for the files area of the backup folder, `s3` for an S3-compatible bucket.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobCopy/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case disk = "disk"
+                case folder = "folder"
                 case s3 = "s3"
             }
-            /// The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
+            /// The kind of store: `disk` for the disk beside the server, `folder` for the files area of the backup folder, `s3` for an S3-compatible bucket.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobCopy/kind`.
             public var kind: Components.Schemas.BlobCopy.KindPayload
-            /// Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
-            ///
-            /// - Remark: Generated from `#/components/schemas/BlobCopy/policy`.
-            public var policy: Swift.String
             /// `true` if the instance's configuration no longer names the store. A copy in a detached store doesn't count toward `min_copies`.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobCopy/detached`.
@@ -12174,22 +12520,19 @@ extension Components {
             ///
             /// - Parameters:
             ///   - storeId: The ID of the store that holds the copy.
-            ///   - kind: The kind of store: `disk` for the disk beside the server, `s3` for an S3-compatible bucket.
-            ///   - policy: Which blobs the store takes. Marfa defines one policy, `all`: the store takes every blob.
+            ///   - kind: The kind of store: `disk` for the disk beside the server, `folder` for the files area of the backup folder, `s3` for an S3-compatible bucket.
             ///   - detached: `true` if the instance's configuration no longer names the store. A copy in a detached store doesn't count toward `min_copies`.
             ///   - recordedAt: When Marfa recorded the copy, in UTC.
             ///   - verifiedAt: When a check last found the copy present and intact, in UTC, or `null` if none has.
             public init(
                 storeId: Swift.String,
                 kind: Components.Schemas.BlobCopy.KindPayload,
-                policy: Swift.String,
                 detached: Swift.Bool,
                 recordedAt: Swift.String,
                 verifiedAt: Swift.String? = nil
             ) {
                 self.storeId = storeId
                 self.kind = kind
-                self.policy = policy
                 self.detached = detached
                 self.recordedAt = recordedAt
                 self.verifiedAt = verifiedAt
@@ -12197,7 +12540,6 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case storeId = "store_id"
                 case kind
-                case policy
                 case detached
                 case recordedAt = "recorded_at"
                 case verifiedAt = "verified_at"
@@ -12368,6 +12710,88 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal`.
+        public struct CopyHeldByBackupRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case copyHeldByBackup = "copy_held_by_backup"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error/code`.
+                public var code: Components.Schemas.CopyHeldByBackupRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error/details`.
+                public var details: Components.Schemas.CopyHeldByBackupRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.CopyHeldByBackupRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.CopyHeldByBackupRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CopyHeldByBackupRefusal/error`.
+            public var error: Components.Schemas.CopyHeldByBackupRefusal._ErrorPayload
+            /// Creates a new `CopyHeldByBackupRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.CopyHeldByBackupRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// A page holding every housekeeping job.
         ///
         /// - Remark: Generated from `#/components/schemas/HousekeepingJobPage`.
@@ -12405,10 +12829,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/name`.
             public var name: Swift.String
-            /// How often the job runs, in milliseconds.
+            /// How often the job runs, in seconds.
             ///
-            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/interval_ms`.
-            public var intervalMs: Swift.Int
+            /// - Remark: Generated from `#/components/schemas/HousekeepingJob/interval_seconds`.
+            public var intervalSeconds: Swift.Int
             /// When the job is next due, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/next_run_at`.
@@ -12441,7 +12865,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - name: The job's name, such as `trash-purge`.
-            ///   - intervalMs: How often the job runs, in milliseconds.
+            ///   - intervalSeconds: How often the job runs, in seconds.
             ///   - nextRunAt: When the job is next due, in UTC.
             ///   - runningSince: When the current run started, in UTC, or `null` if the job isn't running.
             ///   - lastStartedAt: When the latest run started, in UTC, or `null` if the job has never run.
@@ -12451,7 +12875,7 @@ extension Components {
             ///   - lastResult: What the last run reported, or `null` if it reported nothing.
             public init(
                 name: Swift.String,
-                intervalMs: Swift.Int,
+                intervalSeconds: Swift.Int,
                 nextRunAt: Swift.String,
                 runningSince: Swift.String? = nil,
                 lastStartedAt: Swift.String? = nil,
@@ -12461,7 +12885,7 @@ extension Components {
                 lastResult: Components.Schemas.MarfaNullableHousekeepingReport
             ) {
                 self.name = name
-                self.intervalMs = intervalMs
+                self.intervalSeconds = intervalSeconds
                 self.nextRunAt = nextRunAt
                 self.runningSince = runningSince
                 self.lastStartedAt = lastStartedAt
@@ -12472,7 +12896,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case name
-                case intervalMs = "interval_ms"
+                case intervalSeconds = "interval_seconds"
                 case nextRunAt = "next_run_at"
                 case runningSince = "running_since"
                 case lastStartedAt = "last_started_at"
@@ -12482,14 +12906,15 @@ extension Components {
                 case lastResult = "last_result"
             }
         }
-        /// How a run ended: `ok` if it finished, `error` if it failed.
+        /// How a run ended: `succeeded` if it finished, `failed` if it failed, `held` if it did nothing because the clock is far ahead or a restore holds writes.
         ///
         /// - Remark: Generated from `#/components/schemas/HousekeepingOutcome`.
         @frozen public enum HousekeepingOutcome: String, Codable, Hashable, Sendable, CaseIterable {
-            case ok = "ok"
-            case error = "error"
+            case succeeded = "succeeded"
+            case failed = "failed"
+            case held = "held"
         }
-        /// What a run reports, under names its job chooses, such as `deleted` or `copied`.
+        /// What a run reports, under names its job chooses, such as `deleted`, `copied` or, for `trash-purge`, `passed_over`: the items it could not purge and left for the next run.
         ///
         /// - Remark: Generated from `#/components/schemas/HousekeepingReport`.
         public typealias HousekeepingReport = OpenAPIRuntime.OpenAPIObjectContainer
@@ -13285,7 +13710,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDelivery/query`.
             public var query: Swift.String
-            /// `[name, value]` pairs in the order and case they arrived, without any header whose name begins with `Tailscale-`.
+            /// `[name, value]` pairs with each name in lower case and the repeats of one name in the order they arrived, without any header whose name begins with `tailscale-`.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDelivery/headers`.
             public var headers: [OpenAPIRuntime.OpenAPIArrayContainer]
@@ -13364,7 +13789,7 @@ extension Components {
             ///   - receivedAt: When Marfa received the delivery.
             ///   - method: The HTTP method of the request.
             ///   - query: The query string as the sender sent it, without the `?`; empty if there was none.
-            ///   - headers: `[name, value]` pairs in the order and case they arrived, without any header whose name begins with `Tailscale-`.
+            ///   - headers: `[name, value]` pairs with each name in lower case and the repeats of one name in the order they arrived, without any header whose name begins with `tailscale-`.
             ///   - size: The size of the body in bytes.
             ///   - sha256: The SHA-256 hash of the body, in hex.
             ///   - duplicateOf: The earliest retained delivery on the same endpoint with the same `duplicate_header` value; `null` if this is the first with its value, the delivery lacks the header, or the endpoint sets none.
@@ -13793,13 +14218,13 @@ extension Components {
         }
         /// The current attention inventory, without pagination.
         ///
-        /// - Remark: Generated from `#/components/schemas/AttentionList`.
-        public struct AttentionList: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/AttentionPage`.
+        public struct AttentionPage: Codable, Hashable, Sendable {
             /// Every known concern and unavailable check; empty when all checks report no concerns.
             ///
-            /// - Remark: Generated from `#/components/schemas/AttentionList/data`.
+            /// - Remark: Generated from `#/components/schemas/AttentionPage/data`.
             public var data: [Components.Schemas.AttentionConcern]
-            /// Creates a new `AttentionList`.
+            /// Creates a new `AttentionPage`.
             ///
             /// - Parameters:
             ///   - data: Every known concern and unavailable check; empty when all checks report no concerns.
@@ -13814,7 +14239,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/AttentionConcern`.
         public struct AttentionConcern: Codable, Hashable, Sendable {
-            /// health: degraded or down; job: failed last run; connector: failed, problems, or quiet; folder: sync concern; key: expires within seven days; unavailable: check failed or timed out.
+            /// health: degraded or down; job: last run failed; connector: failed, has problems, or quiet a day; folder: sync problems; key: expiring; backup: none kept, off or failing; setting: a secret to set again; clock: ahead or behind; unavailable: no answer.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -13823,13 +14248,16 @@ extension Components {
                 case connector = "connector"
                 case folder = "folder"
                 case key = "key"
+                case backup = "backup"
+                case setting = "setting"
+                case clock = "clock"
                 case unavailable = "unavailable"
             }
-            /// health: degraded or down; job: failed last run; connector: failed, problems, or quiet; folder: sync concern; key: expires within seven days; unavailable: check failed or timed out.
+            /// health: degraded or down; job: last run failed; connector: failed, has problems, or quiet a day; folder: sync problems; key: expiring; backup: none kept, off or failing; setting: a secret to set again; clock: ahead or behind; unavailable: no answer.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
             public var kind: Components.Schemas.AttentionConcern.KindPayload
-            /// The component or job name, connector, folder, or key ID, or unavailable check name.
+            /// The component, job, connector, folder, or key ID, the check that couldn't answer, a backup concern such as `no_backup_destination`, `run` or `store`, a secret setting's key, or a clock concern `clock_ahead` or `clock_behind`.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/reference`.
             public var reference: Swift.String
@@ -13841,52 +14269,29 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/description`.
             public var description: Swift.String
-            /// The local console path for the concern.
-            ///
-            /// - Remark: Generated from `#/components/schemas/AttentionConcern/href`.
-            public var href: Swift.String
-            /// warn: needs a look; danger: a component or connector failed. Present when the concern has a severity.
-            ///
-            /// - Remark: Generated from `#/components/schemas/AttentionConcern/tone`.
-            @frozen public enum TonePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case warn = "warn"
-                case danger = "danger"
-            }
-            /// warn: needs a look; danger: a component or connector failed. Present when the concern has a severity.
-            ///
-            /// - Remark: Generated from `#/components/schemas/AttentionConcern/tone`.
-            public var tone: Components.Schemas.AttentionConcern.TonePayload?
             /// Creates a new `AttentionConcern`.
             ///
             /// - Parameters:
-            ///   - kind: health: degraded or down; job: failed last run; connector: failed, problems, or quiet; folder: sync concern; key: expires within seven days; unavailable: check failed or timed out.
-            ///   - reference: The component or job name, connector, folder, or key ID, or unavailable check name.
+            ///   - kind: health: degraded or down; job: last run failed; connector: failed, has problems, or quiet a day; folder: sync problems; key: expiring; backup: none kept, off or failing; setting: a secret to set again; clock: ahead or behind; unavailable: no answer.
+            ///   - reference: The component, job, connector, folder, or key ID, the check that couldn't answer, a backup concern such as `no_backup_destination`, `run` or `store`, a secret setting's key, or a clock concern `clock_ahead` or `clock_behind`.
             ///   - title: A short name for the concern.
             ///   - description: What needs attention or remains unknown.
-            ///   - href: The local console path for the concern.
-            ///   - tone: warn: needs a look; danger: a component or connector failed. Present when the concern has a severity.
             public init(
                 kind: Components.Schemas.AttentionConcern.KindPayload,
                 reference: Swift.String,
                 title: Swift.String,
-                description: Swift.String,
-                href: Swift.String,
-                tone: Components.Schemas.AttentionConcern.TonePayload? = nil
+                description: Swift.String
             ) {
                 self.kind = kind
                 self.reference = reference
                 self.title = title
                 self.description = description
-                self.href = href
-                self.tone = tone
             }
             public enum CodingKeys: String, CodingKey {
                 case kind
                 case reference
                 case title
                 case description
-                case href
-                case tone
             }
         }
         /// An error response.
@@ -14197,33 +14602,41 @@ extension Components {
                 ])
             }
         }
-        /// A removal waits to be confirmed when it takes more than `files` files and more than `fraction` of the folder's files.
+        /// A removal waits to be confirmed when it takes more than `files` files and more than `fraction` of the folder's files, or more than `ceiling` files. Each scan or pull is judged on the files it removes.
         ///
         /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold`.
         public struct FolderRemovalThreshold: Codable, Hashable, Sendable {
-            /// A removal waits to be confirmed only if it takes more than this many files. Absent means 10.
+            /// A removal exceeding both this count and `fraction` waits for confirmation. The independent `ceiling` also applies. Absent means 10.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/files`.
             public var files: Swift.Int?
-            /// A removal waits to be confirmed only if it takes more than this fraction of the folder's files. Absent means 0.25.
+            /// A removal exceeding both this fraction of bound files and `files` waits for confirmation. The independent `ceiling` also applies. Absent means 0.25.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/fraction`.
             public var fraction: Swift.Double?
+            /// A removal that takes more than this many files waits to be confirmed, whatever share of the folder's files they are. Absent means 100.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderRemovalThreshold/ceiling`.
+            public var ceiling: Swift.Int?
             /// Creates a new `FolderRemovalThreshold`.
             ///
             /// - Parameters:
-            ///   - files: A removal waits to be confirmed only if it takes more than this many files. Absent means 10.
-            ///   - fraction: A removal waits to be confirmed only if it takes more than this fraction of the folder's files. Absent means 0.25.
+            ///   - files: A removal exceeding both this count and `fraction` waits for confirmation. The independent `ceiling` also applies. Absent means 10.
+            ///   - fraction: A removal exceeding both this fraction of bound files and `files` waits for confirmation. The independent `ceiling` also applies. Absent means 0.25.
+            ///   - ceiling: A removal that takes more than this many files waits to be confirmed, whatever share of the folder's files they are. Absent means 100.
             public init(
                 files: Swift.Int? = nil,
-                fraction: Swift.Double? = nil
+                fraction: Swift.Double? = nil,
+                ceiling: Swift.Int? = nil
             ) {
                 self.files = files
                 self.fraction = fraction
+                self.ceiling = ceiling
             }
             public enum CodingKeys: String, CodingKey {
                 case files
                 case fraction
+                case ceiling
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -14235,9 +14648,14 @@ extension Components {
                     Swift.Double.self,
                     forKey: .fraction
                 )
+                self.ceiling = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .ceiling
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "files",
-                    "fraction"
+                    "fraction",
+                    "ceiling"
                 ])
             }
         }
@@ -14604,7 +15022,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatus/totals`.
             public struct TotalsPayload: Codable, Hashable, Sendable {
-                /// `true` if any total exceeded the safe integer bound; capped totals then mean at least that bound.
+                /// `true` if any total exceeded 9007199254740991; capped totals then mean at least that number.
                 ///
                 /// - Remark: Generated from `#/components/schemas/FolderStatus/totals/saturated`.
                 public var saturated: Swift.Bool
@@ -14631,7 +15049,7 @@ extension Components {
                 /// Creates a new `TotalsPayload`.
                 ///
                 /// - Parameters:
-                ///   - saturated: `true` if any total exceeded the safe integer bound; capped totals then mean at least that bound.
+                ///   - saturated: `true` if any total exceeded 9007199254740991; capped totals then mean at least that number.
                 ///   - pendingUploads: The sum of pending upload files across current sign-ins' copies.
                 ///   - pendingDownloads: The sum of observed pending download files across current sign-ins' copies.
                 ///   - pausedRemovals: The sum of paused file removals across current sign-ins' copies.
@@ -14694,15 +15112,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in`.
             public struct SignInPayload: Codable, Hashable, Sendable {
-                /// browser: owner browser session; app: signed-in app grant; key: API key.
+                /// app: signed-in app grant; key: API key.
                 ///
                 /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/kind`.
                 @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case browser = "browser"
                     case app = "app"
                     case key = "key"
                 }
-                /// browser: owner browser session; app: signed-in app grant; key: API key.
+                /// app: signed-in app grant; key: API key.
                 ///
                 /// - Remark: Generated from `#/components/schemas/FolderStatusGroup/sign_in/kind`.
                 public var kind: Components.Schemas.FolderStatusGroup.SignInPayload.KindPayload
@@ -14717,7 +15134,7 @@ extension Components {
                 /// Creates a new `SignInPayload`.
                 ///
                 /// - Parameters:
-                ///   - kind: browser: owner browser session; app: signed-in app grant; key: API key.
+                ///   - kind: app: signed-in app grant; key: API key.
                 ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
                 ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 public init(
@@ -15084,7 +15501,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/label`.
             public var label: Swift.String
-            /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
+            /// The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/source`.
             public var source: Swift.String
@@ -15226,7 +15643,7 @@ extension Components {
             ///   - id: Unique identifier for the key.
             ///   - key: The plaintext key, which you send as a bearer token. Save it: no other response shows it.
             ///   - label: A name for the key, to tell it apart from your other keys.
-            ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
+            ///   - source: The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
             ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
@@ -15346,7 +15763,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/label`.
             public var label: Swift.String
-            /// The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
+            /// The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/source`.
             public var source: Swift.String
@@ -15487,7 +15904,7 @@ extension Components {
             /// - Parameters:
             ///   - id: Unique identifier for the key.
             ///   - label: A name for the key, to tell it apart from your other keys.
-            ///   - source: The key's own source, stamped on the rows it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
+            ///   - source: The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
             ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
@@ -15567,7 +15984,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ApiKeyNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case apiKeyNotFound = "api_key_not_found"
+                    case keyNotFound = "key_not_found"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
@@ -15838,11 +16255,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_ocr_enabled`.
             public var enrichmentOcrEnabled: Swift.Bool?
-            /// `true` if error alerts and exception reports are sent. Enabling requires a configured receiver. Absent: the environment default applies.
+            /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/error_reporting_enabled`.
             public var errorReportingEnabled: Swift.Bool?
-            /// `true` if scheduled heartbeat requests are sent. Enabling requires a configured receiver. Absent: the environment default applies.
+            /// `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/heartbeat_enabled`.
             public var heartbeatEnabled: Swift.Bool?
@@ -15895,14 +16312,18 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/audit_retention_days`.
             public var auditRetentionDays: Swift.Int?
-            /// Hours Marfa keeps events, which a stream can replay from a cursor, and the answers it replays for an `Idempotency-Key`. `0` keeps them with no age limit. Absent: the server's default applies.
+            /// Days Marfa keeps events, which a stream can replay from a cursor, and the answers it replays for an `Idempotency-Key`. `0` keeps them with no age limit. Absent: the server's default applies.
             ///
-            /// - Remark: Generated from `#/components/schemas/InstanceConfig/event_log_retention_hours`.
-            public var eventLogRetentionHours: Swift.Int?
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/event_log_retention_days`.
+            public var eventLogRetentionDays: Swift.Int?
             /// Days an item stays in the trash before Marfa purges it. `0` keeps them with no age limit. Absent: the server's default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/trash_retention_days`.
             public var trashRetentionDays: Swift.Int?
+            /// Days a table keeps a batch in its change log, so you can undo it. `0` keeps them with no age limit. Absent: the server's default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/row_log_retention_days`.
+            public var rowLogRetentionDays: Swift.Int?
             /// Days Marfa keeps inbound webhook deliveries a connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_handled_retention_days`.
@@ -15911,6 +16332,178 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_pending_retention_days`.
             public var inboundPendingRetentionDays: Swift.Int?
+            /// The addresses people reach this instance at, each an origin with no path. The sign-in address is always one of them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/addresses`.
+            public var addresses: [Swift.String]?
+            /// The address people sign in at, an origin with no path. Absent: this computer's own address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/sign_in_address`.
+            public var signInAddress: Swift.String?
+            /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/backup_path`.
+            public var backupPath: Swift.String?
+            /// The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_bucket`.
+            public var objectStoreBucket: Swift.String?
+            /// The region of the object store. Absent: `us-east-1`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_region`.
+            public var objectStoreRegion: Swift.String?
+            /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_endpoint`.
+            public var objectStoreEndpoint: Swift.String?
+            /// `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_path_style`.
+            public var objectStorePathStyle: Swift.Bool?
+            /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_prefix`.
+            public var objectStorePrefix: Swift.String?
+            /// The access key ID for the object store.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_access_key_id`.
+            public var objectStoreAccessKeyId: Swift.String?
+            /// `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/allow_private_addresses`.
+            public var allowPrivateAddresses: Swift.Bool?
+            /// The key of each secret setting stored with a value Marfa can read, present only while one is. Marfa never returns a secret's value.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/secrets_set`.
+            public var secretsSet: [Swift.String]?
+            /// What the move did and what the owner does next. Present only in the answer to the write that moved the sign-in address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/sign_in_moved`.
+            public var signInMoved: Components.Schemas.SignInMove?
+            /// The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/max_request_bytes`.
+            public var maxRequestBytes: Swift.Int?
+            /// The largest body the bulk operations accept, in bytes, and the largest row a restore reads. The most you can set is 33554432, half the 67108864 bytes a restore reads on one archive line.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/max_bulk_request_bytes`.
+            public var maxBulkRequestBytes: Swift.Int?
+            /// Free disk space an upload must leave on the blob volume, in bytes. `0` refuses no write for room, and health still reports the disk as degraded below 64 MiB.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/disk_reserve_bytes`.
+            public var diskReserveBytes: Swift.Int?
+            /// The fewest live copies Marfa keeps of each blob.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/blob_min_copies`.
+            public var blobMinCopies: Swift.Int?
+            /// `true` if the `blob-orphans` job purges blobs nothing references once they have stood in the orphan report for `blob_cleanup_grace_seconds`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/blob_cleanup_enabled`.
+            public var blobCleanupEnabled: Swift.Bool?
+            /// How long a blob nothing references stands in the orphan report before a later run purges it, in seconds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/blob_cleanup_grace_seconds`.
+            public var blobCleanupGraceSeconds: Swift.Int?
+            /// How often Marfa makes a backup when anything it holds has changed, in seconds. `0` turns scheduled backups off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/backup_interval_seconds`.
+            public var backupIntervalSeconds: Swift.Int?
+            /// `true` if the rate limiter is on for requests a key or app makes, app registrations, device code requests, passkey sign-in challenges and deliveries to inbound addresses.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/rate_limit_enabled`.
+            public var rateLimitEnabled: Swift.Bool?
+            /// How many requests one key or app may make in each rate-limit window, across every operation.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/rate_limit_requests`.
+            public var rateLimitRequests: Swift.Int?
+            /// How many requests one key may make in each rate-limit window to the operations under `/keys`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/rate_limit_keys_requests`.
+            public var rateLimitKeysRequests: Swift.Int?
+            /// How long one rate-limit window lasts, in seconds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/rate_limit_window_seconds`.
+            public var rateLimitWindowSeconds: Swift.Int?
+            /// Hours Marfa keeps an app that registered itself and holds no grant. `0` keeps it with no age limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/unapproved_app_retention_hours`.
+            public var unapprovedAppRetentionHours: Swift.Int?
+            /// Days Marfa keeps a revoked app grant. `0` keeps it with no age limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/revoked_grant_retention_days`.
+            public var revokedGrantRetentionDays: Swift.Int?
+            /// The largest file Marfa reads whole to extract its text, in bytes. Marfa skips a larger file unread, and reads a sound or video from its headers whatever its size.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_max_blob_bytes`.
+            public var enrichmentMaxBlobBytes: Swift.Int?
+            /// The most Unicode characters of extracted text Marfa keeps, counted as characters and not UTF-16 code units. Marfa cuts longer text short.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_max_text_chars`.
+            public var enrichmentMaxTextChars: Swift.Int?
+            /// The most a document may inflate to when Marfa extracts its text, all its parts together, in bytes. Marfa skips a document that inflates past it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_max_inflated_bytes`.
+            public var enrichmentMaxInflatedBytes: Swift.Int?
+            /// The most memory the process that reads one file may take, in bytes. Marfa skips a file that needs more.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_max_memory_bytes`.
+            public var enrichmentMaxMemoryBytes: Swift.Int?
+            /// How many times Marfa tries to read a file that fails, or that stops the server, before it stops trying.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_max_attempts`.
+            public var enrichmentMaxAttempts: Swift.Int?
+            /// `true` if Marfa checks GitHub for new releases every few hours. When `false`, it makes no request for them and reports no release as newer.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/update_check_enabled`.
+            public var updateCheckEnabled: Swift.Bool?
+            /// The most event-stream viewers one server serves at once. `0` sets no limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/event_stream_max_viewers`.
+            public var eventStreamMaxViewers: Swift.Int?
+            /// `true` if MCP tools fetch a file from a web address, or a file a chat attached, to save it. When `false`, a tool asked to fetch one is refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/mcp_fetch_enabled`.
+            public var mcpFetchEnabled: Swift.Bool?
+            /// The largest file an MCP tool fetches from a web address to save, in bytes. Marfa refuses a larger file and stores nothing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/mcp_fetch_max_bytes`.
+            public var mcpFetchMaxBytes: Swift.Int?
+            /// How long an MCP tool's fetch of a file from a web address may take, from connecting to the last byte, in seconds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/mcp_fetch_timeout_seconds`.
+            public var mcpFetchTimeoutSeconds: Swift.Int?
+            /// The largest inbound webhook delivery Marfa stores, in bytes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_max_bytes`.
+            public var inboundMaxBytes: Swift.Int?
+            /// How many requests one inbound endpoint's address takes in each rate-limit window, whatever each is answered.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/rate_limit_inbound_requests`.
+            public var rateLimitInboundRequests: Swift.Int?
+            /// The most bytes of inbound webhook deliveries Marfa holds in memory at once. One source holds at most half.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_in_flight_bytes`.
+            public var inboundInFlightBytes: Swift.Int?
+            /// The unhandled deliveries one registration may hold before Marfa refuses more for it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_backlog_deliveries`.
+            public var inboundBacklogDeliveries: Swift.Int?
+            /// The bytes of unhandled deliveries one registration may hold before Marfa refuses more for it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_backlog_bytes`.
+            public var inboundBacklogBytes: Swift.Int?
+            /// The most deliveries one registration retains across its live and retired endpoints.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_retained_deliveries`.
+            public var inboundRetainedDeliveries: Swift.Int?
+            /// The most bytes of bodies, headers and queries one registration retains across its live and retired endpoints.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_retained_bytes`.
+            public var inboundRetainedBytes: Swift.Int?
+            /// The browser origins allowed to call the API across origins with a token, beside the web pages the owner approves. Each is an origin with no path.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/cors_origins`.
+            public var corsOrigins: [Swift.String]?
             /// Creates a new `InstanceConfig`.
             ///
             /// - Parameters:
@@ -15922,15 +16515,59 @@ extension Components {
             ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement.
             ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
             ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
-            ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires a configured receiver. Absent: the environment default applies.
-            ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires a configured receiver. Absent: the environment default applies.
+            ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies.
+            ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
             ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
             ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
             ///   - auditRetentionDays: Days Marfa keeps audit log entries and outbound webhook delivery history. `0` keeps them with no age limit. Absent: the server's default applies.
-            ///   - eventLogRetentionHours: Hours Marfa keeps events, which a stream can replay from a cursor, and the answers it replays for an `Idempotency-Key`. `0` keeps them with no age limit. Absent: the server's default applies.
+            ///   - eventLogRetentionDays: Days Marfa keeps events, which a stream can replay from a cursor, and the answers it replays for an `Idempotency-Key`. `0` keeps them with no age limit. Absent: the server's default applies.
             ///   - trashRetentionDays: Days an item stays in the trash before Marfa purges it. `0` keeps them with no age limit. Absent: the server's default applies.
+            ///   - rowLogRetentionDays: Days a table keeps a batch in its change log, so you can undo it. `0` keeps them with no age limit. Absent: the server's default applies.
             ///   - inboundHandledRetentionDays: Days Marfa keeps inbound webhook deliveries a connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
             ///   - inboundPendingRetentionDays: Days Marfa keeps inbound webhook deliveries no connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
+            ///   - addresses: The addresses people reach this instance at, each an origin with no path. The sign-in address is always one of them.
+            ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address.
+            ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder.
+            ///   - objectStoreBucket: The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store.
+            ///   - objectStoreRegion: The region of the object store. Absent: `us-east-1`.
+            ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it.
+            ///   - objectStorePathStyle: `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`.
+            ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`.
+            ///   - objectStoreAccessKeyId: The access key ID for the object store.
+            ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+            ///   - secretsSet: The key of each secret setting stored with a value Marfa can read, present only while one is. Marfa never returns a secret's value.
+            ///   - signInMoved: What the move did and what the owner does next. Present only in the answer to the write that moved the sign-in address.
+            ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link.
+            ///   - maxBulkRequestBytes: The largest body the bulk operations accept, in bytes, and the largest row a restore reads. The most you can set is 33554432, half the 67108864 bytes a restore reads on one archive line.
+            ///   - diskReserveBytes: Free disk space an upload must leave on the blob volume, in bytes. `0` refuses no write for room, and health still reports the disk as degraded below 64 MiB.
+            ///   - blobMinCopies: The fewest live copies Marfa keeps of each blob.
+            ///   - blobCleanupEnabled: `true` if the `blob-orphans` job purges blobs nothing references once they have stood in the orphan report for `blob_cleanup_grace_seconds`.
+            ///   - blobCleanupGraceSeconds: How long a blob nothing references stands in the orphan report before a later run purges it, in seconds.
+            ///   - backupIntervalSeconds: How often Marfa makes a backup when anything it holds has changed, in seconds. `0` turns scheduled backups off.
+            ///   - rateLimitEnabled: `true` if the rate limiter is on for requests a key or app makes, app registrations, device code requests, passkey sign-in challenges and deliveries to inbound addresses.
+            ///   - rateLimitRequests: How many requests one key or app may make in each rate-limit window, across every operation.
+            ///   - rateLimitKeysRequests: How many requests one key may make in each rate-limit window to the operations under `/keys`.
+            ///   - rateLimitWindowSeconds: How long one rate-limit window lasts, in seconds.
+            ///   - unapprovedAppRetentionHours: Hours Marfa keeps an app that registered itself and holds no grant. `0` keeps it with no age limit.
+            ///   - revokedGrantRetentionDays: Days Marfa keeps a revoked app grant. `0` keeps it with no age limit.
+            ///   - enrichmentMaxBlobBytes: The largest file Marfa reads whole to extract its text, in bytes. Marfa skips a larger file unread, and reads a sound or video from its headers whatever its size.
+            ///   - enrichmentMaxTextChars: The most Unicode characters of extracted text Marfa keeps, counted as characters and not UTF-16 code units. Marfa cuts longer text short.
+            ///   - enrichmentMaxInflatedBytes: The most a document may inflate to when Marfa extracts its text, all its parts together, in bytes. Marfa skips a document that inflates past it.
+            ///   - enrichmentMaxMemoryBytes: The most memory the process that reads one file may take, in bytes. Marfa skips a file that needs more.
+            ///   - enrichmentMaxAttempts: How many times Marfa tries to read a file that fails, or that stops the server, before it stops trying.
+            ///   - updateCheckEnabled: `true` if Marfa checks GitHub for new releases every few hours. When `false`, it makes no request for them and reports no release as newer.
+            ///   - eventStreamMaxViewers: The most event-stream viewers one server serves at once. `0` sets no limit.
+            ///   - mcpFetchEnabled: `true` if MCP tools fetch a file from a web address, or a file a chat attached, to save it. When `false`, a tool asked to fetch one is refused.
+            ///   - mcpFetchMaxBytes: The largest file an MCP tool fetches from a web address to save, in bytes. Marfa refuses a larger file and stores nothing.
+            ///   - mcpFetchTimeoutSeconds: How long an MCP tool's fetch of a file from a web address may take, from connecting to the last byte, in seconds.
+            ///   - inboundMaxBytes: The largest inbound webhook delivery Marfa stores, in bytes.
+            ///   - rateLimitInboundRequests: How many requests one inbound endpoint's address takes in each rate-limit window, whatever each is answered.
+            ///   - inboundInFlightBytes: The most bytes of inbound webhook deliveries Marfa holds in memory at once. One source holds at most half.
+            ///   - inboundBacklogDeliveries: The unhandled deliveries one registration may hold before Marfa refuses more for it.
+            ///   - inboundBacklogBytes: The bytes of unhandled deliveries one registration may hold before Marfa refuses more for it.
+            ///   - inboundRetainedDeliveries: The most deliveries one registration retains across its live and retired endpoints.
+            ///   - inboundRetainedBytes: The most bytes of bodies, headers and queries one registration retains across its live and retired endpoints.
+            ///   - corsOrigins: The browser origins allowed to call the API across origins with a token, beside the web pages the owner approves. Each is an origin with no path.
             public init(
                 instanceId: Swift.String,
                 versionRecentDays: Swift.Int? = nil,
@@ -15945,10 +16582,54 @@ extension Components {
                 name: Swift.String? = nil,
                 enforcement: Components.Schemas.InstanceConfig.EnforcementPayload? = nil,
                 auditRetentionDays: Swift.Int? = nil,
-                eventLogRetentionHours: Swift.Int? = nil,
+                eventLogRetentionDays: Swift.Int? = nil,
                 trashRetentionDays: Swift.Int? = nil,
+                rowLogRetentionDays: Swift.Int? = nil,
                 inboundHandledRetentionDays: Swift.Int? = nil,
-                inboundPendingRetentionDays: Swift.Int? = nil
+                inboundPendingRetentionDays: Swift.Int? = nil,
+                addresses: [Swift.String]? = nil,
+                signInAddress: Swift.String? = nil,
+                backupPath: Swift.String? = nil,
+                objectStoreBucket: Swift.String? = nil,
+                objectStoreRegion: Swift.String? = nil,
+                objectStoreEndpoint: Swift.String? = nil,
+                objectStorePathStyle: Swift.Bool? = nil,
+                objectStorePrefix: Swift.String? = nil,
+                objectStoreAccessKeyId: Swift.String? = nil,
+                allowPrivateAddresses: Swift.Bool? = nil,
+                secretsSet: [Swift.String]? = nil,
+                signInMoved: Components.Schemas.SignInMove? = nil,
+                maxRequestBytes: Swift.Int? = nil,
+                maxBulkRequestBytes: Swift.Int? = nil,
+                diskReserveBytes: Swift.Int? = nil,
+                blobMinCopies: Swift.Int? = nil,
+                blobCleanupEnabled: Swift.Bool? = nil,
+                blobCleanupGraceSeconds: Swift.Int? = nil,
+                backupIntervalSeconds: Swift.Int? = nil,
+                rateLimitEnabled: Swift.Bool? = nil,
+                rateLimitRequests: Swift.Int? = nil,
+                rateLimitKeysRequests: Swift.Int? = nil,
+                rateLimitWindowSeconds: Swift.Int? = nil,
+                unapprovedAppRetentionHours: Swift.Int? = nil,
+                revokedGrantRetentionDays: Swift.Int? = nil,
+                enrichmentMaxBlobBytes: Swift.Int? = nil,
+                enrichmentMaxTextChars: Swift.Int? = nil,
+                enrichmentMaxInflatedBytes: Swift.Int? = nil,
+                enrichmentMaxMemoryBytes: Swift.Int? = nil,
+                enrichmentMaxAttempts: Swift.Int? = nil,
+                updateCheckEnabled: Swift.Bool? = nil,
+                eventStreamMaxViewers: Swift.Int? = nil,
+                mcpFetchEnabled: Swift.Bool? = nil,
+                mcpFetchMaxBytes: Swift.Int? = nil,
+                mcpFetchTimeoutSeconds: Swift.Int? = nil,
+                inboundMaxBytes: Swift.Int? = nil,
+                rateLimitInboundRequests: Swift.Int? = nil,
+                inboundInFlightBytes: Swift.Int? = nil,
+                inboundBacklogDeliveries: Swift.Int? = nil,
+                inboundBacklogBytes: Swift.Int? = nil,
+                inboundRetainedDeliveries: Swift.Int? = nil,
+                inboundRetainedBytes: Swift.Int? = nil,
+                corsOrigins: [Swift.String]? = nil
             ) {
                 self.instanceId = instanceId
                 self.versionRecentDays = versionRecentDays
@@ -15963,10 +16644,54 @@ extension Components {
                 self.name = name
                 self.enforcement = enforcement
                 self.auditRetentionDays = auditRetentionDays
-                self.eventLogRetentionHours = eventLogRetentionHours
+                self.eventLogRetentionDays = eventLogRetentionDays
                 self.trashRetentionDays = trashRetentionDays
+                self.rowLogRetentionDays = rowLogRetentionDays
                 self.inboundHandledRetentionDays = inboundHandledRetentionDays
                 self.inboundPendingRetentionDays = inboundPendingRetentionDays
+                self.addresses = addresses
+                self.signInAddress = signInAddress
+                self.backupPath = backupPath
+                self.objectStoreBucket = objectStoreBucket
+                self.objectStoreRegion = objectStoreRegion
+                self.objectStoreEndpoint = objectStoreEndpoint
+                self.objectStorePathStyle = objectStorePathStyle
+                self.objectStorePrefix = objectStorePrefix
+                self.objectStoreAccessKeyId = objectStoreAccessKeyId
+                self.allowPrivateAddresses = allowPrivateAddresses
+                self.secretsSet = secretsSet
+                self.signInMoved = signInMoved
+                self.maxRequestBytes = maxRequestBytes
+                self.maxBulkRequestBytes = maxBulkRequestBytes
+                self.diskReserveBytes = diskReserveBytes
+                self.blobMinCopies = blobMinCopies
+                self.blobCleanupEnabled = blobCleanupEnabled
+                self.blobCleanupGraceSeconds = blobCleanupGraceSeconds
+                self.backupIntervalSeconds = backupIntervalSeconds
+                self.rateLimitEnabled = rateLimitEnabled
+                self.rateLimitRequests = rateLimitRequests
+                self.rateLimitKeysRequests = rateLimitKeysRequests
+                self.rateLimitWindowSeconds = rateLimitWindowSeconds
+                self.unapprovedAppRetentionHours = unapprovedAppRetentionHours
+                self.revokedGrantRetentionDays = revokedGrantRetentionDays
+                self.enrichmentMaxBlobBytes = enrichmentMaxBlobBytes
+                self.enrichmentMaxTextChars = enrichmentMaxTextChars
+                self.enrichmentMaxInflatedBytes = enrichmentMaxInflatedBytes
+                self.enrichmentMaxMemoryBytes = enrichmentMaxMemoryBytes
+                self.enrichmentMaxAttempts = enrichmentMaxAttempts
+                self.updateCheckEnabled = updateCheckEnabled
+                self.eventStreamMaxViewers = eventStreamMaxViewers
+                self.mcpFetchEnabled = mcpFetchEnabled
+                self.mcpFetchMaxBytes = mcpFetchMaxBytes
+                self.mcpFetchTimeoutSeconds = mcpFetchTimeoutSeconds
+                self.inboundMaxBytes = inboundMaxBytes
+                self.rateLimitInboundRequests = rateLimitInboundRequests
+                self.inboundInFlightBytes = inboundInFlightBytes
+                self.inboundBacklogDeliveries = inboundBacklogDeliveries
+                self.inboundBacklogBytes = inboundBacklogBytes
+                self.inboundRetainedDeliveries = inboundRetainedDeliveries
+                self.inboundRetainedBytes = inboundRetainedBytes
+                self.corsOrigins = corsOrigins
             }
             public enum CodingKeys: String, CodingKey {
                 case instanceId = "instance_id"
@@ -15982,39 +16707,85 @@ extension Components {
                 case name
                 case enforcement
                 case auditRetentionDays = "audit_retention_days"
-                case eventLogRetentionHours = "event_log_retention_hours"
+                case eventLogRetentionDays = "event_log_retention_days"
                 case trashRetentionDays = "trash_retention_days"
+                case rowLogRetentionDays = "row_log_retention_days"
                 case inboundHandledRetentionDays = "inbound_handled_retention_days"
                 case inboundPendingRetentionDays = "inbound_pending_retention_days"
+                case addresses
+                case signInAddress = "sign_in_address"
+                case backupPath = "backup_path"
+                case objectStoreBucket = "object_store_bucket"
+                case objectStoreRegion = "object_store_region"
+                case objectStoreEndpoint = "object_store_endpoint"
+                case objectStorePathStyle = "object_store_path_style"
+                case objectStorePrefix = "object_store_prefix"
+                case objectStoreAccessKeyId = "object_store_access_key_id"
+                case allowPrivateAddresses = "allow_private_addresses"
+                case secretsSet = "secrets_set"
+                case signInMoved = "sign_in_moved"
+                case maxRequestBytes = "max_request_bytes"
+                case maxBulkRequestBytes = "max_bulk_request_bytes"
+                case diskReserveBytes = "disk_reserve_bytes"
+                case blobMinCopies = "blob_min_copies"
+                case blobCleanupEnabled = "blob_cleanup_enabled"
+                case blobCleanupGraceSeconds = "blob_cleanup_grace_seconds"
+                case backupIntervalSeconds = "backup_interval_seconds"
+                case rateLimitEnabled = "rate_limit_enabled"
+                case rateLimitRequests = "rate_limit_requests"
+                case rateLimitKeysRequests = "rate_limit_keys_requests"
+                case rateLimitWindowSeconds = "rate_limit_window_seconds"
+                case unapprovedAppRetentionHours = "unapproved_app_retention_hours"
+                case revokedGrantRetentionDays = "revoked_grant_retention_days"
+                case enrichmentMaxBlobBytes = "enrichment_max_blob_bytes"
+                case enrichmentMaxTextChars = "enrichment_max_text_chars"
+                case enrichmentMaxInflatedBytes = "enrichment_max_inflated_bytes"
+                case enrichmentMaxMemoryBytes = "enrichment_max_memory_bytes"
+                case enrichmentMaxAttempts = "enrichment_max_attempts"
+                case updateCheckEnabled = "update_check_enabled"
+                case eventStreamMaxViewers = "event_stream_max_viewers"
+                case mcpFetchEnabled = "mcp_fetch_enabled"
+                case mcpFetchMaxBytes = "mcp_fetch_max_bytes"
+                case mcpFetchTimeoutSeconds = "mcp_fetch_timeout_seconds"
+                case inboundMaxBytes = "inbound_max_bytes"
+                case rateLimitInboundRequests = "rate_limit_inbound_requests"
+                case inboundInFlightBytes = "inbound_in_flight_bytes"
+                case inboundBacklogDeliveries = "inbound_backlog_deliveries"
+                case inboundBacklogBytes = "inbound_backlog_bytes"
+                case inboundRetainedDeliveries = "inbound_retained_deliveries"
+                case inboundRetainedBytes = "inbound_retained_bytes"
+                case corsOrigins = "cors_origins"
             }
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal`.
-        public struct InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal`.
+        public struct InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case inheritanceViolation = "inheritance_violation"
                     case invalidProperties = "invalid_properties"
                     case invalidSchema = "invalid_schema"
+                    case propertyShadowsField = "property_shadows_field"
                     case validationError = "validation_error"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/code`.
-                public var code: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -16034,8 +16805,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error/details`.
-                public var details: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -16043,9 +16814,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -16059,13 +16830,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal/error`.
-            public var error: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload
-            /// Creates a new `InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal`.
+            /// - Remark: Generated from `#/components/schemas/InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.InvalidPropertiesOrInvalidSchemaOrValidationErrorRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.InheritanceViolationOrInvalidPropertiesOrInvalidSchemaOrPropertyShadowsFieldOrValidationErrorRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -16237,163 +17008,6 @@ extension Components {
                 case error
             }
         }
-        /// A page holding every retired type.
-        ///
-        /// - Remark: Generated from `#/components/schemas/RetiredPlatformTypePage`.
-        public struct RetiredPlatformTypePage: Codable, Hashable, Sendable {
-            /// Every retired type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RetiredPlatformTypePage/data`.
-            public var data: [Components.Schemas.RetiredPlatformType]
-            /// Always `null`: Marfa returns every retired type in one page.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RetiredPlatformTypePage/next_cursor`.
-            public var nextCursor: Swift.String?
-            /// Creates a new `RetiredPlatformTypePage`.
-            ///
-            /// - Parameters:
-            ///   - data: Every retired type.
-            ///   - nextCursor: Always `null`: Marfa returns every retired type in one page.
-            public init(
-                data: [Components.Schemas.RetiredPlatformType],
-                nextCursor: Swift.String? = nil
-            ) {
-                self.data = data
-                self.nextCursor = nextCursor
-            }
-            public enum CodingKeys: String, CodingKey {
-                case data
-                case nextCursor = "next_cursor"
-            }
-        }
-        /// A platform type that this build no longer ships.
-        ///
-        /// - Remark: Generated from `#/components/schemas/RetiredPlatformType`.
-        public struct RetiredPlatformType: Codable, Hashable, Sendable {
-            /// The identifier of the retired type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RetiredPlatformType/id`.
-            public var id: Swift.String
-            /// How many items carry this type, counted when you ask.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RetiredPlatformType/item_count`.
-            public var itemCount: Swift.Double
-            /// The types that name this one as their `parent`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RetiredPlatformType/child_types`.
-            public var childTypes: [Swift.String]
-            /// `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it or names it in `compatible_with`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/RetiredPlatformType/removable`.
-            public var removable: Swift.Bool
-            /// Creates a new `RetiredPlatformType`.
-            ///
-            /// - Parameters:
-            ///   - id: The identifier of the retired type.
-            ///   - itemCount: How many items carry this type, counted when you ask.
-            ///   - childTypes: The types that name this one as their `parent`.
-            ///   - removable: `true` if `DELETE /platform-types/{id}` would remove the type: no item carries it and no type inherits from it or names it in `compatible_with`.
-            public init(
-                id: Swift.String,
-                itemCount: Swift.Double,
-                childTypes: [Swift.String],
-                removable: Swift.Bool
-            ) {
-                self.id = id
-                self.itemCount = itemCount
-                self.childTypes = childTypes
-                self.removable = removable
-            }
-            public enum CodingKeys: String, CodingKey {
-                case id
-                case itemCount = "item_count"
-                case childTypes = "child_types"
-                case removable
-            }
-        }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal`.
-        public struct NotFoundOrTypeNotFoundRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case notFound = "not_found"
-                    case typeNotFound = "type_not_found"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/NotFoundOrTypeNotFoundRefusal/error`.
-            public var error: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload
-            /// Creates a new `NotFoundOrTypeNotFoundRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.NotFoundOrTypeNotFoundRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
         /// The single owner of the instance.
         ///
         /// - Remark: Generated from `#/components/schemas/Owner`.
@@ -16410,7 +17024,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
             public var name: Swift.String
-            /// The address of the owner's picture on this instance, or `null` when none is set. Fetch it with `GET /owner/picture`.
+            /// The address of the owner's avatar on this instance, or `null` when none is set. Fetch it with `GET /profile/avatar`.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/avatar`.
             public var avatar: Swift.String?
@@ -16424,7 +17038,7 @@ extension Components {
             ///   - id: Unique identifier for the owner.
             ///   - email: Email address used to sign in.
             ///   - name: Display name of the owner.
-            ///   - avatar: The address of the owner's picture on this instance, or `null` when none is set. Fetch it with `GET /owner/picture`.
+            ///   - avatar: The address of the owner's avatar on this instance, or `null` when none is set. Fetch it with `GET /profile/avatar`.
             ///   - createdAt: When the owner was created, in UTC.
             public init(
                 id: Swift.String,
@@ -16531,17 +17145,17 @@ extension Components {
         }
         /// Every live sign-in of the owner.
         ///
-        /// - Remark: Generated from `#/components/schemas/SignInList`.
-        public struct SignInList: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/SignInPage`.
+        public struct SignInPage: Codable, Hashable, Sendable {
             /// The owner's live sign-ins, oldest first.
             ///
-            /// - Remark: Generated from `#/components/schemas/SignInList/data`.
+            /// - Remark: Generated from `#/components/schemas/SignInPage/data`.
             public var data: [Components.Schemas.SignIn]
             /// Always `null`: Marfa returns every sign-in in one page.
             ///
-            /// - Remark: Generated from `#/components/schemas/SignInList/next_cursor`.
+            /// - Remark: Generated from `#/components/schemas/SignInPage/next_cursor`.
             public var nextCursor: Swift.String?
-            /// Creates a new `SignInList`.
+            /// Creates a new `SignInPage`.
             ///
             /// - Parameters:
             ///   - data: The owner's live sign-ins, oldest first.
@@ -16582,10 +17196,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/name`.
             public var name: Swift.String
-            /// `true` if this sign-in sent the request.
-            ///
-            /// - Remark: Generated from `#/components/schemas/SignIn/current`.
-            public var current: Swift.Bool
             /// When the sign-in was made, in UTC. For an app, when the owner last approved it.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/created_at`.
@@ -16598,10 +17208,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/expires_at`.
             public var expiresAt: Swift.String?
-            /// The address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
+            /// The IP address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
             ///
-            /// - Remark: Generated from `#/components/schemas/SignIn/ip_address`.
-            public var ipAddress: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/SignIn/client_ip`.
+            public var clientIp: Swift.String?
             /// The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/user_agent`.
@@ -16616,33 +17226,30 @@ extension Components {
             ///   - id: Unique identifier for the sign-in.
             ///   - kind: What signed in. `browser`: a browser signed in with the owner's password. `app`: an app the owner approved, for every device it signs in on with that approval. `key`: an API key.
             ///   - name: A readable name: a browser's from its `user_agent`, an app's the owner's name for it or else its registered name, a key's its `label`. A name with a control or bidirectional character, or over 200 characters, gives way to the ID.
-            ///   - current: `true` if this sign-in sent the request.
             ///   - createdAt: When the sign-in was made, in UTC. For an app, when the owner last approved it.
             ///   - lastUsedAt: When a recorded use occurred, in UTC, or `null` if none is recorded. Uses are recorded at most once a minute for browsers and once an hour for apps or keys. Failed recording leaves the previous value.
             ///   - expiresAt: When the sign-in ends unless used again, in UTC. For an app, the inactivity boundary. `null` for disabled app inactivity retirement or a key without an expiry.
-            ///   - ipAddress: The address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
+            ///   - clientIp: The IP address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
             ///   - userAgent: The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
             ///   - mintedBy: For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, any other key, and a key whose app has ended.
             public init(
                 id: Swift.String,
                 kind: Components.Schemas.SignIn.KindPayload,
                 name: Swift.String,
-                current: Swift.Bool,
                 createdAt: Swift.String,
                 lastUsedAt: Swift.String? = nil,
                 expiresAt: Swift.String? = nil,
-                ipAddress: Swift.String? = nil,
+                clientIp: Swift.String? = nil,
                 userAgent: Swift.String? = nil,
                 mintedBy: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
                 self.name = name
-                self.current = current
                 self.createdAt = createdAt
                 self.lastUsedAt = lastUsedAt
                 self.expiresAt = expiresAt
-                self.ipAddress = ipAddress
+                self.clientIp = clientIp
                 self.userAgent = userAgent
                 self.mintedBy = mintedBy
             }
@@ -16650,11 +17257,10 @@ extension Components {
                 case id
                 case kind
                 case name
-                case current
                 case createdAt = "created_at"
                 case lastUsedAt = "last_used_at"
                 case expiresAt = "expires_at"
-                case ipAddress = "ip_address"
+                case clientIp = "client_ip"
                 case userAgent = "user_agent"
                 case mintedBy = "minted_by"
             }
@@ -16931,19 +17537,43 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// The same whole seconds as `Retry-After`.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/RateLimitedRefusal/error/details/retry_after_seconds`.
+                    public var retryAfterSeconds: Swift.Int?
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
                     /// Creates a new `DetailsPayload`.
                     ///
                     /// - Parameters:
+                    ///   - retryAfterSeconds: The same whole seconds as `Retry-After`.
                     ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    public init(
+                        retryAfterSeconds: Swift.Int? = nil,
+                        additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+                    ) {
+                        self.retryAfterSeconds = retryAfterSeconds
                         self.additionalProperties = additionalProperties
                     }
+                    public enum CodingKeys: String, CodingKey {
+                        case retryAfterSeconds = "retry_after_seconds"
+                    }
                     public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.retryAfterSeconds = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .retryAfterSeconds
+                        )
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                            "retry_after_seconds"
+                        ])
                     }
                     public func encode(to encoder: any Swift.Encoder) throws {
+                        var container = encoder.container(keyedBy: CodingKeys.self)
+                        try container.encodeIfPresent(
+                            self.retryAfterSeconds,
+                            forKey: .retryAfterSeconds
+                        )
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
@@ -16989,17 +17619,17 @@ extension Components {
         }
         /// Every registered owner passkey.
         ///
-        /// - Remark: Generated from `#/components/schemas/OwnerPasskeyList`.
-        public struct OwnerPasskeyList: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/OwnerPasskeyPage`.
+        public struct OwnerPasskeyPage: Codable, Hashable, Sendable {
             /// Every registered owner passkey, oldest first.
             ///
-            /// - Remark: Generated from `#/components/schemas/OwnerPasskeyList/data`.
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskeyPage/data`.
             public var data: [Components.Schemas.OwnerPasskey]
             /// Always `null`: every passkey is returned in one page.
             ///
-            /// - Remark: Generated from `#/components/schemas/OwnerPasskeyList/next_cursor`.
+            /// - Remark: Generated from `#/components/schemas/OwnerPasskeyPage/next_cursor`.
             public var nextCursor: Components.Schemas.MarfaNull
-            /// Creates a new `OwnerPasskeyList`.
+            /// Creates a new `OwnerPasskeyPage`.
             ///
             /// - Parameters:
             ///   - data: Every registered owner passkey, oldest first.
@@ -17227,29 +17857,29 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal`.
-        public struct ExportRowsUnrestorableRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal`.
+        public struct ExportItemsUnrestorableRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case exportRowsUnrestorable = "export_rows_unrestorable"
+                    case exportEntryUnrestorable = "export_entry_unrestorable"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/code`.
-                public var code: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error/code`.
+                public var code: Components.Schemas.ExportItemsUnrestorableRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -17269,8 +17899,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error/details`.
-                public var details: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error/details`.
+                public var details: Components.Schemas.ExportItemsUnrestorableRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -17278,9 +17908,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.ExportItemsUnrestorableRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.ExportItemsUnrestorableRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -17294,13 +17924,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/ExportRowsUnrestorableRefusal/error`.
-            public var error: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload
-            /// Creates a new `ExportRowsUnrestorableRefusal`.
+            /// - Remark: Generated from `#/components/schemas/ExportItemsUnrestorableRefusal/error`.
+            public var error: Components.Schemas.ExportItemsUnrestorableRefusal._ErrorPayload
+            /// Creates a new `ExportItemsUnrestorableRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.ExportRowsUnrestorableRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.ExportItemsUnrestorableRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -17309,31 +17939,30 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal`.
-        public struct BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal`.
+        public struct EnforcementUnreadableOrExportItemsUnrestorableRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case blobStoreUnavailable = "blob_store_unavailable"
-                    case exportUnrestorable = "export_unrestorable"
-                    case writeContention = "write_contention"
+                    case enforcementUnreadable = "enforcement_unreadable"
+                    case exportEntryUnrestorable = "export_entry_unrestorable"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/code`.
-                public var code: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error/code`.
+                public var code: Components.Schemas.EnforcementUnreadableOrExportItemsUnrestorableRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -17353,8 +17982,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error/details`.
-                public var details: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error/details`.
+                public var details: Components.Schemas.EnforcementUnreadableOrExportItemsUnrestorableRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -17362,9 +17991,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.EnforcementUnreadableOrExportItemsUnrestorableRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.EnforcementUnreadableOrExportItemsUnrestorableRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -17378,13 +18007,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal/error`.
-            public var error: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload
-            /// Creates a new `BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal`.
+            /// - Remark: Generated from `#/components/schemas/EnforcementUnreadableOrExportItemsUnrestorableRefusal/error`.
+            public var error: Components.Schemas.EnforcementUnreadableOrExportItemsUnrestorableRefusal._ErrorPayload
+            /// Creates a new `EnforcementUnreadableOrExportItemsUnrestorableRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.BlobStoreUnavailableOrExportUnrestorableOrWriteContentionRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.EnforcementUnreadableOrExportItemsUnrestorableRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -17393,17 +18022,17 @@ extension Components {
         }
         /// The active app grants.
         ///
-        /// - Remark: Generated from `#/components/schemas/AppGrantList`.
-        public struct AppGrantList: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/AppGrantPage`.
+        public struct AppGrantPage: Codable, Hashable, Sendable {
             /// Every active app grant.
             ///
-            /// - Remark: Generated from `#/components/schemas/AppGrantList/data`.
+            /// - Remark: Generated from `#/components/schemas/AppGrantPage/data`.
             public var data: [Components.Schemas.AppGrant]
             /// Always null: every grant is returned in one page.
             ///
-            /// - Remark: Generated from `#/components/schemas/AppGrantList/next_cursor`.
+            /// - Remark: Generated from `#/components/schemas/AppGrantPage/next_cursor`.
             public var nextCursor: Swift.String?
-            /// Creates a new `AppGrantList`.
+            /// Creates a new `AppGrantPage`.
             ///
             /// - Parameters:
             ///   - data: Every active app grant.
@@ -17534,29 +18163,29 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal`.
-        public struct OauthGrantNotFoundRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal`.
+        public struct GrantNotFoundRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case oauthGrantNotFound = "oauth_grant_not_found"
+                    case grantNotFound = "grant_not_found"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error/code`.
-                public var code: Components.Schemas.OauthGrantNotFoundRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.GrantNotFoundRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -17576,8 +18205,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error/details`.
-                public var details: Components.Schemas.OauthGrantNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.GrantNotFoundRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -17585,9 +18214,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.OauthGrantNotFoundRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.GrantNotFoundRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.OauthGrantNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.GrantNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -17601,20 +18230,20 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/OauthGrantNotFoundRefusal/error`.
-            public var error: Components.Schemas.OauthGrantNotFoundRefusal._ErrorPayload
-            /// Creates a new `OauthGrantNotFoundRefusal`.
+            /// - Remark: Generated from `#/components/schemas/GrantNotFoundRefusal/error`.
+            public var error: Components.Schemas.GrantNotFoundRefusal._ErrorPayload
+            /// Creates a new `GrantNotFoundRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.OauthGrantNotFoundRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.GrantNotFoundRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
                 case error
             }
         }
-        /// An OAuth client: its app metadata and the grants it uses.
+        /// An OAuth client: its app metadata and the grants it uses. Marfa ignores metadata it doesn't support and leaves it out of the answer.
         ///
         /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration`.
         public struct OAuthClientRegistration: Codable, Hashable, Sendable {
@@ -17622,7 +18251,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/redirect_uris`.
             public var redirectUris: [Swift.String]?
-            /// Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
+            /// Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out for your content and links: `content:read content:write edge.*:read edge.*:write offline_access`.
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/scope`.
             public var scope: Swift.String?
@@ -17658,75 +18287,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/software_version`.
             public var softwareVersion: Swift.String?
-            /// A signed software statement. Leave it out to register without one.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/software_statement`.
-            public var softwareStatement: Swift.String?
-            /// Addresses the app may return to after sign-out. Leave it out if there are none.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/post_logout_redirect_uris`.
-            public var postLogoutRedirectUris: [Swift.String]?
-            /// `none` is public, `client_secret_basic` uses HTTP Basic and `client_secret_post` sends the secret in the body. Other methods, including `private_key_jwt`, are refused with `invalid_client_metadata`.
+            /// `none`: the client is public and proves itself with PKCE. Any other method is refused with `invalid_client_metadata`.
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/token_endpoint_auth_method`.
             @frozen public enum TokenEndpointAuthMethodPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case none = "none"
-                case clientSecretBasic = "client_secret_basic"
-                case clientSecretPost = "client_secret_post"
             }
-            /// `none` is public, `client_secret_basic` uses HTTP Basic and `client_secret_post` sends the secret in the body. Other methods, including `private_key_jwt`, are refused with `invalid_client_metadata`.
+            /// `none`: the client is public and proves itself with PKCE. Any other method is refused with `invalid_client_metadata`.
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/token_endpoint_auth_method`.
             public var tokenEndpointAuthMethod: Components.Schemas.OAuthClientRegistration.TokenEndpointAuthMethodPayload?
-            /// The client's public JSON Web Key Set. Leave it out if the client has none.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks`.
-            public struct JwksPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks/KeysPayload`.
-                public struct KeysPayloadPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `KeysPayloadPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// The client's public JSON Web Keys, including any extension members.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks/keys`.
-                public typealias KeysPayload = [Components.Schemas.OAuthClientRegistration.JwksPayload.KeysPayloadPayload]
-                /// The client's public JSON Web Keys, including any extension members.
-                ///
-                /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks/keys`.
-                public var keys: Components.Schemas.OAuthClientRegistration.JwksPayload.KeysPayload
-                /// Creates a new `JwksPayload`.
-                ///
-                /// - Parameters:
-                ///   - keys: The client's public JSON Web Keys, including any extension members.
-                public init(keys: Components.Schemas.OAuthClientRegistration.JwksPayload.KeysPayload) {
-                    self.keys = keys
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case keys
-                }
-            }
-            /// The client's public JSON Web Key Set. Leave it out if the client has none.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks`.
-            public var jwks: Components.Schemas.OAuthClientRegistration.JwksPayload?
-            /// The URL of the client's public JSON Web Key Set. Leave it out if the client has none.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/jwks_uri`.
-            public var jwksUri: Swift.String?
             /// The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`. Without `authorization_code`, add `refresh_token` to get a refresh token with `offline_access`.
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/grant_types`.
@@ -17754,21 +18324,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/application_type`.
             public var applicationType: Components.Schemas.OAuthClientRegistration.ApplicationTypePayload?
-            /// `public` for public subject identifiers. Leave it out to use public identifiers. `pairwise` is refused with `invalid_client_metadata`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/subject_type`.
-            @frozen public enum SubjectTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case _public = "public"
-            }
-            /// `public` for public subject identifiers. Leave it out to use public identifiers. `pairwise` is refused with `invalid_client_metadata`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/subject_type`.
-            public var subjectType: Components.Schemas.OAuthClientRegistration.SubjectTypePayload?
-            /// `true` to bind the client's access tokens to DPoP proofs. Leave it out for tokens without that binding.
-            ///
-            /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/dpop_bound_access_tokens`.
-            public var dpopBoundAccessTokens: Swift.Bool?
-            /// Resource identifiers to register the client for. Leave it out for the instance's default resources.
+            /// Resource identifiers, each an absolute URI without a fragment; any other value is refused with `invalid_target`. Marfa doesn't register them or return them: a token request names its own `resource`.
             ///
             /// - Remark: Generated from `#/components/schemas/OAuthClientRegistration/resources`.
             public var resources: [Swift.String]?
@@ -17776,7 +18332,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - redirectUris: The addresses Marfa may send a person back to after authorization. Required for `authorization_code`. At most 10. A `web` client's URIs must use `https` off the loopback; a `native` client may use `http` on `localhost`, `127.0.0.1` or `[::1]`.
-            ///   - scope: Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out to register the client for every scope the instance allows that it can use.
+            ///   - scope: Space-separated scopes to register the client for. `offline_access` needs `refresh_token` or `authorization_code` in `grant_types`. Leave it out for your content and links: `content:read content:write edge.*:read edge.*:write offline_access`.
             ///   - clientName: The app's name, which Marfa shows a person asked to approve it.
             ///   - clientUri: The app's home page URL. Leave it out if the app has none.
             ///   - logoUri: The app's logo URL. Leave it out if the app has none.
@@ -17785,17 +18341,11 @@ extension Components {
             ///   - policyUri: The app's privacy policy URL. Leave it out if the app has none.
             ///   - softwareId: The software's identifier. Leave it out if there is none.
             ///   - softwareVersion: The software's version. Leave it out if there is none.
-            ///   - softwareStatement: A signed software statement. Leave it out to register without one.
-            ///   - postLogoutRedirectUris: Addresses the app may return to after sign-out. Leave it out if there are none.
-            ///   - tokenEndpointAuthMethod: `none` is public, `client_secret_basic` uses HTTP Basic and `client_secret_post` sends the secret in the body. Other methods, including `private_key_jwt`, are refused with `invalid_client_metadata`.
-            ///   - jwks: The client's public JSON Web Key Set. Leave it out if the client has none.
-            ///   - jwksUri: The URL of the client's public JSON Web Key Set. Leave it out if the client has none.
+            ///   - tokenEndpointAuthMethod: `none`: the client is public and proves itself with PKCE. Any other method is refused with `invalid_client_metadata`.
             ///   - grantTypes: The grants the client uses: `authorization_code`, `refresh_token` or `urn:ietf:params:oauth:grant-type:device_code`. Defaults to `authorization_code`. Without `authorization_code`, add `refresh_token` to get a refresh token with `offline_access`.
             ///   - responseTypes: The response types the client uses. Defaults to `code` when `grant_types` includes `authorization_code`.
             ///   - applicationType: `web` or `native`, which decides the redirect URIs the client may use. Defaults to `web`.
-            ///   - subjectType: `public` for public subject identifiers. Leave it out to use public identifiers. `pairwise` is refused with `invalid_client_metadata`.
-            ///   - dpopBoundAccessTokens: `true` to bind the client's access tokens to DPoP proofs. Leave it out for tokens without that binding.
-            ///   - resources: Resource identifiers to register the client for. Leave it out for the instance's default resources.
+            ///   - resources: Resource identifiers, each an absolute URI without a fragment; any other value is refused with `invalid_target`. Marfa doesn't register them or return them: a token request names its own `resource`.
             public init(
                 redirectUris: [Swift.String]? = nil,
                 scope: Swift.String? = nil,
@@ -17807,16 +18357,10 @@ extension Components {
                 policyUri: Swift.String? = nil,
                 softwareId: Swift.String? = nil,
                 softwareVersion: Swift.String? = nil,
-                softwareStatement: Swift.String? = nil,
-                postLogoutRedirectUris: [Swift.String]? = nil,
                 tokenEndpointAuthMethod: Components.Schemas.OAuthClientRegistration.TokenEndpointAuthMethodPayload? = nil,
-                jwks: Components.Schemas.OAuthClientRegistration.JwksPayload? = nil,
-                jwksUri: Swift.String? = nil,
                 grantTypes: [Swift.String]? = nil,
                 responseTypes: Components.Schemas.OAuthClientRegistration.ResponseTypesPayload? = nil,
                 applicationType: Components.Schemas.OAuthClientRegistration.ApplicationTypePayload? = nil,
-                subjectType: Components.Schemas.OAuthClientRegistration.SubjectTypePayload? = nil,
-                dpopBoundAccessTokens: Swift.Bool? = nil,
                 resources: [Swift.String]? = nil
             ) {
                 self.redirectUris = redirectUris
@@ -17829,16 +18373,10 @@ extension Components {
                 self.policyUri = policyUri
                 self.softwareId = softwareId
                 self.softwareVersion = softwareVersion
-                self.softwareStatement = softwareStatement
-                self.postLogoutRedirectUris = postLogoutRedirectUris
                 self.tokenEndpointAuthMethod = tokenEndpointAuthMethod
-                self.jwks = jwks
-                self.jwksUri = jwksUri
                 self.grantTypes = grantTypes
                 self.responseTypes = responseTypes
                 self.applicationType = applicationType
-                self.subjectType = subjectType
-                self.dpopBoundAccessTokens = dpopBoundAccessTokens
                 self.resources = resources
             }
             public enum CodingKeys: String, CodingKey {
@@ -17852,16 +18390,10 @@ extension Components {
                 case policyUri = "policy_uri"
                 case softwareId = "software_id"
                 case softwareVersion = "software_version"
-                case softwareStatement = "software_statement"
-                case postLogoutRedirectUris = "post_logout_redirect_uris"
                 case tokenEndpointAuthMethod = "token_endpoint_auth_method"
-                case jwks
-                case jwksUri = "jwks_uri"
                 case grantTypes = "grant_types"
                 case responseTypes = "response_types"
                 case applicationType = "application_type"
-                case subjectType = "subject_type"
-                case dpopBoundAccessTokens = "dpop_bound_access_tokens"
                 case resources
             }
         }
@@ -17964,10 +18496,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/events`.
             public var events: [Swift.String]
-            /// The type, with its subtypes, or the pattern whose item events Marfa sends. Absent when Marfa sends item events of every type. Edge events aren't filtered.
+            /// The type, with its subtypes, or the pattern whose item events Marfa sends. `null` when Marfa sends item events of every type. Edge events aren't filtered.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/type_filter`.
-            public var typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
+            public var typeFilter: Swift.String?
             /// The key Marfa signs each delivery with. Only `POST /webhooks` returns it whole; other responses show `****` and its last four characters.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/secret`.
@@ -17990,7 +18522,7 @@ extension Components {
             ///   - id: Unique identifier for the webhook.
             ///   - url: The URL Marfa posts events to.
             ///   - events: The events Marfa sends, such as `item.created`.
-            ///   - typeFilter: The type, with its subtypes, or the pattern whose item events Marfa sends. Absent when Marfa sends item events of every type. Edge events aren't filtered.
+            ///   - typeFilter: The type, with its subtypes, or the pattern whose item events Marfa sends. `null` when Marfa sends item events of every type. Edge events aren't filtered.
             ///   - secret: The key Marfa signs each delivery with. Only `POST /webhooks` returns it whole; other responses show `****` and its last four characters.
             ///   - active: `true` if Marfa sends events to the webhook.
             ///   - createdAt: When the webhook was created, in UTC.
@@ -17999,7 +18531,7 @@ extension Components {
                 id: Swift.String,
                 url: Swift.String,
                 events: [Swift.String],
-                typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
+                typeFilter: Swift.String? = nil,
                 secret: Swift.String,
                 active: Swift.Bool,
                 createdAt: Swift.String,
@@ -18263,16 +18795,16 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/id`.
             public var id: Swift.String
-            /// `pending`: waiting to be sent or retried. `success`: the receiver answered with a `2xx` status. `dead_letter`: Marfa gave up, and you can redeliver it. `canceled`: Marfa settled it unsent, and `error` says why.
+            /// `pending`: waiting to be sent or retried. `succeeded`: the receiver answered with a `2xx` status. `failed`: Marfa gave up, and you can redeliver it. `canceled`: Marfa settled it unsent, and `error` says why.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/status`.
             @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case pending = "pending"
-                case success = "success"
-                case deadLetter = "dead_letter"
+                case succeeded = "succeeded"
+                case failed = "failed"
                 case canceled = "canceled"
             }
-            /// `pending`: waiting to be sent or retried. `success`: the receiver answered with a `2xx` status. `dead_letter`: Marfa gave up, and you can redeliver it. `canceled`: Marfa settled it unsent, and `error` says why.
+            /// `pending`: waiting to be sent or retried. `succeeded`: the receiver answered with a `2xx` status. `failed`: Marfa gave up, and you can redeliver it. `canceled`: Marfa settled it unsent, and `error` says why.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/status`.
             public var status: Components.Schemas.WebhookDelivery.StatusPayload
@@ -18292,7 +18824,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/attempt`.
             public var attempt: Swift.Double
-            /// `true` if `status` is `success`.
+            /// `true` if `status` is `succeeded`.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/succeeded`.
             public var succeeded: Swift.Bool
@@ -18308,12 +18840,12 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the delivery. Marfa sends it as `delivery_id`, the same on every attempt.
-            ///   - status: `pending`: waiting to be sent or retried. `success`: the receiver answered with a `2xx` status. `dead_letter`: Marfa gave up, and you can redeliver it. `canceled`: Marfa settled it unsent, and `error` says why.
+            ///   - status: `pending`: waiting to be sent or retried. `succeeded`: the receiver answered with a `2xx` status. `failed`: Marfa gave up, and you can redeliver it. `canceled`: Marfa settled it unsent, and `error` says why.
             ///   - webhookId: The ID of the webhook the delivery belongs to.
             ///   - eventType: The event delivered, such as `item.created`.
             ///   - statusCode: The HTTP status the receiver answered on the latest recorded attempt, or `null` if that attempt got no answer or no attempt has run.
             ///   - attempt: How many attempts have recorded an outcome, across every redelivery. A send whose outcome was lost, such as during a restart, isn't counted, so the receiver may have seen more.
-            ///   - succeeded: `true` if `status` is `success`.
+            ///   - succeeded: `true` if `status` is `succeeded`.
             ///   - error: Why the latest attempt failed, or why Marfa settled the delivery unsent. `null` after a success or before the first attempt.
             ///   - createdAt: When Marfa queued the delivery, in UTC.
             public init(
@@ -18385,7 +18917,7 @@ extension Components {
             /// The sign-in name and kind recorded when the action happened, Marfa for server work, or null when unknown.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/actor`.
-            public var actor: Components.Schemas.MarfaNullableMarfaInlined4567187ff0a66df
+            public var actor: Components.Schemas.MarfaNullableMarfaInlinef5e21acab2df7137
             /// Unique identifier for the entry.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/id`.
@@ -18451,7 +18983,7 @@ extension Components {
             ///   - clientIp: The IP address of the request that acted, or `null` if the entry records none.
             ///   - details: More about the action. What it holds depends on `action`.
             public init(
-                actor: Components.Schemas.MarfaNullableMarfaInlined4567187ff0a66df,
+                actor: Components.Schemas.MarfaNullableMarfaInlinef5e21acab2df7137,
                 id: Swift.String,
                 createdAt: Swift.String,
                 keyId: Swift.String? = nil,
@@ -18528,19 +19060,83 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// The milliseconds the write waited for the write lock. Absent when a restore turned the write away at once.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details/budget_ms`.
+                    public var budgetMs: Swift.Int?
+                    /// Why Marfa turned the write away without a wait. `restore_running` means a restore is running.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details/reason`.
+                    @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case restoreRunning = "restore_running"
+                    }
+                    /// Why Marfa turned the write away without a wait. `restore_running` means a restore is running.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details/reason`.
+                    public var reason: Components.Schemas.WriteContentionRefusal._ErrorPayload.DetailsPayload.ReasonPayload?
+                    /// The same whole seconds as `Retry-After`. Present when `reason` is `restore_running`.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/WriteContentionRefusal/error/details/retry_after_seconds`.
+                    public var retryAfterSeconds: Swift.Int?
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
                     /// Creates a new `DetailsPayload`.
                     ///
                     /// - Parameters:
+                    ///   - budgetMs: The milliseconds the write waited for the write lock. Absent when a restore turned the write away at once.
+                    ///   - reason: Why Marfa turned the write away without a wait. `restore_running` means a restore is running.
+                    ///   - retryAfterSeconds: The same whole seconds as `Retry-After`. Present when `reason` is `restore_running`.
                     ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    public init(
+                        budgetMs: Swift.Int? = nil,
+                        reason: Components.Schemas.WriteContentionRefusal._ErrorPayload.DetailsPayload.ReasonPayload? = nil,
+                        retryAfterSeconds: Swift.Int? = nil,
+                        additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+                    ) {
+                        self.budgetMs = budgetMs
+                        self.reason = reason
+                        self.retryAfterSeconds = retryAfterSeconds
                         self.additionalProperties = additionalProperties
                     }
+                    public enum CodingKeys: String, CodingKey {
+                        case budgetMs = "budget_ms"
+                        case reason
+                        case retryAfterSeconds = "retry_after_seconds"
+                    }
                     public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.budgetMs = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .budgetMs
+                        )
+                        self.reason = try container.decodeIfPresent(
+                            Components.Schemas.WriteContentionRefusal._ErrorPayload.DetailsPayload.ReasonPayload.self,
+                            forKey: .reason
+                        )
+                        self.retryAfterSeconds = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .retryAfterSeconds
+                        )
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                            "budget_ms",
+                            "reason",
+                            "retry_after_seconds"
+                        ])
                     }
                     public func encode(to encoder: any Swift.Encoder) throws {
+                        var container = encoder.container(keyedBy: CodingKeys.self)
+                        try container.encodeIfPresent(
+                            self.budgetMs,
+                            forKey: .budgetMs
+                        )
+                        try container.encodeIfPresent(
+                            self.reason,
+                            forKey: .reason
+                        )
+                        try container.encodeIfPresent(
+                            self.retryAfterSeconds,
+                            forKey: .retryAfterSeconds
+                        )
                         try encoder.encodeAdditionalProperties(additionalProperties)
                     }
                 }
@@ -18750,6 +19346,88 @@ extension Components {
         }
         /// An error response.
         ///
+        /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal`.
+        public struct ContractMismatchRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case contractMismatch = "contract_mismatch"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error/code`.
+                public var code: Components.Schemas.ContractMismatchRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error/details`.
+                public var details: Components.Schemas.ContractMismatchRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ContractMismatchRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ContractMismatchRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContractMismatchRefusal/error`.
+            public var error: Components.Schemas.ContractMismatchRefusal._ErrorPayload
+            /// Creates a new `ContractMismatchRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ContractMismatchRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
         /// - Remark: Generated from `#/components/schemas/InstanceChangedRefusal`.
         public struct InstanceChangedRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
@@ -18914,30 +19592,31 @@ extension Components {
         }
         /// An error response.
         ///
-        /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal`.
-        public struct IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal: Codable, Hashable, Sendable {
+        /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal`.
+        public struct IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal: Codable, Hashable, Sendable {
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error`.
+            /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error`.
             public struct _ErrorPayload: Codable, Hashable, Sendable {
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/code`.
+                /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/code`.
                 @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case idempotencyContractChanged = "idempotency_contract_changed"
                     case idempotencyKeyReused = "idempotency_key_reused"
                     case idempotencyResultNotRetained = "idempotency_result_not_retained"
                 }
                 /// A machine-readable code for the error. Use it in your logic.
                 ///
-                /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/code`.
-                public var code: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.CodePayload
+                /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/code`.
+                public var code: Components.Schemas.IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.CodePayload
                 /// A description of the error for a person to read. It can change, so don't match on it.
                 ///
-                /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/message`.
+                /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/message`.
                 public var message: Swift.String
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/details`.
+                /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/details`.
                 public struct DetailsPayload: Codable, Hashable, Sendable {
                     /// A container of undocumented properties.
                     public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
@@ -18957,8 +19636,8 @@ extension Components {
                 }
                 /// More about the error, such as the field it concerns. Each code defines its own details.
                 ///
-                /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/details`.
-                public var details: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.DetailsPayload?
+                /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error/details`.
+                public var details: Components.Schemas.IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.DetailsPayload?
                 /// Creates a new `_ErrorPayload`.
                 ///
                 /// - Parameters:
@@ -18966,9 +19645,9 @@ extension Components {
                 ///   - message: A description of the error for a person to read. It can change, so don't match on it.
                 ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
                 public init(
-                    code: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.CodePayload,
+                    code: Components.Schemas.IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.CodePayload,
                     message: Swift.String,
-                    details: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.DetailsPayload? = nil
+                    details: Components.Schemas.IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload.DetailsPayload? = nil
                 ) {
                     self.code = code
                     self.message = message
@@ -18982,13 +19661,13 @@ extension Components {
             }
             /// What went wrong.
             ///
-            /// - Remark: Generated from `#/components/schemas/IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error`.
-            public var error: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload
-            /// Creates a new `IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal`.
+            /// - Remark: Generated from `#/components/schemas/IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal/error`.
+            public var error: Components.Schemas.IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload
+            /// Creates a new `IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal`.
             ///
             /// - Parameters:
             ///   - error: What went wrong.
-            public init(error: Components.Schemas.IdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload) {
+            public init(error: Components.Schemas.IdempotencyContractChangedOrIdempotencyKeyReusedOrIdempotencyResultNotRetainedRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {
@@ -19005,7 +19684,7 @@ extension Components {
             @frozen public enum EventTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case item_created = "item.created"
                 case item_updated = "item.updated"
-                case item_deleted = "item.deleted"
+                case item_trashed = "item.trashed"
                 case item_restored = "item.restored"
                 case item_purged = "item.purged"
                 case item_stateChanged = "item.state_changed"
@@ -19015,11 +19694,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemEventFrame/event_type`.
             public var eventType: Components.Schemas.ItemEventFrame.EventTypePayload
-            /// The item after the change. On `item.deleted` and `item.purged` of an item a cascade trashed, it carries `trashed_by_cascade`, and `trashed_with` if you can read that item's type.
+            /// The item after the change. On `item.trashed` and `item.purged` of an item a cascade trashed, it carries `trashed_by_cascade`, and `trashed_with` if you can read that item's type.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemEventFrame/item`.
             public var item: Components.Schemas.Item
-            /// The item's tags and extensions after the change, with only the namespaces you can read. The stream leaves it out when the event carries none, and a webhook sends `null`.
+            /// The item's tags and extensions after the change, or before it on `item.purged`, with only the namespaces you can read. A webhook sends `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemEventFrame/metadata`.
             public var metadata: Components.Schemas.MarfaNullableMetadata?
@@ -19035,8 +19714,8 @@ extension Components {
             ///
             /// - Parameters:
             ///   - eventType: The event, which is also the frame's `event:`.
-            ///   - item: The item after the change. On `item.deleted` and `item.purged` of an item a cascade trashed, it carries `trashed_by_cascade`, and `trashed_with` if you can read that item's type.
-            ///   - metadata: The item's tags and extensions after the change, with only the namespaces you can read. The stream leaves it out when the event carries none, and a webhook sends `null`.
+            ///   - item: The item after the change. On `item.trashed` and `item.purged` of an item a cascade trashed, it carries `trashed_by_cascade`, and `trashed_with` if you can read that item's type.
+            ///   - metadata: The item's tags and extensions after the change, or before it on `item.purged`, with only the namespaces you can read. A webhook sends `null`.
             ///   - restoredWith: On `item.restored` of an item another item's restore brought back: the ID of that item, if you can read its type.
             ///   - listed: Only on a copy stream: `true` if the item is in the set you can list, `false` if you can read it only by ID.
             public init(
@@ -19060,7 +19739,7 @@ extension Components {
                 case listed
             }
         }
-        /// An edge event: a change to an edge. You receive it only if you can read both the edge type and `source_type`, and, except on a copy stream, only if your source filter shows the edge's source item.
+        /// An edge event: a change to an edge. You receive it only if you can read both the edge type and `from_type`, and, except on a copy stream, only if your source filter shows the item the edge points from.
         ///
         /// - Remark: Generated from `#/components/schemas/EdgeEventFrame`.
         public struct EdgeEventFrame: Codable, Hashable, Sendable {
@@ -19080,10 +19759,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeEventFrame/edge`.
             public var edge: Components.Schemas.Edge
-            /// The type of the edge's source item when the event happened.
+            /// The type of the item the edge points from when the event happened.
             ///
-            /// - Remark: Generated from `#/components/schemas/EdgeEventFrame/source_type`.
-            public var sourceType: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/EdgeEventFrame/from_type`.
+            public var fromType: Swift.String?
             /// On `edge.deleted` of an edge a purge removed: the ID of the purged item.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeEventFrame/purged_with`.
@@ -19093,23 +19772,23 @@ extension Components {
             /// - Parameters:
             ///   - eventType: The event, which is also the frame's `event:`.
             ///   - edge: The edge after the change, or before it for `edge.deleted`.
-            ///   - sourceType: The type of the edge's source item when the event happened.
+            ///   - fromType: The type of the item the edge points from when the event happened.
             ///   - purgedWith: On `edge.deleted` of an edge a purge removed: the ID of the purged item.
             public init(
                 eventType: Components.Schemas.EdgeEventFrame.EventTypePayload,
                 edge: Components.Schemas.Edge,
-                sourceType: Swift.String? = nil,
+                fromType: Swift.String? = nil,
                 purgedWith: Swift.String? = nil
             ) {
                 self.eventType = eventType
                 self.edge = edge
-                self.sourceType = sourceType
+                self.fromType = fromType
                 self.purgedWith = purgedWith
             }
             public enum CodingKeys: String, CodingKey {
                 case eventType = "event_type"
                 case edge
-                case sourceType = "source_type"
+                case fromType = "from_type"
                 case purgedWith = "purged_with"
             }
         }
@@ -19178,7 +19857,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/event_type`.
             public var eventType: Components.Schemas.StreamLiveFrame.EventTypePayload
-            /// A position you can resume from without receiving again what the catch-up covered. `null` only when Marfa couldn't read the log in time and had nothing to replay.
+            /// A position you can resume from without receiving again what the catch-up covered. `null` only on a copy stream, when Marfa couldn't read the log in time and had nothing to replay.
             ///
             /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/cursor`.
             public var cursor: Swift.String?
@@ -19194,7 +19873,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - eventType: The frame's name, which is also its `event:`.
-            ///   - cursor: A position you can resume from without receiving again what the catch-up covered. `null` only when Marfa couldn't read the log in time and had nothing to replay.
+            ///   - cursor: A position you can resume from without receiving again what the catch-up covered. `null` only on a copy stream, when Marfa couldn't read the log in time and had nothing to replay.
             ///   - instanceId: Only on a copy stream: the instance's ID, as `GET /` returns it.
             ///   - reach: Only on a copy stream: the reach to send as `X-Marfa-Reach`, to resume or to read the working copy's data.
             public init(
@@ -19215,7 +19894,7 @@ extension Components {
                 case reach
             }
         }
-        /// The last frame, with no `id:`, when the stream can no longer deliver what it opened with. Marfa sends nothing past the gap, so reconnect with the last `id:` you received. `reader_behind` comes when 4 MiB of frames wait unread, or when you take none for 30 seconds during the catch-up.
+        /// The last frame, with no `id:`, when the stream can no longer deliver what it opened with. Marfa sends nothing past the gap, so reconnect with the last `id:` you received. Marfa closes a stream whose reader takes nothing for 30 seconds, with no frame.
         ///
         /// - Remark: Generated from `#/components/schemas/StreamIncompleteFrame`.
         public struct StreamIncompleteFrame: Codable, Hashable, Sendable {
@@ -19229,18 +19908,15 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StreamIncompleteFrame/event_type`.
             public var eventType: Components.Schemas.StreamIncompleteFrame.EventTypePayload
-            /// `replay_failed`: catch-up failed. `backlog_overflow`: changes piled up as it opened. `live_delivery_failed`: live events failed. `credential_ended`: your credential ended. `reader_behind`: you fell behind. `server_stopping`: Marfa is stopping.
+            /// `credential_ended`: your credential ended. `read_failed`: Marfa couldn't read the log or your credential. `server_stopping`: Marfa is stopping.
             ///
             /// - Remark: Generated from `#/components/schemas/StreamIncompleteFrame/reason`.
             @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case replayFailed = "replay_failed"
-                case backlogOverflow = "backlog_overflow"
-                case liveDeliveryFailed = "live_delivery_failed"
                 case credentialEnded = "credential_ended"
-                case readerBehind = "reader_behind"
+                case readFailed = "read_failed"
                 case serverStopping = "server_stopping"
             }
-            /// `replay_failed`: catch-up failed. `backlog_overflow`: changes piled up as it opened. `live_delivery_failed`: live events failed. `credential_ended`: your credential ended. `reader_behind`: you fell behind. `server_stopping`: Marfa is stopping.
+            /// `credential_ended`: your credential ended. `read_failed`: Marfa couldn't read the log or your credential. `server_stopping`: Marfa is stopping.
             ///
             /// - Remark: Generated from `#/components/schemas/StreamIncompleteFrame/reason`.
             public var reason: Components.Schemas.StreamIncompleteFrame.ReasonPayload
@@ -19252,7 +19928,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - eventType: The frame's name, which is also its `event:`.
-            ///   - reason: `replay_failed`: catch-up failed. `backlog_overflow`: changes piled up as it opened. `live_delivery_failed`: live events failed. `credential_ended`: your credential ended. `reader_behind`: you fell behind. `server_stopping`: Marfa is stopping.
+            ///   - reason: `credential_ended`: your credential ended. `read_failed`: Marfa couldn't read the log or your credential. `server_stopping`: Marfa is stopping.
             ///   - cursor: The ID of the last event the stream sent, or `null` if it sent none.
             public init(
                 eventType: Components.Schemas.StreamIncompleteFrame.EventTypePayload,
@@ -19269,7 +19945,7 @@ extension Components {
                 case cursor
             }
         }
-        /// The last frame, with no `id:`, when the log no longer holds the events after your `Last-Event-ID`. Read state again from the API, then open a new stream.
+        /// The last frame, with no `id:`, when the log no longer holds the events after your `Last-Event-ID`, or the stream reaches an event Marfa can't read. Read state again from the API, then open a new stream.
         ///
         /// - Remark: Generated from `#/components/schemas/CatchupTooOldFrame`.
         public struct CatchupTooOldFrame: Codable, Hashable, Sendable {
@@ -19287,7 +19963,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/CatchupTooOldFrame/min_retained_id`.
             public var minRetainedId: Swift.String
-            /// The `Last-Event-ID` you sent.
+            /// The `Last-Event-ID` you sent, or the ID of the latest event when you sent none.
             ///
             /// - Remark: Generated from `#/components/schemas/CatchupTooOldFrame/requested`.
             public var requested: Swift.String
@@ -19296,7 +19972,7 @@ extension Components {
             /// - Parameters:
             ///   - eventType: The frame's name, which is also its `event:`.
             ///   - minRetainedId: The ID of the oldest event the log still holds.
-            ///   - requested: The `Last-Event-ID` you sent.
+            ///   - requested: The `Last-Event-ID` you sent, or the ID of the latest event when you sent none.
             public init(
                 eventType: Components.Schemas.CatchupTooOldFrame.EventTypePayload,
                 minRetainedId: Swift.String,
@@ -19389,16 +20065,20 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case2`.
             case ItemEventFrame(Components.Schemas.ItemEventFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case3`.
-            case EdgeEventFrame(Components.Schemas.EdgeEventFrame)
+            case RowsChangedFrame(Components.Schemas.RowsChangedFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case4`.
-            case StreamLiveFrame(Components.Schemas.StreamLiveFrame)
+            case EdgeEventFrame(Components.Schemas.EdgeEventFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case5`.
-            case StreamIncompleteFrame(Components.Schemas.StreamIncompleteFrame)
+            case AttentionEventFrame(Components.Schemas.AttentionEventFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case6`.
-            case CatchupTooOldFrame(Components.Schemas.CatchupTooOldFrame)
+            case StreamLiveFrame(Components.Schemas.StreamLiveFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case7`.
-            case CursorAheadFrame(Components.Schemas.CursorAheadFrame)
+            case StreamIncompleteFrame(Components.Schemas.StreamIncompleteFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case8`.
+            case CatchupTooOldFrame(Components.Schemas.CatchupTooOldFrame)
+            /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case9`.
+            case CursorAheadFrame(Components.Schemas.CursorAheadFrame)
+            /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case10`.
             case ReachChangedFrame(Components.Schemas.ReachChangedFrame)
             public init(from decoder: any Swift.Decoder) throws {
                 var errors: [any Swift.Error] = []
@@ -19415,7 +20095,19 @@ extension Components {
                     errors.append(error)
                 }
                 do {
+                    self = .RowsChangedFrame(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
                     self = .EdgeEventFrame(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self = .AttentionEventFrame(try .init(from: decoder))
                     return
                 } catch {
                     errors.append(error)
@@ -19462,7 +20154,11 @@ extension Components {
                     try value.encode(to: encoder)
                 case let .ItemEventFrame(value):
                     try value.encode(to: encoder)
+                case let .RowsChangedFrame(value):
+                    try value.encode(to: encoder)
                 case let .EdgeEventFrame(value):
+                    try value.encode(to: encoder)
+                case let .AttentionEventFrame(value):
                     try value.encode(to: encoder)
                 case let .StreamLiveFrame(value):
                     try value.encode(to: encoder)
@@ -19548,42 +20244,7 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/WebhookEdgeEvent/value1`.
             public var value1: Components.Schemas.EdgeEventFrame
             /// - Remark: Generated from `#/components/schemas/WebhookEdgeEvent/value2`.
-            public struct Value2Payload: Codable, Hashable, Sendable {
-                /// The event's ID in the log, the same as its `id:` on `GET /events`.
-                ///
-                /// - Remark: Generated from `#/components/schemas/WebhookEdgeEvent/value2/event_id`.
-                public var eventId: Swift.String
-                /// The ID of the delivery, the same on every attempt. Use it to recognize a repeat.
-                ///
-                /// - Remark: Generated from `#/components/schemas/WebhookEdgeEvent/value2/delivery_id`.
-                public var deliveryId: Swift.String
-                /// When Marfa sent this attempt, in UTC.
-                ///
-                /// - Remark: Generated from `#/components/schemas/WebhookEdgeEvent/value2/delivered_at`.
-                public var deliveredAt: Swift.String
-                /// Creates a new `Value2Payload`.
-                ///
-                /// - Parameters:
-                ///   - eventId: The event's ID in the log, the same as its `id:` on `GET /events`.
-                ///   - deliveryId: The ID of the delivery, the same on every attempt. Use it to recognize a repeat.
-                ///   - deliveredAt: When Marfa sent this attempt, in UTC.
-                public init(
-                    eventId: Swift.String,
-                    deliveryId: Swift.String,
-                    deliveredAt: Swift.String
-                ) {
-                    self.eventId = eventId
-                    self.deliveryId = deliveryId
-                    self.deliveredAt = deliveredAt
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case eventId = "event_id"
-                    case deliveryId = "delivery_id"
-                    case deliveredAt = "delivered_at"
-                }
-            }
-            /// - Remark: Generated from `#/components/schemas/WebhookEdgeEvent/value2`.
-            public var value2: Components.Schemas.WebhookEdgeEvent.Value2Payload
+            public var value2: Components.Schemas.WebhookDeliveryAttempt
             /// Creates a new `WebhookEdgeEvent`.
             ///
             /// - Parameters:
@@ -19591,7 +20252,7 @@ extension Components {
             ///   - value2:
             public init(
                 value1: Components.Schemas.EdgeEventFrame,
-                value2: Components.Schemas.WebhookEdgeEvent.Value2Payload
+                value2: Components.Schemas.WebhookDeliveryAttempt
             ) {
                 self.value1 = value1
                 self.value2 = value2
@@ -19612,7 +20273,11 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/WebhookEvent/case1`.
             case WebhookItemEvent(Components.Schemas.WebhookItemEvent)
             /// - Remark: Generated from `#/components/schemas/WebhookEvent/case2`.
+            case WebhookRowsEvent(Components.Schemas.WebhookRowsEvent)
+            /// - Remark: Generated from `#/components/schemas/WebhookEvent/case3`.
             case WebhookEdgeEvent(Components.Schemas.WebhookEdgeEvent)
+            /// - Remark: Generated from `#/components/schemas/WebhookEvent/case4`.
+            case WebhookAttentionEvent(Components.Schemas.WebhookAttentionEvent)
             public init(from decoder: any Swift.Decoder) throws {
                 var errors: [any Swift.Error] = []
                 do {
@@ -19622,7 +20287,19 @@ extension Components {
                     errors.append(error)
                 }
                 do {
+                    self = .WebhookRowsEvent(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
                     self = .WebhookEdgeEvent(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self = .WebhookAttentionEvent(try .init(from: decoder))
                     return
                 } catch {
                     errors.append(error)
@@ -19637,9 +20314,3535 @@ extension Components {
                 switch self {
                 case let .WebhookItemEvent(value):
                     try value.encode(to: encoder)
+                case let .WebhookRowsEvent(value):
+                    try value.encode(to: encoder)
                 case let .WebhookEdgeEvent(value):
                     try value.encode(to: encoder)
+                case let .WebhookAttentionEvent(value):
+                    try value.encode(to: encoder)
                 }
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal`.
+        public struct BackupNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case backupNotFound = "backup_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.BackupNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.BackupNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BackupNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BackupNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BackupNotFoundRefusal/error`.
+            public var error: Components.Schemas.BackupNotFoundRefusal._ErrorPayload
+            /// Creates a new `BackupNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BackupNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal`.
+        public struct NoBackupDestinationRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case noBackupDestination = "no_backup_destination"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error/code`.
+                public var code: Components.Schemas.NoBackupDestinationRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error/details`.
+                public var details: Components.Schemas.NoBackupDestinationRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.NoBackupDestinationRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.NoBackupDestinationRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NoBackupDestinationRefusal/error`.
+            public var error: Components.Schemas.NoBackupDestinationRefusal._ErrorPayload
+            /// Creates a new `NoBackupDestinationRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.NoBackupDestinationRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal`.
+        public struct BackupFilesMissingRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case backupFilesMissing = "backup_files_missing"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error/code`.
+                public var code: Components.Schemas.BackupFilesMissingRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error/message`.
+                public var message: Swift.String
+                /// Names the files the restore could not find.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// The hash of each file the backup names that neither the backup folder nor this instance holds whole.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error/details/missing_blobs`.
+                    public var missingBlobs: [Swift.String]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - missingBlobs: The hash of each file the backup names that neither the backup folder nor this instance holds whole.
+                    public init(missingBlobs: [Swift.String]) {
+                        self.missingBlobs = missingBlobs
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case missingBlobs = "missing_blobs"
+                    }
+                }
+                /// Names the files the restore could not find.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error/details`.
+                public var details: Components.Schemas.BackupFilesMissingRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: Names the files the restore could not find.
+                public init(
+                    code: Components.Schemas.BackupFilesMissingRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BackupFilesMissingRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BackupFilesMissingRefusal/error`.
+            public var error: Components.Schemas.BackupFilesMissingRefusal._ErrorPayload
+            /// Creates a new `BackupFilesMissingRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BackupFilesMissingRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal`.
+        public struct BackupPartsMissingRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case backupPartsMissing = "backup_parts_missing"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error/code`.
+                public var code: Components.Schemas.BackupPartsMissingRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error/message`.
+                public var message: Swift.String
+                /// Names the parts the restore could not read whole.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// The name of each part the backup's manifest names that the destination lacks, or holds with another size or SHA-256 than the manifest records.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error/details/missing_parts`.
+                    public var missingParts: [Swift.String]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - missingParts: The name of each part the backup's manifest names that the destination lacks, or holds with another size or SHA-256 than the manifest records.
+                    public init(missingParts: [Swift.String]) {
+                        self.missingParts = missingParts
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case missingParts = "missing_parts"
+                    }
+                }
+                /// Names the parts the restore could not read whole.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error/details`.
+                public var details: Components.Schemas.BackupPartsMissingRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: Names the parts the restore could not read whole.
+                public init(
+                    code: Components.Schemas.BackupPartsMissingRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BackupPartsMissingRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BackupPartsMissingRefusal/error`.
+            public var error: Components.Schemas.BackupPartsMissingRefusal._ErrorPayload
+            /// Creates a new `BackupPartsMissingRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BackupPartsMissingRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// A backup in the instance's backup folder or object store.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Backup`.
+        public struct Backup: Codable, Hashable, Sendable {
+            /// The backup's name: the instant Marfa took it in ISO 8601 basic format, with no colons, followed by `.json`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Backup/name`.
+            public var name: Swift.String
+            /// The ID of the instance that took the backup. Each instance keeps its backups in a folder of its own, and thins only its own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Backup/instance_id`.
+            public var instanceId: Swift.String
+            /// When Marfa took the backup.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Backup/created_at`.
+            public var createdAt: Foundation.Date
+            /// The bytes the backup takes: its manifest and every part it names, a part another backup shares included.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Backup/size_bytes`.
+            public var sizeBytes: Swift.Int
+            /// Creates a new `Backup`.
+            ///
+            /// - Parameters:
+            ///   - name: The backup's name: the instant Marfa took it in ISO 8601 basic format, with no colons, followed by `.json`.
+            ///   - instanceId: The ID of the instance that took the backup. Each instance keeps its backups in a folder of its own, and thins only its own.
+            ///   - createdAt: When Marfa took the backup.
+            ///   - sizeBytes: The bytes the backup takes: its manifest and every part it names, a part another backup shares included.
+            public init(
+                name: Swift.String,
+                instanceId: Swift.String,
+                createdAt: Foundation.Date,
+                sizeBytes: Swift.Int
+            ) {
+                self.name = name
+                self.instanceId = instanceId
+                self.createdAt = createdAt
+                self.sizeBytes = sizeBytes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case instanceId = "instance_id"
+                case createdAt = "created_at"
+                case sizeBytes = "size_bytes"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal`.
+        public struct ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case conflict = "conflict"
+                    case instanceChanged = "instance_changed"
+                    case signInAddressChangeUnconfirmed = "sign_in_address_change_unconfirmed"
+                    case signInAddressCheckFailed = "sign_in_address_check_failed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error/code`.
+                public var code: Components.Schemas.ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error/details`.
+                public var details: Components.Schemas.ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal/error`.
+            public var error: Components.Schemas.ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal._ErrorPayload
+            /// Creates a new `ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConflictOrInstanceChangedOrSignInAddressChangeUnconfirmedOrSignInAddressCheckFailedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// One thing a change of address does.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AddressConsequence`.
+        public struct AddressConsequence: Codable, Hashable, Sendable {
+            /// What happens: `browser_sessions_end`, `passkeys_unusable` or `apps_sign_in_again` when the sign-in address moves, `address_removed` for each address that is dropped.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressConsequence/code`.
+            @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case browserSessionsEnd = "browser_sessions_end"
+                case passkeysUnusable = "passkeys_unusable"
+                case appsSignInAgain = "apps_sign_in_again"
+                case addressRemoved = "address_removed"
+            }
+            /// What happens: `browser_sessions_end`, `passkeys_unusable` or `apps_sign_in_again` when the sign-in address moves, `address_removed` for each address that is dropped.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressConsequence/code`.
+            public var code: Components.Schemas.AddressConsequence.CodePayload
+            /// The consequence, in a sentence for a person to read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressConsequence/sentence`.
+            public var sentence: Swift.String
+            /// How many sessions, passkeys or apps it affects, or `null` for an address that is dropped.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressConsequence/count`.
+            public var count: Swift.Int?
+            /// Creates a new `AddressConsequence`.
+            ///
+            /// - Parameters:
+            ///   - code: What happens: `browser_sessions_end`, `passkeys_unusable` or `apps_sign_in_again` when the sign-in address moves, `address_removed` for each address that is dropped.
+            ///   - sentence: The consequence, in a sentence for a person to read.
+            ///   - count: How many sessions, passkeys or apps it affects, or `null` for an address that is dropped.
+            public init(
+                code: Components.Schemas.AddressConsequence.CodePayload,
+                sentence: Swift.String,
+                count: Swift.Int? = nil
+            ) {
+                self.code = code
+                self.sentence = sentence
+                self.count = count
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code
+                case sentence
+                case count
+            }
+        }
+        /// What a change of address would do. Nothing is written.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AddressCheck`.
+        public struct AddressCheck: Codable, Hashable, Sendable {
+            /// The sign-in address after the change.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address`.
+            public var signInAddress: Swift.String
+            /// The addresses after the change.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/addresses`.
+            public var addresses: [Swift.String]
+            /// `true` if a write of this change needs `confirm_sign_in_address_change: true`: the sign-in address of a claimed instance moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/requires_confirmation`.
+            public var requiresConfirmation: Swift.Bool
+            /// Everything the change does, empty if it does nothing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/consequences`.
+            public var consequences: [Components.Schemas.AddressConsequence]
+            /// What the owner would do after the change, in order. Empty unless the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/next_steps`.
+            public var nextSteps: [Components.Schemas.AddressNextStep]
+            /// Whether the new sign-in address answers as this instance, as a write of the change checks it. Present when `requires_confirmation` is `true`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check`.
+            public struct SignInAddressCheckPayload: Codable, Hashable, Sendable {
+                /// `true` if the new sign-in address answered `GET /` as this instance, `false` if it didn't, and `null` if Marfa didn't ask it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check/passed`.
+                public var passed: Swift.Bool?
+                /// Why it didn't pass: `unreachable`, nothing answered; `timed_out`, no answer in 5 seconds; `not_this_instance`, something else answered; `needs_recent_sign_in`, the address isn't public and you couldn't make the move. Present if `passed` isn't `true`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check/reason`.
+                @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case unreachable = "unreachable"
+                    case timedOut = "timed_out"
+                    case notThisInstance = "not_this_instance"
+                    case needsRecentSignIn = "needs_recent_sign_in"
+                }
+                /// Why it didn't pass: `unreachable`, nothing answered; `timed_out`, no answer in 5 seconds; `not_this_instance`, something else answered; `needs_recent_sign_in`, the address isn't public and you couldn't make the move. Present if `passed` isn't `true`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check/reason`.
+                public var reason: Components.Schemas.AddressCheck.SignInAddressCheckPayload.ReasonPayload?
+                /// Creates a new `SignInAddressCheckPayload`.
+                ///
+                /// - Parameters:
+                ///   - passed: `true` if the new sign-in address answered `GET /` as this instance, `false` if it didn't, and `null` if Marfa didn't ask it.
+                ///   - reason: Why it didn't pass: `unreachable`, nothing answered; `timed_out`, no answer in 5 seconds; `not_this_instance`, something else answered; `needs_recent_sign_in`, the address isn't public and you couldn't make the move. Present if `passed` isn't `true`.
+                public init(
+                    passed: Swift.Bool? = nil,
+                    reason: Components.Schemas.AddressCheck.SignInAddressCheckPayload.ReasonPayload? = nil
+                ) {
+                    self.passed = passed
+                    self.reason = reason
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case passed
+                    case reason
+                }
+            }
+            /// Whether the new sign-in address answers as this instance, as a write of the change checks it. Present when `requires_confirmation` is `true`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check`.
+            public var signInAddressCheck: Components.Schemas.AddressCheck.SignInAddressCheckPayload?
+            /// Creates a new `AddressCheck`.
+            ///
+            /// - Parameters:
+            ///   - signInAddress: The sign-in address after the change.
+            ///   - addresses: The addresses after the change.
+            ///   - requiresConfirmation: `true` if a write of this change needs `confirm_sign_in_address_change: true`: the sign-in address of a claimed instance moves.
+            ///   - consequences: Everything the change does, empty if it does nothing.
+            ///   - nextSteps: What the owner would do after the change, in order. Empty unless the sign-in address moves.
+            ///   - signInAddressCheck: Whether the new sign-in address answers as this instance, as a write of the change checks it. Present when `requires_confirmation` is `true`.
+            public init(
+                signInAddress: Swift.String,
+                addresses: [Swift.String],
+                requiresConfirmation: Swift.Bool,
+                consequences: [Components.Schemas.AddressConsequence],
+                nextSteps: [Components.Schemas.AddressNextStep],
+                signInAddressCheck: Components.Schemas.AddressCheck.SignInAddressCheckPayload? = nil
+            ) {
+                self.signInAddress = signInAddress
+                self.addresses = addresses
+                self.requiresConfirmation = requiresConfirmation
+                self.consequences = consequences
+                self.nextSteps = nextSteps
+                self.signInAddressCheck = signInAddressCheck
+            }
+            public enum CodingKeys: String, CodingKey {
+                case signInAddress = "sign_in_address"
+                case addresses
+                case requiresConfirmation = "requires_confirmation"
+                case consequences
+                case nextSteps = "next_steps"
+                case signInAddressCheck = "sign_in_address_check"
+            }
+        }
+        /// The address change to check, written as `PATCH /config` writes it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AddressCheckRequest`.
+        public struct AddressCheckRequest: Codable, Hashable, Sendable {
+            /// The sign-in address to try, an origin with no path. `null` tries removing it, so the server's default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheckRequest/sign_in_address`.
+            public var signInAddress: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
+            /// The addresses to try, each an origin with no path. `null` tries removing them, so the server's default applies.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressCheckRequest/addresses`.
+            public var addresses: Components.Schemas.MarfaNullableMarfaInline681004346c78d5f3?
+            /// Creates a new `AddressCheckRequest`.
+            ///
+            /// - Parameters:
+            ///   - signInAddress: The sign-in address to try, an origin with no path. `null` tries removing it, so the server's default applies.
+            ///   - addresses: The addresses to try, each an origin with no path. `null` tries removing them, so the server's default applies.
+            public init(
+                signInAddress: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
+                addresses: Components.Schemas.MarfaNullableMarfaInline681004346c78d5f3? = nil
+            ) {
+                self.signInAddress = signInAddress
+                self.addresses = addresses
+            }
+            public enum CodingKeys: String, CodingKey {
+                case signInAddress = "sign_in_address"
+                case addresses
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.signInAddress = try container.decodeIfPresent(
+                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                    forKey: .signInAddress
+                )
+                self.addresses = try container.decodeIfPresent(
+                    Components.Schemas.MarfaNullableMarfaInline681004346c78d5f3.self,
+                    forKey: .addresses
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sign_in_address",
+                    "addresses"
+                ])
+            }
+        }
+        /// A stored setting: its value, its default and the rule it follows.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConfigSetting`.
+        public struct ConfigSetting: Codable, Hashable, Sendable {
+            /// The setting's key, the field `/config` reads and writes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/key`.
+            public var key: Swift.String
+            /// What the setting does.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/description`.
+            public var description: Swift.String
+            /// The value in force now: the stored one if it reads, else the default.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/value`.
+            public var value: OpenAPIRuntime.OpenAPIValueContainer
+            /// The value the setting takes when nothing is stored.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/default`.
+            public var _default: OpenAPIRuntime.OpenAPIValueContainer
+            /// The value stored for it, `null` if none is, or the stored text itself if it no longer reads.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/stored`.
+            public var stored: OpenAPIRuntime.OpenAPIValueContainer
+            /// The values the setting accepts, in words.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/rule`.
+            public var rule: Swift.String
+            /// `true` if the stored value no longer reads. Marfa then uses the default. Present only then.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/unreadable`.
+            public var unreadable: Swift.Bool?
+            /// The keys of the other settings a rule across settings ties to this one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/together`.
+            public var together: [Swift.String]
+            /// `true` if the setting holds a secret. Marfa then answers `value`, `default` and `stored` as `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/secret`.
+            public var secret: Swift.Bool
+            /// `true` if a secret setting holds a value Marfa can read. Present only for a secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSetting/set`.
+            public var set: Swift.Bool?
+            /// Creates a new `ConfigSetting`.
+            ///
+            /// - Parameters:
+            ///   - key: The setting's key, the field `/config` reads and writes.
+            ///   - description: What the setting does.
+            ///   - value: The value in force now: the stored one if it reads, else the default.
+            ///   - _default: The value the setting takes when nothing is stored.
+            ///   - stored: The value stored for it, `null` if none is, or the stored text itself if it no longer reads.
+            ///   - rule: The values the setting accepts, in words.
+            ///   - unreadable: `true` if the stored value no longer reads. Marfa then uses the default. Present only then.
+            ///   - together: The keys of the other settings a rule across settings ties to this one.
+            ///   - secret: `true` if the setting holds a secret. Marfa then answers `value`, `default` and `stored` as `null`.
+            ///   - set: `true` if a secret setting holds a value Marfa can read. Present only for a secret.
+            public init(
+                key: Swift.String,
+                description: Swift.String,
+                value: OpenAPIRuntime.OpenAPIValueContainer,
+                _default: OpenAPIRuntime.OpenAPIValueContainer,
+                stored: OpenAPIRuntime.OpenAPIValueContainer,
+                rule: Swift.String,
+                unreadable: Swift.Bool? = nil,
+                together: [Swift.String],
+                secret: Swift.Bool,
+                set: Swift.Bool? = nil
+            ) {
+                self.key = key
+                self.description = description
+                self.value = value
+                self._default = _default
+                self.stored = stored
+                self.rule = rule
+                self.unreadable = unreadable
+                self.together = together
+                self.secret = secret
+                self.set = set
+            }
+            public enum CodingKeys: String, CodingKey {
+                case key
+                case description
+                case value
+                case _default = "default"
+                case stored
+                case rule
+                case unreadable
+                case together
+                case secret
+                case set
+            }
+        }
+        /// A rule that holds across several settings.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConfigSettingRule`.
+        public struct ConfigSettingRule: Codable, Hashable, Sendable {
+            /// The rule's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSettingRule/name`.
+            public var name: Swift.String
+            /// What the rule requires of the settings it names.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSettingRule/description`.
+            public var description: Swift.String
+            /// The keys of the settings the rule holds together.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSettingRule/keys`.
+            public var keys: [Swift.String]
+            /// Creates a new `ConfigSettingRule`.
+            ///
+            /// - Parameters:
+            ///   - name: The rule's name.
+            ///   - description: What the rule requires of the settings it names.
+            ///   - keys: The keys of the settings the rule holds together.
+            public init(
+                name: Swift.String,
+                description: Swift.String,
+                keys: [Swift.String]
+            ) {
+                self.name = name
+                self.description = description
+                self.keys = keys
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case description
+                case keys
+            }
+        }
+        /// A setting only the environment sets, read when Marfa starts.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StartOnlySetting`.
+        public struct StartOnlySetting: Codable, Hashable, Sendable {
+            /// The environment variable that sets it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartOnlySetting/name`.
+            public var name: Swift.String
+            /// What the setting does.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartOnlySetting/description`.
+            public var description: Swift.String
+            /// `true` if the setting holds a secret, which Marfa never shows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartOnlySetting/secret`.
+            public var secret: Swift.Bool
+            /// `true` if the environment sets it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StartOnlySetting/set`.
+            public var set: Swift.Bool
+            /// Creates a new `StartOnlySetting`.
+            ///
+            /// - Parameters:
+            ///   - name: The environment variable that sets it.
+            ///   - description: What the setting does.
+            ///   - secret: `true` if the setting holds a secret, which Marfa never shows.
+            ///   - set: `true` if the environment sets it.
+            public init(
+                name: Swift.String,
+                description: Swift.String,
+                secret: Swift.Bool,
+                set: Swift.Bool
+            ) {
+                self.name = name
+                self.description = description
+                self.secret = secret
+                self.set = set
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case description
+                case secret
+                case set
+            }
+        }
+        /// Every setting Marfa has: the stored ones, the rules across them and the ones only the environment sets.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConfigSettings`.
+        public struct ConfigSettings: Codable, Hashable, Sendable {
+            /// Every stored setting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSettings/data`.
+            public var data: [Components.Schemas.ConfigSetting]
+            /// Every rule that holds across settings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSettings/rules`.
+            public var rules: [Components.Schemas.ConfigSettingRule]
+            /// Every setting only the environment sets.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConfigSettings/start_only`.
+            public var startOnly: [Components.Schemas.StartOnlySetting]
+            /// Creates a new `ConfigSettings`.
+            ///
+            /// - Parameters:
+            ///   - data: Every stored setting.
+            ///   - rules: Every rule that holds across settings.
+            ///   - startOnly: Every setting only the environment sets.
+            public init(
+                data: [Components.Schemas.ConfigSetting],
+                rules: [Components.Schemas.ConfigSettingRule],
+                startOnly: [Components.Schemas.StartOnlySetting]
+            ) {
+                self.data = data
+                self.rules = rules
+                self.startOnly = startOnly
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case rules
+                case startOnly = "start_only"
+            }
+        }
+        /// One column of a table: its type, and how rows may fill it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ColumnDefinition`.
+        public struct ColumnDefinition: Codable, Hashable, Sendable {
+            /// The column's type. `item` holds the ID of an item, and `type_constraints` may name the types it accepts. The others are as a field of that type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/type`.
+            @frozen public enum _TypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case string = "string"
+                case email = "email"
+                case url = "url"
+                case _enum = "enum"
+                case boolean = "boolean"
+                case integer = "integer"
+                case number = "number"
+                case date = "date"
+                case datetime = "datetime"
+                case item = "item"
+            }
+            /// The column's type. `item` holds the ID of an item, and `type_constraints` may name the types it accepts. The others are as a field of that type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/type`.
+            public var _type: Components.Schemas.ColumnDefinition._TypePayload
+            /// A name for people to read, up to 100 characters. Leave it out and a type read answers one made from the column's name, such as `Due At` for `due_at`. The type list answers only the declared label.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/label`.
+            public var label: Swift.String?
+            /// What the column holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/description`.
+            public var description: Swift.String?
+            /// `true` if every row must have a value for the column.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/required`.
+            public var required: Swift.Bool?
+            /// The values an `enum` column allows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/enum_values`.
+            public var enumValues: [Swift.String]?
+            /// A refinement of a `string` column, as a field's `format`. Not for an `item` column.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/format`.
+            @frozen public enum FormatPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case url = "url"
+                case email = "email"
+                case date = "date"
+                case bcp47 = "bcp47"
+                case iso3166 = "iso3166"
+                case currency = "currency"
+                case phone = "phone"
+            }
+            /// A refinement of a `string` column, as a field's `format`. Not for an `item` column.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/format`.
+            public var format: Components.Schemas.ColumnDefinition.FormatPayload?
+            /// The longest value a `string` or `enum` column allows. Not for an `item` column.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/max_length`.
+            public var maxLength: Swift.Int?
+            /// The lowest value the column allows, itself included. Only a `number` or `integer` column takes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/minimum`.
+            public var minimum: Swift.Double?
+            /// The highest value the column allows, itself included. Only a `number` or `integer` column takes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/maximum`.
+            public var maximum: Swift.Double?
+            /// The identifiers of the types an `item` column accepts. Each must be registered, or be the type that declares the column. Leave it out to accept any type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/type_constraints`.
+            public var typeConstraints: [Swift.String]?
+            /// How the column totals: `sum` and `average` for a `number` or `integer` column, `min` and `max` also for a `date` or `datetime` column, and `count` of the rows that hold a value for any column. Leave it out for no total.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/adds_up`.
+            @frozen public enum AddsUpPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case sum = "sum"
+                case average = "average"
+                case min = "min"
+                case max = "max"
+                case count = "count"
+            }
+            /// How the column totals: `sum` and `average` for a `number` or `integer` column, `min` and `max` also for a `date` or `datetime` column, and `count` of the rows that hold a value for any column. Leave it out for no total.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/adds_up`.
+            public var addsUp: Components.Schemas.ColumnDefinition.AddsUpPayload?
+            /// `true` to feed full-text search from a `string`, `email` or `url` column. Defaults to `false`, unlike a field.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ColumnDefinition/searchable`.
+            public var searchable: Swift.Bool?
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+            /// Creates a new `ColumnDefinition`.
+            ///
+            /// - Parameters:
+            ///   - _type: The column's type. `item` holds the ID of an item, and `type_constraints` may name the types it accepts. The others are as a field of that type.
+            ///   - label: A name for people to read, up to 100 characters. Leave it out and a type read answers one made from the column's name, such as `Due At` for `due_at`. The type list answers only the declared label.
+            ///   - description: What the column holds.
+            ///   - required: `true` if every row must have a value for the column.
+            ///   - enumValues: The values an `enum` column allows.
+            ///   - format: A refinement of a `string` column, as a field's `format`. Not for an `item` column.
+            ///   - maxLength: The longest value a `string` or `enum` column allows. Not for an `item` column.
+            ///   - minimum: The lowest value the column allows, itself included. Only a `number` or `integer` column takes it.
+            ///   - maximum: The highest value the column allows, itself included. Only a `number` or `integer` column takes it.
+            ///   - typeConstraints: The identifiers of the types an `item` column accepts. Each must be registered, or be the type that declares the column. Leave it out to accept any type.
+            ///   - addsUp: How the column totals: `sum` and `average` for a `number` or `integer` column, `min` and `max` also for a `date` or `datetime` column, and `count` of the rows that hold a value for any column. Leave it out for no total.
+            ///   - searchable: `true` to feed full-text search from a `string`, `email` or `url` column. Defaults to `false`, unlike a field.
+            ///   - additionalProperties: A container of undocumented properties.
+            public init(
+                _type: Components.Schemas.ColumnDefinition._TypePayload,
+                label: Swift.String? = nil,
+                description: Swift.String? = nil,
+                required: Swift.Bool? = nil,
+                enumValues: [Swift.String]? = nil,
+                format: Components.Schemas.ColumnDefinition.FormatPayload? = nil,
+                maxLength: Swift.Int? = nil,
+                minimum: Swift.Double? = nil,
+                maximum: Swift.Double? = nil,
+                typeConstraints: [Swift.String]? = nil,
+                addsUp: Components.Schemas.ColumnDefinition.AddsUpPayload? = nil,
+                searchable: Swift.Bool? = nil,
+                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+            ) {
+                self._type = _type
+                self.label = label
+                self.description = description
+                self.required = required
+                self.enumValues = enumValues
+                self.format = format
+                self.maxLength = maxLength
+                self.minimum = minimum
+                self.maximum = maximum
+                self.typeConstraints = typeConstraints
+                self.addsUp = addsUp
+                self.searchable = searchable
+                self.additionalProperties = additionalProperties
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case label
+                case description
+                case required
+                case enumValues = "enum_values"
+                case format
+                case maxLength = "max_length"
+                case minimum
+                case maximum
+                case typeConstraints = "type_constraints"
+                case addsUp = "adds_up"
+                case searchable
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decode(
+                    Components.Schemas.ColumnDefinition._TypePayload.self,
+                    forKey: ._type
+                )
+                self.label = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.description = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.required = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                self.enumValues = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .enumValues
+                )
+                self.format = try container.decodeIfPresent(
+                    Components.Schemas.ColumnDefinition.FormatPayload.self,
+                    forKey: .format
+                )
+                self.maxLength = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .maxLength
+                )
+                self.minimum = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .minimum
+                )
+                self.maximum = try container.decodeIfPresent(
+                    Swift.Double.self,
+                    forKey: .maximum
+                )
+                self.typeConstraints = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .typeConstraints
+                )
+                self.addsUp = try container.decodeIfPresent(
+                    Components.Schemas.ColumnDefinition.AddsUpPayload.self,
+                    forKey: .addsUp
+                )
+                self.searchable = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .searchable
+                )
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                    "type",
+                    "label",
+                    "description",
+                    "required",
+                    "enum_values",
+                    "format",
+                    "max_length",
+                    "minimum",
+                    "maximum",
+                    "type_constraints",
+                    "adds_up",
+                    "searchable"
+                ])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(
+                    self._type,
+                    forKey: ._type
+                )
+                try container.encodeIfPresent(
+                    self.label,
+                    forKey: .label
+                )
+                try container.encodeIfPresent(
+                    self.description,
+                    forKey: .description
+                )
+                try container.encodeIfPresent(
+                    self.required,
+                    forKey: .required
+                )
+                try container.encodeIfPresent(
+                    self.enumValues,
+                    forKey: .enumValues
+                )
+                try container.encodeIfPresent(
+                    self.format,
+                    forKey: .format
+                )
+                try container.encodeIfPresent(
+                    self.maxLength,
+                    forKey: .maxLength
+                )
+                try container.encodeIfPresent(
+                    self.minimum,
+                    forKey: .minimum
+                )
+                try container.encodeIfPresent(
+                    self.maximum,
+                    forKey: .maximum
+                )
+                try container.encodeIfPresent(
+                    self.typeConstraints,
+                    forKey: .typeConstraints
+                )
+                try container.encodeIfPresent(
+                    self.addsUp,
+                    forKey: .addsUp
+                )
+                try container.encodeIfPresent(
+                    self.searchable,
+                    forKey: .searchable
+                )
+                try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// One table a type declares: the rows an item of the type holds under a name, in the columns it lists.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TableDefinition`.
+        public struct TableDefinition: Codable, Hashable, Sendable {
+            /// A name for people to read, up to 100 characters. Leave it out and a type read answers one made from the table's name, such as `Line Items` for `line_items`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableDefinition/label`.
+            public var label: Swift.String?
+            /// What the table holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableDefinition/description`.
+            public var description: Swift.String?
+            /// The table's columns, by name: at least one and at most 64.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableDefinition/columns`.
+            public struct ColumnsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.ColumnDefinition]
+                /// Creates a new `ColumnsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.ColumnDefinition] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The table's columns, by name: at least one and at most 64.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableDefinition/columns`.
+            public var columns: Components.Schemas.TableDefinition.ColumnsPayload
+            /// The name of a `datetime`, `number`, `integer` or `string` column whose order the server keeps for the rows, so a page sorted by it reads only the rows it answers. Changing or removing it needs `schema.write`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableDefinition/order`.
+            public var order: Swift.String?
+            /// A container of undocumented properties.
+            public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+            /// Creates a new `TableDefinition`.
+            ///
+            /// - Parameters:
+            ///   - label: A name for people to read, up to 100 characters. Leave it out and a type read answers one made from the table's name, such as `Line Items` for `line_items`.
+            ///   - description: What the table holds.
+            ///   - columns: The table's columns, by name: at least one and at most 64.
+            ///   - order: The name of a `datetime`, `number`, `integer` or `string` column whose order the server keeps for the rows, so a page sorted by it reads only the rows it answers. Changing or removing it needs `schema.write`.
+            ///   - additionalProperties: A container of undocumented properties.
+            public init(
+                label: Swift.String? = nil,
+                description: Swift.String? = nil,
+                columns: Components.Schemas.TableDefinition.ColumnsPayload,
+                order: Swift.String? = nil,
+                additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+            ) {
+                self.label = label
+                self.description = description
+                self.columns = columns
+                self.order = order
+                self.additionalProperties = additionalProperties
+            }
+            public enum CodingKeys: String, CodingKey {
+                case label
+                case description
+                case columns
+                case order
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.label = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.description = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.columns = try container.decode(
+                    Components.Schemas.TableDefinition.ColumnsPayload.self,
+                    forKey: .columns
+                )
+                self.order = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .order
+                )
+                additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                    "label",
+                    "description",
+                    "columns",
+                    "order"
+                ])
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encodeIfPresent(
+                    self.label,
+                    forKey: .label
+                )
+                try container.encodeIfPresent(
+                    self.description,
+                    forKey: .description
+                )
+                try container.encode(
+                    self.columns,
+                    forKey: .columns
+                )
+                try container.encodeIfPresent(
+                    self.order,
+                    forKey: .order
+                )
+                try encoder.encodeAdditionalProperties(additionalProperties)
+            }
+        }
+        /// A row of an item's table. A row is never an item: it has no version, tags or edges.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TableRow`.
+        public struct TableRow: Codable, Hashable, Sendable {
+            /// Unique identifier for the row, a UUIDv7.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRow/id`.
+            public var id: Swift.String
+            /// The row's values, keyed by column. A column with no value is left out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRow/values`.
+            public struct ValuesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ValuesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The row's values, keyed by column. A column with no value is left out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRow/values`.
+            public var values: Components.Schemas.TableRow.ValuesPayload
+            /// When the row last changed, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRow/updated_at`.
+            public var updatedAt: Swift.String
+            /// Present when a column of type `item` names an item you can't read: those columns, left out of `values`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRow/withheld`.
+            public var withheld: [Swift.String]?
+            /// Creates a new `TableRow`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the row, a UUIDv7.
+            ///   - values: The row's values, keyed by column. A column with no value is left out.
+            ///   - updatedAt: When the row last changed, in UTC.
+            ///   - withheld: Present when a column of type `item` names an item you can't read: those columns, left out of `values`.
+            public init(
+                id: Swift.String,
+                values: Components.Schemas.TableRow.ValuesPayload,
+                updatedAt: Swift.String,
+                withheld: [Swift.String]? = nil
+            ) {
+                self.id = id
+                self.values = values
+                self.updatedAt = updatedAt
+                self.withheld = withheld
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case values
+                case updatedAt = "updated_at"
+                case withheld
+            }
+        }
+        /// A page of a table's rows.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TableRowPage`.
+        public struct TableRowPage: Codable, Hashable, Sendable {
+            /// The rows on this page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRowPage/data`.
+            public var data: [Components.Schemas.TableRow]
+            /// Pass this as `cursor` to get the next page, or `null` when there are no more.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableRowPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `TableRowPage`.
+            ///
+            /// - Parameters:
+            ///   - data: The rows on this page.
+            ///   - nextCursor: Pass this as `cursor` to get the next page, or `null` when there are no more.
+            public init(
+                data: [Components.Schemas.TableRow],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// A table an item's type declares, with what the item holds in it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TableSummary`.
+        public struct TableSummary: Codable, Hashable, Sendable {
+            /// The table's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummary/name`.
+            public var name: Swift.String
+            /// The table's label, or one made from its name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummary/label`.
+            public var label: Swift.String
+            /// How many rows the item holds in the table.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummary/row_count`.
+            public var rowCount: Swift.Int
+            /// The size of the rows' values as JSON, in bytes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummary/bytes`.
+            public var bytes: Swift.Int
+            /// The ID of the last batch that changed a row of the table, or `null` if none has.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummary/last_batch`.
+            public var lastBatch: Swift.String?
+            /// When a row of the table last changed, in UTC, or `null` if none has.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummary/changed_at`.
+            public var changedAt: Swift.String?
+            /// Creates a new `TableSummary`.
+            ///
+            /// - Parameters:
+            ///   - name: The table's name.
+            ///   - label: The table's label, or one made from its name.
+            ///   - rowCount: How many rows the item holds in the table.
+            ///   - bytes: The size of the rows' values as JSON, in bytes.
+            ///   - lastBatch: The ID of the last batch that changed a row of the table, or `null` if none has.
+            ///   - changedAt: When a row of the table last changed, in UTC, or `null` if none has.
+            public init(
+                name: Swift.String,
+                label: Swift.String,
+                rowCount: Swift.Int,
+                bytes: Swift.Int,
+                lastBatch: Swift.String? = nil,
+                changedAt: Swift.String? = nil
+            ) {
+                self.name = name
+                self.label = label
+                self.rowCount = rowCount
+                self.bytes = bytes
+                self.lastBatch = lastBatch
+                self.changedAt = changedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case label
+                case rowCount = "row_count"
+                case bytes
+                case lastBatch = "last_batch"
+                case changedAt = "changed_at"
+            }
+        }
+        /// The tables an item's type declares, by name.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TableSummaryPage`.
+        public struct TableSummaryPage: Codable, Hashable, Sendable {
+            /// Each table, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummaryPage/data`.
+            public var data: [Components.Schemas.TableSummary]
+            /// Always `null`: Marfa returns every table in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TableSummaryPage/next_cursor`.
+            public var nextCursor: Components.Schemas.MarfaNull
+            /// Creates a new `TableSummaryPage`.
+            ///
+            /// - Parameters:
+            ///   - data: Each table, by name.
+            ///   - nextCursor: Always `null`: Marfa returns every table in one page.
+            public init(
+                data: [Components.Schemas.TableSummary],
+                nextCursor: Components.Schemas.MarfaNull
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// One change to a row: `put` creates or replaces a whole row, `patch` sets the columns it names, and `delete` removes a row.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowOperation`.
+        public struct RowOperation: Codable, Hashable, Sendable {
+            /// `put` writes the whole row, `patch` sets only the columns in `values`, and `delete` removes the row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowOperation/op`.
+            @frozen public enum OpPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case put = "put"
+                case patch = "patch"
+                case delete = "delete"
+            }
+            /// `put` writes the whole row, `patch` sets only the columns in `values`, and `delete` removes the row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowOperation/op`.
+            public var op: Components.Schemas.RowOperation.OpPayload
+            /// The ID of the row, a UUIDv7 in lowercase. Required for `patch` and `delete`. Leave it out of a `put` for Marfa to create one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowOperation/id`.
+            public var id: Swift.String?
+            /// The values, keyed by column. The row an operation leaves holds at most 65536 bytes (64 KiB) of values as JSON. On a `patch`, `null` clears a column. A `put` keeps each value that names an item you can't read. A `delete` takes none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowOperation/values`.
+            public struct ValuesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ValuesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The values, keyed by column. The row an operation leaves holds at most 65536 bytes (64 KiB) of values as JSON. On a `patch`, `null` clears a column. A `put` keeps each value that names an item you can't read. A `delete` takes none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowOperation/values`.
+            public var values: Components.Schemas.RowOperation.ValuesPayload?
+            /// Creates a new `RowOperation`.
+            ///
+            /// - Parameters:
+            ///   - op: `put` writes the whole row, `patch` sets only the columns in `values`, and `delete` removes the row.
+            ///   - id: The ID of the row, a UUIDv7 in lowercase. Required for `patch` and `delete`. Leave it out of a `put` for Marfa to create one.
+            ///   - values: The values, keyed by column. The row an operation leaves holds at most 65536 bytes (64 KiB) of values as JSON. On a `patch`, `null` clears a column. A `put` keeps each value that names an item you can't read. A `delete` takes none.
+            public init(
+                op: Components.Schemas.RowOperation.OpPayload,
+                id: Swift.String? = nil,
+                values: Components.Schemas.RowOperation.ValuesPayload? = nil
+            ) {
+                self.op = op
+                self.id = id
+                self.values = values
+            }
+            public enum CodingKeys: String, CodingKey {
+                case op
+                case id
+                case values
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.op = try container.decode(
+                    Components.Schemas.RowOperation.OpPayload.self,
+                    forKey: .op
+                )
+                self.id = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.values = try container.decodeIfPresent(
+                    Components.Schemas.RowOperation.ValuesPayload.self,
+                    forKey: .values
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "op",
+                    "id",
+                    "values"
+                ])
+            }
+        }
+        /// What a batch of row changes did.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowBatchResult`.
+        public struct RowBatchResult: Codable, Hashable, Sendable {
+            /// The ID of the batch, or `null` when it changed no row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchResult/batch`.
+            public var batch: Swift.String?
+            /// The time of the batch, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the batch changed no row. An item that held a later `last_activity_at` keeps it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchResult/last_activity_at`.
+            public var lastActivityAt: Swift.String
+            /// What one operation did to its row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchResult/ResultsPayload`.
+            public struct ResultsPayloadPayload: Codable, Hashable, Sendable {
+                /// The ID of the row.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowBatchResult/ResultsPayload/id`.
+                public var id: Swift.String
+                /// `created`, `replaced`, `patched` or `deleted` for a change, `unchanged` when the row already held the values, `absent` for a delete of a row that wasn't there.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowBatchResult/ResultsPayload/outcome`.
+                @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case created = "created"
+                    case replaced = "replaced"
+                    case patched = "patched"
+                    case unchanged = "unchanged"
+                    case deleted = "deleted"
+                    case absent = "absent"
+                }
+                /// `created`, `replaced`, `patched` or `deleted` for a change, `unchanged` when the row already held the values, `absent` for a delete of a row that wasn't there.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowBatchResult/ResultsPayload/outcome`.
+                public var outcome: Components.Schemas.RowBatchResult.ResultsPayloadPayload.OutcomePayload
+                /// Creates a new `ResultsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - id: The ID of the row.
+                ///   - outcome: `created`, `replaced`, `patched` or `deleted` for a change, `unchanged` when the row already held the values, `absent` for a delete of a row that wasn't there.
+                public init(
+                    id: Swift.String,
+                    outcome: Components.Schemas.RowBatchResult.ResultsPayloadPayload.OutcomePayload
+                ) {
+                    self.id = id
+                    self.outcome = outcome
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case outcome
+                }
+            }
+            /// One entry per operation, in the order you sent them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchResult/results`.
+            public typealias ResultsPayload = [Components.Schemas.RowBatchResult.ResultsPayloadPayload]
+            /// One entry per operation, in the order you sent them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchResult/results`.
+            public var results: Components.Schemas.RowBatchResult.ResultsPayload
+            /// Creates a new `RowBatchResult`.
+            ///
+            /// - Parameters:
+            ///   - batch: The ID of the batch, or `null` when it changed no row.
+            ///   - lastActivityAt: The time of the batch, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the batch changed no row. An item that held a later `last_activity_at` keeps it.
+            ///   - results: One entry per operation, in the order you sent them.
+            public init(
+                batch: Swift.String? = nil,
+                lastActivityAt: Swift.String,
+                results: Components.Schemas.RowBatchResult.ResultsPayload
+            ) {
+                self.batch = batch
+                self.lastActivityAt = lastActivityAt
+                self.results = results
+            }
+            public enum CodingKeys: String, CodingKey {
+                case batch
+                case lastActivityAt = "last_activity_at"
+                case results
+            }
+        }
+        /// The totals of a table's columns that add up, over the rows a filter selects.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowTotals`.
+        public struct RowTotals: Codable, Hashable, Sendable {
+            /// How many rows the filter selects.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowTotals/row_count`.
+            public var rowCount: Swift.Int
+            /// For each column that names `adds_up`, an object with that way as its one key: `sum` and `count` are `0` over no values, and `average`, `min` and `max` are `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowTotals/totals`.
+            public struct TotalsPayload: Codable, Hashable, Sendable {
+                /// The column's total, under its `adds_up`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowTotals/totals/additionalProperties`.
+                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: Swift.Double?]
+                    /// Creates a new `AdditionalPropertiesPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: Swift.Double?] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.RowTotals.TotalsPayload.AdditionalPropertiesPayload]
+                /// Creates a new `TotalsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.RowTotals.TotalsPayload.AdditionalPropertiesPayload] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// For each column that names `adds_up`, an object with that way as its one key: `sum` and `count` are `0` over no values, and `average`, `min` and `max` are `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowTotals/totals`.
+            public var totals: Components.Schemas.RowTotals.TotalsPayload
+            /// Creates a new `RowTotals`.
+            ///
+            /// - Parameters:
+            ///   - rowCount: How many rows the filter selects.
+            ///   - totals: For each column that names `adds_up`, an object with that way as its one key: `sum` and `count` are `0` over no values, and `average`, `min` and `max` are `null`.
+            public init(
+                rowCount: Swift.Int,
+                totals: Components.Schemas.RowTotals.TotalsPayload
+            ) {
+                self.rowCount = rowCount
+                self.totals = totals
+            }
+            public enum CodingKeys: String, CodingKey {
+                case rowCount = "row_count"
+                case totals
+            }
+        }
+        /// One batch of changes to an item's table. You receive it if you can read the item's type and your source filter shows the item. Copy streams never receive it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowsChangedFrame`.
+        public struct RowsChangedFrame: Codable, Hashable, Sendable {
+            /// The event, which is also the frame's `event:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/event_type`.
+            @frozen public enum EventTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case rows_changed = "rows.changed"
+            }
+            /// The event, which is also the frame's `event:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/event_type`.
+            public var eventType: Components.Schemas.RowsChangedFrame.EventTypePayload
+            /// The item whose rows changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/item`.
+            public struct ItemPayload: Codable, Hashable, Sendable {
+                /// The ID of the item.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/item/id`.
+                public var id: Swift.String
+                /// The item's type.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/item/type`.
+                public var _type: Swift.String
+                /// The item's source.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/item/source`.
+                public var source: Swift.String
+                /// Creates a new `ItemPayload`.
+                ///
+                /// - Parameters:
+                ///   - id: The ID of the item.
+                ///   - _type: The item's type.
+                ///   - source: The item's source.
+                public init(
+                    id: Swift.String,
+                    _type: Swift.String,
+                    source: Swift.String
+                ) {
+                    self.id = id
+                    self._type = _type
+                    self.source = source
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case _type = "type"
+                    case source
+                }
+            }
+            /// The item whose rows changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/item`.
+            public var item: Components.Schemas.RowsChangedFrame.ItemPayload
+            /// The name of the table.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/table`.
+            public var table: Swift.String
+            /// The ID of the batch.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/batch`.
+            public var batch: Swift.String
+            /// Present when the batch is an undo: the ID of the batch it undid.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/undoes`.
+            public var undoes: Swift.String?
+            /// The time of the batch, in UTC. An item that held a later `last_activity_at` keeps it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/last_activity_at`.
+            public var lastActivityAt: Swift.String
+            /// Present, as `false`, when the batch's values were too large to carry: each entry of `rows` then holds only its `id`, and `deleted` for a removed row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/values_included`.
+            public var valuesIncluded: Swift.Bool?
+            /// A row the batch changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/RowsPayload`.
+            public struct RowsPayloadPayload: Codable, Hashable, Sendable {
+                /// The ID of the row.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/RowsPayload/id`.
+                public var id: Swift.String
+                /// The row's values after the batch.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/RowsPayload/values`.
+                public struct ValuesPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `ValuesPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// The row's values after the batch.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/RowsPayload/values`.
+                public var values: Components.Schemas.RowsChangedFrame.RowsPayloadPayload.ValuesPayload?
+                /// Present, as `true`, when the batch removed the row.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/RowsPayload/deleted`.
+                public var deleted: Swift.Bool?
+                /// Present when a column of type `item` names an item you can't read: those columns, left out of `values`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/RowsPayload/withheld`.
+                public var withheld: [Swift.String]?
+                /// Creates a new `RowsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - id: The ID of the row.
+                ///   - values: The row's values after the batch.
+                ///   - deleted: Present, as `true`, when the batch removed the row.
+                ///   - withheld: Present when a column of type `item` names an item you can't read: those columns, left out of `values`.
+                public init(
+                    id: Swift.String,
+                    values: Components.Schemas.RowsChangedFrame.RowsPayloadPayload.ValuesPayload? = nil,
+                    deleted: Swift.Bool? = nil,
+                    withheld: [Swift.String]? = nil
+                ) {
+                    self.id = id
+                    self.values = values
+                    self.deleted = deleted
+                    self.withheld = withheld
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case values
+                    case deleted
+                    case withheld
+                }
+            }
+            /// Each row the batch changed, as the batch left it, or with `deleted` `true` for a removed row. A row changed at `last_activity_at`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/rows`.
+            public typealias RowsPayload = [Components.Schemas.RowsChangedFrame.RowsPayloadPayload]
+            /// Each row the batch changed, as the batch left it, or with `deleted` `true` for a removed row. A row changed at `last_activity_at`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowsChangedFrame/rows`.
+            public var rows: Components.Schemas.RowsChangedFrame.RowsPayload
+            /// Creates a new `RowsChangedFrame`.
+            ///
+            /// - Parameters:
+            ///   - eventType: The event, which is also the frame's `event:`.
+            ///   - item: The item whose rows changed.
+            ///   - table: The name of the table.
+            ///   - batch: The ID of the batch.
+            ///   - undoes: Present when the batch is an undo: the ID of the batch it undid.
+            ///   - lastActivityAt: The time of the batch, in UTC. An item that held a later `last_activity_at` keeps it.
+            ///   - valuesIncluded: Present, as `false`, when the batch's values were too large to carry: each entry of `rows` then holds only its `id`, and `deleted` for a removed row.
+            ///   - rows: Each row the batch changed, as the batch left it, or with `deleted` `true` for a removed row. A row changed at `last_activity_at`.
+            public init(
+                eventType: Components.Schemas.RowsChangedFrame.EventTypePayload,
+                item: Components.Schemas.RowsChangedFrame.ItemPayload,
+                table: Swift.String,
+                batch: Swift.String,
+                undoes: Swift.String? = nil,
+                lastActivityAt: Swift.String,
+                valuesIncluded: Swift.Bool? = nil,
+                rows: Components.Schemas.RowsChangedFrame.RowsPayload
+            ) {
+                self.eventType = eventType
+                self.item = item
+                self.table = table
+                self.batch = batch
+                self.undoes = undoes
+                self.lastActivityAt = lastActivityAt
+                self.valuesIncluded = valuesIncluded
+                self.rows = rows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case eventType = "event_type"
+                case item
+                case table
+                case batch
+                case undoes
+                case lastActivityAt = "last_activity_at"
+                case valuesIncluded = "values_included"
+                case rows
+            }
+        }
+        /// The body of a webhook delivery of a rows event.
+        ///
+        /// - Remark: Generated from `#/components/schemas/WebhookRowsEvent`.
+        public struct WebhookRowsEvent: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/WebhookRowsEvent/value1`.
+            public var value1: Components.Schemas.RowsChangedFrame
+            /// - Remark: Generated from `#/components/schemas/WebhookRowsEvent/value2`.
+            public var value2: Components.Schemas.WebhookDeliveryAttempt
+            /// Creates a new `WebhookRowsEvent`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.RowsChangedFrame,
+                value2: Components.Schemas.WebhookDeliveryAttempt
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal`.
+        public struct ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case itemNotFound = "item_not_found"
+                    case rowNotFound = "row_not_found"
+                    case tableNotFound = "table_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal/error`.
+            public var error: Components.Schemas.ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal._ErrorPayload
+            /// Creates a new `ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ItemNotFoundOrRowNotFoundOrTableNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal`.
+        public struct ItemNotFoundOrTableNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case itemNotFound = "item_not_found"
+                    case tableNotFound = "table_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ItemNotFoundOrTableNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ItemNotFoundOrTableNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ItemNotFoundOrTableNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ItemNotFoundOrTableNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemNotFoundOrTableNotFoundRefusal/error`.
+            public var error: Components.Schemas.ItemNotFoundOrTableNotFoundRefusal._ErrorPayload
+            /// Creates a new `ItemNotFoundOrTableNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ItemNotFoundOrTableNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal`.
+        public struct TypeInUseRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case typeInUse = "type_in_use"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error/code`.
+                public var code: Components.Schemas.TypeInUseRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error/details`.
+                public var details: Components.Schemas.TypeInUseRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.TypeInUseRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.TypeInUseRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeInUseRefusal/error`.
+            public var error: Components.Schemas.TypeInUseRefusal._ErrorPayload
+            /// Creates a new `TypeInUseRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.TypeInUseRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// What a webhook delivery adds to the event it carries.
+        ///
+        /// - Remark: Generated from `#/components/schemas/WebhookDeliveryAttempt`.
+        public struct WebhookDeliveryAttempt: Codable, Hashable, Sendable {
+            /// The event's ID in the log, the same as its `id:` on `GET /events`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WebhookDeliveryAttempt/event_id`.
+            public var eventId: Swift.String
+            /// The ID of the delivery, the same on every attempt. Use it to recognize a repeat.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WebhookDeliveryAttempt/delivery_id`.
+            public var deliveryId: Swift.String
+            /// When Marfa sent this attempt, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WebhookDeliveryAttempt/delivered_at`.
+            public var deliveredAt: Swift.String
+            /// Creates a new `WebhookDeliveryAttempt`.
+            ///
+            /// - Parameters:
+            ///   - eventId: The event's ID in the log, the same as its `id:` on `GET /events`.
+            ///   - deliveryId: The ID of the delivery, the same on every attempt. Use it to recognize a repeat.
+            ///   - deliveredAt: When Marfa sent this attempt, in UTC.
+            public init(
+                eventId: Swift.String,
+                deliveryId: Swift.String,
+                deliveredAt: Swift.String
+            ) {
+                self.eventId = eventId
+                self.deliveryId = deliveryId
+                self.deliveredAt = deliveredAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case eventId = "event_id"
+                case deliveryId = "delivery_id"
+                case deliveredAt = "delivered_at"
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal`.
+        public struct BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case batchNotFound = "batch_not_found"
+                    case itemNotFound = "item_not_found"
+                    case tableNotFound = "table_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal/error`.
+            public var error: Components.Schemas.BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal._ErrorPayload
+            /// Creates a new `BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BatchNotFoundOrItemNotFoundOrTableNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal`.
+        public struct UndoConflictRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case undoConflict = "undo_conflict"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error/code`.
+                public var code: Components.Schemas.UndoConflictRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error/details`.
+                public var details: Components.Schemas.UndoConflictRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.UndoConflictRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.UndoConflictRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UndoConflictRefusal/error`.
+            public var error: Components.Schemas.UndoConflictRefusal._ErrorPayload
+            /// Creates a new `UndoConflictRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.UndoConflictRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// A batch a table's change log holds.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowBatchEntry`.
+        public struct RowBatchEntry: Codable, Hashable, Sendable {
+            /// The ID of the batch.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchEntry/id`.
+            public var id: Swift.String
+            /// When the batch was made, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchEntry/at`.
+            public var at: Swift.String
+            /// How many rows the batch changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchEntry/rows`.
+            public var rows: Swift.Int
+            /// The ID of the batch this one undid, or `null` when it's not an undo.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchEntry/undoes`.
+            public var undoes: Swift.String?
+            /// Creates a new `RowBatchEntry`.
+            ///
+            /// - Parameters:
+            ///   - id: The ID of the batch.
+            ///   - at: When the batch was made, in UTC.
+            ///   - rows: How many rows the batch changed.
+            ///   - undoes: The ID of the batch this one undid, or `null` when it's not an undo.
+            public init(
+                id: Swift.String,
+                at: Swift.String,
+                rows: Swift.Int,
+                undoes: Swift.String? = nil
+            ) {
+                self.id = id
+                self.at = at
+                self.rows = rows
+                self.undoes = undoes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case at
+                case rows
+                case undoes
+            }
+        }
+        /// The batches a table's change log holds, newest first.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowBatchPage`.
+        public struct RowBatchPage: Codable, Hashable, Sendable {
+            /// Each batch, newest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchPage/data`.
+            public var data: [Components.Schemas.RowBatchEntry]
+            /// Pass this as `cursor` to get the next page. `null` when there are no more.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowBatchPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `RowBatchPage`.
+            ///
+            /// - Parameters:
+            ///   - data: Each batch, newest first.
+            ///   - nextCursor: Pass this as `cursor` to get the next page. `null` when there are no more.
+            public init(
+                data: [Components.Schemas.RowBatchEntry],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+        }
+        /// What an undo did.
+        ///
+        /// - Remark: Generated from `#/components/schemas/RowUndoResult`.
+        public struct RowUndoResult: Codable, Hashable, Sendable {
+            /// The ID of the undo's own batch, or `null` when every row already stood as it was before the undone batch. Undo this batch to redo the one it undid.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowUndoResult/batch`.
+            public var batch: Swift.String?
+            /// The ID of the batch you undid.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowUndoResult/undoes`.
+            public var undoes: Swift.String
+            /// The time of the undo, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the undo changed no row. An item that held a later `last_activity_at` keeps it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowUndoResult/last_activity_at`.
+            public var lastActivityAt: Swift.String
+            /// What the undo did to one row.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowUndoResult/ResultsPayload`.
+            public struct ResultsPayloadPayload: Codable, Hashable, Sendable {
+                /// The ID of the row.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowUndoResult/ResultsPayload/id`.
+                public var id: Swift.String
+                /// `created` when the undo put back a row the batch deleted, `replaced` when it put back values the batch changed, `deleted` when it removed a row the batch created, and `unchanged` when the row already stood as it was before the batch.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowUndoResult/ResultsPayload/outcome`.
+                @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case created = "created"
+                    case replaced = "replaced"
+                    case deleted = "deleted"
+                    case unchanged = "unchanged"
+                }
+                /// `created` when the undo put back a row the batch deleted, `replaced` when it put back values the batch changed, `deleted` when it removed a row the batch created, and `unchanged` when the row already stood as it was before the batch.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RowUndoResult/ResultsPayload/outcome`.
+                public var outcome: Components.Schemas.RowUndoResult.ResultsPayloadPayload.OutcomePayload
+                /// Creates a new `ResultsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - id: The ID of the row.
+                ///   - outcome: `created` when the undo put back a row the batch deleted, `replaced` when it put back values the batch changed, `deleted` when it removed a row the batch created, and `unchanged` when the row already stood as it was before the batch.
+                public init(
+                    id: Swift.String,
+                    outcome: Components.Schemas.RowUndoResult.ResultsPayloadPayload.OutcomePayload
+                ) {
+                    self.id = id
+                    self.outcome = outcome
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case outcome
+                }
+            }
+            /// One entry per row the undone batch changed, by ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowUndoResult/results`.
+            public typealias ResultsPayload = [Components.Schemas.RowUndoResult.ResultsPayloadPayload]
+            /// One entry per row the undone batch changed, by ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/RowUndoResult/results`.
+            public var results: Components.Schemas.RowUndoResult.ResultsPayload
+            /// Creates a new `RowUndoResult`.
+            ///
+            /// - Parameters:
+            ///   - batch: The ID of the undo's own batch, or `null` when every row already stood as it was before the undone batch. Undo this batch to redo the one it undid.
+            ///   - undoes: The ID of the batch you undid.
+            ///   - lastActivityAt: The time of the undo, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the undo changed no row. An item that held a later `last_activity_at` keeps it.
+            ///   - results: One entry per row the undone batch changed, by ID.
+            public init(
+                batch: Swift.String? = nil,
+                undoes: Swift.String,
+                lastActivityAt: Swift.String,
+                results: Components.Schemas.RowUndoResult.ResultsPayload
+            ) {
+                self.batch = batch
+                self.undoes = undoes
+                self.lastActivityAt = lastActivityAt
+                self.results = results
+            }
+            public enum CodingKeys: String, CodingKey {
+                case batch
+                case undoes
+                case lastActivityAt = "last_activity_at"
+                case results
+            }
+        }
+        /// One kind of thing the archive doesn't hold, with what to do about it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/NotRestored`.
+        public struct NotRestored: Codable, Hashable, Sendable {
+            /// What the archive doesn't hold. `enforcement` appears only when the instance that wrote the archive couldn't read its enforcement settings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotRestored/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case signIn = "sign_in"
+                case keys = "keys"
+                case apps = "apps"
+                case webhooks = "webhooks"
+                case inboundEndpoints = "inbound_endpoints"
+                case connectorKeys = "connector_keys"
+                case addresses = "addresses"
+                case name = "name"
+                case logs = "logs"
+                case enforcement = "enforcement"
+            }
+            /// What the archive doesn't hold. `enforcement` appears only when the instance that wrote the archive couldn't read its enforcement settings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotRestored/kind`.
+            public var kind: Components.Schemas.NotRestored.KindPayload
+            /// A sentence saying that this kind is not restored and what to do about it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NotRestored/message`.
+            public var message: Swift.String
+            /// Creates a new `NotRestored`.
+            ///
+            /// - Parameters:
+            ///   - kind: What the archive doesn't hold. `enforcement` appears only when the instance that wrote the archive couldn't read its enforcement settings.
+            ///   - message: A sentence saying that this kind is not restored and what to do about it.
+            public init(
+                kind: Components.Schemas.NotRestored.KindPayload,
+                message: Swift.String
+            ) {
+                self.kind = kind
+                self.message = message
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case message
+            }
+        }
+        /// The instance that wrote an archive, and what it keeps in this instance's backup destination. Present when the archive was written by another instance than this one.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PreviousInstance`.
+        public struct PreviousInstance: Codable, Hashable, Sendable {
+            /// The ID of the instance that wrote the archive.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PreviousInstance/instance_id`.
+            public var instanceId: Swift.String
+            /// Where this instance takes its backups: `folder` for a backup folder, `bucket` for an object store, or `null` when it has no backup destination.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PreviousInstance/destination`.
+            @frozen public enum DestinationPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case folder = "folder"
+                case bucket = "bucket"
+                case _empty_ = ""
+            }
+            /// Where this instance takes its backups: `folder` for a backup folder, `bucket` for an object store, or `null` when it has no backup destination.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PreviousInstance/destination`.
+            public var destination: Components.Schemas.PreviousInstance.DestinationPayload?
+            /// Its `backups/<id>`, `backup-parts/<id>` and `files/<id>` folders in a backup folder, or only `<prefix>/backups/<id>` and `<prefix>/backup-parts/<id>` in a bucket. Empty with none. Delete only once that instance no longer runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PreviousInstance/kept_by_previous_instance`.
+            public var keptByPreviousInstance: [Swift.String]
+            /// A sentence naming that instance and what it keeps, and saying to delete it only once that instance no longer runs and nothing else restores from it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PreviousInstance/message`.
+            public var message: Swift.String
+            /// Creates a new `PreviousInstance`.
+            ///
+            /// - Parameters:
+            ///   - instanceId: The ID of the instance that wrote the archive.
+            ///   - destination: Where this instance takes its backups: `folder` for a backup folder, `bucket` for an object store, or `null` when it has no backup destination.
+            ///   - keptByPreviousInstance: Its `backups/<id>`, `backup-parts/<id>` and `files/<id>` folders in a backup folder, or only `<prefix>/backups/<id>` and `<prefix>/backup-parts/<id>` in a bucket. Empty with none. Delete only once that instance no longer runs.
+            ///   - message: A sentence naming that instance and what it keeps, and saying to delete it only once that instance no longer runs and nothing else restores from it.
+            public init(
+                instanceId: Swift.String,
+                destination: Components.Schemas.PreviousInstance.DestinationPayload? = nil,
+                keptByPreviousInstance: [Swift.String],
+                message: Swift.String
+            ) {
+                self.instanceId = instanceId
+                self.destination = destination
+                self.keptByPreviousInstance = keptByPreviousInstance
+                self.message = message
+            }
+            public enum CodingKeys: String, CodingKey {
+                case instanceId = "instance_id"
+                case destination
+                case keptByPreviousInstance = "kept_by_previous_instance"
+                case message
+            }
+        }
+        /// An OAuth error in the shape RFC 6749 defines, for a client Marfa does not accept.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InvalidClientError`.
+        public struct InvalidClientError: Codable, Hashable, Sendable {
+            /// The OAuth error code.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidClientError/error`.
+            @frozen public enum _ErrorPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case invalidClient = "invalid_client"
+            }
+            /// The OAuth error code.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidClientError/error`.
+            public var error: Components.Schemas.InvalidClientError._ErrorPayload
+            /// A description of the error for a person to read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InvalidClientError/error_description`.
+            public var errorDescription: Swift.String?
+            /// Creates a new `InvalidClientError`.
+            ///
+            /// - Parameters:
+            ///   - error: The OAuth error code.
+            ///   - errorDescription: A description of the error for a person to read.
+            public init(
+                error: Components.Schemas.InvalidClientError._ErrorPayload,
+                errorDescription: Swift.String? = nil
+            ) {
+                self.error = error
+                self.errorDescription = errorDescription
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+                case errorDescription = "error_description"
+            }
+        }
+        /// An item's tags.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ItemTags`.
+        public struct ItemTags: Codable, Hashable, Sendable {
+            /// The item's tags.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTags/tags`.
+            public var tags: [Swift.String]
+            /// Creates a new `ItemTags`.
+            ///
+            /// - Parameters:
+            ///   - tags: The item's tags.
+            public init(tags: [Swift.String]) {
+                self.tags = tags
+            }
+            public enum CodingKeys: String, CodingKey {
+                case tags
+            }
+        }
+        /// The time Marfa now trusts, after you confirmed its clock.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ClockConfirmation`.
+        public struct ClockConfirmation: Codable, Hashable, Sendable {
+            /// The clock's time when you confirmed it, in UTC, now the trusted time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ClockConfirmation/confirmed_at`.
+            public var confirmedAt: Swift.String
+            /// Creates a new `ClockConfirmation`.
+            ///
+            /// - Parameters:
+            ///   - confirmedAt: The clock's time when you confirmed it, in UTC, now the trusted time.
+            public init(confirmedAt: Swift.String) {
+                self.confirmedAt = confirmedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case confirmedAt = "confirmed_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.confirmedAt = try container.decode(
+                    Swift.String.self,
+                    forKey: .confirmedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "confirmed_at"
+                ])
+            }
+        }
+        /// The page where the owner signs in to add a passkey.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PasskeyAddLink`.
+        public struct PasskeyAddLink: Codable, Hashable, Sendable {
+            /// The sign-in page at the instance's own address, which goes on to the owner's passkey page once the owner signs in. It carries no credential.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PasskeyAddLink/url`.
+            public var url: Swift.String
+            /// Creates a new `PasskeyAddLink`.
+            ///
+            /// - Parameters:
+            ///   - url: The sign-in page at the instance's own address, which goes on to the owner's passkey page once the owner signs in. It carries no credential.
+            public init(url: Swift.String) {
+                self.url = url
+            }
+            public enum CodingKeys: String, CodingKey {
+                case url
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.url = try container.decode(
+                    Swift.String.self,
+                    forKey: .url
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "url"
+                ])
+            }
+        }
+        /// A new entry in what needs the owner's attention, sent once when a check first finds it. You receive it only with `instance.read`, and only on a stream that names no `type` and isn't a copy stream.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AttentionEventFrame`.
+        public struct AttentionEventFrame: Codable, Hashable, Sendable {
+            /// The event, which is also the frame's `event:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventFrame/event_type`.
+            @frozen public enum EventTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case attention_raised = "attention.raised"
+            }
+            /// The event, which is also the frame's `event:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventFrame/event_type`.
+            public var eventType: Components.Schemas.AttentionEventFrame.EventTypePayload
+            /// The new entry: its kind and reference, with a sentence fixed for its kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventFrame/attention`.
+            public var attention: Components.Schemas.AttentionEventEntry
+            /// Creates a new `AttentionEventFrame`.
+            ///
+            /// - Parameters:
+            ///   - eventType: The event, which is also the frame's `event:`.
+            ///   - attention: The new entry: its kind and reference, with a sentence fixed for its kind.
+            public init(
+                eventType: Components.Schemas.AttentionEventFrame.EventTypePayload,
+                attention: Components.Schemas.AttentionEventEntry
+            ) {
+                self.eventType = eventType
+                self.attention = attention
+            }
+            public enum CodingKeys: String, CodingKey {
+                case eventType = "event_type"
+                case attention
+            }
+        }
+        /// Which entry is new, with a sentence fixed for its kind. The entry's title and description, which can name a file path or an error, are read from `GET /attention`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AttentionEventEntry`.
+        public struct AttentionEventEntry: Codable, Hashable, Sendable {
+            /// The entry's `kind`, as `GET /attention` lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventEntry/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case health = "health"
+                case job = "job"
+                case connector = "connector"
+                case folder = "folder"
+                case key = "key"
+                case backup = "backup"
+                case clock = "clock"
+                case unavailable = "unavailable"
+            }
+            /// The entry's `kind`, as `GET /attention` lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventEntry/kind`.
+            public var kind: Components.Schemas.AttentionEventEntry.KindPayload
+            /// The entry's `reference`, as `GET /attention` lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventEntry/reference`.
+            public var reference: Swift.String
+            /// A sentence fixed for the kind, the same for every entry of it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AttentionEventEntry/description`.
+            public var description: Swift.String
+            /// Creates a new `AttentionEventEntry`.
+            ///
+            /// - Parameters:
+            ///   - kind: The entry's `kind`, as `GET /attention` lists it.
+            ///   - reference: The entry's `reference`, as `GET /attention` lists it.
+            ///   - description: A sentence fixed for the kind, the same for every entry of it.
+            public init(
+                kind: Components.Schemas.AttentionEventEntry.KindPayload,
+                reference: Swift.String,
+                description: Swift.String
+            ) {
+                self.kind = kind
+                self.reference = reference
+                self.description = description
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case reference
+                case description
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.kind = try container.decode(
+                    Components.Schemas.AttentionEventEntry.KindPayload.self,
+                    forKey: .kind
+                )
+                self.reference = try container.decode(
+                    Swift.String.self,
+                    forKey: .reference
+                )
+                self.description = try container.decode(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "kind",
+                    "reference",
+                    "description"
+                ])
+            }
+        }
+        /// The body of a webhook delivery of a new attention entry.
+        ///
+        /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent`.
+        public struct WebhookAttentionEvent: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value1`.
+            public var value1: Components.Schemas.AttentionEventFrame
+            /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value2`.
+            public var value2: Components.Schemas.WebhookDeliveryAttempt
+            /// Creates a new `WebhookAttentionEvent`.
+            ///
+            /// - Parameters:
+            ///   - value1:
+            ///   - value2:
+            public init(
+                value1: Components.Schemas.AttentionEventFrame,
+                value2: Components.Schemas.WebhookDeliveryAttempt
+            ) {
+                self.value1 = value1
+                self.value2 = value2
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                self.value1 = try .init(from: decoder)
+                self.value2 = try .init(from: decoder)
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                try self.value1.encode(to: encoder)
+                try self.value2.encode(to: encoder)
+            }
+        }
+        /// The newest published release Marfa found.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateLatest`.
+        public struct UpdateLatest: Codable, Hashable, Sendable {
+            /// The release, such as `0.0.75`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLatest/release`.
+            public var release: Swift.String
+            /// When the release was published, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLatest/published_at`.
+            public var publishedAt: Swift.String
+            /// Creates a new `UpdateLatest`.
+            ///
+            /// - Parameters:
+            ///   - release: The release, such as `0.0.75`.
+            ///   - publishedAt: When the release was published, in UTC.
+            public init(
+                release: Swift.String,
+                publishedAt: Swift.String
+            ) {
+                self.release = release
+                self.publishedAt = publishedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case release
+                case publishedAt = "published_at"
+            }
+        }
+        /// Why the latest check for a release failed.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateCheckError`.
+        public struct UpdateCheckError: Codable, Hashable, Sendable {
+            /// When the check failed, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateCheckError/at`.
+            public var at: Swift.String?
+            /// Why the check found no release, in words for a person.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateCheckError/message`.
+            public var message: Swift.String
+            /// Creates a new `UpdateCheckError`.
+            ///
+            /// - Parameters:
+            ///   - at: When the check failed, in UTC.
+            ///   - message: Why the check found no release, in words for a person.
+            public init(
+                at: Swift.String? = nil,
+                message: Swift.String
+            ) {
+                self.at = at
+                self.message = message
+            }
+            public enum CodingKeys: String, CodingKey {
+                case at
+                case message
+            }
+        }
+        /// The update under way, if any.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateProgress`.
+        public struct UpdateProgress: Codable, Hashable, Sendable {
+            /// Where the update is. `idle`: none under way. `fetching`: downloading. `checking`: checking the download. `swapping`: putting the new programs in place. `restarting`: the server is ending to start it. `settling`: the release is up, not yet settled.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProgress/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case idle = "idle"
+                case fetching = "fetching"
+                case checking = "checking"
+                case swapping = "swapping"
+                case restarting = "restarting"
+                case settling = "settling"
+            }
+            /// Where the update is. `idle`: none under way. `fetching`: downloading. `checking`: checking the download. `swapping`: putting the new programs in place. `restarting`: the server is ending to start it. `settling`: the release is up, not yet settled.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProgress/state`.
+            public var state: Components.Schemas.UpdateProgress.StatePayload
+            /// The release being moved to, or `null` when `state` is `idle`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateProgress/release`.
+            public var release: Swift.String?
+            /// Creates a new `UpdateProgress`.
+            ///
+            /// - Parameters:
+            ///   - state: Where the update is. `idle`: none under way. `fetching`: downloading. `checking`: checking the download. `swapping`: putting the new programs in place. `restarting`: the server is ending to start it. `settling`: the release is up, not yet settled.
+            ///   - release: The release being moved to, or `null` when `state` is `idle`.
+            public init(
+                state: Components.Schemas.UpdateProgress.StatePayload,
+                release: Swift.String? = nil
+            ) {
+                self.state = state
+                self.release = release
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case release
+            }
+        }
+        /// How the latest update ended.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateLast`.
+        public struct UpdateLast: Codable, Hashable, Sendable {
+            /// How the update ended. `succeeded`: the new release stayed up. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: the new release did not stay up and Marfa put the old one back.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLast/outcome`.
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case succeeded = "succeeded"
+                case failed = "failed"
+                case rolledBack = "rolled_back"
+            }
+            /// How the update ended. `succeeded`: the new release stayed up. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: the new release did not stay up and Marfa put the old one back.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLast/outcome`.
+            public var outcome: Components.Schemas.UpdateLast.OutcomePayload
+            /// The release the update moved to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLast/release`.
+            public var release: Swift.String
+            /// When the update ended, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLast/finished_at`.
+            public var finishedAt: Swift.String
+            /// Why the update did not succeed, in words for a person, or `null` when it did.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateLast/reason`.
+            public var reason: Swift.String?
+            /// Creates a new `UpdateLast`.
+            ///
+            /// - Parameters:
+            ///   - outcome: How the update ended. `succeeded`: the new release stayed up. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: the new release did not stay up and Marfa put the old one back.
+            ///   - release: The release the update moved to.
+            ///   - finishedAt: When the update ended, in UTC.
+            ///   - reason: Why the update did not succeed, in words for a person, or `null` when it did.
+            public init(
+                outcome: Components.Schemas.UpdateLast.OutcomePayload,
+                release: Swift.String,
+                finishedAt: Swift.String,
+                reason: Swift.String? = nil
+            ) {
+                self.outcome = outcome
+                self.release = release
+                self.finishedAt = finishedAt
+                self.reason = reason
+            }
+            public enum CodingKeys: String, CodingKey {
+                case outcome
+                case release
+                case finishedAt = "finished_at"
+                case reason
+            }
+        }
+        /// Which release this server runs, the newest one Marfa found, and how this server moves to it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Update`.
+        public struct Update: Codable, Hashable, Sendable {
+            /// The release this server runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/release`.
+            public var release: Swift.String
+            /// `true` if Marfa checks for new releases. See the stored setting `update_check_enabled`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/check_enabled`.
+            public var checkEnabled: Swift.Bool
+            /// When a check last found the newest release, in UTC, or `null` if none has.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/checked_at`.
+            public var checkedAt: Swift.String?
+            /// Why the latest check failed, or `null` if it did not. A failed check keeps `latest` as it was.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/check_error`.
+            public var checkError: Components.Schemas.MarfaNullableUpdateCheckError
+            /// The newest published release Marfa found, or `null` if it has found none or the check is off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/latest`.
+            public var latest: Components.Schemas.MarfaNullableUpdateLatest
+            /// `true` if `latest` is newer than `version`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/available`.
+            public var available: Swift.Bool
+            /// How this server moves to a newer release. `server`: it can update itself when you start an update. `manual`: someone takes the step in `step` on its host.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/method`.
+            @frozen public enum MethodPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case server = "server"
+                case manual = "manual"
+            }
+            /// How this server moves to a newer release. `server`: it can update itself when you start an update. `manual`: someone takes the step in `step` on its host.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/method`.
+            public var method: Components.Schemas.Update.MethodPayload
+            /// What to do on the host to move to `latest`, in plain words, when `available` is `true` and `method` is `manual`; otherwise `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/step`.
+            public var step: Swift.String?
+            /// The update under way, if any.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/progress`.
+            public var progress: Components.Schemas.UpdateProgress
+            /// How the latest update ended, or `null` if none has.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Update/last`.
+            public var last: Components.Schemas.MarfaNullableUpdateLast
+            /// Creates a new `Update`.
+            ///
+            /// - Parameters:
+            ///   - release: The release this server runs.
+            ///   - checkEnabled: `true` if Marfa checks for new releases. See the stored setting `update_check_enabled`.
+            ///   - checkedAt: When a check last found the newest release, in UTC, or `null` if none has.
+            ///   - checkError: Why the latest check failed, or `null` if it did not. A failed check keeps `latest` as it was.
+            ///   - latest: The newest published release Marfa found, or `null` if it has found none or the check is off.
+            ///   - available: `true` if `latest` is newer than `version`.
+            ///   - method: How this server moves to a newer release. `server`: it can update itself when you start an update. `manual`: someone takes the step in `step` on its host.
+            ///   - step: What to do on the host to move to `latest`, in plain words, when `available` is `true` and `method` is `manual`; otherwise `null`.
+            ///   - progress: The update under way, if any.
+            ///   - last: How the latest update ended, or `null` if none has.
+            public init(
+                release: Swift.String,
+                checkEnabled: Swift.Bool,
+                checkedAt: Swift.String? = nil,
+                checkError: Components.Schemas.MarfaNullableUpdateCheckError,
+                latest: Components.Schemas.MarfaNullableUpdateLatest,
+                available: Swift.Bool,
+                method: Components.Schemas.Update.MethodPayload,
+                step: Swift.String? = nil,
+                progress: Components.Schemas.UpdateProgress,
+                last: Components.Schemas.MarfaNullableUpdateLast
+            ) {
+                self.release = release
+                self.checkEnabled = checkEnabled
+                self.checkedAt = checkedAt
+                self.checkError = checkError
+                self.latest = latest
+                self.available = available
+                self.method = method
+                self.step = step
+                self.progress = progress
+                self.last = last
+            }
+            public enum CodingKeys: String, CodingKey {
+                case release
+                case checkEnabled = "check_enabled"
+                case checkedAt = "checked_at"
+                case checkError = "check_error"
+                case latest
+                case available
+                case method
+                case step
+                case progress
+                case last
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal`.
+        public struct UpdateNotReadyRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case updateNotReady = "update_not_ready"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error/code`.
+                public var code: Components.Schemas.UpdateNotReadyRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error/details`.
+                public var details: Components.Schemas.UpdateNotReadyRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.UpdateNotReadyRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.UpdateNotReadyRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateNotReadyRefusal/error`.
+            public var error: Components.Schemas.UpdateNotReadyRefusal._ErrorPayload
+            /// Creates a new `UpdateNotReadyRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.UpdateNotReadyRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal`.
+        public struct UpdateUnavailableRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case updateUnavailable = "update_unavailable"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error/code`.
+                public var code: Components.Schemas.UpdateUnavailableRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error/details`.
+                public var details: Components.Schemas.UpdateUnavailableRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.UpdateUnavailableRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.UpdateUnavailableRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateUnavailableRefusal/error`.
+            public var error: Components.Schemas.UpdateUnavailableRefusal._ErrorPayload
+            /// Creates a new `UpdateUnavailableRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.UpdateUnavailableRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal`.
+        public struct InsufficientUserAuthenticationOrUnauthorizedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case insufficientUserAuthentication = "insufficient_user_authentication"
+                    case unauthorized = "unauthorized"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error/code`.
+                public var code: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error/details`.
+                public var details: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InsufficientUserAuthenticationOrUnauthorizedRefusal/error`.
+            public var error: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal._ErrorPayload
+            /// Creates a new `InsufficientUserAuthenticationOrUnauthorizedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal`.
+        public struct AppSignInRequiredOrForbiddenRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case appSignInRequired = "app_sign_in_required"
+                    case forbidden = "forbidden"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error/code`.
+                public var code: Components.Schemas.AppSignInRequiredOrForbiddenRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error/details`.
+                public var details: Components.Schemas.AppSignInRequiredOrForbiddenRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.AppSignInRequiredOrForbiddenRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.AppSignInRequiredOrForbiddenRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppSignInRequiredOrForbiddenRefusal/error`.
+            public var error: Components.Schemas.AppSignInRequiredOrForbiddenRefusal._ErrorPayload
+            /// Creates a new `AppSignInRequiredOrForbiddenRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.AppSignInRequiredOrForbiddenRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// One thing the owner does after the sign-in address moves.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AddressNextStep`.
+        public struct AddressNextStep: Codable, Hashable, Sendable {
+            /// What the owner does: `sign_in` signs in again at the new address, and `add_passkey` adds a passkey there.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressNextStep/code`.
+            @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case signIn = "sign_in"
+                case addPasskey = "add_passkey"
+            }
+            /// What the owner does: `sign_in` signs in again at the new address, and `add_passkey` adds a passkey there.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressNextStep/code`.
+            public var code: Components.Schemas.AddressNextStep.CodePayload
+            /// The step, in a sentence for a person to read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressNextStep/sentence`.
+            public var sentence: Swift.String
+            /// Where the owner takes the step, at the new sign-in address. It carries no credential.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddressNextStep/url`.
+            public var url: Swift.String
+            /// Creates a new `AddressNextStep`.
+            ///
+            /// - Parameters:
+            ///   - code: What the owner does: `sign_in` signs in again at the new address, and `add_passkey` adds a passkey there.
+            ///   - sentence: The step, in a sentence for a person to read.
+            ///   - url: Where the owner takes the step, at the new sign-in address. It carries no credential.
+            public init(
+                code: Components.Schemas.AddressNextStep.CodePayload,
+                sentence: Swift.String,
+                url: Swift.String
+            ) {
+                self.code = code
+                self.sentence = sentence
+                self.url = url
+            }
+            public enum CodingKeys: String, CodingKey {
+                case code
+                case sentence
+                case url
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.code = try container.decode(
+                    Components.Schemas.AddressNextStep.CodePayload.self,
+                    forKey: .code
+                )
+                self.sentence = try container.decode(
+                    Swift.String.self,
+                    forKey: .sentence
+                )
+                self.url = try container.decode(
+                    Swift.String.self,
+                    forKey: .url
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "code",
+                    "sentence",
+                    "url"
+                ])
+            }
+        }
+        /// What moving the sign-in address did: every browser session and every app's sign-in ended, and API keys kept working.
+        ///
+        /// - Remark: Generated from `#/components/schemas/SignInMove`.
+        public struct SignInMove: Codable, Hashable, Sendable {
+            /// What the move did, as `POST /config/address-check` reported it beforehand.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignInMove/consequences`.
+            public var consequences: [Components.Schemas.AddressConsequence]
+            /// What the owner does next, in order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SignInMove/next_steps`.
+            public var nextSteps: [Components.Schemas.AddressNextStep]
+            /// Creates a new `SignInMove`.
+            ///
+            /// - Parameters:
+            ///   - consequences: What the move did, as `POST /config/address-check` reported it beforehand.
+            ///   - nextSteps: What the owner does next, in order.
+            public init(
+                consequences: [Components.Schemas.AddressConsequence],
+                nextSteps: [Components.Schemas.AddressNextStep]
+            ) {
+                self.consequences = consequences
+                self.nextSteps = nextSteps
+            }
+            public enum CodingKeys: String, CodingKey {
+                case consequences
+                case nextSteps = "next_steps"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.consequences = try container.decode(
+                    [Components.Schemas.AddressConsequence].self,
+                    forKey: .consequences
+                )
+                self.nextSteps = try container.decode(
+                    [Components.Schemas.AddressNextStep].self,
+                    forKey: .nextSteps
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "consequences",
+                    "next_steps"
+                ])
             }
         }
         /// - Remark: Generated from `#/components/schemas/MarfaNull`.
@@ -19650,8 +23853,8 @@ extension Components {
         public typealias MarfaInline52ba84a4bbf396ba = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaInline0606c3c8f2e5ac06 = Swift.Int
-        /// - Remark: Generated from `#/components/schemas/MarfaInlineea288f4ef558f5f1`.
-        public typealias MarfaInlineea288f4ef558f5f1 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInline700693241c848bce`.
+        public typealias MarfaInline700693241c848bce = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline7cb541e84f226754`.
         public typealias MarfaInline7cb541e84f226754 = Swift.Bool
         /// - Remark: Generated from `#/components/schemas/MarfaInlineaeb0b69539bcab54`.
@@ -19709,8 +23912,38 @@ extension Components {
                 ])
             }
         }
+        /// - Remark: Generated from `#/components/schemas/MarfaInline681004346c78d5f3`.
+        public typealias MarfaInline681004346c78d5f3 = [Swift.String]
+        /// - Remark: Generated from `#/components/schemas/MarfaInline099cb398ed5d68c2`.
+        public typealias MarfaInline099cb398ed5d68c2 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInlined856c03b0c724c83`.
+        public typealias MarfaInlined856c03b0c724c83 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinef9757109fae32f55`.
+        public typealias MarfaInlinef9757109fae32f55 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinef9d1ebbef8c9bb54`.
+        public typealias MarfaInlinef9d1ebbef8c9bb54 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline66f34441032fb10a`.
+        public typealias MarfaInline66f34441032fb10a = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline85c0b849645b528d`.
+        public typealias MarfaInline85c0b849645b528d = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlineb7a5eebe6656cb32`.
+        public typealias MarfaInlineb7a5eebe6656cb32 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInline7e83520094f45158`.
+        public typealias MarfaInline7e83520094f45158 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinea546f27b0159257c`.
+        public typealias MarfaInlinea546f27b0159257c = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInline4d4b977bdd05938a`.
+        public typealias MarfaInline4d4b977bdd05938a = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline9983a886c97e38f1`.
         public typealias MarfaInline9983a886c97e38f1 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlineea2de7a866d9a476`.
+        public typealias MarfaInlineea2de7a866d9a476 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinee238f277e0a04179`.
+        public typealias MarfaInlinee238f277e0a04179 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinefba6ed0c457db5a5`.
+        public typealias MarfaInlinefba6ed0c457db5a5 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInline44fbb8f844b56845`.
+        public typealias MarfaInline44fbb8f844b56845 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInlinecddf8275afa15408`.
         public typealias MarfaInlinecddf8275afa15408 = Swift.Double
         /// - Remark: Generated from `#/components/schemas/MarfaInlinefdf0831745ef621f`.
@@ -19772,13 +24005,17 @@ extension Components {
                 ])
             }
         }
-        /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df`.
-        public struct MarfaInlined4567187ff0a66df: Codable, Hashable, Sendable {
-            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1`.
+        /// - Remark: Generated from `#/components/schemas/MarfaInline4f410cd74c87d8dd`.
+        public typealias MarfaInline4f410cd74c87d8dd = Foundation.Date
+        /// - Remark: Generated from `#/components/schemas/MarfaInline0d3ac1e9e006c011`.
+        public typealias MarfaInline0d3ac1e9e006c011 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137`.
+        public struct MarfaInlinef5e21acab2df7137: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1`.
             public struct Value1Payload: Codable, Hashable, Sendable {
                 /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/kind`.
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1/kind`.
                 @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case browser = "browser"
                     case app = "app"
@@ -19787,15 +24024,15 @@ extension Components {
                 }
                 /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/kind`.
-                public var kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload.KindPayload
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1/kind`.
+                public var kind: Components.Schemas.MarfaInlinef5e21acab2df7137.Value1Payload.KindPayload
                 /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/id`.
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1/id`.
                 public var id: Swift.String
                 /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1/name`.
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1/name`.
                 public var name: Swift.String
                 /// Creates a new `Value1Payload`.
                 ///
@@ -19804,7 +24041,7 @@ extension Components {
                 ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
                 ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
                 public init(
-                    kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload.KindPayload,
+                    kind: Components.Schemas.MarfaInlinef5e21acab2df7137.Value1Payload.KindPayload,
                     id: Swift.String,
                     name: Swift.String
                 ) {
@@ -19818,40 +24055,40 @@ extension Components {
                     case name
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value1`.
-            public var value1: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload?
-            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2`.
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1`.
+            public var value1: Components.Schemas.MarfaInlinef5e21acab2df7137.Value1Payload?
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2`.
             public struct Value2Payload: Codable, Hashable, Sendable {
                 /// Marfa acting without a sign-in.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/kind`.
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2/kind`.
                 @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case server = "server"
                 }
                 /// Marfa acting without a sign-in.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/kind`.
-                public var kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.KindPayload
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2/kind`.
+                public var kind: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload.KindPayload
                 /// The server actor identifier.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/id`.
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2/id`.
                 @frozen public enum IdPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case server = "server"
                 }
                 /// The server actor identifier.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/id`.
-                public var id: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.IdPayload
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2/id`.
+                public var id: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload.IdPayload
                 /// The server actor name.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/name`.
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2/name`.
                 @frozen public enum NamePayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case marfa = "Marfa"
                 }
                 /// The server actor name.
                 ///
-                /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2/name`.
-                public var name: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.NamePayload
+                /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2/name`.
+                public var name: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload.NamePayload
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
@@ -19859,9 +24096,9 @@ extension Components {
                 ///   - id: The server actor identifier.
                 ///   - name: The server actor name.
                 public init(
-                    kind: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.KindPayload,
-                    id: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.IdPayload,
-                    name: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload.NamePayload
+                    kind: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload.KindPayload,
+                    id: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload.IdPayload,
+                    name: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload.NamePayload
                 ) {
                     self.kind = kind
                     self.id = id
@@ -19873,16 +24110,16 @@ extension Components {
                     case name
                 }
             }
-            /// - Remark: Generated from `#/components/schemas/MarfaInlined4567187ff0a66df/value2`.
-            public var value2: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload?
-            /// Creates a new `MarfaInlined4567187ff0a66df`.
+            /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value2`.
+            public var value2: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload?
+            /// Creates a new `MarfaInlinef5e21acab2df7137`.
             ///
             /// - Parameters:
             ///   - value1:
             ///   - value2:
             public init(
-                value1: Components.Schemas.MarfaInlined4567187ff0a66df.Value1Payload? = nil,
-                value2: Components.Schemas.MarfaInlined4567187ff0a66df.Value2Payload? = nil
+                value1: Components.Schemas.MarfaInlinef5e21acab2df7137.Value1Payload? = nil,
+                value2: Components.Schemas.MarfaInlinef5e21acab2df7137.Value2Payload? = nil
             ) {
                 self.value1 = value1
                 self.value2 = value2
@@ -19924,18 +24161,52 @@ extension Components {
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaNullableMarfaInline0606c3c8f2e5ac06 = MarfaNullable<Components.Schemas.MarfaInline0606c3c8f2e5ac06>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineea288f4ef558f5f1`.
-        public typealias MarfaNullableMarfaInlineea288f4ef558f5f1 = MarfaNullable<Components.Schemas.MarfaInlineea288f4ef558f5f1>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline700693241c848bce`.
+        public typealias MarfaNullableMarfaInline700693241c848bce = MarfaNullable<Components.Schemas.MarfaInline700693241c848bce>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline7cb541e84f226754`.
         public typealias MarfaNullableMarfaInline7cb541e84f226754 = MarfaNullable<Components.Schemas.MarfaInline7cb541e84f226754>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineaeb0b69539bcab54`.
         public typealias MarfaNullableMarfaInlineaeb0b69539bcab54 = MarfaNullable<Components.Schemas.MarfaInlineaeb0b69539bcab54>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline681004346c78d5f3`.
+        public typealias MarfaNullableMarfaInline681004346c78d5f3 = MarfaNullable<Components.Schemas.MarfaInline681004346c78d5f3>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline099cb398ed5d68c2`.
+        public typealias MarfaNullableMarfaInline099cb398ed5d68c2 = MarfaNullable<Components.Schemas.MarfaInline099cb398ed5d68c2>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlined856c03b0c724c83`.
+        public typealias MarfaNullableMarfaInlined856c03b0c724c83 = MarfaNullable<Components.Schemas.MarfaInlined856c03b0c724c83>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef9757109fae32f55`.
+        public typealias MarfaNullableMarfaInlinef9757109fae32f55 = MarfaNullable<Components.Schemas.MarfaInlinef9757109fae32f55>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef9d1ebbef8c9bb54`.
+        public typealias MarfaNullableMarfaInlinef9d1ebbef8c9bb54 = MarfaNullable<Components.Schemas.MarfaInlinef9d1ebbef8c9bb54>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline66f34441032fb10a`.
+        public typealias MarfaNullableMarfaInline66f34441032fb10a = MarfaNullable<Components.Schemas.MarfaInline66f34441032fb10a>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline85c0b849645b528d`.
+        public typealias MarfaNullableMarfaInline85c0b849645b528d = MarfaNullable<Components.Schemas.MarfaInline85c0b849645b528d>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineb7a5eebe6656cb32`.
+        public typealias MarfaNullableMarfaInlineb7a5eebe6656cb32 = MarfaNullable<Components.Schemas.MarfaInlineb7a5eebe6656cb32>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline7e83520094f45158`.
+        public typealias MarfaNullableMarfaInline7e83520094f45158 = MarfaNullable<Components.Schemas.MarfaInline7e83520094f45158>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinea546f27b0159257c`.
+        public typealias MarfaNullableMarfaInlinea546f27b0159257c = MarfaNullable<Components.Schemas.MarfaInlinea546f27b0159257c>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline4d4b977bdd05938a`.
+        public typealias MarfaNullableMarfaInline4d4b977bdd05938a = MarfaNullable<Components.Schemas.MarfaInline4d4b977bdd05938a>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline9983a886c97e38f1`.
         public typealias MarfaNullableMarfaInline9983a886c97e38f1 = MarfaNullable<Components.Schemas.MarfaInline9983a886c97e38f1>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineea2de7a866d9a476`.
+        public typealias MarfaNullableMarfaInlineea2de7a866d9a476 = MarfaNullable<Components.Schemas.MarfaInlineea2de7a866d9a476>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinee238f277e0a04179`.
+        public typealias MarfaNullableMarfaInlinee238f277e0a04179 = MarfaNullable<Components.Schemas.MarfaInlinee238f277e0a04179>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinefba6ed0c457db5a5`.
+        public typealias MarfaNullableMarfaInlinefba6ed0c457db5a5 = MarfaNullable<Components.Schemas.MarfaInlinefba6ed0c457db5a5>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline44fbb8f844b56845`.
+        public typealias MarfaNullableMarfaInline44fbb8f844b56845 = MarfaNullable<Components.Schemas.MarfaInline44fbb8f844b56845>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinecddf8275afa15408`.
         public typealias MarfaNullableMarfaInlinecddf8275afa15408 = MarfaNullable<Components.Schemas.MarfaInlinecddf8275afa15408>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinefdf0831745ef621f`.
         public typealias MarfaNullableMarfaInlinefdf0831745ef621f = MarfaNullable<Components.Schemas.MarfaInlinefdf0831745ef621f>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline4f410cd74c87d8dd`.
+        public typealias MarfaNullableMarfaInline4f410cd74c87d8dd = MarfaNullable<Components.Schemas.MarfaInline4f410cd74c87d8dd>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0d3ac1e9e006c011`.
+        public typealias MarfaNullableMarfaInline0d3ac1e9e006c011 = MarfaNullable<Components.Schemas.MarfaInline0d3ac1e9e006c011>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableTypeDefinition`.
         public typealias MarfaNullableTypeDefinition = MarfaNullable<Components.Schemas.TypeDefinition>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.
@@ -19944,9 +24215,15 @@ extension Components {
         public typealias MarfaNullableHousekeepingReport = MarfaNullable<Components.Schemas.HousekeepingReport>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorRun`.
         public typealias MarfaNullableConnectorRun = MarfaNullable<Components.Schemas.ConnectorRun>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlined4567187ff0a66df`.
-        public typealias MarfaNullableMarfaInlined4567187ff0a66df = MarfaNullable<Components.Schemas.MarfaInlined4567187ff0a66df>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef5e21acab2df7137`.
+        public typealias MarfaNullableMarfaInlinef5e21acab2df7137 = MarfaNullable<Components.Schemas.MarfaInlinef5e21acab2df7137>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMetadata`.
         public typealias MarfaNullableMetadata = MarfaNullable<Components.Schemas.Metadata>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateCheckError`.
+        public typealias MarfaNullableUpdateCheckError = MarfaNullable<Components.Schemas.UpdateCheckError>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateLatest`.
+        public typealias MarfaNullableUpdateLatest = MarfaNullable<Components.Schemas.UpdateLatest>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateLast`.
+        public typealias MarfaNullableUpdateLast = MarfaNullable<Components.Schemas.UpdateLast>
     }
 }

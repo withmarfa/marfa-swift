@@ -27,7 +27,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         case state(ItemState, at: String)
         case tags(TagChange)
         case madeEdge(Edge)
-        case editEdge(properties: JsonObject, source: String?, target: String?)
+        case editEdge(properties: JsonObject, from: String?, to: String?)
         case removedEdge
     }
 
@@ -170,11 +170,11 @@ final class InMemoryCore: CoreProtocol, Sendable {
     }
 
     func edgesFrom(id: String) throws -> [Edge] {
-        state.withLock { $0.edgesInOrder.filter { $0.sourceId == id } }
+        state.withLock { $0.edgesInOrder.filter { $0.fromId == id } }
     }
 
     func edgesTo(id: String) throws -> [Edge] {
-        state.withLock { $0.edgesInOrder.filter { $0.targetId == id } }
+        state.withLock { $0.edgesInOrder.filter { $0.toId == id } }
     }
 
     func edgesOfType(edgeType: String) throws -> [Edge] {
@@ -353,8 +353,8 @@ extension InMemoryCore.State {
         var seen: Set<String> = [id]
         var queue = [id]
         while let next = queue.popLast() {
-            for edge in edges.values where edge.edgeType == "parent-of" && edge.sourceId == next {
-                if seen.insert(edge.targetId).inserted { queue.append(edge.targetId) }
+            for edge in edges.values where edge.edgeType == "parent-of" && edge.fromId == next {
+                if seen.insert(edge.toId).inserted { queue.append(edge.toId) }
             }
         }
         return seen

@@ -28,7 +28,7 @@ extension InMemoryCore {
                 report.held += 1
             case .refused(let reason):
                 let refusal = Refusal(
-                    reason: reason, code: nil, message: nil, fields: [], trashed: false, grant: nil)
+                    reason: reason, code: nil, message: nil, fields: [], trashed: false, grant: nil, requestLimit: nil)
                 report.verdicts.append(state.withLock { $0.answer(id, .refused(refusal: refusal)) })
                 report.unsent += 1
             case .ready(let write, let choose):
@@ -44,7 +44,7 @@ extension InMemoryCore {
         return report
     }
 
-    func withdraw(id: String) throws -> Bool {
+    func withdraw(id: String) throws -> [String] {
         try state.withLock { state in
             guard let at = state.at(id) else { throw Refuse.write(id) }
             switch state.entries[at].write.verdict {
@@ -57,14 +57,14 @@ extension InMemoryCore {
                     let waited = state.entries[other].write.id
                     let refusal = Refusal(
                         reason: "waited on \(id), which was withdrawn", code: nil, message: nil, fields: [],
-                        trashed: false, grant: nil)
+                        trashed: false, grant: nil, requestLimit: nil)
                     _ = state.answer(waited, .refused(refusal: refusal))
                 }
                 state.entries[at].withdrawn = true
                 state.replay()
-                return true
+                return [id]
             default:
-                return false
+                return []
             }
         }
     }

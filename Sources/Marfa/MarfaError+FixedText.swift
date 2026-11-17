@@ -40,21 +40,21 @@ extension MarfaError {
     /// See ``FixedErrorText``.
     public var fixedText: FixedErrorText {
         switch self {
-        case .notFound(let code, _):
+        case .notFound(let code, _, _):
             FixedErrorText(type: "not_found", sentence: "nothing was found at what the request named", serverCode: code)
-        case .unauthorized(let code, _):
+        case .unauthorized(let code, _, _):
             FixedErrorText(type: "unauthorized", sentence: "the server did not accept the credential", serverCode: code)
-        case .forbidden(let code, _):
+        case .forbidden(let code, _, _):
             FixedErrorText(
                 type: "forbidden", sentence: "the request was refused because the credential lacks a permission",
                 serverCode: code)
-        case .validation(let code, _, _):
+        case .validation(let code, _, _, _):
             FixedErrorText(type: "validation", sentence: "the request was rejected as invalid", serverCode: code)
         case .unknownType:
             FixedErrorText(type: "unknown_type", sentence: "the server does not know the type that was named")
-        case .rateLimited(let code, _, _):
+        case .rateLimited(let code, _, _, _):
             FixedErrorText(type: "rate_limited", sentence: "the server rate limited the request", serverCode: code)
-        case .server(_, let code, _):
+        case .server(_, let code, _, _, _):
             FixedErrorText(type: "server", sentence: "the server failed to complete the request", serverCode: code)
         case .io:
             FixedErrorText(type: "io", sentence: "reading or writing a file or a stream failed")
@@ -66,6 +66,10 @@ extension MarfaError {
             FixedErrorText(type: "decoding", sentence: "an answer could not be decoded")
         case .store:
             FixedErrorText(type: "store", sentence: "the local working copy reported a fault")
+        case .storeBusy:
+            FixedErrorText(type: "store_busy", sentence: "another process holds the working copy's store")
+        case .storeDamaged:
+            FixedErrorText(type: "store_damaged", sentence: "the working copy's store could not be read")
         case .storageFull:
             FixedErrorText(type: "storage_full", sentence: "local storage is full")
         case .signedOut:

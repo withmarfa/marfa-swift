@@ -93,6 +93,11 @@ public final class WorkingCopy: Sendable {
     /// count, call ``remove(store:unsent:)`` with it, and open again. `.replace` also leaves the store as it is and
     /// throws `readingHandle` while another process writes it.
     ///
+    /// A store SQLite cannot read is refused with `MarfaError.storeDamaged`, which names the store and counts its unsent
+    /// writes where the queue can be read. ``unsentWrites(in:)`` lists the writes of a refused store of either kind,
+    /// ``setAsideDamaged(store:)`` keeps a damaged store beside itself and carries what it can read, and
+    /// ``removeLosingAll(store:)`` gives it up.
+    ///
     /// A replacement keeps the files the copy downloaded, because they are kept by content and not by the store,
     /// and the file budget the old store recorded. What only the old store held does not stay: pins, the position
     /// in the server's events and the declared types. Hydrate the new copy as you would a new one.
@@ -778,7 +783,9 @@ public struct Items: Sendable {
     ) {
         let embed = try core.embedText(id: id, file: attached.item.itemId ?? "")
         guard let host = try core.get(id: id).map(Item.init) else {
-            throw MarfaError.notFound(code: "item_not_found", message: "\(id) is not a row this copy holds")
+            throw MarfaError.notFound(
+                code: "item_not_found", message: "\(id) is not a row this copy holds",
+                server: nil)
         }
         let field = try core.itemType(id: host.type).bodyField ?? "body"
         let body = host.properties[field]?.string ?? ""
@@ -880,14 +887,14 @@ public struct Edges: Sendable {
     /// - An end in the bin throws `notFound` with the code `item_not_found`.
     /// - An end of a type the edge type does not admit, then nesting under a flat edge type, throws `validation`
     ///   with the code `edge_constraint_violation`.
-    /// - An edge of the same type, source and target as one the copy shows throws `edge_constraint_violation`
+    /// - An edge of the same type, from end and to end as one the copy shows throws `edge_constraint_violation`
     ///   with `details.constraint` `"duplicate"`.
-    /// - An end that already holds the one edge of the type it may, such as a target that has a `parent-of` parent,
+    /// - An end that already holds the one edge of the type it may, such as a to end that has a `parent-of` parent,
     ///   throws `edge_constraint_violation` with `details.constraint` `"cardinality"`, naming the full end in
-    ///   `details.source_id` or `details.target_id`.
+    ///   `details.from_id` or `details.to_id`.
     /// - A cycle through edges the copy holds throws `edge_cycle`.
     ///
-    /// ``MarfaError/validation(code:message:details:)`` describes the `details` each refusal carries. The edges
+    /// ``MarfaError/validation(code:message:details:server:)`` describes the `details` each refusal carries. The edges
     /// counted are those the copy shows: the server's, with the copy's own waiting creates and moves where they will
     /// stand, and none a waiting delete removes. An edge the copy still shows only because of a write the server
     /// refused is not counted until the copy reads the server's row again.
@@ -905,7 +912,7 @@ public struct Edges: Sendable {
 
     /// Throws what ``update(_:_:)`` would throw for a move of one end of the edge `id` now, and queues nothing.
     ///
-    /// Use it to tell, before the person tries, whether an edge's source or target may move to another item, such as
+    /// Use it to tell, before the person tries, whether an edge's from end or to end may move to another item, such as
     /// whether a drop target can take an item's one parent. It refuses as ``EdgeEdit`` describes, whatever version an
     /// edit would carry: a move onto an item whose end already holds the one edge of the type it may throws
     /// `validation` with the code `edge_constraint_violation` and `details.constraint` `"cardinality"`. It throws
@@ -924,7 +931,7 @@ public struct Edges: Sendable {
         from source: String, to target: String, type: String, properties: JSONObject, id: String?
     ) -> MarfaCore.EdgeDraft {
         MarfaCore.EdgeDraft(
-            sourceId: source, targetId: target, edgeType: type, properties: properties.core, id: id)
+            fromId: source, toId: target, edgeType: type, properties: properties.core, id: id)
     }
 
     /// Changes an edge's properties, moves one of its ends, or both, in one queued write.
@@ -981,7 +988,7 @@ public struct Metadata: Sendable {
     let feed: Feed
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
-        try await queued(holder, feed) { core in try core.replaceMetadata(id: id, tags: tags) }
+        try await queued(holder, feed) { core in try core.replaceTags(id: id, tags: tags) }
     }
 }
 
@@ -1125,14 +1132,15 @@ public struct Queue: Sendable {
     /// Takes a write that can never be sent out of the queue, and puts its
     /// row back to what the server holds.
     ///
-    /// Only a write blocked `ancestorUnavailable`, `conflictUnresolved`,
-    /// `failingAlone` or `instanceChanged` is taken; `false` for any other. Writes waiting on it
+    /// Only a dead write, or one blocked `ancestorUnavailable`, `conflictUnresolved`,
+    /// `failingAlone`, `instanceChanged` or `recordUnread`, is taken; any other answers an empty list. Writes waiting on it
     /// are refused unsent. It reads the row from the server first, so it needs
-    /// the server, and returns `false` when the copy moved during the read;
-    /// ask again.
-    public func withdraw(_ id: String) async throws -> Bool {
+    /// the server, and answers an empty list when the copy moved during the read;
+    /// ask again. It answers the id of every write it took out of the queue, which holds more than `id` where
+    /// the write belonged to a batch the core withdraws whole.
+    public func withdraw(_ id: String) async throws -> [String] {
         let withdrawn = try await holder.run { core in try core.withdraw(id: id) }
-        if withdrawn {
+        if !withdrawn.isEmpty {
             feed.announce(Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil))
         }
         return withdrawn
