@@ -1193,3 +1193,71 @@ struct UntidyAddresses {
         }
     }
 }
+
+@Suite(.timeLimit(.minutes(1)))
+struct SignInContractHeader {
+    private let contract = String(marfaContractVersion)
+
+    @Test func everyRequestOfABrowserSignInNamesTheContract() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in
+            request.path == "/oauth/token" ? tokens("at-1", "rt-1") : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            _ = try await authorization.signIn { url, _ in
+                let state = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first { $0.name == "state" }?.value
+                return URL(string: "so.marfa.tests:/signed-in?code=the-code&state=\(state ?? "")")!
+            }
+        }
+        let paths = Set(server.requests.map(\.path))
+        #expect(
+            paths == ["/.well-known/oauth-authorization-server", "/oauth/register", "/oauth/token"], "\(paths)")
+        for request in server.requests {
+            #expect(request.headers["X-Marfa-Contract"] == contract, "\(request.path)")
+        }
+    }
+
+    @Test func everyRequestOfADeviceSignInNamesTheContract() async throws {
+        let server = ScriptedAuthServer()
+        let origin = server.origin
+        marfa(server) { request in
+            switch request.path {
+            case "/oauth/device-authorization":
+                .json(
+                    200,
+                    [
+                        "device_code": "device-1", "user_code": "ABCD-EFGH",
+                        "verification_uri": "\(origin)/auth/device", "expires_in": 600, "interval": 5,
+                    ])
+            case "/oauth/token": tokens("at-1", "rt-1")
+            default: .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: server.transport())
+            _ = try await authorization.startDeviceSignIn().credential()
+        }
+        #expect(server.requests(to: "/oauth/device-authorization").count == 1)
+        #expect(server.requests(to: "/oauth/token").count == 1)
+        for request in server.requests {
+            #expect(request.headers["X-Marfa-Contract"] == contract, "\(request.path)")
+        }
+    }
+
+    @Test func aTokenRenewalNamesTheContract() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in tokens("at-2", "rt-2") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (_, credential) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await renew(credential, refused: "at-1") == "at-2")
+        }
+        let renewal = try #require(server.requests(to: "/oauth/token").first)
+        #expect(renewal.headers["X-Marfa-Contract"] == contract)
+    }
+}

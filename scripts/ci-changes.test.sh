@@ -72,7 +72,11 @@ check "a push is classified against the commit before it" \
 check "a push is classified up to its own commit" \
   "$(grep -cF 'HEAD: ${{ github.event.pull_request.head.sha || github.sha }}' "${workflow}")" 1
 check "the classifier may read the runs of this workflow" "$(grep -cF '      actions: read' "${workflow}")" 1
-check "the classifier is handed a token" "$(grep -cF 'GH_TOKEN: ${{ github.token }}' "${workflow}")" 1
+check "the classifier is handed a token" \
+  "$(grep -B4 -F 'run: scripts/ci-changes.sh' "${workflow}" | grep -cF 'GH_TOKEN: ${{ github.token }}')" 1
+check "the release fetch is handed a token" \
+  "$(grep -B4 -F 'run: scripts/release-archive.sh' "${workflow}" | grep -cF 'GH_TOKEN: ${{ github.token }}')" 1
+check "no other step is handed a token" "$(grep -cF 'GH_TOKEN' "${workflow}")" 2
 check "the classifier asks about the workflow it is in" "$(grep -cF 'workflows/ci.yml/runs' "${classifier}")" 1
 
 # A draft starts no Mac job, so no step of `Build + test` needs to skip itself for one. On a pull request
