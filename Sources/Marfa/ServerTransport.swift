@@ -153,8 +153,8 @@ extension Server {
         _ method: String, _ path: String, query: [URLQueryItem] = [], headers: [String: String] = [:],
         body: Data? = nil, timeout: Duration
     ) async throws(MarfaError) -> Data {
-        let token = try currentToken()
         let mark = confirmationMark()
+        let token = try currentToken()
         do {
             return try await timed(
                 method, path, query: query, headers: headers, body: body, timeout: timeout, token: token)

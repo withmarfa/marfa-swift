@@ -16,8 +16,8 @@ struct Access: ClientMiddleware {
         next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
     ) async throws -> (HTTPResponse, HTTPBody?) {
         let origin = server.origin
-        let token = try server.currentToken()
         let mark = server.confirmationMark()
+        let token = try server.currentToken()
         let write = request.method != .get && request.method != .head
         let sent = try await send(request, body, baseURL, token, next)
         if let refused = await refusal(sent, origin: origin, write: write) {
