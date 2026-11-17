@@ -1127,10 +1127,10 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * the server nothing, until a hydration completes; an expired copy is
      * refused. `told_unreachable` says the app was last told
      * `ServerUnreachable` by a follow before this one, so this one tells
-     * `ServerReachable` when it has its first stream. Each time it tells
-     * `ServerReachable` with work queued for a drain, it drains once, after
-     * any drain under way, and tells `QueueDrained` or `QueueNotDrained`;
-     * `ended` follows that drain's end.
+     * `ServerReachable` when a stream first takes an event or goes live.
+     * Each time it tells `ServerReachable` with work queued for a drain, it
+     * drains once, after any drain under way, and tells `QueueDrained` or
+     * `QueueNotDrained`; `ended` follows that drain's end.
      */
     func follow(toldUnreachable: Bool, listener: ChangeListener)  -> Subscription
     
@@ -1262,8 +1262,9 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func queue() throws  -> [QueuedWrite]
     
     /**
-     * Sends a blocked or dead write again, under a fresh idempotency key.
-     * Answers whether the row was one a release applies to.
+     * Sends a blocked or dead write again, under a fresh idempotency key but
+     * for a row write or an undo, which keeps its key unless blocked
+     * `key_spent`. Answers whether the row was one a release applies to.
      */
     func release(id: String) throws  -> Bool
     
@@ -1287,7 +1288,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
     /**
      * Writes the item's tags whole, dropping any not named.
      */
-    func replaceMetadata(id: String, tags: [String]) throws  -> QueuedWrite
+    func replaceTags(id: String, tags: [String]) throws  -> QueuedWrite
     
     /**
      * Takes an item out of the bin and queues the restore: locally where the
@@ -1392,12 +1393,9 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func watch(toldUnreachable: Bool, listener: ChangeListener) throws  -> Subscription
     
     /**
-     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved`,
-     * `failing_alone` or `instance_changed` out of the queue, and puts the copy back to what the server holds;
-     * each write held for it is refused unsent. Answers whether the row was
-     * one a withdraw takes.
+     * Returns every withdrawn ID, including the other writes in a table batch.
      */
-    func withdraw(id: String) throws  -> Bool
+    func withdraw(id: String) throws  -> [String]
     
     /**
      * Writes one extension namespace, as its own write.
@@ -1980,10 +1978,10 @@ open func fileCache()throws  -> FileCache  {
      * the server nothing, until a hydration completes; an expired copy is
      * refused. `told_unreachable` says the app was last told
      * `ServerUnreachable` by a follow before this one, so this one tells
-     * `ServerReachable` when it has its first stream. Each time it tells
-     * `ServerReachable` with work queued for a drain, it drains once, after
-     * any drain under way, and tells `QueueDrained` or `QueueNotDrained`;
-     * `ended` follows that drain's end.
+     * `ServerReachable` when a stream first takes an event or goes live.
+     * Each time it tells `ServerReachable` with work queued for a drain, it
+     * drains once, after any drain under way, and tells `QueueDrained` or
+     * `QueueNotDrained`; `ended` follows that drain's end.
      */
 open func follow(toldUnreachable: Bool, listener: ChangeListener) -> Subscription  {
     return try!  FfiConverterTypeSubscription_lift(try! rustCall() {
@@ -2240,8 +2238,9 @@ open func queue()throws  -> [QueuedWrite]  {
 }
     
     /**
-     * Sends a blocked or dead write again, under a fresh idempotency key.
-     * Answers whether the row was one a release applies to.
+     * Sends a blocked or dead write again, under a fresh idempotency key but
+     * for a row write or an undo, which keeps its key unless blocked
+     * `key_spent`. Answers whether the row was one a release applies to.
      */
 open func release(id: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2293,9 +2292,9 @@ open func removeTag(id: String, tag: String)throws  -> QueuedWrite  {
     /**
      * Writes the item's tags whole, dropping any not named.
      */
-open func replaceMetadata(id: String, tags: [String])throws  -> QueuedWrite  {
+open func replaceTags(id: String, tags: [String])throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
-    uniffi_marfa_core_ffi_fn_method_core_replace_metadata(
+    uniffi_marfa_core_ffi_fn_method_core_replace_tags(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterSequenceString.lower(tags),$0
@@ -2508,13 +2507,10 @@ open func watch(toldUnreachable: Bool, listener: ChangeListener)throws  -> Subsc
 }
     
     /**
-     * Takes a write blocked `ancestor_unavailable`, `conflict_unresolved`,
-     * `failing_alone` or `instance_changed` out of the queue, and puts the copy back to what the server holds;
-     * each write held for it is refused unsent. Answers whether the row was
-     * one a withdraw takes.
+     * Returns every withdrawn ID, including the other writes in a table batch.
      */
-open func withdraw(id: String)throws  -> Bool  {
-    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func withdraw(id: String)throws  -> [String]  {
+    return try  FfiConverterSequenceString.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_withdraw(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),$0
@@ -5196,7 +5192,7 @@ public struct DrainVerdict: Equatable, Hashable {
     public var id: String
     public var kind: WriteKind
     /**
-     * An edge write's source; otherwise the row written to.
+     * An edge write's source; otherwise the item written to.
      */
     public var itemId: String?
     public var edgeId: String?
@@ -5212,7 +5208,7 @@ public struct DrainVerdict: Equatable, Hashable {
     // declare one manually.
     public init(id: String, kind: WriteKind, 
         /**
-         * An edge write's source; otherwise the row written to.
+         * An edge write's source; otherwise the item written to.
          */itemId: String?, edgeId: String?, verdict: Verdict?, refusals: Int64, 
         /**
          * The server answered from its record of this idempotency key rather
@@ -5285,8 +5281,8 @@ public func FfiConverterTypeDrainVerdict_lower(_ value: DrainVerdict) -> RustBuf
  */
 public struct Edge: Equatable, Hashable {
     public var id: String
-    public var sourceId: String
-    public var targetId: String
+    public var fromId: String
+    public var toId: String
     public var edgeType: String
     /**
      * Empty where `unreadable_properties` is set.
@@ -5303,7 +5299,7 @@ public struct Edge: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, sourceId: String, targetId: String, edgeType: String, 
+    public init(id: String, fromId: String, toId: String, edgeType: String, 
         /**
          * Empty where `unreadable_properties` is set.
          */properties: JsonObject, version: Int64, createdAt: String, updatedAt: String, 
@@ -5312,8 +5308,8 @@ public struct Edge: Equatable, Hashable {
          * properties cannot be read.
          */unreadableProperties: String? = nil) {
         self.id = id
-        self.sourceId = sourceId
-        self.targetId = targetId
+        self.fromId = fromId
+        self.toId = toId
         self.edgeType = edgeType
         self.properties = properties
         self.version = version
@@ -5339,8 +5335,8 @@ public struct FfiConverterTypeEdge: FfiConverterRustBuffer {
         return
             try Edge(
                 id: FfiConverterString.read(from: &buf), 
-                sourceId: FfiConverterString.read(from: &buf), 
-                targetId: FfiConverterString.read(from: &buf), 
+                fromId: FfiConverterString.read(from: &buf), 
+                toId: FfiConverterString.read(from: &buf), 
                 edgeType: FfiConverterString.read(from: &buf), 
                 properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 version: FfiConverterInt64.read(from: &buf), 
@@ -5352,8 +5348,8 @@ public struct FfiConverterTypeEdge: FfiConverterRustBuffer {
 
     public static func write(_ value: Edge, into buf: inout [UInt8]) {
         FfiConverterString.write(value.id, into: &buf)
-        FfiConverterString.write(value.sourceId, into: &buf)
-        FfiConverterString.write(value.targetId, into: &buf)
+        FfiConverterString.write(value.fromId, into: &buf)
+        FfiConverterString.write(value.toId, into: &buf)
         FfiConverterString.write(value.edgeType, into: &buf)
         FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterInt64.write(value.version, into: &buf)
@@ -5383,17 +5379,17 @@ public func FfiConverterTypeEdge_lower(_ value: Edge) -> RustBuffer {
  * An edge, before it is queued.
  */
 public struct EdgeDraft: Equatable, Hashable {
-    public var sourceId: String
-    public var targetId: String
+    public var fromId: String
+    public var toId: String
     public var edgeType: String
     public var properties: JsonObject
     public var id: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(sourceId: String, targetId: String, edgeType: String, properties: JsonObject = JsonObject(), id: String? = nil) {
-        self.sourceId = sourceId
-        self.targetId = targetId
+    public init(fromId: String, toId: String, edgeType: String, properties: JsonObject = JsonObject(), id: String? = nil) {
+        self.fromId = fromId
+        self.toId = toId
         self.edgeType = edgeType
         self.properties = properties
         self.id = id
@@ -5415,8 +5411,8 @@ public struct FfiConverterTypeEdgeDraft: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeDraft {
         return
             try EdgeDraft(
-                sourceId: FfiConverterString.read(from: &buf), 
-                targetId: FfiConverterString.read(from: &buf), 
+                fromId: FfiConverterString.read(from: &buf), 
+                toId: FfiConverterString.read(from: &buf), 
                 edgeType: FfiConverterString.read(from: &buf), 
                 properties: FfiConverterTypeJsonObject.read(from: &buf), 
                 id: FfiConverterOptionString.read(from: &buf)
@@ -5424,8 +5420,8 @@ public struct FfiConverterTypeEdgeDraft: FfiConverterRustBuffer {
     }
 
     public static func write(_ value: EdgeDraft, into buf: inout [UInt8]) {
-        FfiConverterString.write(value.sourceId, into: &buf)
-        FfiConverterString.write(value.targetId, into: &buf)
+        FfiConverterString.write(value.fromId, into: &buf)
+        FfiConverterString.write(value.toId, into: &buf)
         FfiConverterString.write(value.edgeType, into: &buf)
         FfiConverterTypeJsonObject.write(value.properties, into: &buf)
         FfiConverterOptionString.write(value.id, into: &buf)
@@ -5591,12 +5587,12 @@ public struct EdgeType: Equatable, Hashable {
     public var description: String?
     public var cardinality: String
     /**
-     * The name the edge goes by read from its target.
+     * The name the edge goes by read from its to item.
      */
     public var reverseName: String?
-    public var writtenAt: EdgeWrittenAt
-    public var sourceTypeConstraints: [String]
-    public var targetTypeConstraints: [String]
+    public var writtenFrom: EdgeWrittenFrom
+    public var fromTypeConstraints: [String]
+    public var toTypeConstraints: [String]
     public var cascadeOnDelete: String
     public var properties: [TypeField]
     public var shipped: Bool
@@ -5620,8 +5616,8 @@ public struct EdgeType: Equatable, Hashable {
          * The name shown on the target end.
          */reverseLabel: String, description: String?, cardinality: String, 
         /**
-         * The name the edge goes by read from its target.
-         */reverseName: String?, writtenAt: EdgeWrittenAt, sourceTypeConstraints: [String], targetTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool, 
+         * The name the edge goes by read from its to item.
+         */reverseName: String?, writtenFrom: EdgeWrittenFrom, fromTypeConstraints: [String], toTypeConstraints: [String], cascadeOnDelete: String, properties: [TypeField], shipped: Bool, 
         /**
          * Whether the server refuses an edge of this type that closes a cycle
          * through other edges of the type.
@@ -5635,9 +5631,9 @@ public struct EdgeType: Equatable, Hashable {
         self.description = description
         self.cardinality = cardinality
         self.reverseName = reverseName
-        self.writtenAt = writtenAt
-        self.sourceTypeConstraints = sourceTypeConstraints
-        self.targetTypeConstraints = targetTypeConstraints
+        self.writtenFrom = writtenFrom
+        self.fromTypeConstraints = fromTypeConstraints
+        self.toTypeConstraints = toTypeConstraints
         self.cascadeOnDelete = cascadeOnDelete
         self.properties = properties
         self.shipped = shipped
@@ -5667,9 +5663,9 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
                 description: FfiConverterOptionString.read(from: &buf), 
                 cardinality: FfiConverterString.read(from: &buf), 
                 reverseName: FfiConverterOptionString.read(from: &buf), 
-                writtenAt: FfiConverterTypeEdgeWrittenAt.read(from: &buf), 
-                sourceTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
-                targetTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
+                writtenFrom: FfiConverterTypeEdgeWrittenFrom.read(from: &buf), 
+                fromTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
+                toTypeConstraints: FfiConverterSequenceString.read(from: &buf), 
                 cascadeOnDelete: FfiConverterString.read(from: &buf), 
                 properties: FfiConverterSequenceTypeTypeField.read(from: &buf), 
                 shipped: FfiConverterBool.read(from: &buf), 
@@ -5685,9 +5681,9 @@ public struct FfiConverterTypeEdgeType: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.description, into: &buf)
         FfiConverterString.write(value.cardinality, into: &buf)
         FfiConverterOptionString.write(value.reverseName, into: &buf)
-        FfiConverterTypeEdgeWrittenAt.write(value.writtenAt, into: &buf)
-        FfiConverterSequenceString.write(value.sourceTypeConstraints, into: &buf)
-        FfiConverterSequenceString.write(value.targetTypeConstraints, into: &buf)
+        FfiConverterTypeEdgeWrittenFrom.write(value.writtenFrom, into: &buf)
+        FfiConverterSequenceString.write(value.fromTypeConstraints, into: &buf)
+        FfiConverterSequenceString.write(value.toTypeConstraints, into: &buf)
         FfiConverterString.write(value.cascadeOnDelete, into: &buf)
         FfiConverterSequenceTypeTypeField.write(value.properties, into: &buf)
         FfiConverterBool.write(value.shipped, into: &buf)
@@ -7796,17 +7792,15 @@ public func FfiConverterTypeHydrateReport_lower(_ value: HydrateReport) -> RustB
 public struct InstanceDescription: Equatable, Hashable {
     public var name: String
     public var version: String
-    public var release: String?
     public var instanceId: String
     public var contract: UInt64
     public var features: [String]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(name: String, version: String, release: String?, instanceId: String, contract: UInt64, features: [String]) {
+    public init(name: String, version: String, instanceId: String, contract: UInt64, features: [String]) {
         self.name = name
         self.version = version
-        self.release = release
         self.instanceId = instanceId
         self.contract = contract
         self.features = features
@@ -7830,7 +7824,6 @@ public struct FfiConverterTypeInstanceDescription: FfiConverterRustBuffer {
             try InstanceDescription(
                 name: FfiConverterString.read(from: &buf), 
                 version: FfiConverterString.read(from: &buf), 
-                release: FfiConverterOptionString.read(from: &buf), 
                 instanceId: FfiConverterString.read(from: &buf), 
                 contract: FfiConverterUInt64.read(from: &buf), 
                 features: FfiConverterSequenceString.read(from: &buf)
@@ -7840,7 +7833,6 @@ public struct FfiConverterTypeInstanceDescription: FfiConverterRustBuffer {
     public static func write(_ value: InstanceDescription, into buf: inout [UInt8]) {
         FfiConverterString.write(value.name, into: &buf)
         FfiConverterString.write(value.version, into: &buf)
-        FfiConverterOptionString.write(value.release, into: &buf)
         FfiConverterString.write(value.instanceId, into: &buf)
         FfiConverterUInt64.write(value.contract, into: &buf)
         FfiConverterSequenceString.write(value.features, into: &buf)
@@ -8191,6 +8183,10 @@ public struct ItemType: Equatable, Hashable {
     public var parent: String?
     public var version: Int64
     public var fields: [TypeField]
+    /**
+     * Each table the type declares or inherits, by name.
+     */
+    public var tables: JsonObject
     public var titleField: String?
     public var bodyField: String?
     /**
@@ -8212,7 +8208,10 @@ public struct ItemType: Equatable, Hashable {
         /**
          * The name an app shows for more than one item of the type, such as
          * `People`: the type's own, else one made from its label.
-         */plural: String, description: String?, parent: String?, version: Int64, fields: [TypeField], titleField: String?, bodyField: String?, 
+         */plural: String, description: String?, parent: String?, version: Int64, fields: [TypeField], 
+        /**
+         * Each table the type declares or inherits, by name.
+         */tables: JsonObject, titleField: String?, bodyField: String?, 
         /**
          * False where an item's body does not name it, such as a highlight's
          * passage (`types/item-name-fields`).
@@ -8227,6 +8226,7 @@ public struct ItemType: Equatable, Hashable {
         self.parent = parent
         self.version = version
         self.fields = fields
+        self.tables = tables
         self.titleField = titleField
         self.bodyField = bodyField
         self.nameFromBody = nameFromBody
@@ -8259,6 +8259,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
                 parent: FfiConverterOptionString.read(from: &buf), 
                 version: FfiConverterInt64.read(from: &buf), 
                 fields: FfiConverterSequenceTypeTypeField.read(from: &buf), 
+                tables: FfiConverterTypeJsonObject.read(from: &buf), 
                 titleField: FfiConverterOptionString.read(from: &buf), 
                 bodyField: FfiConverterOptionString.read(from: &buf), 
                 nameFromBody: FfiConverterBool.read(from: &buf), 
@@ -8277,6 +8278,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.parent, into: &buf)
         FfiConverterInt64.write(value.version, into: &buf)
         FfiConverterSequenceTypeTypeField.write(value.fields, into: &buf)
+        FfiConverterTypeJsonObject.write(value.tables, into: &buf)
         FfiConverterOptionString.write(value.titleField, into: &buf)
         FfiConverterOptionString.write(value.bodyField, into: &buf)
         FfiConverterBool.write(value.nameFromBody, into: &buf)
@@ -8719,6 +8721,10 @@ public struct LinkParts: Equatable, Hashable {
      */
     public var name: LinkPart
     public var heading: LinkPart?
+    /**
+     * The row a `#^` names, in place of a heading.
+     */
+    public var row: LinkPart?
     public var alias: LinkPart?
 
     // Default memberwise initializers are never public by default, so we
@@ -8734,13 +8740,17 @@ public struct LinkParts: Equatable, Hashable {
          */target: String, 
         /**
          * What the link names. Empty for a link to a heading of the same text.
-         */name: LinkPart, heading: LinkPart?, alias: LinkPart?) {
+         */name: LinkPart, heading: LinkPart?, 
+        /**
+         * The row a `#^` names, in place of a heading.
+         */row: LinkPart?, alias: LinkPart?) {
         self.text = text
         self.start = start
         self.end = end
         self.target = target
         self.name = name
         self.heading = heading
+        self.row = row
         self.alias = alias
     }
 
@@ -8766,6 +8776,7 @@ public struct FfiConverterTypeLinkParts: FfiConverterRustBuffer {
                 target: FfiConverterString.read(from: &buf), 
                 name: FfiConverterTypeLinkPart.read(from: &buf), 
                 heading: FfiConverterOptionTypeLinkPart.read(from: &buf), 
+                row: FfiConverterOptionTypeLinkPart.read(from: &buf), 
                 alias: FfiConverterOptionTypeLinkPart.read(from: &buf)
         )
     }
@@ -8777,6 +8788,7 @@ public struct FfiConverterTypeLinkParts: FfiConverterRustBuffer {
         FfiConverterString.write(value.target, into: &buf)
         FfiConverterTypeLinkPart.write(value.name, into: &buf)
         FfiConverterOptionTypeLinkPart.write(value.heading, into: &buf)
+        FfiConverterOptionTypeLinkPart.write(value.row, into: &buf)
         FfiConverterOptionTypeLinkPart.write(value.alias, into: &buf)
     }
 }
@@ -9297,7 +9309,7 @@ public struct QueuedWrite: Equatable, Hashable {
     public var id: String
     public var kind: WriteKind
     public var itemId: String?
-    public var targetId: String?
+    public var toId: String?
     public var edgeId: String?
     public var namespace: String?
     public var tag: String?
@@ -9312,7 +9324,7 @@ public struct QueuedWrite: Equatable, Hashable {
      */
     public var dependsOn: [String]
     /**
-     * The write ahead of this one to the same row or edge, which it goes
+     * The write ahead of this one to the same item or edge, which it goes
      * out after and is not refused with.
      */
     public var follows: String?
@@ -9349,7 +9361,7 @@ public struct QueuedWrite: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: String, kind: WriteKind, itemId: String?, targetId: String?, edgeId: String?, namespace: String?, tag: String?, 
+    public init(id: String, kind: WriteKind, itemId: String?, toId: String?, edgeId: String?, namespace: String?, tag: String?, 
         /**
          * The blob an upload carries, by its hash.
          */blob: String?, baseVersion: Int64?, idempotencyKey: String, 
@@ -9357,7 +9369,7 @@ public struct QueuedWrite: Equatable, Hashable {
          * The writes this one cannot go without, and is refused with.
          */dependsOn: [String], 
         /**
-         * The write ahead of this one to the same row or edge, which it goes
+         * The write ahead of this one to the same item or edge, which it goes
          * out after and is not refused with.
          */follows: String?, 
         /**
@@ -9384,7 +9396,7 @@ public struct QueuedWrite: Equatable, Hashable {
         self.id = id
         self.kind = kind
         self.itemId = itemId
-        self.targetId = targetId
+        self.toId = toId
         self.edgeId = edgeId
         self.namespace = namespace
         self.tag = tag
@@ -9423,7 +9435,7 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
                 id: FfiConverterString.read(from: &buf), 
                 kind: FfiConverterTypeWriteKind.read(from: &buf), 
                 itemId: FfiConverterOptionString.read(from: &buf), 
-                targetId: FfiConverterOptionString.read(from: &buf), 
+                toId: FfiConverterOptionString.read(from: &buf), 
                 edgeId: FfiConverterOptionString.read(from: &buf), 
                 namespace: FfiConverterOptionString.read(from: &buf), 
                 tag: FfiConverterOptionString.read(from: &buf), 
@@ -9448,7 +9460,7 @@ public struct FfiConverterTypeQueuedWrite: FfiConverterRustBuffer {
         FfiConverterString.write(value.id, into: &buf)
         FfiConverterTypeWriteKind.write(value.kind, into: &buf)
         FfiConverterOptionString.write(value.itemId, into: &buf)
-        FfiConverterOptionString.write(value.targetId, into: &buf)
+        FfiConverterOptionString.write(value.toId, into: &buf)
         FfiConverterOptionString.write(value.edgeId, into: &buf)
         FfiConverterOptionString.write(value.namespace, into: &buf)
         FfiConverterOptionString.write(value.tag, into: &buf)
@@ -9511,6 +9523,10 @@ public struct Refusal: Equatable, Hashable {
      * The permission the credential's key lacks, where the refusal names one.
      */
     public var grant: MissingGrant?
+    /**
+     * An unsent write exceeded the server's request limit.
+     */
+    public var requestLimit: RequestLimit?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -9530,13 +9546,17 @@ public struct Refusal: Equatable, Hashable {
          */trashed: Bool, 
         /**
          * The permission the credential's key lacks, where the refusal names one.
-         */grant: MissingGrant?) {
+         */grant: MissingGrant?, 
+        /**
+         * An unsent write exceeded the server's request limit.
+         */requestLimit: RequestLimit?) {
         self.reason = reason
         self.code = code
         self.message = message
         self.fields = fields
         self.trashed = trashed
         self.grant = grant
+        self.requestLimit = requestLimit
     }
 
     
@@ -9560,7 +9580,8 @@ public struct FfiConverterTypeRefusal: FfiConverterRustBuffer {
                 message: FfiConverterOptionString.read(from: &buf), 
                 fields: FfiConverterSequenceTypeFieldRefusal.read(from: &buf), 
                 trashed: FfiConverterBool.read(from: &buf), 
-                grant: FfiConverterOptionTypeMissingGrant.read(from: &buf)
+                grant: FfiConverterOptionTypeMissingGrant.read(from: &buf), 
+                requestLimit: FfiConverterOptionTypeRequestLimit.read(from: &buf)
         )
     }
 
@@ -9571,6 +9592,7 @@ public struct FfiConverterTypeRefusal: FfiConverterRustBuffer {
         FfiConverterSequenceTypeFieldRefusal.write(value.fields, into: &buf)
         FfiConverterBool.write(value.trashed, into: &buf)
         FfiConverterOptionTypeMissingGrant.write(value.grant, into: &buf)
+        FfiConverterOptionTypeRequestLimit.write(value.requestLimit, into: &buf)
     }
 }
 
@@ -9602,6 +9624,10 @@ public struct RemovalThreshold: Equatable, Hashable {
      * `None` is 0.25.
      */
     public var fraction: Double?
+    /**
+     * More files than this wait whatever their share. `None` is 100.
+     */
+    public var ceiling: UInt64?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -9611,9 +9637,13 @@ public struct RemovalThreshold: Equatable, Hashable {
          */files: UInt64? = nil, 
         /**
          * `None` is 0.25.
-         */fraction: Double? = nil) {
+         */fraction: Double? = nil, 
+        /**
+         * More files than this wait whatever their share. `None` is 100.
+         */ceiling: UInt64? = nil) {
         self.files = files
         self.fraction = fraction
+        self.ceiling = ceiling
     }
 
     
@@ -9633,13 +9663,15 @@ public struct FfiConverterTypeRemovalThreshold: FfiConverterRustBuffer {
         return
             try RemovalThreshold(
                 files: FfiConverterOptionUInt64.read(from: &buf), 
-                fraction: FfiConverterOptionDouble.read(from: &buf)
+                fraction: FfiConverterOptionDouble.read(from: &buf), 
+                ceiling: FfiConverterOptionUInt64.read(from: &buf)
         )
     }
 
     public static func write(_ value: RemovalThreshold, into buf: inout [UInt8]) {
         FfiConverterOptionUInt64.write(value.files, into: &buf)
         FfiConverterOptionDouble.write(value.fraction, into: &buf)
+        FfiConverterOptionUInt64.write(value.ceiling, into: &buf)
     }
 }
 
@@ -9656,6 +9688,75 @@ public func FfiConverterTypeRemovalThreshold_lift(_ buf: RustBuffer) throws -> R
 #endif
 public func FfiConverterTypeRemovalThreshold_lower(_ value: RemovalThreshold) -> RustBuffer {
     return FfiConverterTypeRemovalThreshold.lower(value)
+}
+
+
+/**
+ * An unsent write's request size and the server's limit, in bytes.
+ */
+public struct RequestLimit: Equatable, Hashable {
+    /**
+     * The bytes of the write's request body.
+     */
+    public var size: UInt64
+    /**
+     * The most bytes the server takes in one request.
+     */
+    public var limit: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The bytes of the write's request body.
+         */size: UInt64, 
+        /**
+         * The most bytes the server takes in one request.
+         */limit: UInt64) {
+        self.size = size
+        self.limit = limit
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RequestLimit: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRequestLimit: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RequestLimit {
+        return
+            try RequestLimit(
+                size: FfiConverterUInt64.read(from: &buf), 
+                limit: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RequestLimit, into buf: inout [UInt8]) {
+        FfiConverterUInt64.write(value.size, into: &buf)
+        FfiConverterUInt64.write(value.limit, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRequestLimit_lift(_ buf: RustBuffer) throws -> RequestLimit {
+    return try FfiConverterTypeRequestLimit.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRequestLimit_lower(_ value: RequestLimit) -> RustBuffer {
+    return FfiConverterTypeRequestLimit.lower(value)
 }
 
 
@@ -9743,6 +9844,63 @@ public func FfiConverterTypeRestoredRemoval_lift(_ buf: RustBuffer) throws -> Re
 #endif
 public func FfiConverterTypeRestoredRemoval_lower(_ value: RestoredRemoval) -> RustBuffer {
     return FfiConverterTypeRestoredRemoval.lower(value)
+}
+
+
+/**
+ * A cell of a row that a row write replaced without the copy having shown it.
+ */
+public struct RowConflict: Equatable, Hashable {
+    public var row: String
+    public var column: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(row: String, column: String) {
+        self.row = row
+        self.column = column
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RowConflict: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRowConflict: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RowConflict {
+        return
+            try RowConflict(
+                row: FfiConverterString.read(from: &buf), 
+                column: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RowConflict, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.row, into: &buf)
+        FfiConverterString.write(value.column, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRowConflict_lift(_ buf: RustBuffer) throws -> RowConflict {
+    return try FfiConverterTypeRowConflict.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRowConflict_lower(_ value: RowConflict) -> RustBuffer {
+    return FfiConverterTypeRowConflict.lower(value)
 }
 
 
@@ -9958,6 +10116,67 @@ public func FfiConverterTypeSearchHit_lower(_ value: SearchHit) -> RustBuffer {
 
 
 /**
+ * A server's answer, without the device's interpretation.
+ */
+public struct ServerAnswer: Equatable, Hashable {
+    public var status: UInt16
+    public var code: String?
+    public var details: JsonValue?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(status: UInt16, code: String?, details: JsonValue?) {
+        self.status = status
+        self.code = code
+        self.details = details
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ServerAnswer: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeServerAnswer: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ServerAnswer {
+        return
+            try ServerAnswer(
+                status: FfiConverterUInt16.read(from: &buf), 
+                code: FfiConverterOptionString.read(from: &buf), 
+                details: FfiConverterOptionTypeJsonValue.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ServerAnswer, into buf: inout [UInt8]) {
+        FfiConverterUInt16.write(value.status, into: &buf)
+        FfiConverterOptionString.write(value.code, into: &buf)
+        FfiConverterOptionTypeJsonValue.write(value.details, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeServerAnswer_lift(_ buf: RustBuffer) throws -> ServerAnswer {
+    return try FfiConverterTypeServerAnswer.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeServerAnswer_lower(_ value: ServerAnswer) -> RustBuffer {
+    return FfiConverterTypeServerAnswer.lower(value)
+}
+
+
+/**
  * A server's two catalogs as it lists them now.
  */
 public struct ServerCatalog: Equatable, Hashable {
@@ -10023,6 +10242,147 @@ public func FfiConverterTypeServerCatalog_lift(_ buf: RustBuffer) throws -> Serv
 #endif
 public func FfiConverterTypeServerCatalog_lower(_ value: ServerCatalog) -> RustBuffer {
     return FfiConverterTypeServerCatalog.lower(value)
+}
+
+
+/**
+ * What `setAsideDamaged` did.
+ */
+public struct SetAside: Equatable, Hashable {
+    /**
+     * Where the damaged store now is, with its logs beside it.
+     */
+    public var setAside: String
+    /**
+     * The writes the new store holds that the server has not taken.
+     */
+    public var carried: UInt64
+    /**
+     * The writes found in the old queue that could not be read.
+     */
+    public var unread: UInt64
+    /**
+     * The id of each unread write whose id could be read.
+     */
+    public var unreadIds: [String]
+    /**
+     * Whether every write the old queue holds was found, and every record
+     * that decides how a carried write is sent, and of the bytes an earlier
+     * set-aside keeps, was read; where not, or where a write did not read,
+     * the store set aside may hold more, and every byte the cache held as
+     * it was set aside stays until that store is removed or moved from
+     * where the set-aside put it.
+     */
+    public var whole: Bool
+    /**
+     * The carried writes held blocked `instanceChanged`, because the old
+     * store did not say which instance it was built from; release one to
+     * send it to the instance the new store is hydrated from.
+     */
+    public var held: UInt64
+    /**
+     * The carried writes held blocked `recordUnread`, because a record that
+     * decides how each is sent could not be read; release one to send it
+     * without that record. Where the store is built from another instance
+     * than the one it was made against, or the set-aside could not tell
+     * which, a release holds it `instanceChanged` instead.
+     */
+    public var recordUnread: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Where the damaged store now is, with its logs beside it.
+         */setAside: String, 
+        /**
+         * The writes the new store holds that the server has not taken.
+         */carried: UInt64, 
+        /**
+         * The writes found in the old queue that could not be read.
+         */unread: UInt64, 
+        /**
+         * The id of each unread write whose id could be read.
+         */unreadIds: [String], 
+        /**
+         * Whether every write the old queue holds was found, and every record
+         * that decides how a carried write is sent, and of the bytes an earlier
+         * set-aside keeps, was read; where not, or where a write did not read,
+         * the store set aside may hold more, and every byte the cache held as
+         * it was set aside stays until that store is removed or moved from
+         * where the set-aside put it.
+         */whole: Bool, 
+        /**
+         * The carried writes held blocked `instanceChanged`, because the old
+         * store did not say which instance it was built from; release one to
+         * send it to the instance the new store is hydrated from.
+         */held: UInt64, 
+        /**
+         * The carried writes held blocked `recordUnread`, because a record that
+         * decides how each is sent could not be read; release one to send it
+         * without that record. Where the store is built from another instance
+         * than the one it was made against, or the set-aside could not tell
+         * which, a release holds it `instanceChanged` instead.
+         */recordUnread: UInt64) {
+        self.setAside = setAside
+        self.carried = carried
+        self.unread = unread
+        self.unreadIds = unreadIds
+        self.whole = whole
+        self.held = held
+        self.recordUnread = recordUnread
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SetAside: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSetAside: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SetAside {
+        return
+            try SetAside(
+                setAside: FfiConverterString.read(from: &buf), 
+                carried: FfiConverterUInt64.read(from: &buf), 
+                unread: FfiConverterUInt64.read(from: &buf), 
+                unreadIds: FfiConverterSequenceString.read(from: &buf), 
+                whole: FfiConverterBool.read(from: &buf), 
+                held: FfiConverterUInt64.read(from: &buf), 
+                recordUnread: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SetAside, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.setAside, into: &buf)
+        FfiConverterUInt64.write(value.carried, into: &buf)
+        FfiConverterUInt64.write(value.unread, into: &buf)
+        FfiConverterSequenceString.write(value.unreadIds, into: &buf)
+        FfiConverterBool.write(value.whole, into: &buf)
+        FfiConverterUInt64.write(value.held, into: &buf)
+        FfiConverterUInt64.write(value.recordUnread, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSetAside_lift(_ buf: RustBuffer) throws -> SetAside {
+    return try FfiConverterTypeSetAside.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSetAside_lower(_ value: SetAside) -> RustBuffer {
+    return FfiConverterTypeSetAside.lower(value)
 }
 
 
@@ -10548,6 +10908,93 @@ public func FfiConverterTypeUnregisteredType_lower(_ value: UnregisteredType) ->
 }
 
 
+/**
+ * An unsent write with the kind and verdict recorded by the store's build.
+ */
+public struct UnsentWrite: Equatable, Hashable {
+    public var id: String
+    /**
+     * As the store names it, which may be a kind this build does not send.
+     */
+    public var kind: String
+    public var itemId: String?
+    /**
+     * The body it sends, as the store holds it.
+     */
+    public var body: String
+    /**
+     * The stored verdict, including values this build does not recognize.
+     */
+    public var verdict: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, 
+        /**
+         * As the store names it, which may be a kind this build does not send.
+         */kind: String, itemId: String?, 
+        /**
+         * The body it sends, as the store holds it.
+         */body: String, 
+        /**
+         * The stored verdict, including values this build does not recognize.
+         */verdict: String?) {
+        self.id = id
+        self.kind = kind
+        self.itemId = itemId
+        self.body = body
+        self.verdict = verdict
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnsentWrite: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnsentWrite: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnsentWrite {
+        return
+            try UnsentWrite(
+                id: FfiConverterString.read(from: &buf), 
+                kind: FfiConverterString.read(from: &buf), 
+                itemId: FfiConverterOptionString.read(from: &buf), 
+                body: FfiConverterString.read(from: &buf), 
+                verdict: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnsentWrite, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.kind, into: &buf)
+        FfiConverterOptionString.write(value.itemId, into: &buf)
+        FfiConverterString.write(value.body, into: &buf)
+        FfiConverterOptionString.write(value.verdict, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentWrite_lift(_ buf: RustBuffer) throws -> UnsentWrite {
+    return try FfiConverterTypeUnsentWrite.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentWrite_lower(_ value: UnsentWrite) -> RustBuffer {
+    return FfiConverterTypeUnsentWrite.lower(value)
+}
+
+
 public struct UnsureFile: Equatable, Hashable {
     public var path: String
     public var reason: String
@@ -10907,6 +11354,12 @@ public enum BlockedReason: Equatable, Hashable, CaseIterable {
      * has been built from since, and is sent only once released.
      */
     case instanceChanged
+    /**
+     * The write was carried from a store set aside where a record that
+     * decides how it is sent could not be read, and is sent only once
+     * released.
+     */
+    case recordUnread
 
 
 
@@ -10940,6 +11393,8 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case 6: return .instanceChanged
         
+        case 7: return .recordUnread
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -10970,6 +11425,10 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case .instanceChanged:
             writeInt(&buf, Int32(6))
+        
+        
+        case .recordUnread:
+            writeInt(&buf, Int32(7))
         
         }
     }
@@ -11519,8 +11978,8 @@ public func FfiConverterTypeEdgeDirection_lower(_ value: EdgeDirection) -> RustB
 
 public enum EdgeEnd: Equatable, Hashable, CaseIterable {
     
-    case source
-    case target
+    case from
+    case to
 
 
 
@@ -11542,9 +12001,9 @@ public struct FfiConverterTypeEdgeEnd: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .source
+        case 1: return .from
         
-        case 2: return .target
+        case 2: return .to
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -11554,11 +12013,11 @@ public struct FfiConverterTypeEdgeEnd: FfiConverterRustBuffer {
         switch value {
         
         
-        case .source:
+        case .from:
             writeInt(&buf, Int32(1))
         
         
-        case .target:
+        case .to:
             writeInt(&buf, Int32(2))
         
         }
@@ -11587,10 +12046,10 @@ public func FfiConverterTypeEdgeEnd_lower(_ value: EdgeEnd) -> RustBuffer {
  * Which end of an edge has the file that writes it in a folder, or neither.
  */
 
-public enum EdgeWrittenAt: Equatable, Hashable, CaseIterable {
+public enum EdgeWrittenFrom: Equatable, Hashable, CaseIterable {
     
-    case source
-    case target
+    case from
+    case to
     case none
 
 
@@ -11600,22 +12059,22 @@ public enum EdgeWrittenAt: Equatable, Hashable, CaseIterable {
 }
 
 #if compiler(>=6)
-extension EdgeWrittenAt: Sendable {}
+extension EdgeWrittenFrom: Sendable {}
 #endif
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public struct FfiConverterTypeEdgeWrittenAt: FfiConverterRustBuffer {
-    typealias SwiftType = EdgeWrittenAt
+public struct FfiConverterTypeEdgeWrittenFrom: FfiConverterRustBuffer {
+    typealias SwiftType = EdgeWrittenFrom
 
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeWrittenAt {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EdgeWrittenFrom {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .source
+        case 1: return .from
         
-        case 2: return .target
+        case 2: return .to
         
         case 3: return .none
         
@@ -11623,15 +12082,15 @@ public struct FfiConverterTypeEdgeWrittenAt: FfiConverterRustBuffer {
         }
     }
 
-    public static func write(_ value: EdgeWrittenAt, into buf: inout [UInt8]) {
+    public static func write(_ value: EdgeWrittenFrom, into buf: inout [UInt8]) {
         switch value {
         
         
-        case .source:
+        case .from:
             writeInt(&buf, Int32(1))
         
         
-        case .target:
+        case .to:
             writeInt(&buf, Int32(2))
         
         
@@ -11646,15 +12105,15 @@ public struct FfiConverterTypeEdgeWrittenAt: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeEdgeWrittenAt_lift(_ buf: RustBuffer) throws -> EdgeWrittenAt {
-    return try FfiConverterTypeEdgeWrittenAt.lift(buf)
+public func FfiConverterTypeEdgeWrittenFrom_lift(_ buf: RustBuffer) throws -> EdgeWrittenFrom {
+    return try FfiConverterTypeEdgeWrittenFrom.lift(buf)
 }
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-public func FfiConverterTypeEdgeWrittenAt_lower(_ value: EdgeWrittenAt) -> RustBuffer {
-    return FfiConverterTypeEdgeWrittenAt.lower(value)
+public func FfiConverterTypeEdgeWrittenFrom_lower(_ value: EdgeWrittenFrom) -> RustBuffer {
+    return FfiConverterTypeEdgeWrittenFrom.lower(value)
 }
 
 
@@ -13169,26 +13628,25 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
 
     
     
-    case NotFound(code: String, message: String
+    case NotFound(code: String, message: String, 
+        /**
+         * What a server sent, present only where one answered.
+         */server: ServerAnswer?
     )
-    case Unauthorized(code: String, message: String
+    case Unauthorized(code: String, message: String, server: ServerAnswer?
     )
-    case Forbidden(code: String, message: String
+    case Forbidden(code: String, message: String, server: ServerAnswer?
     )
     case Validation(code: String, message: String, 
         /**
-         * The server's `error.details` for the same refusal, on each
-         * `edge_constraint_violation` and `edge_cycle` the copy gives
-         * itself, such as its `constraint`; `nil` on every other refusal.
-         * Shaped as a refused write's `answer` holds them, under
-         * `error.details`.
-         */details: JsonValue?
+         * The copy's own details; a server's details belong in `server`.
+         */details: JsonValue?, server: ServerAnswer?
     )
-    case UnknownType(message: String
+    case UnknownType(message: String, server: ServerAnswer?
     )
-    case RateLimited(code: String, message: String, retryAfterSeconds: UInt64?
+    case RateLimited(code: String, message: String, retryAfterSeconds: UInt64?, server: ServerAnswer?
     )
-    case Server(status: UInt16, code: String, message: String
+    case Server(status: UInt16, code: String, message: String, details: JsonValue?, server: ServerAnswer?
     )
     case Io(message: String
     )
@@ -13198,13 +13656,15 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
      * Something in front of the server answered `status` naming no
      * contract: taken as the network failing, never as the server's word.
      */
-    case Unnamed(status: UInt16, message: String
+    case Unnamed(status: UInt16, message: String, server: ServerAnswer?
     )
     case Decoding(message: String
     )
     case Store(message: String
     )
-    case Redirected(origin: String, status: UInt16, location: String?, message: String
+    case StoreBusy(message: String
+    )
+    case Redirected(origin: String, status: UInt16, location: String?, message: String, server: ServerAnswer?
     )
     case StorageFull(message: String
     )
@@ -13237,6 +13697,20 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case ReadingHandle(message: String
     )
     /**
+     * A store SQLite cannot read, or one whose set-aside stopped part way:
+     * `setAsideDamaged` keeps it and carries the writes it can read.
+     */
+    case StoreDamaged(
+        /**
+         * Empty where the damage was met part way through a call, which
+         * does not know the store's path: `checkStore` names it.
+         */path: String, reason: String, 
+        /**
+         * Writes in its queue the server has not taken; `None` where the
+         * queue cannot be read whole.
+         */unsent: UInt64?, message: String
+    )
+    /**
      * A removal of a store was refused, leaving it as it was, because the
      * writes it holds that the server has not taken are not the number the
      * caller agreed to lose. Carried so an app can show the person the
@@ -13251,9 +13725,12 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
      * The copy can no longer be kept current from its cursor: a hydration
      * is owed, and the queue survives it.
      */
-    case CopyExpired(reason: String, message: String
+    case CopyExpired(reason: String, message: String, 
+        /**
+         * What a server sent, where its answer ended the copy.
+         */server: ServerAnswer?
     )
-    case StreamIncomplete(reason: String, message: String
+    case StreamIncomplete(reason: String, message: String, server: ServerAnswer?
     )
     case WrongServer(expected: String, got: String, message: String
     )
@@ -13278,7 +13755,10 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
          */served: String?, expected: UInt64, status: UInt16?, 
         /**
          * The answer was to a write, which may have taken effect.
-         */writeSent: Bool, message: String
+         */writeSent: Bool, message: String, 
+        /**
+         * The answer's status, where it was read; its body was not.
+         */server: ServerAnswer?
     )
     /**
      * The `Stop` the call was given was raised before it finished.
@@ -13302,8 +13782,7 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
 
     
     /**
-     * The error classification used by the command line and Node binding.
-     * A variant's `code` field carries the server's more specific error code.
+     * The classification shared with the command line and Node binding.
      */
 public func code() -> String  {
     return try!  FfiConverterString.lift(try! rustCall() {
@@ -13342,33 +13821,41 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         
         case 1: return .NotFound(
             code: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 2: return .Unauthorized(
             code: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 3: return .Forbidden(
             code: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 4: return .Validation(
             code: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf), 
-            details: try FfiConverterOptionTypeJsonValue.read(from: &buf)
+            details: try FfiConverterOptionTypeJsonValue.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 5: return .UnknownType(
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 6: return .RateLimited(
             code: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf), 
-            retryAfterSeconds: try FfiConverterOptionUInt64.read(from: &buf)
+            retryAfterSeconds: try FfiConverterOptionUInt64.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 7: return .Server(
             status: try FfiConverterUInt16.read(from: &buf), 
             code: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionTypeJsonValue.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 8: return .Io(
             message: try FfiConverterString.read(from: &buf)
@@ -13378,7 +13865,8 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             )
         case 10: return .Unnamed(
             status: try FfiConverterUInt16.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
         case 11: return .Decoding(
             message: try FfiConverterString.read(from: &buf)
@@ -13386,90 +13874,103 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 12: return .Store(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 13: return .Redirected(
+        case 13: return .StoreBusy(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 14: return .Redirected(
             origin: try FfiConverterString.read(from: &buf), 
             status: try FfiConverterUInt16.read(from: &buf), 
             location: try FfiConverterOptionString.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
+            )
+        case 15: return .StorageFull(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 14: return .StorageFull(
-            message: try FfiConverterString.read(from: &buf)
-            )
-        case 15: return .SignedOut(
+        case 16: return .SignedOut(
             origin: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 16: return .NoKeychain(
+        case 17: return .NoKeychain(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 17: return .NoServer(
+        case 18: return .NoServer(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 18: return .NoCursor(
+        case 19: return .NoCursor(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 19: return .HydrationIncomplete(
+        case 20: return .HydrationIncomplete(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 20: return .NoCatalog(
+        case 21: return .NoCatalog(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 21: return .WrongSchema(
+        case 22: return .WrongSchema(
             path: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             unsent: try FfiConverterOptionUInt64.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 22: return .ReadingHandle(
+        case 23: return .ReadingHandle(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 23: return .UnsentDiffers(
+        case 24: return .StoreDamaged(
+            path: try FfiConverterString.read(from: &buf), 
+            reason: try FfiConverterString.read(from: &buf), 
+            unsent: try FfiConverterOptionUInt64.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 25: return .UnsentDiffers(
             path: try FfiConverterString.read(from: &buf), 
             unsent: try FfiConverterOptionUInt64.read(from: &buf), 
             agreed: try FfiConverterUInt64.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 24: return .CopyExpired(
+        case 26: return .CopyExpired(
             reason: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
-        case 25: return .StreamIncomplete(
+        case 27: return .StreamIncomplete(
             reason: try FfiConverterString.read(from: &buf), 
-            message: try FfiConverterString.read(from: &buf)
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
-        case 26: return .WrongServer(
+        case 28: return .WrongServer(
             expected: try FfiConverterString.read(from: &buf), 
             got: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 27: return .BytesAbsent(
+        case 29: return .BytesAbsent(
             hash: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 28: return .NoRoom(
+        case 30: return .NoRoom(
             hash: try FfiConverterString.read(from: &buf), 
             size: try FfiConverterUInt64.read(from: &buf), 
             free: try FfiConverterUInt64.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 29: return .ContractMismatch(
+        case 31: return .ContractMismatch(
             served: try FfiConverterOptionString.read(from: &buf), 
             expected: try FfiConverterUInt64.read(from: &buf), 
             status: try FfiConverterOptionUInt16.read(from: &buf), 
             writeSent: try FfiConverterBool.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf), 
+            server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
+            )
+        case 32: return .Canceled(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 30: return .Canceled(
+        case 33: return .FirstSyncWaiting(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 31: return .FirstSyncWaiting(
+        case 34: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 32: return .Invalid(
-            message: try FfiConverterString.read(from: &buf)
-            )
-        case 33: return .Fault(
+        case 35: return .Fault(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -13484,48 +13985,56 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
 
         
         
-        case let .NotFound(code,message):
+        case let .NotFound(code,message,server):
             writeInt(&buf, Int32(1))
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .Unauthorized(code,message):
+        case let .Unauthorized(code,message,server):
             writeInt(&buf, Int32(2))
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .Forbidden(code,message):
+        case let .Forbidden(code,message,server):
             writeInt(&buf, Int32(3))
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .Validation(code,message,details):
+        case let .Validation(code,message,details,server):
             writeInt(&buf, Int32(4))
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
             FfiConverterOptionTypeJsonValue.write(details, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .UnknownType(message):
+        case let .UnknownType(message,server):
             writeInt(&buf, Int32(5))
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .RateLimited(code,message,retryAfterSeconds):
+        case let .RateLimited(code,message,retryAfterSeconds,server):
             writeInt(&buf, Int32(6))
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
             FfiConverterOptionUInt64.write(retryAfterSeconds, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .Server(status,code,message):
+        case let .Server(status,code,message,details,server):
             writeInt(&buf, Int32(7))
             FfiConverterUInt16.write(status, into: &buf)
             FfiConverterString.write(code, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeJsonValue.write(details, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
         case let .Io(message):
@@ -13538,10 +14047,11 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Unnamed(status,message):
+        case let .Unnamed(status,message,server):
             writeInt(&buf, Int32(10))
             FfiConverterUInt16.write(status, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
         case let .Decoding(message):
@@ -13554,52 +14064,58 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Redirected(origin,status,location,message):
+        case let .StoreBusy(message):
             writeInt(&buf, Int32(13))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Redirected(origin,status,location,message,server):
+            writeInt(&buf, Int32(14))
             FfiConverterString.write(origin, into: &buf)
             FfiConverterUInt16.write(status, into: &buf)
             FfiConverterOptionString.write(location, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
         case let .StorageFull(message):
-            writeInt(&buf, Int32(14))
+            writeInt(&buf, Int32(15))
             FfiConverterString.write(message, into: &buf)
             
         
         case let .SignedOut(origin,message):
-            writeInt(&buf, Int32(15))
+            writeInt(&buf, Int32(16))
             FfiConverterString.write(origin, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .NoKeychain(message):
-            writeInt(&buf, Int32(16))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .NoServer(message):
             writeInt(&buf, Int32(17))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NoCursor(message):
+        case let .NoServer(message):
             writeInt(&buf, Int32(18))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .HydrationIncomplete(message):
+        case let .NoCursor(message):
             writeInt(&buf, Int32(19))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NoCatalog(message):
+        case let .HydrationIncomplete(message):
             writeInt(&buf, Int32(20))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .WrongSchema(path,reason,unsent,message):
+        case let .NoCatalog(message):
             writeInt(&buf, Int32(21))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .WrongSchema(path,reason,unsent,message):
+            writeInt(&buf, Int32(22))
             FfiConverterString.write(path, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterOptionUInt64.write(unsent, into: &buf)
@@ -13607,78 +14123,89 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             
         
         case let .ReadingHandle(message):
-            writeInt(&buf, Int32(22))
+            writeInt(&buf, Int32(23))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .StoreDamaged(path,reason,unsent,message):
+            writeInt(&buf, Int32(24))
+            FfiConverterString.write(path, into: &buf)
+            FfiConverterString.write(reason, into: &buf)
+            FfiConverterOptionUInt64.write(unsent, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .UnsentDiffers(path,unsent,agreed,message):
-            writeInt(&buf, Int32(23))
+            writeInt(&buf, Int32(25))
             FfiConverterString.write(path, into: &buf)
             FfiConverterOptionUInt64.write(unsent, into: &buf)
             FfiConverterUInt64.write(agreed, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .CopyExpired(reason,message):
-            writeInt(&buf, Int32(24))
+        case let .CopyExpired(reason,message,server):
+            writeInt(&buf, Int32(26))
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .StreamIncomplete(reason,message):
-            writeInt(&buf, Int32(25))
+        case let .StreamIncomplete(reason,message,server):
+            writeInt(&buf, Int32(27))
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
         case let .WrongServer(expected,got,message):
-            writeInt(&buf, Int32(26))
+            writeInt(&buf, Int32(28))
             FfiConverterString.write(expected, into: &buf)
             FfiConverterString.write(got, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .BytesAbsent(hash,reason,message):
-            writeInt(&buf, Int32(27))
+            writeInt(&buf, Int32(29))
             FfiConverterString.write(hash, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .NoRoom(hash,size,free,message):
-            writeInt(&buf, Int32(28))
+            writeInt(&buf, Int32(30))
             FfiConverterString.write(hash, into: &buf)
             FfiConverterUInt64.write(size, into: &buf)
             FfiConverterUInt64.write(free, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .ContractMismatch(served,expected,status,writeSent,message):
-            writeInt(&buf, Int32(29))
+        case let .ContractMismatch(served,expected,status,writeSent,message,server):
+            writeInt(&buf, Int32(31))
             FfiConverterOptionString.write(served, into: &buf)
             FfiConverterUInt64.write(expected, into: &buf)
             FfiConverterOptionUInt16.write(status, into: &buf)
             FfiConverterBool.write(writeSent, into: &buf)
             FfiConverterString.write(message, into: &buf)
+            FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
         case let .Canceled(message):
-            writeInt(&buf, Int32(30))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .FirstSyncWaiting(message):
-            writeInt(&buf, Int32(31))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .Invalid(message):
             writeInt(&buf, Int32(32))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Fault(message):
+        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(33))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Invalid(message):
+            writeInt(&buf, Int32(34))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Fault(message):
+            writeInt(&buf, Int32(35))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -14574,9 +15101,9 @@ public enum Verdict: Equatable, Hashable {
     case merged(fields: [String]
     )
     /**
-     * The server kept its own value and wrote the losing one to a sibling.
+     * Only item conflicts have a sibling; row conflicts name the replaced cells.
      */
-    case conflicted(siblingId: String, fields: [String]
+    case conflicted(siblingId: String?, fields: [String], conflicts: [RowConflict]
     )
     /**
      * The refusal read into its parts.
@@ -14621,7 +15148,7 @@ public struct FfiConverterTypeVerdict: FfiConverterRustBuffer {
         case 2: return .merged(fields: try FfiConverterSequenceString.read(from: &buf)
         )
         
-        case 3: return .conflicted(siblingId: try FfiConverterString.read(from: &buf), fields: try FfiConverterSequenceString.read(from: &buf)
+        case 3: return .conflicted(siblingId: try FfiConverterOptionString.read(from: &buf), fields: try FfiConverterSequenceString.read(from: &buf), conflicts: try FfiConverterSequenceTypeRowConflict.read(from: &buf)
         )
         
         case 4: return .refused(refusal: try FfiConverterTypeRefusal.read(from: &buf)
@@ -14649,10 +15176,11 @@ public struct FfiConverterTypeVerdict: FfiConverterRustBuffer {
             FfiConverterSequenceString.write(fields, into: &buf)
             
         
-        case let .conflicted(siblingId,fields):
+        case let .conflicted(siblingId,fields,conflicts):
             writeInt(&buf, Int32(3))
-            FfiConverterString.write(siblingId, into: &buf)
+            FfiConverterOptionString.write(siblingId, into: &buf)
             FfiConverterSequenceString.write(fields, into: &buf)
+            FfiConverterSequenceTypeRowConflict.write(conflicts, into: &buf)
             
         
         case let .refused(refusal):
@@ -14705,12 +15233,14 @@ public enum WriteKind: Equatable, Hashable, CaseIterable {
     case createEdge
     case updateEdge
     case deleteEdge
-    case replaceMetadata
+    case replaceTags
     case addTag
     case removeTag
     case writeExtension
     case deleteExtension
     case uploadBlob
+    case writeRows
+    case undoRows
 
 
 
@@ -14748,7 +15278,7 @@ public struct FfiConverterTypeWriteKind: FfiConverterRustBuffer {
         
         case 8: return .deleteEdge
         
-        case 9: return .replaceMetadata
+        case 9: return .replaceTags
         
         case 10: return .addTag
         
@@ -14759,6 +15289,10 @@ public struct FfiConverterTypeWriteKind: FfiConverterRustBuffer {
         case 13: return .deleteExtension
         
         case 14: return .uploadBlob
+        
+        case 15: return .writeRows
+        
+        case 16: return .undoRows
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -14800,7 +15334,7 @@ public struct FfiConverterTypeWriteKind: FfiConverterRustBuffer {
             writeInt(&buf, Int32(8))
         
         
-        case .replaceMetadata:
+        case .replaceTags:
             writeInt(&buf, Int32(9))
         
         
@@ -14822,6 +15356,14 @@ public struct FfiConverterTypeWriteKind: FfiConverterRustBuffer {
         
         case .uploadBlob:
             writeInt(&buf, Int32(14))
+        
+        
+        case .writeRows:
+            writeInt(&buf, Int32(15))
+        
+        
+        case .undoRows:
+            writeInt(&buf, Int32(16))
         
         }
     }
@@ -15438,6 +15980,54 @@ fileprivate struct FfiConverterOptionTypeRemovalThreshold: FfiConverterRustBuffe
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeRemovalThreshold.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeRequestLimit: FfiConverterRustBuffer {
+    typealias SwiftType = RequestLimit?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRequestLimit.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRequestLimit.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeServerAnswer: FfiConverterRustBuffer {
+    typealias SwiftType = ServerAnswer?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeServerAnswer.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeServerAnswer.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -16378,6 +16968,31 @@ fileprivate struct FfiConverterSequenceTypeQueuedWrite: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeRowConflict: FfiConverterRustBuffer {
+    typealias SwiftType = [RowConflict]
+
+    public static func write(_ value: [RowConflict], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRowConflict.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RowConflict] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RowConflict]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRowConflict.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeSearchHit: FfiConverterRustBuffer {
     typealias SwiftType = [SearchHit]
 
@@ -16445,6 +17060,31 @@ fileprivate struct FfiConverterSequenceTypeUnregisteredType: FfiConverterRustBuf
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeUnregisteredType.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeUnsentWrite: FfiConverterRustBuffer {
+    typealias SwiftType = [UnsentWrite]
+
+    public static func write(_ value: [UnsentWrite], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeUnsentWrite.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UnsentWrite] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UnsentWrite]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeUnsentWrite.read(from: &buf))
         }
         return seq
     }
@@ -16678,6 +17318,20 @@ fileprivate struct FfiConverterDictionaryStringSequenceString: FfiConverterRustB
     }
 }
 /**
+ * Reads every page of the store at `path`, and checks each index against its
+ * rows. Throws `StoreDamaged`, naming it and how many writes its queue holds
+ * that the server has not taken, where SQLite cannot read it, `WrongSchema` where another build made it, and
+ * `ReadingHandle` while another process, or another `Core` in this one,
+ * writes it. Changes nothing, and reads the whole file, so it takes longer
+ * the larger the store.
+ */
+public func checkStore(path: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_check_store(
+        FfiConverterString.lower(path),$0
+    )
+}
+}
+/**
  * Every link in `text` in order, repeats included, split as Marfa reads
  * it, with each part's place in the text. Needs no store.
  */
@@ -16685,6 +17339,16 @@ public func linkParts(text: String) -> [LinkParts]  {
     return try!  FfiConverterSequenceTypeLinkParts.lift(try! rustCall() {
     uniffi_marfa_core_ffi_fn_func_link_parts(
         FfiConverterString.lower(text),$0
+    )
+})
+}
+/**
+ * Lists unsent writes from a refused store; see BINDINGS.md for refusals.
+ */
+public func readUnsent(path: String)throws  -> [UnsentWrite]  {
+    return try  FfiConverterSequenceTypeUnsentWrite.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_read_unsent(
+        FfiConverterString.lower(path),$0
     )
 })
 }
@@ -16711,6 +17375,37 @@ public func removeStore(path: String, unsent: UInt64)throws   {try rustCallWithE
         FfiConverterUInt64.lower(unsent),$0
     )
 }
+}
+/**
+ * Removes the store at `path` as `removeStore` does, agreeing to lose every
+ * write it holds that the server has not taken, however many there are and
+ * whether or not they can be counted, as for a store `open` refuses with
+ * `StoreDamaged`. Throws as `removeStore` does but for the count.
+ */
+public func removeStoreLosingAll(path: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_remove_store_losing_all(
+        FfiConverterString.lower(path),$0
+    )
+}
+}
+/**
+ * Sets aside the store at `path`, which `open` refuses with `StoreDamaged`:
+ * moves it and its logs to `<path>.damaged-<n>` beside it, never deleting
+ * them, and makes a new store at `path` that carries every write its queue
+ * lets be read, under its id and idempotency key, with its body, base
+ * version and verdict, and the server and instance it was built from. Drop
+ * every `Core` on the store first. The new store holds no copy: hydrate it,
+ * then drain, to send what it carries. Throws `Invalid` for a store that
+ * opens as it is or a folder's store, `WrongSchema` for a store another
+ * build made, and `ReadingHandle` while another process writes it. One that
+ * stopped part way is finished by calling again.
+ */
+public func setAsideDamaged(path: String)throws  -> SetAside  {
+    return try  FfiConverterTypeSetAside_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_func_set_aside_damaged(
+        FfiConverterString.lower(path),$0
+    )
+})
 }
 /**
  * The expression a text in the listing grammar holds, refused with the
@@ -16767,10 +17462,22 @@ private let initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_func_check_store() != 29981) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_func_link_parts() != 21360) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_func_read_unsent() != 231) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_func_remove_store() != 23704) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_remove_store_losing_all() != 18814) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_func_set_aside_damaged() != 15762) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_func_decode_filter() != 57210) {
@@ -16881,7 +17588,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_file_cache() != 11121) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 58708) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_follow() != 56432) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_forget_answered() != 62545) {
@@ -16932,7 +17639,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_queue() != 63256) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_release() != 25231) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_release() != 55536) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_release_reason() != 2563) {
@@ -16944,7 +17651,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_remove_tag() != 65124) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_replace_metadata() != 16791) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_replace_tags() != 34900) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_restore_item() != 12216) {
@@ -16989,7 +17696,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_watch() != 793) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 48429) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 47489) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {

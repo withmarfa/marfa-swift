@@ -104,21 +104,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -133,6 +118,200 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.OccurrencePage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List the trash
+    ///
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
+    ///
+    /// - Remark: HTTP `GET /trash`.
+    /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
+    public func listTrash(_ input: Operations.ListTrash.Input) async throws -> Operations.ListTrash.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListTrash.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/trash",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "type",
+                    value: input.query._type
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "q",
+                    value: input.query.q
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "cursor",
+                    value: input.query.cursor
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "limit",
+                    value: input.query.limit
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListTrash.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListTrash.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.TrashPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Empty the trash
+    ///
+    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
+    ///
+    /// - Remark: HTTP `POST /trash/empty`.
+    /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
+    public func emptyTrash(_ input: Operations.EmptyTrash.Input) async throws -> Operations.EmptyTrash.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.EmptyTrash.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/trash/empty",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "cursor",
+                    value: input.query.cursor
+                )
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.EmptyTrash.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.EmptyTrash.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Operations.EmptyTrash.Output.Ok.Body.JsonPayload.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -198,21 +377,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -297,21 +461,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -350,113 +499,19 @@ public struct Client: ClientProtocol {
             }
         )
     }
-    /// Get item metadata
-    ///
-    /// Returns an item's metadata: its tags and the extension namespaces you can read. To read metadata for many items, use `include=metadata` on `GET /items`.
-    ///
-    /// - Remark: HTTP `GET /items/{id}/metadata`.
-    /// - Remark: Generated from `#/paths//items/{id}/metadata/get(getItemMetadata)`.
-    public func getItemMetadata(_ input: Operations.GetItemMetadata.Input) async throws -> Operations.GetItemMetadata.Output {
-        try await client.send(
-            input: input,
-            forOperation: Operations.GetItemMetadata.id,
-            serializer: { input in
-                let path = try converter.renderedPath(
-                    template: "/items/{}/metadata",
-                    parameters: [
-                        input.path.id
-                    ]
-                )
-                var request: HTTPTypes.HTTPRequest = .init(
-                    soar_path: path,
-                    method: .get
-                )
-                suppressMutabilityWarning(&request)
-                converter.setAcceptHeader(
-                    in: &request.headerFields,
-                    contentTypes: input.headers.accept
-                )
-                return (request, nil)
-            },
-            deserializer: { response, responseBody in
-                switch response.status.code {
-                case 200:
-                    let headers: Operations.GetItemMetadata.Output.Ok.Headers = .init(
-                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-Marfa-Contract",
-                            as: Components.Headers.XMarfaContract.self
-                        ),
-                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-Request-ID",
-                            as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
-                        )
-                    )
-                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.GetItemMetadata.Output.Ok.Body
-                    let chosenContentType = try converter.bestContentType(
-                        received: contentType,
-                        options: [
-                            "application/json"
-                        ]
-                    )
-                    switch chosenContentType {
-                    case "application/json":
-                        body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.MetadataResponse.self,
-                            from: responseBody,
-                            transforming: { value in
-                                .json(value)
-                            }
-                        )
-                    default:
-                        preconditionFailure("bestContentType chose an invalid content type.")
-                    }
-                    return .ok(.init(
-                        headers: headers,
-                        body: body
-                    ))
-                default:
-                    return .undocumented(
-                        statusCode: response.status.code,
-                        .init(
-                            headerFields: response.headerFields,
-                            body: responseBody
-                        )
-                    )
-                }
-            }
-        )
-    }
     /// List tags
     ///
     /// Returns every tag in use on the active items you can read, with the number of items that carry it. Sorted by count, highest first, then by tag.
     ///
-    /// - Remark: HTTP `GET /metadata/tags`.
-    /// - Remark: Generated from `#/paths//metadata/tags/get(listTags)`.
+    /// - Remark: HTTP `GET /tags`.
+    /// - Remark: Generated from `#/paths//tags/get(listTags)`.
     public func listTags(_ input: Operations.ListTags.Input) async throws -> Operations.ListTags.Output {
         try await client.send(
             input: input,
             forOperation: Operations.ListTags.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/metadata/tags",
+                    template: "/tags",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
@@ -483,21 +538,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -538,7 +578,7 @@ public struct Client: ClientProtocol {
     }
     /// Get an extension namespace
     ///
-    /// Returns the data in one extension namespace on the item, or `data: null` if the item has none there.
+    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
@@ -578,21 +618,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -606,7 +631,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Operations.GetItemExtension.Output.Ok.Body.JsonPayload.self,
+                            Components.Schemas.Extension.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -633,7 +658,7 @@ public struct Client: ClientProtocol {
     }
     /// List extension namespaces
     ///
-    /// Returns the extension namespaces on the item that you can read, each with its data.
+    /// Returns the extension namespaces on the item that you can read, each with its document.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/get(listItemExtensions)`.
@@ -672,21 +697,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -700,7 +710,673 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.ExtensionsResponse.self,
+                            Components.Schemas.ExtensionPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List table rows
+    ///
+    /// Returns a page of a table's rows, in the table's `order` unless you name a sort, and by `id` for a table that names no `order`. A row without the sorted column comes last, and ties go by `id`.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/rows`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/get(listTableRows)`.
+    public func listTableRows(_ input: Operations.ListTableRows.Input) async throws -> Operations.ListTableRows.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListTableRows.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables/{}/rows",
+                    parameters: [
+                        input.path.id,
+                        input.path.table
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "limit",
+                    value: input.query.limit
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "cursor",
+                    value: input.query.cursor
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "filter",
+                    value: input.query.filter
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "sort",
+                    value: input.query.sort
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "direction",
+                    value: input.query.direction
+                )
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Reach",
+                    value: input.headers.xMarfaReach
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListTableRows.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        xMarfaReach: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Reach",
+                            as: Components.Headers.XMarfaReach.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListTableRows.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.TableRowPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Write table rows
+    ///
+    /// Applies a batch of up to 1000 row operations to one table of an item, all of them or none. A batch that changes rows moves the item's `last_activity_at` to the batch's time, unless the item holds a later one, and sends one `rows.changed` event.
+    ///
+    /// - Remark: HTTP `POST /items/{id}/tables/{table}/rows`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/post(writeTableRows)`.
+    public func writeTableRows(_ input: Operations.WriteTableRows.Input) async throws -> Operations.WriteTableRows.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.WriteTableRows.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables/{}/rows",
+                    parameters: [
+                        input.path.id,
+                        input.path.table
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "Idempotency-Key",
+                    value: input.headers.idempotencyKey
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.WriteTableRows.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        idempotencyReplayed: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Idempotency-Replayed",
+                            as: Components.Headers.IdempotencyReplayed.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.WriteTableRows.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.RowBatchResult.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get a table row
+    ///
+    /// Returns one row of an item's table.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/rows/{row}`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/rows/{row}/get(getTableRow)`.
+    public func getTableRow(_ input: Operations.GetTableRow.Input) async throws -> Operations.GetTableRow.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetTableRow.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables/{}/rows/{}",
+                    parameters: [
+                        input.path.id,
+                        input.path.table,
+                        input.path.row
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetTableRow.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetTableRow.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.TableRow.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List an item's tables
+    ///
+    /// Returns each table the item's type declares, with how many rows the item holds in it and when one last changed.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/get(listItemTables)`.
+    public func listItemTables(_ input: Operations.ListItemTables.Input) async throws -> Operations.ListItemTables.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListItemTables.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Reach",
+                    value: input.headers.xMarfaReach
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListItemTables.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        xMarfaReach: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Reach",
+                            as: Components.Headers.XMarfaReach.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListItemTables.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.TableSummaryPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get table totals
+    ///
+    /// Returns the total of each column that names `adds_up`, over the rows `filter` selects, or every row.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/totals`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/totals/get(getTableTotals)`.
+    public func getTableTotals(_ input: Operations.GetTableTotals.Input) async throws -> Operations.GetTableTotals.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetTableTotals.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables/{}/totals",
+                    parameters: [
+                        input.path.id,
+                        input.path.table
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "filter",
+                    value: input.query.filter
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetTableTotals.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetTableTotals.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.RowTotals.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List table batches
+    ///
+    /// Returns the batches the table's change log holds, newest first, so you can find one to undo. The log keeps a batch for `row_log_retention_days`.
+    ///
+    /// - Remark: HTTP `GET /items/{id}/tables/{table}/batches`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/get(listTableBatches)`.
+    public func listTableBatches(_ input: Operations.ListTableBatches.Input) async throws -> Operations.ListTableBatches.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListTableBatches.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables/{}/batches",
+                    parameters: [
+                        input.path.id,
+                        input.path.table
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "limit",
+                    value: input.query.limit
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "cursor",
+                    value: input.query.cursor
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListTableBatches.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListTableBatches.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.RowBatchPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Undo a table batch
+    ///
+    /// Puts back every row a batch changed as it was before the batch, as a new batch, all or none. Undo an undo to redo it. Sends one `rows.changed` event that names the undone batch in `undoes`.
+    ///
+    /// - Remark: HTTP `POST /items/{id}/tables/{table}/batches/{batch}/undo`.
+    /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/{batch}/undo/post(undoTableBatch)`.
+    public func undoTableBatch(_ input: Operations.UndoTableBatch.Input) async throws -> Operations.UndoTableBatch.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.UndoTableBatch.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/items/{}/tables/{}/batches/{}/undo",
+                    parameters: [
+                        input.path.id,
+                        input.path.table,
+                        input.path.batch
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "Idempotency-Key",
+                    value: input.headers.idempotencyKey
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.UndoTableBatch.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        idempotencyReplayed: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Idempotency-Replayed",
+                            as: Components.Headers.IdempotencyReplayed.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.UndoTableBatch.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.RowUndoResult.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -769,21 +1445,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         ),
                         xMarfaReach: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
@@ -880,21 +1541,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -908,7 +1554,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.TypeResponse.self,
+                            Components.Schemas.RegisteredType.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -974,21 +1620,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1054,6 +1685,13 @@ public struct Client: ClientProtocol {
                     name: "X-Marfa-Instance-Id",
                     value: input.headers.xMarfaInstanceId
                 )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "force",
+                    value: input.query.force
+                )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
                     contentTypes: input.headers.accept
@@ -1082,21 +1720,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1110,7 +1733,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.TypeResponse.self,
+                            Components.Schemas.RegisteredType.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -1137,7 +1760,7 @@ public struct Client: ClientProtocol {
     }
     /// Delete a type
     ///
-    /// Deletes a type no item holds and no folder, view or webhook names. With `force=true`, a key keeps the items without their type and leaves the settings as they are; new writes then fail until it's registered again.
+    /// Deletes a type no item holds and no folder, view, webhook or table column names. With `force=true`, keeps the items, settings and column constraints; new item writes fail until the type is registered again.
     ///
     /// - Remark: HTTP `DELETE /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)`.
@@ -1188,21 +1811,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1296,21 +1904,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1348,21 +1941,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1454,21 +2032,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1551,21 +2114,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         ),
                         xMarfaReach: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
@@ -1662,21 +2210,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1690,7 +2223,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.EdgeTypeRegistrationResponse.self,
+                            Components.Schemas.EdgeType.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -1714,21 +2247,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1742,7 +2260,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.EdgeTypeRegistrationResponse.self,
+                            Components.Schemas.EdgeType.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -1820,21 +2338,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -1873,9 +2376,120 @@ public struct Client: ClientProtocol {
             }
         )
     }
+    /// Check a blob
+    ///
+    /// Returns the headers `GET /blobs/{hash}` sends and no body, so you can check that you can read a blob and learn its type and size. Send one `Range` as you would to download.
+    ///
+    /// - Remark: HTTP `HEAD /blobs/{hash}`.
+    /// - Remark: Generated from `#/paths//blobs/{hash}/head(checkBlob)`.
+    public func checkBlob(_ input: Operations.CheckBlob.Input) async throws -> Operations.CheckBlob.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.CheckBlob.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/blobs/{}",
+                    parameters: [
+                        input.path.hash
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .head
+                )
+                suppressMutabilityWarning(&request)
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.CheckBlob.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        contentDisposition: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Content-Disposition",
+                            as: Swift.String.self
+                        ),
+                        contentSecurityPolicy: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Content-Security-Policy",
+                            as: Swift.String.self
+                        ),
+                        acceptRanges: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Accept-Ranges",
+                            as: Swift.String.self
+                        ),
+                        eTag: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "ETag",
+                            as: Swift.String.self
+                        )
+                    )
+                    return .ok(.init(headers: headers))
+                case 206:
+                    let headers: Operations.CheckBlob.Output.PartialContent.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        ),
+                        contentDisposition: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Content-Disposition",
+                            as: Swift.String.self
+                        ),
+                        contentSecurityPolicy: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Content-Security-Policy",
+                            as: Swift.String.self
+                        ),
+                        acceptRanges: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Accept-Ranges",
+                            as: Swift.String.self
+                        ),
+                        eTag: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "ETag",
+                            as: Swift.String.self
+                        ),
+                        contentRange: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "Content-Range",
+                            as: Swift.String.self
+                        )
+                    )
+                    return .partialContent(.init(headers: headers))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// Get a blob URL
     ///
-    /// Returns a URL that serves the blob's bytes without a credential, and `expires_in`, the seconds until it stops working. The URL keeps working for that time even if you revoke your credential.
+    /// Returns a URL that serves the blob's bytes without a credential, and `ttl_seconds`, the seconds until it stops working. The URL keeps working for that time even if you revoke your credential.
     ///
     /// - Remark: HTTP `GET /blobs/{hash}/url`.
     /// - Remark: Generated from `#/paths//blobs/{hash}/url/get(getBlobUrl)`.
@@ -1899,8 +2513,8 @@ public struct Client: ClientProtocol {
                     in: &request,
                     style: .form,
                     explode: true,
-                    name: "ttl",
-                    value: input.query.ttl
+                    name: "ttl_seconds",
+                    value: input.query.ttlSeconds
                 )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
@@ -1921,21 +2535,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2015,21 +2614,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2115,21 +2699,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2207,21 +2776,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2299,21 +2853,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2354,7 +2893,7 @@ public struct Client: ClientProtocol {
     }
     /// List webhooks
     ///
-    /// Returns webhooks and their makers, with secrets redacted. The owner's browser session and local command see every subscription; keys and apps see only their own.
+    /// Returns webhooks and their makers, with secrets redacted. The local command sees every subscription; keys and apps see only their own.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -2391,21 +2930,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2497,21 +3021,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2552,7 +3061,7 @@ public struct Client: ClientProtocol {
     }
     /// Get a webhook
     ///
-    /// Returns a webhook and its maker, with its secret redacted. The owner's browser session and local command can read any subscription; keys and apps can read only their own.
+    /// Returns a webhook and its maker, with its secret redacted. The local command can read any subscription; keys and apps can read only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -2591,21 +3100,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2699,21 +3193,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2798,21 +3277,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2853,7 +3317,7 @@ public struct Client: ClientProtocol {
     }
     /// List webhook deliveries
     ///
-    /// Returns delivery metadata without event payloads, newest first. The owner's browser session and local command can inspect any subscription; keys and apps can inspect only their own.
+    /// Returns delivery metadata without event payloads, newest first. The local command can inspect any subscription; keys and apps can inspect only their own.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -2906,21 +3370,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -2961,7 +3410,7 @@ public struct Client: ClientProtocol {
     }
     /// Redeliver a webhook delivery
     ///
-    /// Redelivers a failed delivery, queuing it again at the current URL. The owner's recently authenticated browser session or local command can retry any subscription; keys and apps can retry only their own.
+    /// Redelivers a failed delivery, queuing it again at the current URL. The local command can retry any subscription; keys and apps can retry only their own.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -3006,21 +3455,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3061,7 +3495,7 @@ public struct Client: ClientProtocol {
     }
     /// Get a folder status
     ///
-    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. Historical reports remain visible.
+    /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. A sign-in's reports stay as history until its key or app grant is removed.
     ///
     /// - Remark: HTTP `GET /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
@@ -3100,21 +3534,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3155,7 +3574,7 @@ public struct Client: ClientProtocol {
     }
     /// List API keys
     ///
-    /// Returns key metadata without plaintext. `keys.manage` and direct owner or local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Returns key metadata without plaintext. `keys.manage` and local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `GET /keys`.
     /// - Remark: Generated from `#/paths//keys/get(listKeys)`.
@@ -3192,21 +3611,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3298,21 +3702,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3396,21 +3785,6 @@ public struct Client: ClientProtocol {
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
                         ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
-                        ),
                         xMarfaReach: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Reach",
@@ -3455,7 +3829,7 @@ public struct Client: ClientProtocol {
     }
     /// Update an API key
     ///
-    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or direct owner or local authority.
+    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -3508,21 +3882,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3563,7 +3922,7 @@ public struct Client: ClientProtocol {
     }
     /// Revoke an API key
     ///
-    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or direct owner or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
+    /// Revokes a key, ending its event streams and queued bulk actions. `keys.manage` or local authority can revoke any key. A caller with only `keys.mint` can revoke keys within its current reach.
     ///
     /// - Remark: HTTP `DELETE /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/delete(revokeKey)`.
@@ -3607,21 +3966,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3662,17 +4006,17 @@ public struct Client: ClientProtocol {
     }
     /// List app grants
     ///
-    /// Returns every active app grant in one page. Requires `grants.manage` or direct authority.
+    /// Returns every active app grant in one page. Requires `grants.manage`.
     ///
-    /// - Remark: HTTP `GET /auth/grants`.
-    /// - Remark: Generated from `#/paths//auth/grants/get(listAppGrants)`.
+    /// - Remark: HTTP `GET /grants`.
+    /// - Remark: Generated from `#/paths//grants/get(listAppGrants)`.
     public func listAppGrants(_ input: Operations.ListAppGrants.Input) async throws -> Operations.ListAppGrants.Output {
         try await client.send(
             input: input,
             forOperation: Operations.ListAppGrants.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/auth/grants",
+                    template: "/grants",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
@@ -3699,21 +4043,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3727,7 +4056,95 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.AppGrantList.self,
+                            Components.Schemas.AppGrantPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Narrow an app grant
+    ///
+    /// Narrows an app's standing access. Requires `grants.manage`. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    ///
+    /// - Remark: HTTP `PATCH /grants/{id}`.
+    /// - Remark: Generated from `#/paths//grants/{id}/patch(narrowAppGrant)`.
+    public func narrowAppGrant(_ input: Operations.NarrowAppGrant.Input) async throws -> Operations.NarrowAppGrant.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.NarrowAppGrant.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/grants/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .patch
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.NarrowAppGrant.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.NarrowAppGrant.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.NarrowedAppGrant.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -3754,17 +4171,17 @@ public struct Client: ClientProtocol {
     }
     /// Revoke an app grant
     ///
-    /// Revokes the app's tokens and consent. Requires `grants.manage` or direct authority; an owner browser needs a sign-in within five minutes.
+    /// Revokes the app's tokens and consent. Requires `grants.manage`.
     ///
-    /// - Remark: HTTP `DELETE /auth/grants/{id}`.
-    /// - Remark: Generated from `#/paths//auth/grants/{id}/delete(revokeAppGrant)`.
+    /// - Remark: HTTP `DELETE /grants/{id}`.
+    /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
     public func revokeAppGrant(_ input: Operations.RevokeAppGrant.Input) async throws -> Operations.RevokeAppGrant.Output {
         try await client.send(
             input: input,
             forOperation: Operations.RevokeAppGrant.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/auth/grants/{}",
+                    template: "/grants/{}",
                     parameters: [
                         input.path.id
                     ]
@@ -3781,12 +4198,16 @@ public struct Client: ClientProtocol {
                     name: "revoke_keys",
                     value: input.query.revokeKeys
                 )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
                 return (request, nil)
             },
             deserializer: { response, responseBody in
                 switch response.status.code {
-                case 204:
-                    let headers: Operations.RevokeAppGrant.Output.NoContent.Headers = .init(
+                case 200:
+                    let headers: Operations.RevokeAppGrant.Output.Ok.Headers = .init(
                         xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Contract",
@@ -3796,24 +4217,109 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
-                    return .noContent(.init(headers: headers))
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RevokeAppGrant.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Ok.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get the owner's profile
+    ///
+    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
+    ///
+    /// - Remark: HTTP `GET /profile`.
+    /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
+    public func getProfile(_ input: Operations.GetProfile.Input) async throws -> Operations.GetProfile.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetProfile.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/profile",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetProfile.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetProfile.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Profile.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
                 default:
                     return .undocumented(
                         statusCode: response.status.code,
@@ -3828,7 +4334,7 @@ public struct Client: ClientProtocol {
     }
     /// Update the owner's profile
     ///
-    /// Updates the owner's name or removes the picture and returns `ok: true`. Requires profile write permission for every submitted field; email cannot be changed here. All fields commit together.
+    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -3879,21 +4385,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -3907,7 +4398,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.Ok.self,
+                            Components.Schemas.Profile.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -3932,19 +4423,19 @@ public struct Client: ClientProtocol {
             }
         )
     }
-    /// Get the owner's picture
+    /// Get the profile avatar
     ///
-    /// Returns the owner's picture as an image download. Requires an owner sign-in or a credential with profile read permission for the avatar. Send `If-None-Match` to revalidate.
+    /// Returns the owner's avatar as an image download. Requires profile read permission for the avatar. Send `If-None-Match` to revalidate.
     ///
-    /// - Remark: HTTP `GET /owner/picture`.
-    /// - Remark: Generated from `#/paths//owner/picture/get(getOwnerPicture)`.
-    public func getOwnerPicture(_ input: Operations.GetOwnerPicture.Input) async throws -> Operations.GetOwnerPicture.Output {
+    /// - Remark: HTTP `GET /profile/avatar`.
+    /// - Remark: Generated from `#/paths//profile/avatar/get(getProfileAvatar)`.
+    public func getProfileAvatar(_ input: Operations.GetProfileAvatar.Input) async throws -> Operations.GetProfileAvatar.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.GetOwnerPicture.id,
+            forOperation: Operations.GetProfileAvatar.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/owner/picture",
+                    template: "/profile/avatar",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
@@ -3961,7 +4452,7 @@ public struct Client: ClientProtocol {
             deserializer: { response, responseBody in
                 switch response.status.code {
                 case 200:
-                    let headers: Operations.GetOwnerPicture.Output.Ok.Headers = .init(
+                    let headers: Operations.GetProfileAvatar.Output.Ok.Headers = .init(
                         xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Contract",
@@ -3972,21 +4463,6 @@ public struct Client: ClientProtocol {
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
                         ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
-                        ),
                         eTag: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "ETag",
@@ -3994,7 +4470,7 @@ public struct Client: ClientProtocol {
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.GetOwnerPicture.Output.Ok.Body
+                    let body: Operations.GetProfileAvatar.Output.Ok.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [
@@ -4036,7 +4512,7 @@ public struct Client: ClientProtocol {
                         body: body
                     ))
                 case 304:
-                    let headers: Operations.GetOwnerPicture.Output.NotModified.Headers = .init(
+                    let headers: Operations.GetProfileAvatar.Output.NotModified.Headers = .init(
                         xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Contract",
@@ -4046,21 +4522,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         ),
                         eTag: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
@@ -4081,19 +4542,19 @@ public struct Client: ClientProtocol {
             }
         )
     }
-    /// Replace the picture as an app
+    /// Replace the avatar as an app
     ///
-    /// Stores the request body as the owner's picture and returns `ok: true`. Requires profile write permission for the avatar.
+    /// Stores the request body as the owner's avatar and returns the profile fields you can read. Requires profile write permission for the avatar.
     ///
-    /// - Remark: HTTP `PUT /profile/picture`.
-    /// - Remark: Generated from `#/paths//profile/picture/put(replaceProfilePicture)`.
-    public func replaceProfilePicture(_ input: Operations.ReplaceProfilePicture.Input) async throws -> Operations.ReplaceProfilePicture.Output {
+    /// - Remark: HTTP `PUT /profile/avatar`.
+    /// - Remark: Generated from `#/paths//profile/avatar/put(replaceProfileAvatar)`.
+    public func replaceProfileAvatar(_ input: Operations.ReplaceProfileAvatar.Input) async throws -> Operations.ReplaceProfileAvatar.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.ReplaceProfilePicture.id,
+            forOperation: Operations.ReplaceProfileAvatar.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/profile/picture",
+                    template: "/profile/avatar",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
@@ -4124,7 +4585,7 @@ public struct Client: ClientProtocol {
             deserializer: { response, responseBody in
                 switch response.status.code {
                 case 200:
-                    let headers: Operations.ReplaceProfilePicture.Output.Ok.Headers = .init(
+                    let headers: Operations.ReplaceProfileAvatar.Output.Ok.Headers = .init(
                         xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Contract",
@@ -4134,25 +4595,271 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.ReplaceProfilePicture.Output.Ok.Body
+                    let body: Operations.ReplaceProfileAvatar.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Profile.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List sign-ins
+    ///
+    /// Returns every browser, app and key that can reach Marfa. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `GET /owner/sign-ins`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/get(listSignIns)`.
+    public func listSignIns(_ input: Operations.ListSignIns.Input) async throws -> Operations.ListSignIns.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListSignIns.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/sign-ins",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListSignIns.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListSignIns.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.SignInPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Rename a sign-in
+    ///
+    /// Renames an app or a key and returns the sign-in. A key's name is its `label`. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /owner/sign-ins/{id}`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/patch(renameSignIn)`.
+    public func renameSignIn(_ input: Operations.RenameSignIn.Input) async throws -> Operations.RenameSignIn.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RenameSignIn.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/sign-ins/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .patch
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RenameSignIn.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RenameSignIn.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.SignIn.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// End a sign-in
+    ///
+    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
+    /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
+    public func endSignIn(_ input: Operations.EndSignIn.Input) async throws -> Operations.EndSignIn.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.EndSignIn.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/sign-ins/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "revoke_keys",
+                    value: input.query.revokeKeys
+                )
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.EndSignIn.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.EndSignIn.Output.Ok.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [
@@ -4163,6 +4870,428 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.Ok.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Replace the password
+    ///
+    /// Replaces the owner's password once `current_password` proves right, and ends every browser sign-in. Keys and apps keep their access. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `PUT /owner/password`.
+    /// - Remark: Generated from `#/paths//owner/password/put(replaceOwnerPassword)`.
+    public func replaceOwnerPassword(_ input: Operations.ReplaceOwnerPassword.Input) async throws -> Operations.ReplaceOwnerPassword.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ReplaceOwnerPassword.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/password",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .put
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ReplaceOwnerPassword.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ReplaceOwnerPassword.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Ok.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List passkeys
+    ///
+    /// Returns every registered owner passkey, oldest first. Requires the owner's browser session or `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `GET /owner/passkeys`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/get(listOwnerPasskeys)`.
+    public func listOwnerPasskeys(_ input: Operations.ListOwnerPasskeys.Input) async throws -> Operations.ListOwnerPasskeys.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListOwnerPasskeys.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/passkeys",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListOwnerPasskeys.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListOwnerPasskeys.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.OwnerPasskeyPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Rename a passkey
+    ///
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
+    public func renameOwnerPasskey(_ input: Operations.RenameOwnerPasskey.Input) async throws -> Operations.RenameOwnerPasskey.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RenameOwnerPasskey.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/passkeys/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .patch
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RenameOwnerPasskey.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RenameOwnerPasskey.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.OwnerPasskey.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Delete a passkey
+    ///
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
+    public func deleteOwnerPasskey(_ input: Operations.DeleteOwnerPasskey.Input) async throws -> Operations.DeleteOwnerPasskey.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DeleteOwnerPasskey.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/passkeys/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.DeleteOwnerPasskey.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DeleteOwnerPasskey.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Ok.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get the passkey add link
+    ///
+    /// Returns the address where the owner signs in and then adds a passkey in their browser. The link carries no credential. Requires `sign_ins.manage`.
+    ///
+    /// - Remark: HTTP `GET /owner/passkeys/add-url`.
+    /// - Remark: Generated from `#/paths//owner/passkeys/add-url/get(getPasskeyAddUrl)`.
+    public func getPasskeyAddUrl(_ input: Operations.GetPasskeyAddUrl.Input) async throws -> Operations.GetPasskeyAddUrl.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetPasskeyAddUrl.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/owner/passkeys/add-url",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetPasskeyAddUrl.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetPasskeyAddUrl.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PasskeyAddLink.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -4226,21 +5355,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -4332,21 +5446,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -4385,9 +5484,249 @@ public struct Client: ClientProtocol {
             }
         )
     }
+    /// List the settings
+    ///
+    /// Returns every stored setting with its value, default and rule, the rules across settings, and the settings only the environment sets. Requires `config.manage` or `instance.read`.
+    ///
+    /// - Remark: HTTP `GET /config/settings`.
+    /// - Remark: Generated from `#/paths//config/settings/get(listSettings)`.
+    public func listSettings(_ input: Operations.ListSettings.Input) async throws -> Operations.ListSettings.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListSettings.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/config/settings",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListSettings.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListSettings.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConfigSettings.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Check an address change
+    ///
+    /// Returns what changing the addresses would do, whether a write needs confirmation and whether a new sign-in address answers as this instance, and writes nothing. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `POST /config/address-check`.
+    /// - Remark: Generated from `#/paths//config/address-check/post(checkAddressChange)`.
+    public func checkAddressChange(_ input: Operations.CheckAddressChange.Input) async throws -> Operations.CheckAddressChange.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.CheckAddressChange.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/config/address-check",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.CheckAddressChange.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.CheckAddressChange.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.AddressCheck.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List attention items
+    ///
+    /// Returns what needs the owner's attention. Requires `instance.read`. A check that fails or runs out of time appears as an unavailable item beside the known concerns. An empty list means every check completed without a concern.
+    ///
+    /// - Remark: HTTP `GET /attention`.
+    /// - Remark: Generated from `#/paths//attention/get(listAttention)`.
+    public func listAttention(_ input: Operations.ListAttention.Input) async throws -> Operations.ListAttention.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListAttention.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/attention",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListAttention.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListAttention.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.AttentionPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// Get instance metrics
     ///
-    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. Requires `instance.read`; the counters include records outside your content permissions.
+    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. The counters are counted when you ask. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getInstanceMetrics)`.
@@ -4424,21 +5763,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -4579,21 +5903,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -4671,21 +5980,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -4770,21 +6064,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -4823,24 +6102,24 @@ public struct Client: ClientProtocol {
             }
         )
     }
-    /// List retired platform types
+    /// Confirm the clock
     ///
-    /// Returns the platform types that this instance still carries but this build no longer ships, with how many items use each. They stay in `GET /types` until removed. Requires `instance.read`.
+    /// Takes the server's clock as right and returns the time it now trusts. While the clock reads more than 7 days later than the trusted time, the jobs that delete old records do nothing; this lets them run now. Requires `instance.maintain`.
     ///
-    /// - Remark: HTTP `GET /platform-types/retired`.
-    /// - Remark: Generated from `#/paths//platform-types/retired/get(listRetiredPlatformTypes)`.
-    public func listRetiredPlatformTypes(_ input: Operations.ListRetiredPlatformTypes.Input) async throws -> Operations.ListRetiredPlatformTypes.Output {
+    /// - Remark: HTTP `POST /clock/confirm`.
+    /// - Remark: Generated from `#/paths//clock/confirm/post(confirmClock)`.
+    public func confirmClock(_ input: Operations.ConfirmClock.Input) async throws -> Operations.ConfirmClock.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.ListRetiredPlatformTypes.id,
+            forOperation: Operations.ConfirmClock.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/platform-types/retired",
+                    template: "/clock/confirm",
                     parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
                     soar_path: path,
-                    method: .get
+                    method: .post
                 )
                 suppressMutabilityWarning(&request)
                 converter.setAcceptHeader(
@@ -4852,7 +6131,7 @@ public struct Client: ClientProtocol {
             deserializer: { response, responseBody in
                 switch response.status.code {
                 case 200:
-                    let headers: Operations.ListRetiredPlatformTypes.Output.Ok.Headers = .init(
+                    let headers: Operations.ConfirmClock.Output.Ok.Headers = .init(
                         xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Contract",
@@ -4862,25 +6141,10 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.ListRetiredPlatformTypes.Output.Ok.Body
+                    let body: Operations.ConfirmClock.Output.Ok.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [
@@ -4890,7 +6154,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Components.Schemas.RetiredPlatformTypePage.self,
+                            Components.Schemas.ClockConfirmation.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -4915,26 +6179,101 @@ public struct Client: ClientProtocol {
             }
         )
     }
-    /// Delete a retired platform type
+    /// Get the update status
     ///
-    /// Deletes one retired platform type: a type this build no longer ships. The type stops resolving at once. Requires `instance.maintain`.
+    /// Returns the release this server runs, the newest published release Marfa found, and how this server moves to it. Requires `instance.read`.
     ///
-    /// - Remark: HTTP `DELETE /platform-types/{id}`.
-    /// - Remark: Generated from `#/paths//platform-types/{id}/delete(deleteRetiredPlatformType)`.
-    public func deleteRetiredPlatformType(_ input: Operations.DeleteRetiredPlatformType.Input) async throws -> Operations.DeleteRetiredPlatformType.Output {
+    /// - Remark: HTTP `GET /update`.
+    /// - Remark: Generated from `#/paths//update/get(getUpdate)`.
+    public func getUpdate(_ input: Operations.GetUpdate.Input) async throws -> Operations.GetUpdate.Output {
         try await client.send(
             input: input,
-            forOperation: Operations.DeleteRetiredPlatformType.id,
+            forOperation: Operations.GetUpdate.id,
             serializer: { input in
                 let path = try converter.renderedPath(
-                    template: "/platform-types/{}",
-                    parameters: [
-                        input.path.id
-                    ]
+                    template: "/update",
+                    parameters: []
                 )
                 var request: HTTPTypes.HTTPRequest = .init(
                     soar_path: path,
-                    method: .delete
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetUpdate.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetUpdate.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Update.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Start an update
+    ///
+    /// Starts an update to the newest release where Marfa installed this server as a service, and returns the update status. Marfa checks the download, swaps the programs, and restarts the server. Requires `instance.maintain`.
+    ///
+    /// - Remark: HTTP `POST /update`.
+    /// - Remark: Generated from `#/paths//update/post(startUpdate)`.
+    public func startUpdate(_ input: Operations.StartUpdate.Input) async throws -> Operations.StartUpdate.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.StartUpdate.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/update",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
                 )
                 suppressMutabilityWarning(&request)
                 try converter.setHeaderFieldAsURI(
@@ -4950,8 +6289,8 @@ public struct Client: ClientProtocol {
             },
             deserializer: { response, responseBody in
                 switch response.status.code {
-                case 200:
-                    let headers: Operations.DeleteRetiredPlatformType.Output.Ok.Headers = .init(
+                case 202:
+                    let headers: Operations.StartUpdate.Output.Accepted.Headers = .init(
                         xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
                             in: response.headerFields,
                             name: "X-Marfa-Contract",
@@ -4961,25 +6300,10 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
-                    let body: Operations.DeleteRetiredPlatformType.Output.Ok.Body
+                    let body: Operations.StartUpdate.Output.Accepted.Body
                     let chosenContentType = try converter.bestContentType(
                         received: contentType,
                         options: [
@@ -4989,7 +6313,7 @@ public struct Client: ClientProtocol {
                     switch chosenContentType {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
-                            Operations.DeleteRetiredPlatformType.Output.Ok.Body.JsonPayload.self,
+                            Components.Schemas.Update.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -4998,7 +6322,7 @@ public struct Client: ClientProtocol {
                     default:
                         preconditionFailure("bestContentType chose an invalid content type.")
                     }
-                    return .ok(.init(
+                    return .accepted(.init(
                         headers: headers,
                         body: body
                     ))
@@ -5016,7 +6340,7 @@ public struct Client: ClientProtocol {
     }
     /// Export an archive
     ///
-    /// Exports an archive of the items, metadata and edges you can read, excluding trash unless requested. The owner can use their browser session. An archive can be read by `POST /restore`.
+    /// Exports an archive of the items, metadata and edges you can read, excluding trash unless requested. An archive can be read by `POST /restore`.
     ///
     /// - Remark: HTTP `GET /export`.
     /// - Remark: Generated from `#/paths//export/get(exportArchive)`.
@@ -5102,21 +6426,6 @@ public struct Client: ClientProtocol {
                             in: response.headerFields,
                             name: "X-Request-ID",
                             as: Components.Headers.XRequestID.self
-                        ),
-                        xRateLimitLimit: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Limit",
-                            as: Components.Headers.XRateLimitLimit.self
-                        ),
-                        xRateLimitRemaining: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Remaining",
-                            as: Components.Headers.XRateLimitRemaining.self
-                        ),
-                        xRateLimitReset: try converter.getOptionalHeaderFieldAsURI(
-                            in: response.headerFields,
-                            name: "X-RateLimit-Reset",
-                            as: Components.Headers.XRateLimitReset.self
                         )
                     )
                     let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
@@ -5125,7 +6434,7 @@ public struct Client: ClientProtocol {
                         received: contentType,
                         options: [
                             "application/x-ndjson",
-                            "application/gzip"
+                            "application/x-tar"
                         ]
                     )
                     switch chosenContentType {
@@ -5137,12 +6446,421 @@ public struct Client: ClientProtocol {
                                 .applicationXNdjson(value)
                             }
                         )
-                    case "application/gzip":
+                    case "application/x-tar":
                         body = try converter.getResponseBodyAsBinary(
                             OpenAPIRuntime.HTTPBody.self,
                             from: responseBody,
                             transforming: { value in
-                                .applicationGzip(value)
+                                .applicationXTar(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Restore from an archive
+    ///
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage` and a sign-in from the last five minutes.
+    ///
+    /// - Remark: HTTP `POST /restore`.
+    /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
+    public func restoreArchive(_ input: Operations.RestoreArchive.Input) async throws -> Operations.RestoreArchive.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RestoreArchive.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/restore",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .applicationXTar(value):
+                    body = try converter.setRequiredRequestBodyAsBinary(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/x-tar"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RestoreArchive.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RestoreArchive.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Operations.RestoreArchive.Output.Ok.Body.JsonPayload.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List backups
+    ///
+    /// Returns the backups in the instance's backup folder or object store, newest first, including those another instance took there, so a new instance can restore the one it replaces. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `GET /backups`.
+    /// - Remark: Generated from `#/paths//backups/get(listBackups)`.
+    public func listBackups(_ input: Operations.ListBackups.Input) async throws -> Operations.ListBackups.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListBackups.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/backups",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListBackups.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListBackups.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Operations.ListBackups.Output.Ok.Body.JsonPayload.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Take a backup
+    ///
+    /// Takes a backup now and puts it in the instance's backup folder or object store, whether or not anything changed since the last one, then deletes this instance's backups that thinning no longer keeps. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `POST /backups`.
+    /// - Remark: Generated from `#/paths//backups/post(runBackup)`.
+    public func runBackup(_ input: Operations.RunBackup.Input) async throws -> Operations.RunBackup.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RunBackup.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/backups",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RunBackup.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RunBackup.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Operations.RunBackup.Output.Ok.Body.JsonPayload.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Adopt a backup folder
+    ///
+    /// Starts afresh on a disk that replaced the backup folder's disk, when the folder holds no store marker for this instance. Marfa forgets the backups and file copies of the old disk and changes no other store. Requires `backups.manage`.
+    ///
+    /// - Remark: HTTP `POST /backups/folder/adopt`.
+    /// - Remark: Generated from `#/paths//backups/folder/adopt/post(adoptBackupFolder)`.
+    public func adoptBackupFolder(_ input: Operations.AdoptBackupFolder.Input) async throws -> Operations.AdoptBackupFolder.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.AdoptBackupFolder.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/backups/folder/adopt",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.AdoptBackupFolder.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.AdoptBackupFolder.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Operations.AdoptBackupFolder.Output.Ok.Body.JsonPayload.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Restore a backup
+    ///
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage` and a sign-in from the last five minutes.
+    ///
+    /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
+    /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
+    public func restoreBackup(_ input: Operations.RestoreBackup.Input) async throws -> Operations.RestoreBackup.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RestoreBackup.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/backups/{}/{}/restore",
+                    parameters: [
+                        input.path.instanceId,
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "allow_missing_files",
+                    value: input.query.allowMissingFiles
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RestoreBackup.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RestoreBackup.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Operations.RestoreBackup.Output.Ok.Body.JsonPayload.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
                             }
                         )
                     default:

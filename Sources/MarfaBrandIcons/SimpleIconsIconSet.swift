@@ -3,7 +3,7 @@
 /// person to choose from, each `simple-icons:<name>`.
 public enum SimpleIconsIconSet {
     /// The release of `@iconify-json/simple-icons`.
-    public static let version = "1.2.101"
+    public static let version = "1.2.102"
 
     /// Every icon ID the server accepts from this release, in alphabetical order.
     public static let ids: [String] = [
@@ -1996,6 +1996,7 @@ public enum SimpleIconsIconSet {
         "simple-icons:nette",
         "simple-icons:netto",
         "simple-icons:neutralinojs",
+        "simple-icons:newapi",
         "simple-icons:newbalance",
         "simple-icons:newegg",
         "simple-icons:newgrounds",
@@ -2077,6 +2078,7 @@ public enum SimpleIconsIconSet {
         "simple-icons:obsstudio",
         "simple-icons:obtainium",
         "simple-icons:ocaml",
+        "simple-icons:oceanbase",
         "simple-icons:oclc",
         "simple-icons:oclif",
         "simple-icons:octanerender",
@@ -3459,6 +3461,7 @@ public enum SimpleIconsIconSet {
         "simple-icons:zigbee2mqtt",
         "simple-icons:ziggo",
         "simple-icons:zilch",
+        "simple-icons:zilliz",
         "simple-icons:zillow",
         "simple-icons:zincsearch",
         "simple-icons:zingat",
