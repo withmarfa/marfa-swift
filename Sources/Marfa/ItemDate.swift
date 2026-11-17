@@ -83,7 +83,10 @@ public struct ItemDate: Hashable, Sendable {
             guard let second = reader.digits(2) else { return nil }
             seconds = second
             if reader.take(".") {
-                guard let fraction = reader.digitRun(), let value = Double("0." + fraction) else { return nil }
+                // Cut to the millisecond, as the server does, so rounding cannot reach the next second.
+                guard let fraction = reader.digitRun(), let value = Double("0." + fraction.prefix(3)) else {
+                    return nil
+                }
                 fractional = value
             }
         }

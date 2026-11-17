@@ -62,6 +62,15 @@ import Testing
         #expect(dates.lastDay == nil)
     }
 
+    @Test func aFractionPastTheMillisecondIsCutNotRoundedIntoTheNextDay() throws {
+        let dates = try #require(
+            event([
+                "starts_at": .string("2026-03-11T14:59:59.9999999Z"), "all_day": .bool(true),
+                "timezone": .string("Asia/Tokyo"),
+            ]).eventDates())
+        #expect(dates.start.day == day(2026, 3, 11))
+    }
+
     @Test func aTimedEndIsShownInTheStartsZoneWhenItNamesNone() throws {
         let dates = try #require(
             event([
