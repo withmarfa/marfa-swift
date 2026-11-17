@@ -369,8 +369,8 @@ extension InMemoryCore {
             if let movedTo { body.members.append(.init(key: "to_id", value: .string(movedTo))) }
             try Properties.refuseTooDeep(body)
             var dependsOn = state.pendingCreate(ofEdge: id)
-            for waited in state.pendingCreates(of: [movedFrom, movedTo].compactMap { $0 }) where !dependsOn.contains(waited)
-            {
+            let waiting = state.pendingCreates(of: [movedFrom, movedTo].compactMap { $0 })
+            for waited in waiting where !dependsOn.contains(waited) {
                 dependsOn.append(waited)
             }
             let (from, to) = (held.fromId, held.toId)

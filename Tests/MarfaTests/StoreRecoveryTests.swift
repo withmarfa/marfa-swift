@@ -24,7 +24,7 @@ struct StoreRecovery {
         try handle.write(contentsOf: Data(repeating: 0x5A, count: 4096))
     }
 
-    /// Overwrites the page that holds `table`'s rows, so SQLite still reads the file but not that table.
+    /// Overwrites the page that holds one table's rows, so SQLite still reads the file but not that table.
     private static func damage(_ store: URL, table: String) throws {
         var database: OpaquePointer?
         try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
