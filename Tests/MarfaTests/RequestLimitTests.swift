@@ -1,4 +1,5 @@
 import Foundation
+import MarfaTypes
 import Synchronization
 import Testing
 
