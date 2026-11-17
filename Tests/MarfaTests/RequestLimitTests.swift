@@ -48,7 +48,7 @@ struct RequestLimitTests {
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
 
         let large = try await copy.items.create(
-            Draft(type: "core.note", properties: ["title": .string(String(repeating: "é", count: 2_000))], tier: .feed))
+            Draft(type: "core.note", properties: ["title": .string(String(repeating: "é", count: 1_000))], tier: .feed))
         let small = try await copy.items.create(Draft(type: "core.note", properties: ["title": "short"], tier: .feed))
         sendable.set(small.itemId)
 
@@ -65,7 +65,8 @@ struct RequestLimitTests {
         }
         let limit = try #require(refusal.requestLimit)
         #expect(limit.limit == 1_500)
-        #expect(limit.size > 1_500)
+        // 1,000 two-byte characters are under the limit as characters and over it as bytes.
+        #expect(limit.size >= 2_000, "the size counts bytes, not characters: \(limit.size)")
         #expect(refusal.reason.hasPrefix("This write is "), "\(refusal.reason)")
         #expect(refusal.code == nil)
 

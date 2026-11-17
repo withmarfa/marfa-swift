@@ -48,7 +48,7 @@ import Testing
         (.unnamed(status: 401, message: "m", server: nil), .transient),
         (.decoding(message: "m"), .none),
         (.store(message: "m"), .none),
-        (.storeBusy(message: "m"), .none),
+        (.storeBusy(message: "m"), .transient),
         (.storeDamaged(path: "p", reason: "r", unsent: 1, message: "m"), .none),
         (.storeDamaged(path: "", reason: "r", unsent: nil, message: "m"), .none),
         (.storageFull(message: "m"), .transient),

@@ -32,7 +32,7 @@ extension InMemoryCore {
         try refuseUnwritable(
             [
                 Proposed(
-                    edgeType: draft.edgeType, source: .held(draft.fromId), toId: draft.toId,
+                    edgeType: draft.edgeType, from: .held(draft.fromId), toId: draft.toId,
                     replacing: draft.id)
             ],
             in: state)
@@ -41,43 +41,43 @@ extension InMemoryCore {
     func checkEdgeMove(id: String, moves: EdgeMove) throws {
         try state.withLock { state in
             guard let held = state.edges[id] else { throw Refuse.edge(id) }
-            let (source, target) = Self.endsMoved(held, moves)
-            try Self.refuseMove(of: held, source: source, target: target, in: state)
+            let (from, to) = Self.endsMoved(held, moves)
+            try Self.refuseMove(of: held, from: from, to: to, in: state)
         }
     }
 
     /// The ends a move names, each left out where the edge already holds it.
-    static func endsMoved(_ held: Edge, _ moves: EdgeMove?) -> (source: String?, target: String?) {
-        var source = moves.flatMap { $0.end == .from ? $0.to : nil }
-        var target = moves.flatMap { $0.end == .to ? $0.to : nil }
-        if source == held.fromId { source = nil }
-        if target == held.toId { target = nil }
-        return (source, target)
+    static func endsMoved(_ held: Edge, _ moves: EdgeMove?) -> (from: String?, to: String?) {
+        var from = moves.flatMap { $0.end == .from ? $0.to : nil }
+        var to = moves.flatMap { $0.end == .to ? $0.to : nil }
+        if from == held.fromId { from = nil }
+        if to == held.toId { to = nil }
+        return (from, to)
     }
 
     /// The refusals `update_edge` gives a move before it queues, in the core's order.
-    static func refuseMove(of held: Edge, source: String?, target: String?, in state: State) throws {
-        guard source != nil || target != nil else { return }
-        if let type = state.edgeTypes[held.edgeType], !holdsOne(type, at: source != nil ? .to : .from) {
+    static func refuseMove(of held: Edge, from: String?, to: String?, in state: State) throws {
+        guard from != nil || to != nil else { return }
+        if let type = state.edgeTypes[held.edgeType], !holdsOne(type, at: from != nil ? .to : .from) {
             throw Refuse.validation(
                 "validation_error",
                 "\(held.edgeType) is \(type.cardinality), so the end that stays can hold more than this edge and there is none to replace; create the edge wanted and delete this one"
             )
         }
-        try refuseSelfLoop(held.edgeType, source ?? held.fromId, target ?? held.toId)
+        try refuseSelfLoop(held.edgeType, from ?? held.fromId, to ?? held.toId)
         try refuseUnwritable(
             [
                 Proposed(
-                    edgeType: held.edgeType, source: .held(source ?? held.fromId),
-                    toId: target ?? held.toId, replacing: held.id)
+                    edgeType: held.edgeType, from: .held(from ?? held.fromId),
+                    toId: to ?? held.toId, replacing: held.id)
             ],
             in: state)
     }
 
-    static func refuseSelfLoop(_ edgeType: String, _ source: String, _ target: String) throws {
-        guard source != target else {
+    static func refuseSelfLoop(_ edgeType: String, _ from: String, _ to: String) throws {
+        guard from != to else {
             throw Refuse.validation(
-                "edge_cycle", "an edge from \(source) to itself closes a cycle",
+                "edge_cycle", "an edge from \(from) to itself closes a cycle",
                 details: Refuse.details(["edge_type": .string(edgeType)]))
         }
     }
@@ -90,9 +90,9 @@ extension InMemoryCore {
         }
     }
 
-    /// The edge the core's `Proposed` describes: where its source is an item being made, only its type is known.
+    /// The edge the core's `Proposed` describes: where its from end is an item being made, only its type is known.
     struct Proposed {
-        enum Source {
+        enum From {
             case held(String)
             case made(id: String, type: String)
 
@@ -112,7 +112,7 @@ extension InMemoryCore {
         }
 
         var edgeType: String
-        var source: Source
+        var from: From
         var toId: String
         /// The held edge the write is, which its own checks leave out.
         ///
@@ -160,7 +160,7 @@ extension InMemoryCore {
 
     /// The refusals of the edges one write makes, in the core's order.
     ///
-    /// First, for each edge, an end in the bin, an end of a type the edge type does not admit and a source a flat
+    /// First, for each edge, an end in the bin, an end of a type the edge type does not admit and a from end a flat
     /// edge type does not take; then, edge by edge, a triple the copy shows, an end that already holds the one edge
     /// of the type it may, and a cycle. Each edge is counted with those before it in the same write.
     static func refuseUnwritable(_ edges: [Proposed], in state: State) throws {
@@ -174,44 +174,44 @@ extension InMemoryCore {
             let earlier = judged[..<index].map(\.edge)
             let standing = state.edges.values.filter { held in
                 held.edgeType == edge.edgeType && held.id != edge.replacing
-                    && (edge.source.replaced == nil || held.fromId != edge.source.replaced)
+                    && (edge.from.replaced == nil || held.fromId != edge.from.replaced)
             }
-            let sameTriple = { (source: String, target: String) in
-                source == edge.source.id && target == edge.toId
+            let sameTriple = { (from: String, to: String) in
+                from == edge.from.id && to == edge.toId
             }
             if standing.contains(where: { sameTriple($0.fromId, $0.toId) })
-                || earlier.contains(where: { $0.edgeType == edge.edgeType && sameTriple($0.source.id, $0.toId) })
+                || earlier.contains(where: { $0.edgeType == edge.edgeType && sameTriple($0.from.id, $0.toId) })
             {
                 throw Refuse.validation(
                     "edge_constraint_violation", "Edge \"\(edge.edgeType)\" already exists between these items",
                     details: Refuse.details([
-                        "edge_type": .string(edge.edgeType), "from_id": .string(edge.source.id),
+                        "edge_type": .string(edge.edgeType), "from_id": .string(edge.from.id),
                         "to_id": .string(edge.toId), "constraint": .string("duplicate"),
                     ]))
             }
             for end in [EdgeEnd.from, .to] where holdsOne(edgeType, at: end) {
-                let at = end == .from ? edge.source.id : edge.toId
+                let at = end == .from ? edge.from.id : edge.toId
                 let full =
                     standing.contains { (end == .from ? $0.fromId : $0.toId) == at }
                     || earlier.contains {
-                        $0.edgeType == edge.edgeType && (end == .from ? $0.source.id : $0.toId) == at
+                        $0.edgeType == edge.edgeType && (end == .from ? $0.from.id : $0.toId) == at
                     }
                 if full { throw refusedCardinality(edgeType, end, at) }
             }
             if edgeType.acyclic,
-                state.reaches(from: edge.toId, to: edge.source.id, through: edge.edgeType, leaving: edge.replacing)
+                state.reaches(from: edge.toId, to: edge.from.id, through: edge.edgeType, leaving: edge.replacing)
             {
                 throw Refuse.validation(
                     "edge_cycle", "Edge \"\(edge.edgeType)\" would close a cycle",
                     details: Refuse.details([
-                        "edge_type": .string(edge.edgeType), "from_id": .string(edge.source.id),
+                        "edge_type": .string(edge.edgeType), "from_id": .string(edge.from.id),
                         "to_id": .string(edge.toId),
                     ]))
             }
         }
     }
 
-    /// An end in the bin, an end of a type the edge type does not admit, then a source a flat edge type does not
+    /// An end in the bin, an end of a type the edge type does not admit, then a from end a flat edge type does not
     /// take.
     private static func refuseUnfittingEnds(_ edge: Proposed, _ edgeType: EdgeType, in state: State) throws {
         func end(_ name: String, _ id: String) throws -> String? {
@@ -221,27 +221,27 @@ extension InMemoryCore {
             }
             return item.type
         }
-        let sourceType: String?
-        switch edge.source {
-        case .made(_, let type): sourceType = type
-        case .held(let id): sourceType = try end("from", id)
+        let fromType: String?
+        switch edge.from {
+        case .made(_, let type): fromType = type
+        case .held(let id): fromType = try end("from", id)
         }
-        let targetType = try end("to", edge.toId)
+        let toType = try end("to", edge.toId)
         let types = state.resolvedItemTypes()
-        if let sourceType, let lineage = lineage(of: sourceType, in: types),
+        if let fromType, let lineage = lineage(of: fromType, in: types),
             lineage.admitted(by: edgeType.fromTypeConstraints) == false
         {
-            throw refusedEnd(edgeType, .from, sourceType)
+            throw refusedEnd(edgeType, .from, fromType)
         }
-        if let targetType, let lineage = lineage(of: targetType, in: types),
+        if let toType, let lineage = lineage(of: toType, in: types),
             lineage.admitted(by: edgeType.toTypeConstraints) == false
         {
-            throw refusedEnd(edgeType, .to, targetType)
+            throw refusedEnd(edgeType, .to, toType)
         }
-        if edgeType.flat, let sourceType, let lineage = lineage(of: sourceType, in: types),
+        if edgeType.flat, let fromType, let lineage = lineage(of: fromType, in: types),
             lineage.admitted(by: edgeType.toTypeConstraints) == true
         {
-            throw refusedNesting(edge.edgeType, fromId: edge.source.id, sourceType: sourceType)
+            throw refusedNesting(edge.edgeType, fromId: edge.from.id, fromType: fromType)
         }
     }
 
@@ -257,12 +257,12 @@ extension InMemoryCore {
             ]))
     }
 
-    private static func refusedNesting(_ edgeType: String, fromId: String, sourceType: String) -> Error {
+    private static func refusedNesting(_ edgeType: String, fromId: String, fromType: String) -> Error {
         Refuse.validation(
             "edge_constraint_violation",
             "Edge \"\(edgeType)\" does not take a from item its to constraints admit; use \"parent-of\" for hierarchy",
             details: Refuse.details([
-                "edge_type": .string(edgeType), "from_id": .string(fromId), "from_type": .string(sourceType),
+                "edge_type": .string(edgeType), "from_id": .string(fromId), "from_type": .string(fromType),
                 "constraint": .string("nesting"),
             ]))
     }
@@ -293,7 +293,7 @@ extension InMemoryCore {
                 throw refusedEnd(edgeType, .from, type)
             }
             if from, edgeType.flat, lineage.admitted(by: edgeType.toTypeConstraints) == true {
-                throw refusedNesting(edge.edgeType, fromId: id, sourceType: type)
+                throw refusedNesting(edge.edgeType, fromId: id, fromType: type)
             }
             if !from, lineage.admitted(by: edgeType.toTypeConstraints) == false {
                 throw refusedEnd(edgeType, .to, type)
@@ -303,7 +303,7 @@ extension InMemoryCore {
 }
 
 extension InMemoryCore.State {
-    /// Whether `target` reaches `source` through the held edges of one type, those waiting to be sent among them.
+    /// Whether `start` reaches `goal` through the held edges of one type, those waiting to be sent among them.
     func reaches(from start: String, to goal: String, through edgeType: String, leaving replaced: String? = nil) -> Bool
     {
         var seen: Set<String> = [start]

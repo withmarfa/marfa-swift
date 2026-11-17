@@ -656,7 +656,12 @@ struct LocalServer: Sendable {
                 connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
                     let received = received + (data ?? Data())
                     let text = String(decoding: received, as: UTF8.self)
-                    if let end = text.range(of: "\r\n\r\n"), data != nil {
+                    // Until the head ends, and then until the body has come, unless the peer closed.
+                    if data != nil {
+                        guard let end = text.range(of: "\r\n\r\n") else {
+                            read(received)
+                            return
+                        }
                         let length =
                             text[..<end.lowerBound].lowercased().components(separatedBy: "content-length:")
                             .dropFirst().first.flatMap {
@@ -805,45 +810,23 @@ final class OwnServer: Sendable {
     let state: URL
     let url: URL
     let key: String
-    /// The server's control socket, which serves the test hooks when the server was booted with them.
-    let socket: String?
     let owner: (email: String, password: String)?
-    private let testHooks: Bool
     var server: Server { Server(url: url, key: key) }
     private var env: URL { state.appending(path: "env") }
 
-    private init(state: URL, exports: [String: String], testHooks: Bool) throws {
+    private init(state: URL, exports: [String: String]) throws {
         self.state = state
         url = try #require(exports["MARFA_TEST_URL"].flatMap(URL.init(string:)))
         key = try #require(exports["MARFA_TEST_KEY"])
-        socket = exports["MARFA_TEST_SOCKET"]
         owner = exports["MARFA_TEST_OWNER_EMAIL"].flatMap { email in
             exports["MARFA_TEST_OWNER_PASSWORD"].map { (email, $0) }
         }
-        self.testHooks = testHooks
     }
 
-    /// A `marfa-server` built with its `test-hooks` feature, which a release does not carry: `MARFA_HOOKED_SERVER_BIN`.
-    static var hookedServer: String? { ProcessInfo.processInfo.environment["MARFA_HOOKED_SERVER_BIN"] }
-
-    /// `testHooks` boots the server with `MARFA_TEST_HOOKS`, so ``advanceClock(by:)`` can move its clock.
-    static func boot(testHooks: Bool = false) async throws -> OwnServer {
+    static func boot() async throws -> OwnServer {
         let state = FileManager.default.temporaryDirectory.appending(path: "marfa-own-server-\(UUID())")
-        let exports = try await up(state, testHooks: testHooks)
-        return try OwnServer(state: state, exports: exports, testHooks: testHooks)
-    }
-
-    /// Moves the server's clock on, through the test hook on its control socket.
-    func advanceClock(by duration: Duration) async throws {
-        let socket = try #require(socket, "the server printed no control socket")
-        let body = "{\"advance_ms\":\(Int64(duration.components.seconds) * 1000)}"
-        let printed = try await Self.run(
-            "/usr/bin/curl",
-            [
-                "--silent", "--show-error", "--fail", "--unix-socket", socket, "-X", "POST", "-H",
-                "Content-Type: application/json", "--data", body, "http://localhost/_control/test/clock",
-            ], environment: [:])
-        try #require(printed.contains("offset_ms"), "the clock hook answered \(printed)")
+        let exports = try await up(state)
+        return try OwnServer(state: state, exports: exports)
     }
 
     /// Retires every event but the newest, as the server's retention does once the rest are older than it keeps.
@@ -861,7 +844,7 @@ final class OwnServer: Sendable {
     }
 
     func start() async throws {
-        let exports = try await Self.up(state, testHooks: testHooks)
+        let exports = try await Self.up(state)
         try #require(exports["MARFA_TEST_URL"] == url.absoluteString, "the server came back at another address")
     }
 
@@ -871,8 +854,8 @@ final class OwnServer: Sendable {
         try? FileManager.default.removeItem(at: state)
     }
 
-    private static func up(_ state: URL, testHooks: Bool) async throws -> [String: String] {
-        let printed = try await script("server-up.sh", [], keep: state, testHooks: testHooks)
+    private static func up(_ state: URL) async throws -> [String: String] {
+        let printed = try await script("server-up.sh", [], keep: state)
         var exports: [String: String] = [:]
         for line in printed.split(separator: "\n") where line.hasPrefix("export ") {
             let pair = line.dropFirst("export ".count).split(separator: "=", maxSplits: 1)
@@ -882,7 +865,7 @@ final class OwnServer: Sendable {
         return exports
     }
 
-    private static func script(_ name: String, _ arguments: [String], keep: URL, testHooks: Bool = false)
+    private static func script(_ name: String, _ arguments: [String], keep: URL)
         async throws -> String
     {
         let monorepo = try #require(monorepo, "MARFA_MONOREPO names no checkout")
@@ -890,10 +873,6 @@ final class OwnServer: Sendable {
         environment["MARFA_SERVER_KEEP"] = keep.path
         environment["MARFA_SERVER_ENV"] = keep.appending(path: "env").path
         environment.removeValue(forKey: "PORT")
-        if testHooks {
-            environment["MARFA_TEST_HOOKS"] = "true"
-            if let hooked = Self.hookedServer { environment["MARFA_SERVER_BIN"] = hooked }
-        }
         return try await run(
             "/bin/bash", [monorepo.appending(path: "core/scripts/\(name)").path] + arguments,
             environment: environment)

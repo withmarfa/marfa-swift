@@ -32,7 +32,7 @@ extension InMemoryCore {
                 edges.flatMap { named in
                     named.targets.map { target in
                         Proposed(
-                            edgeType: named.type, source: .made(id: id, type: draft.type), toId: target,
+                            edgeType: named.type, from: .made(id: id, type: draft.type), toId: target,
                             replacing: nil)
                     }
                 },
@@ -206,9 +206,9 @@ extension InMemoryCore {
     }
 
     /// The id the core gives the edge it shows from a create that waits, which the same create always shows again.
-    static func projectedEdgeID(_ source: String, _ edgeType: String, _ target: String) -> String {
+    static func projectedEdgeID(_ from: String, _ edgeType: String, _ to: String) -> String {
         var hash = SHA256()
-        for part in [source, edgeType, target] {
+        for part in [from, edgeType, to] {
             var length = UInt64(part.utf8.count).bigEndian
             withUnsafeBytes(of: &length) { hash.update(bufferPointer: $0) }
             hash.update(data: Data(part.utf8))
@@ -358,18 +358,18 @@ extension InMemoryCore {
                     "the update to edge \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
                 )
             }
-            let (source, target) = Self.endsMoved(held, edit.moves)
-            try Self.refuseMove(of: held, source: source, target: target, in: state)
+            let (movedFrom, movedTo) = Self.endsMoved(held, edit.moves)
+            try Self.refuseMove(of: held, from: movedFrom, to: movedTo, in: state)
             try Properties.keptAsWritten(edit.properties)
-            guard !edit.properties.members.isEmpty || source != nil || target != nil else { return nil }
+            guard !edit.properties.members.isEmpty || movedFrom != nil || movedTo != nil else { return nil }
             var body = JsonObject(members: [
                 .init(key: "properties", value: .object(edit.properties)), .init(key: "version", value: .integer(base)),
             ])
-            if let source { body.members.append(.init(key: "from_id", value: .string(source))) }
-            if let target { body.members.append(.init(key: "to_id", value: .string(target))) }
+            if let movedFrom { body.members.append(.init(key: "from_id", value: .string(movedFrom))) }
+            if let movedTo { body.members.append(.init(key: "to_id", value: .string(movedTo))) }
             try Properties.refuseTooDeep(body)
             var dependsOn = state.pendingCreate(ofEdge: id)
-            for waited in state.pendingCreates(of: [source, target].compactMap { $0 }) where !dependsOn.contains(waited)
+            for waited in state.pendingCreates(of: [movedFrom, movedTo].compactMap { $0 }) where !dependsOn.contains(waited)
             {
                 dependsOn.append(waited)
             }
@@ -383,12 +383,12 @@ extension InMemoryCore {
                 }
             }
             held.properties = Properties.served(JsonObject(members: members))
-            if let source { held.fromId = source }
-            if let target { held.toId = target }
+            if let movedFrom { held.fromId = movedFrom }
+            if let movedTo { held.toId = movedTo }
             state.edges[id] = held
             return state.append(
                 .updateEdge, item: from, target: to, edge: id, baseVersion: base, body: body, dependsOn: dependsOn,
-                effect: .editEdge(properties: edit.properties, source: source, target: target))
+                effect: .editEdge(properties: edit.properties, from: movedFrom, to: movedTo))
         }
     }
 
@@ -584,11 +584,11 @@ extension InMemoryCore.State {
             case .madeEdge(var edge):
                 if taken { edge.version = 1 }
                 add(edge)
-            case .editEdge(let properties, let source, let target):
+            case .editEdge(let properties, let from, let to):
                 guard let id = write.edgeId, var row = edges[id] else { continue }
                 row.properties = Properties.merged(row.properties, with: properties, replacing: false, dropping: false)
-                if let source { row.fromId = source }
-                if let target { row.toId = target }
+                if let from { row.fromId = from }
+                if let to { row.toId = to }
                 if taken { row.version += 1 }
                 edges[id] = row
             case .removedEdge:

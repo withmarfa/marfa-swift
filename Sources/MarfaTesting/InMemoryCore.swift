@@ -27,7 +27,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
         case state(ItemState, at: String)
         case tags(TagChange)
         case madeEdge(Edge)
-        case editEdge(properties: JsonObject, source: String?, target: String?)
+        case editEdge(properties: JsonObject, from: String?, to: String?)
         case removedEdge
     }
 

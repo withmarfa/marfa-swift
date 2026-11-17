@@ -12,7 +12,7 @@ internal import MarfaCore
 ///   `streamIncomplete` whose reason is `credential_ended`. It is never `true` for `forbidden`: the server answers
 ///   a revoked or expired key with 401, and every 403 means the key is valid but lacks a permission.
 /// - ``isTransient``: asking again later can clear it, with nothing changed. It is the rule the core's own
-///   follow waits out, with `noConnection` and `keyChanging` added. No error is both a key refusal and transient,
+///   follow waits out, with `noConnection`, `keyChanging` and `storeBusy` added. No error is both a key refusal and transient,
 ///   and every offline error is transient.
 /// - ``isHydrationNeeded``: the copy must be hydrated before it can be caught up or followed. Asking again cannot
 ///   clear it. It is `true` for `copyExpired` (unless its reason is `credential_ended`, which is a key refusal),
@@ -174,13 +174,14 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     }
 
     /// Asking again later can clear it, with nothing changed: the rule the core's own follow waits out
-    /// (`CoreError::is_environmental`), with `noConnection` and `keyChanging` added.
+    /// (`CoreError::is_environmental`), with `noConnection`, `keyChanging` and `storeBusy` added: another program held
+    /// the store, and asking again later finds it free.
     ///
     /// An ``unnamed(status:message:server:)`` answer is transient whatever its status, since a gateway's 401 is not the
     /// server's word on the key.
     public var isTransient: Bool {
         switch self {
-        case .network, .noConnection, .io, .storageFull, .rateLimited, .unnamed, .keyChanging: true
+        case .network, .noConnection, .io, .storageFull, .storeBusy, .rateLimited, .unnamed, .keyChanging: true
         case .server(let status, _, _, _, _): status >= 500 || status == 408
         default: false
         }

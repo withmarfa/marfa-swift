@@ -206,7 +206,12 @@ extension LiveWorkingCopies {
                 return
             }
             #expect(status == 409 && code == "type_in_use")
-            #expect(message.contains(from) && message.contains("view"), "\(message)")
+            #expect(message.contains(from), "\(message)")
+            // The refusal's details, not its message, name the view that holds the type.
+            let named = refused?.server?.details?.object?["settings"]?.array ?? []
+            #expect(
+                named.contains { $0.object?["kind"]?.string == "view" && $0.object?["id"]?.string == view },
+                "\(String(describing: refused?.server?.details))")
 
             try await api.delete(itemType: to)  // the witness: a type no setting names is deleted
 

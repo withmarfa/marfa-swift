@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import SQLite3
 import Testing
 
 /// What a person is offered for a store `open` refuses: to see what it holds, to keep it aside, or to give it up.
@@ -21,6 +22,47 @@ struct StoreRecovery {
         let handle = try FileHandle(forWritingTo: store)
         defer { try? handle.close() }
         try handle.write(contentsOf: Data(repeating: 0x5A, count: 4096))
+    }
+
+    /// Overwrites the page that holds `table`'s rows, so SQLite still reads the file but not that table.
+    private static func damage(_ store: URL, table: String) throws {
+        var database: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        func number(_ sql: String) throws -> Int {
+            var statement: OpaquePointer?
+            try #require(sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK)
+            defer { sqlite3_finalize(statement) }
+            try #require(sqlite3_step(statement) == SQLITE_ROW)
+            return Int(sqlite3_column_int64(statement, 0))
+        }
+        let size = try number("PRAGMA page_size")
+        let root = try number("SELECT rootpage FROM sqlite_master WHERE type = 'table' AND name = '\(table)'")
+        let handle = try FileHandle(forWritingTo: store)
+        defer { try? handle.close() }
+        try handle.seek(toOffset: UInt64((root - 1) * size))
+        try handle.write(contentsOf: Data(repeating: 0xA5, count: size))
+    }
+
+    @Test func aStoreDamagedOutsideItsQueueStillListsItsUnsentWritesAndCarriesThemWhenSetAside() async throws {
+        let (store, id) = try await Self.storeWithUnsentWrites()
+        try Self.damage(store, table: "items")
+        await #expect(throws: Marfa.MarfaError.self) { try await WorkingCopy.check(store: store) }
+
+        // The person can see what is unsent before choosing.
+        let unsent = try await WorkingCopy.unsentWrites(in: store)
+        #expect(unsent.count == 2)
+        #expect(unsent.allSatisfy { $0.itemId == id })
+        #expect(unsent.map(\.kind).sorted() == ["add_tag", "create_item"])
+
+        let result = try await WorkingCopy.setAsideDamaged(store: store)
+        #expect(result.carried > 0, "\(result)")
+        #expect(FileManager.default.fileExists(atPath: result.setAside))
+        let reopened = try await WorkingCopy.open(store: store)
+        #expect(try await reopened.queue.all().isEmpty == false)
+        await reopened.close()
+        try await WorkingCopy.removeLosingAll(store: store)
+        try? FileManager.default.removeItem(atPath: result.setAside)
     }
 
     @Test func aWholeStorePassesTheCheckAndListsItsUnsentWritesWithoutChangingThem() async throws {

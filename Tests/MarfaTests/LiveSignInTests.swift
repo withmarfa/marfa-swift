@@ -6,8 +6,8 @@ import Testing
 /// Signs in to a server of its own with the device grant, as an app without a browser does, and follows the
 /// sign-in through an access token the server stops accepting, a renewal, and a grant the server ends.
 ///
-/// The first test boots a server built with its test hooks, which a release does not carry, so it can move the
-/// server's clock past the access token's lifetime; it runs only where `MARFA_HOOKED_SERVER_BIN` names one.
+/// The server is the release's own, with no test hooks: the owner revokes the access token to make the server
+/// refuse it, as it does once the token's hour has passed.
 @Suite(
     .serialized,
     .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"),
@@ -15,12 +15,8 @@ import Testing
 struct LiveSignIn {
     static let service = "com.withmarfa.marfa-swift.tests"
 
-    @Test(
-        .enabled(
-            if: OwnServer.hookedServer != nil, "set MARFA_HOOKED_SERVER_BIN to a marfa-server built with test-hooks")
-    )
-    func aDeviceSignInWritesRenewsAndEndsWhenTheGrantIsRevoked() async throws {
-        let own = try await OwnServer.boot(testHooks: true)
+    @Test func aDeviceSignInWritesRenewsAndEndsWhenTheGrantIsRevoked() async throws {
+        let own = try await OwnServer.boot()
         do {
             try await inIsolatedKeychainAsync { keychain, _ async throws in
                 try await Self.run(own, keychain)
@@ -173,8 +169,9 @@ struct LiveSignIn {
         #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
         #expect(try await authorization.place.read()?.accessToken == signedIn.accessToken)
 
-        // Past the access token's hour, short of the refresh token's lifetime.
-        try await own.advanceClock(by: .seconds(2 * 3600))
+        // The server stops accepting the access token, as it does after the token's hour.
+        try await revoke(signedIn.accessToken, hint: "access_token", clientId: signedIn.clientId, own)
+        #expect(try await itemsStatus(signedIn.accessToken, own) == 401)
         let after = try await copy.items.create(note("written after the access token expired"))
         #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
         let renewed = try #require(try authorization.place.read())
@@ -184,8 +181,7 @@ struct LiveSignIn {
         #expect(try await read(try #require(before.itemId), own) == 200)
 
         // The owner revokes the app: the grant ends with its refresh token.
-        try await revoke(try #require(renewed.refreshToken), clientId: renewed.clientId, own)
-        try await own.advanceClock(by: .seconds(2 * 3600))
+        try await revoke(try #require(renewed.refreshToken), hint: "refresh_token", clientId: renewed.clientId, own)
         _ = try await copy.items.create(note("written after the grant ended"))
         await #expect {
             try await copy.queue.drain()
@@ -268,10 +264,10 @@ struct LiveSignIn {
         return values
     }
 
-    private static func revoke(_ refreshToken: String, clientId: String, _ own: OwnServer) async throws {
+    private static func revoke(_ token: String, hint: String, clientId: String, _ own: OwnServer) async throws {
         let request = try formRequest(
             "\(own.url.absoluteString)/oauth/revoke",
-            [("token", refreshToken), ("token_type_hint", "refresh_token"), ("client_id", clientId)])
+            [("token", token), ("token_type_hint", hint), ("client_id", clientId)])
         let (_, response) = try await URLSession.shared.data(for: request)
         try #require((response as? HTTPURLResponse)?.statusCode == 200, "the revocation was refused")
     }
