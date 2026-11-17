@@ -650,19 +650,33 @@ struct LocalServer: Sendable {
         listener.newConnectionHandler = { connection in
             log.connections.withLock { $0.append(connection) }
             connection.start(queue: .global())
-            connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
-                let head = String(decoding: data ?? Data(), as: UTF8.self)
-                log.heads.withLock { $0.append(head) }
-                let line = head.prefix { $0 != "\r" }.split(separator: " ")
-                let method = line.first.map(String.init) ?? ""
-                let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
-                if holdsResponse { return }
-                let (status, type, body) = answer(method, path)
-                let response = Data(
-                    ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
-                        + headers + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
-                connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+            // A request's body can arrive after its head, and a connection closed before it is read resets.
+            @Sendable func read(_ received: Data) {
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
+                    let received = received + (data ?? Data())
+                    let text = String(decoding: received, as: UTF8.self)
+                    if let end = text.range(of: "\r\n\r\n"), data != nil {
+                        let length = text[..<end.lowerBound].lowercased().components(separatedBy: "content-length:")
+                            .dropFirst().first.flatMap { Int($0.prefix { $0 != "\r" }.trimmingCharacters(in: .whitespaces)) }
+                            ?? 0
+                        if received.count < text[..<end.upperBound].utf8.count + length {
+                            read(received)
+                            return
+                        }
+                    }
+                    log.heads.withLock { $0.append(text) }
+                    let line = text.prefix { $0 != "\r" }.split(separator: " ")
+                    let method = line.first.map(String.init) ?? ""
+                    let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
+                    if holdsResponse { return }
+                    let (status, type, body) = answer(method, path)
+                    let response = Data(
+                        ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
+                            + headers + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
+                    connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
+                }
             }
+            read(Data())
         }
         let port = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UInt16, Error>) in
             listener.stateUpdateHandler = { state in
