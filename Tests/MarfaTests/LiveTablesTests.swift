@@ -134,6 +134,28 @@ extension LiveWorkingCopies {
             }
         }
 
+        @Test func aPutWithNoIdIsGivenOneAndShownAtOnce() async throws {
+            let suffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+            let type = "app.swift\(suffix).steps"
+            let minted = try await mintKey(for: type, suffix: suffix)
+            let (copy, item) = try await copyHoldingSteps(minted.server, type: type, item: nil)
+            do {
+                _ = try await copy.tables.hold("steps", ofType: type)
+                let written = try await copy.tables.write([.put(values: ["note": "anonymous"])], to: "steps", of: item)
+                let shown = try await copy.tables.rows(of: item, in: "steps")
+                #expect(shown.value.rows.count == 1 && shown.value.rows.first?.values["note"] == "anonymous")
+                let drained = try await copy.queue.drain()
+                #expect(drained.verdicts.first { $0.id == written.id }?.verdict == .accepted, "\(drained)")
+                #expect(try await copy.tables.rows(of: item, in: "steps").value.rows.count == 1)
+                await copy.close()
+                _ = try await request("DELETE", "keys/\(minted.id)")
+            } catch {
+                await copy.close()
+                _ = try? await request("DELETE", "keys/\(minted.id)")
+                throw error
+            }
+        }
+
         @Test func aWriteThatReplacesACellAnotherWriterSetIsConflictedAndNamesIt() async throws {
             let suffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
             let type = "app.swift\(suffix).steps"
