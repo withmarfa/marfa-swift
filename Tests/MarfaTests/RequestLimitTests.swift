@@ -6,13 +6,13 @@ import Testing
 @testable import Marfa
 
 /// The id the server answers a create with, which the test sets once its write is queued.
-private final class Answered: Sendable {
-    let ids = Answered()
+private final class CreateAnswer: Sendable {
+    let ids = CreateAnswer()
     func set(_ id: String?) { ids.withLock { $0 = [id ?? "none"] } }
 }
 
 /// A server whose root names a small `max_request_bytes`, and which answers every create it is sent.
-private func serverTaking(_ limit: Int, creating ids: Answered) async throws -> LocalServer {
+private func serverTaking(_ limit: Int, creating ids: CreateAnswer) async throws -> LocalServer {
     try await LocalServer.start(contract: marfaContractVersion) { method, path in
         switch (method, path) {
         case (_, "/"):
@@ -36,7 +36,7 @@ private func serverTaking(_ limit: Int, creating ids: Answered) async throws -> 
 @Suite(.timeLimit(.minutes(1)))
 struct RequestLimitTests {
     @Test func aSaveOverTheServersLimitIsHeldOnTheDeviceAndOtherWritesGoOn() async throws {
-        let sendable = Answered()
+        let sendable = CreateAnswer()
         let server = try await serverTaking(1_500, creating: sendable)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
@@ -82,7 +82,7 @@ struct RequestLimitTests {
     }
 
     @Test func aSaveAtTheLimitIsSent() async throws {
-        let ids = Answered()
+        let ids = CreateAnswer()
         let server = try await serverTaking(1_500, creating: ids)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
