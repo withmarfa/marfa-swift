@@ -7,7 +7,7 @@ import Testing
 
 /// The id the server answers a create with, which the test sets once its write is queued.
 private final class CreateAnswer: Sendable {
-    let ids = CreateAnswer()
+    let ids = Mutex<[String]>([])
     func set(_ id: String?) { ids.withLock { $0 = [id ?? "none"] } }
 }
 
@@ -82,7 +82,7 @@ struct RequestLimitTests {
     }
 
     @Test func aSaveAtTheLimitIsSent() async throws {
-        let ids = CreateAnswer()
+        let ids = Mutex<[String]>([])
         let server = try await serverTaking(1_500, creating: ids)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
