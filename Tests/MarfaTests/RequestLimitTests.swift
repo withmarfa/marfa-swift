@@ -24,7 +24,7 @@ private func serverTaking(_ limit: Int, creating ids: CreateAnswer) async throws
             let id = ids.ids.withLock { $0.first } ?? "unknown"
             return (
                 201, "application/json",
-                #"{"id":"\#(id)","type":"core.note","properties":{"title":"short"},"tier":"feed","version":1,"state":"active","created_at":"2026-11-17T12:00:00.000Z","updated_at":"2026-11-17T12:00:00.000Z"}"#
+                #"{"id":"\#(id)","type":"core.note","properties":{"title":"short"},"tier":"feed","version":1,"schema_version":1,"source":"app","occurred_at":"2026-11-17T12:00:00.000Z","state":"active","created_at":"2026-11-17T12:00:00.000Z","updated_at":"2026-11-17T12:00:00.000Z"}"#
             )
         case (_, _) where path.hasPrefix("/items/"):
             return (404, "application/json", #"{"error":{"code":"item_not_found","message":"none"}}"#)
@@ -91,8 +91,6 @@ struct RequestLimitTests {
         ids.set(small.itemId)
         let report = try await copy.queue.drain()
         #expect(report.unsent == 0)
-        let stored = try await copy.queue.all()
-        #expect(report.verdicts.first?.verdict != nil, "\(stored)")
         #expect(report.verdicts.first?.verdict == .accepted, "\(report)")
         await copy.close()
     }
