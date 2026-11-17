@@ -102,8 +102,8 @@ jobs:
       && (needs.changes.result != 'success' || needs.changes.outputs.validate != 'false')
       && (github.event_name != 'pull_request' || needs.lint.result == 'success') }}
     runs-on: xcode-27
-    # Twice the 90th percentile of a run that builds the core (23 minutes).
-    timeout-minutes: 45
+    # About twice a run that builds the core: 20 minutes of core, 10 of tests, then both sample builds.
+    timeout-minutes: 75
     # Inside the workspace: actions/cache refuses a path with `..` in it.
     env:
       MARFA_MONOREPO: ${{ github.workspace }}/.build/marfa
