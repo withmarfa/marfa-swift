@@ -2,6 +2,8 @@
 
 The Swift SDK for Marfa, as the Swift package `Marfa`: Swift types, `async` calls, change streams and errors over `MarfaCore`, the Rust engine from `withmarfa/marfa` that every native client embeds. The core does the networking, storage and syncing.
 
+The package exposes every operation an app may be granted, owner tasks included. No app holds a power another app lacks, so an app built on this package can do everything MAPP does.
+
 ## Layout and build
 
 - `MarfaCoreFFI` is the core as a binary, `Frameworks/MarfaCoreFFI.xcframework`, gitignored; a release tag points it at a prebuilt archive instead. `MarfaCore` is its UniFFI glue, `Sources/MarfaTypes` the server's wire types and `Sources/MarfaAPI/Generated` the client for the server's own operations, all generated, committed and never edited. `Marfa` is the hand-written layer apps import. `MarfaAPI` calls the server directly for what only the server can do, such as registering a type; `generator/generate.mjs` chooses its operations by a rule, and `generator/generate.test.mjs` pins the rule on a fixture and checks named operations in the committed client, so a pin that adds an operation regenerates the client and needs no change there.
