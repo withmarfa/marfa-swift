@@ -20,14 +20,21 @@ struct Access: ClientMiddleware {
         let write = request.method != .get && request.method != .head
         let sent = try await send(request, body, baseURL, token, next)
         if let refused = await refusal(sent, origin: origin, write: write) {
-            guard case .unauthorized = refused, let renewed = try await server.renewedToken(refused: token) else {
-                throw refused
-            }
             // A body that can be read once has gone with the refused request.
-            guard body?.iterationBehavior != .single else { throw refused }
-            let again = try await send(request, body, baseURL, renewed, next)
-            if let refusedAgain = await refusal(again, origin: origin, write: write) { throw refusedAgain }
-            return again
+            let again: String?
+            switch refused {
+            case .unauthorized:
+                again = try await server.renewedToken(refused: token)
+                guard body?.iterationBehavior != .single else { throw refused }
+            case .confirmationRequired:
+                guard body?.iterationBehavior != .single else { throw refused }
+                again = try await server.confirmedToken(refused: token, challenge: refused)
+            default: again = nil
+            }
+            guard let again else { throw refused }
+            let second = try await send(request, body, baseURL, again, next)
+            if let refusedAgain = await refusal(second, origin: origin, write: write) { throw refusedAgain }
+            return second
         }
         return sent
     }
@@ -58,8 +65,8 @@ func refusal(_ answer: (HTTPResponse, HTTPBody?), origin: String, write: Bool) a
         status: UInt16(clamping: response.status.code),
         contract: response.headerFields.first { $0.name.canonicalName == "x-marfa-contract" }?.value,
         declaredCode: response.headerFields[xErrorCode],
-        location: response.headerFields[.location], retryAfter: response.headerFields[.retryAfter], origin: origin,
-        write: write
+        location: response.headerFields[.location], retryAfter: response.headerFields[.retryAfter],
+        challenge: response.headerFields[.wwwAuthenticate], origin: origin, write: write
     ) { await read(body) }
 }
 

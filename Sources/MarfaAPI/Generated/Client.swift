@@ -14,9 +14,10 @@ public import MarfaTypes
 /// The server's own operations, for what only the server can do.
 ///
 /// Make one with `Client(_:)` from a `Server`. A working copy answers items, edges, search, folders and
-/// views, offline, and `Server` reads an item's versions, reads and updates the server's settings and sets a
-/// type's icon; this client calls the server for the rest, such as registering a type or managing keys, and needs
-/// a connection for each call. Every call throws `MarfaError`.
+/// views, offline, and `Server` reads an item's versions, names sources and sets a type's icon; this client calls
+/// the server for the rest, such as registering a type, managing keys or looking after the instance as its owner
+/// (updates, settings, backups, passkeys, sign-ins, app grants, the profile, the trash and what needs attention),
+/// and needs a connection for each call. Every call throws `MarfaError`.
 public struct Client: ClientProtocol {
     /// The underlying HTTP client.
     private let client: Sender
@@ -5369,6 +5370,174 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.Overview.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get the configuration
+    ///
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /config`.
+    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
+    public func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetConfig.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/config",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetConfig.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetConfig.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.InstanceConfig.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    public func updateConfig(_ input: Operations.UpdateConfig.Input) async throws -> Operations.UpdateConfig.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.UpdateConfig.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/config",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .patch
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.UpdateConfig.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.UpdateConfig.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.InstanceConfig.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)

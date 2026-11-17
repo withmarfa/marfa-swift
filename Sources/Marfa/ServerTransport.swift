@@ -32,10 +32,11 @@ private final class RefusesRedirects: NSObject, URLSessionTaskDelegate, Sendable
 /// The error an answer stands for, or `nil` for a success from a server speaking this build's contract.
 ///
 /// `body` is read only for an answer that is not a success. `declaredCode` is the `X-Error-Code` header, which names
-/// a server's own refusal of the contract without the body being read.
+/// a server's own refusal of the contract without the body being read. `challenge` is the `WWW-Authenticate` header,
+/// which names how recently the owner must have signed in.
 package func refusal(
     status: UInt16, contract served: String?, declaredCode: String? = nil, location: String?, retryAfter: String?,
-    origin: String, write: Bool, body: () async -> String
+    challenge: String? = nil, origin: String, write: Bool, body: () async -> String
 ) async -> MarfaError? {
     if (300..<400).contains(status) {
         return .redirected(
@@ -77,7 +78,12 @@ package func refusal(
             served: served, expected: expected, status: status, writeSent: false,
             message: "\(origin) refused the request before it acted: \(shown)", server: answer)
     case 400, 422: return .validation(code: code, message: shown, details: nil, server: answer)
+    case 401 where code == "insufficient_user_authentication":
+        return .confirmationRequired(maxAgeSeconds: maxAge(challenge), message: shown, server: answer)
     case 401: return .unauthorized(code: code, message: shown, server: answer)
+    case 403 where code == "app_sign_in_required":
+        return .appSignInRequired(
+            message: "Do this from an app you signed in to. An API key cannot do it.", server: answer)
     case 403: return .forbidden(code: code, message: shown, server: answer)
     case 404: return .notFound(code: code, message: shown, server: answer)
     case 409 where code == "version_conflict": return .versionConflict(message: shown, server: answer)
@@ -87,6 +93,13 @@ package func refusal(
             code: code, message: shown, retryAfterSeconds: retryAfter.flatMap { UInt64($0) }, server: answer)
     default: return .server(status: status, code: code, message: shown, details: answer.details, server: answer)
     }
+}
+
+/// The `max_age` a `WWW-Authenticate: Bearer error="insufficient_user_authentication", max_age="300"` challenge names.
+func maxAge(_ challenge: String?) -> UInt64? {
+    guard let challenge, let found = challenge.range(of: "max_age=") else { return nil }
+    let digits = challenge[found.upperBound...].drop { $0 == "\"" }.prefix { $0.isASCII && $0.isNumber }
+    return UInt64(digits)
 }
 
 /// A refusal's `{"error": {...}}` body, where it has one: the `code`, the `message` and the `details`, which say what
@@ -132,18 +145,37 @@ extension Server {
     /// the sign-in's access token, is sent as a bearer token; a refused access token is renewed once and the request
     /// sent again; a redirect is never followed; and every failure throws a ``MarfaError``.
     ///
-    /// `timeout` limits the whole call, renewal and second request included: once it passes, the call throws
+    /// `timeout` limits each try of the call, renewal and second request included: once it passes, the call throws
     /// ``MarfaError/network(message:)`` and the request is canceled. A renewal already under way finishes on its own,
-    /// so the token it keeps is never lost.
+    /// so the token it keeps is never lost. When the server asks the owner to confirm it is them, the owner's time at
+    /// the sheet counts toward no limit, and the call sent again gets the whole limit.
     func send(
         _ method: String, _ path: String, query: [URLQueryItem] = [], headers: [String: String] = [:],
         body: Data? = nil, timeout: Duration
+    ) async throws(MarfaError) -> Data {
+        let token = try currentToken()
+        do {
+            return try await timed(
+                method, path, query: query, headers: headers, body: body, timeout: timeout, token: token)
+        } catch .confirmationRequired(let maxAge, let message, let answer) {
+            // The sheet waits for a person, so the call's time limit starts again once it closes.
+            let confirmed = try await confirmedToken(
+                refused: token,
+                challenge: .confirmationRequired(maxAgeSeconds: maxAge, message: message, server: answer))
+            return try await timed(
+                method, path, query: query, headers: headers, body: body, timeout: timeout, token: confirmed)
+        }
+    }
+
+    private func timed(
+        _ method: String, _ path: String, query: [URLQueryItem], headers: [String: String], body: Data?,
+        timeout: Duration, token: String
     ) async throws(MarfaError) -> Data {
         let first = FirstAnswer<Result<Data, MarfaError>>()
         let work = Task {
             do throws(MarfaError) {
                 let data = try await unlimited(
-                    method, path, query: query, headers: headers, body: body, timeout: timeout)
+                    method, path, query: query, headers: headers, body: body, timeout: timeout, token: token)
                 first.answer(.success(data))
             } catch {
                 first.answer(.failure(error))
@@ -166,7 +198,7 @@ extension Server {
 
     private func unlimited(
         _ method: String, _ path: String, query: [URLQueryItem], headers: [String: String], body: Data?,
-        timeout: Duration
+        timeout: Duration, token: String
     ) async throws(MarfaError) -> Data {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw .invalid(message: "the address of \(origin) is not one a request can be made to")
@@ -191,7 +223,6 @@ extension Server {
 
         let connection = Connection(base: signInSession, timeout: timeout)
         let write = method != "GET" && method != "HEAD"
-        let token = try currentToken()
         let first = try await exchange(request, token, connection)
         guard let refused = await refusal(first, write: write) else { return first.1 }
         guard case .unauthorized = refused, let renewed = try await renewedToken(refused: token) else { throw refused }
@@ -224,7 +255,8 @@ extension Server {
             contract: response.value(forHTTPHeaderField: ContractHeader.name),
             declaredCode: response.value(forHTTPHeaderField: "X-Error-Code"),
             location: response.value(forHTTPHeaderField: "Location"),
-            retryAfter: response.value(forHTTPHeaderField: "Retry-After"), origin: origin, write: write
+            retryAfter: response.value(forHTTPHeaderField: "Retry-After"),
+            challenge: response.value(forHTTPHeaderField: "WWW-Authenticate"), origin: origin, write: write
         ) { String(decoding: data.prefix(64 * 1024), as: UTF8.self) }
     }
 

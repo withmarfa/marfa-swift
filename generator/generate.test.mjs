@@ -418,8 +418,8 @@ test("the client keeps what an app's credential calls on the server and a workin
     },
   };
   assert.deepEqual(clientOperations(input), [
-    "aNewServerOperation", "cancelBulkActionJob", "getBulkActionJob", "listBlobStores", "registerType",
-    "replaceConfig",
+    "aNewServerOperation", "cancelBulkActionJob", "getBulkActionJob", "getConfig", "listBlobStores", "registerType",
+    "replaceConfig", "updateConfig",
   ]);
 });
 
@@ -430,10 +430,18 @@ test("the committed client makes what the rule keeps from the pinned document", 
   const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
   // The wire types describe every operation, so each absence below is the client's own.
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
-  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "replaceConfig"]) assert.ok(client.has(kept), kept);
+  const owner = [
+    "getUpdate", "startUpdate", "replaceOwnerPassword", "confirmClock", "checkAddressChange", "listSettings", "getConfig",
+    "updateConfig", "replaceConfig", "listBackups", "runBackup", "adoptBackupFolder", "restoreBackup", "restoreArchive",
+    "listOwnerPasskeys", "renameOwnerPasskey", "deleteOwnerPasskey", "getPasskeyAddUrl", "listSignIns", "renameSignIn",
+    "endSignIn", "listAppGrants", "narrowAppGrant", "revokeAppGrant", "getProfile", "updateProfile", "getProfileAvatar",
+    "replaceProfileAvatar", "listTrash", "emptyTrash", "listAttention",
+  ];
+  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", ...owner])
+    assert.ok(client.has(kept), kept);
   for (const left of [
-    "createItem", "applyBulkAction", "registerConnector", "createOwner", "getInstance", "listItemVersions", "getConfig",
-    "updateConfig", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
+    "createItem", "applyBulkAction", "registerConnector", "createOwner", "getInstance", "listItemVersions",
+    "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
   ]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);

@@ -269,8 +269,7 @@ const bulkWrites = new Set(["applyBulkAction"]);
 const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
 // `Server` in the Marfa module makes these itself, so an app has one way to call each.
 const serverCalls = new Set([
-  "listItemVersions", "getConfig", "updateConfig", "setTypeIcon", "clearTypeIcon", "listSources", "getSource",
-  "updateSource", "getItemStats",
+  "listItemVersions", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
 ]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 
@@ -368,9 +367,10 @@ function publish(output, destination) {
 const clientSummary = `/// The server's own operations, for what only the server can do.
 ///
 /// Make one with \`Client(_:)\` from a \`Server\`. A working copy answers items, edges, search, folders and
-/// views, offline, and \`Server\` reads an item's versions, reads and updates the server's settings and sets a
-/// type's icon; this client calls the server for the rest, such as registering a type or managing keys, and needs
-/// a connection for each call. Every call throws \`MarfaError\`.
+/// views, offline, and \`Server\` reads an item's versions, names sources and sets a type's icon; this client calls
+/// the server for the rest, such as registering a type, managing keys or looking after the instance as its owner
+/// (updates, settings, backups, passkeys, sign-ins, app grants, the profile, the trash and what needs attention),
+/// and needs a connection for each call. Every call throws \`MarfaError\`.
 `;
 
 export function generate(binary, source, destination, clientDestination) {

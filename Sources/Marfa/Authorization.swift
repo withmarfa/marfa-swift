@@ -35,10 +35,15 @@ public struct Authorization: Sendable {
         /// added, so the server issues a refresh token.
         public var scopes: [String]
 
-        public init(name: String, redirect: URL? = nil, scopes: [String]) {
+        /// - Parameter ownerPermissions: What the app asks for to look after the instance, which the owner's approval
+        ///   page then shows as a switch each. They are added to `scopes`, and the owner may approve fewer: ask the
+        ///   ``Credential`` with ``Credential/grants(_:)``.
+        public init(
+            name: String, redirect: URL? = nil, scopes: [String], ownerPermissions: [OwnerPermission] = []
+        ) {
             self.name = name
             self.redirect = redirect
-            self.scopes = scopes
+            self.scopes = scopes + ownerPermissions.map(\.rawValue)
         }
 
         var scope: String {
@@ -62,6 +67,14 @@ public struct Authorization: Sendable {
     /// Throws ``SignInError/notAServer`` when `server` is not an `http` or `https` address with a host.
     public init(server: URL, client: Client, keychain: Keychain = .system, service: String) throws(SignInError) {
         try self.init(server: server, client: client, keychain: keychain, service: service, transport: .standard)
+    }
+
+    /// The sign-in the keychain holds for `place`, to sign in again with the registration it kept.
+    init(server: URL, client: Client, place: SignInPlace, transport: SignInTransport) {
+        self.server = server
+        self.client = client
+        self.place = place
+        self.transport = transport
     }
 
     init(server: URL, client: Client, keychain: Keychain, service: String, transport: SignInTransport)
@@ -106,7 +119,11 @@ public struct Authorization: Sendable {
 
     /// The authorization code flow with PKCE (RFC 7636) and `state`, with `browser` showing the
     /// authorization address and answering the address the server returned to.
+    ///
+    /// `maxAge` asks the server to sign the person in again when they signed in longer ago than that many seconds,
+    /// as the server's `insufficient_user_authentication` challenge names it (RFC 9470).
     func signIn(
+        maxAge: UInt64? = nil,
         browser: @MainActor @Sendable (_ authorize: URL, _ scheme: String) async throws -> URL
     ) async throws -> Credential {
         guard let redirect = client.redirect, let scheme = redirect.scheme else { throw SignInError.noRedirect }
@@ -127,7 +144,7 @@ public struct Authorization: Sendable {
                 URLQueryItem(name: "state", value: state),
                 URLQueryItem(name: "code_challenge", value: proof.challenge),
                 URLQueryItem(name: "code_challenge_method", value: "S256"),
-            ]
+            ] + (maxAge.map { [URLQueryItem(name: "max_age", value: String($0))] } ?? [])
         // A form reads `+` as a space, and `URLComponents` leaves it as it is.
         authorize.percentEncodedQuery = authorize.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         guard let address = authorize.url else {
@@ -433,11 +450,55 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     /// The access token kept now, which a renewal may have replaced since the credential was made.
     func accessToken() throws -> String? { try place.read()?.accessToken }
 
+    /// Whether the owner approved `permission` for this sign-in.
+    ///
+    /// The owner may approve fewer permissions than the app asked for, so check before offering a control that
+    /// needs one. This reads the approval kept with the credential; the server decides each call.
+    public func grants(_ permission: OwnerPermission) -> Bool { scopes.contains(permission.rawValue) }
+
+    /// The sign-in that signs the owner in again with the registration this credential kept.
+    ///
+    /// Throws ``SignInError/noRedirect`` for a sign-in made with the device grant, which has no browser to return to,
+    /// and ``SignInError/notSignedIn`` once the keychain no longer holds the sign-in.
+    func reauthorization() throws -> Authorization {
+        guard let kept = try place.read() else { throw SignInError.notSignedIn }
+        guard let redirect = kept.redirect.flatMap(URL.init(string:)) else { throw SignInError.noRedirect }
+        let scopes = (kept.scope ?? "").split(separator: " ").map(String.init)
+        return Authorization(
+            server: server, client: .init(name: "", redirect: redirect, scopes: scopes), place: place,
+            transport: transport)
+    }
+
     public static func == (lhs: Credential, rhs: Credential) -> Bool { lhs.place == rhs.place }
     public func hash(into hasher: inout Hasher) { hasher.combine(place) }
 
     /// Never shows a token.
     public var description: String { "Credential(\(server.absoluteString))" }
+}
+
+/// What an app asks the owner for so it can look after the instance, by the name the server gives each.
+///
+/// Ask for them in ``Authorization/Client/init(name:redirect:scopes:ownerPermissions:)``. The approval page shows the
+/// owner a switch for each, and the owner may approve fewer.
+public enum OwnerPermission: String, Sendable, Hashable, CaseIterable {
+    /// Lists, makes and restores backups, and adopts a backup folder.
+    case backupsManage = "backups.manage"
+    /// Lists, renames and ends the owner's sign-ins, and the owner's passkeys.
+    case signInsManage = "sign_ins.manage"
+    /// Reads and changes the instance's settings, and checks a change of address.
+    case configManage = "config.manage"
+    /// Updates the server, runs housekeeping and confirms the clock.
+    case instanceMaintain = "instance.maintain"
+    /// Reads the server's health, update status, settings and what needs attention.
+    case instanceRead = "instance.read"
+    /// Lists, narrows and revokes other apps' access.
+    case grantsManage = "grants.manage"
+    /// Lists and revokes every key.
+    case keysManage = "keys.manage"
+    /// Lists and empties the trash and purges trashed items.
+    case itemsPurge = "items.purge"
+    /// Changes the owner's email address. The name and avatar need only the profile permission every app asks for.
+    case profileEmailWrite = "profile.email:write"
 }
 
 /// Why a sign-in did not finish.
@@ -492,7 +553,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
 /// Presents one `ASWebAuthenticationSession` and keeps it, and its presentation context, alive until it
 /// answers.
 @MainActor
-private final class WebSession: NSObject, ASWebAuthenticationPresentationContextProviding {
+final class WebSession: NSObject, ASWebAuthenticationPresentationContextProviding {
     private let anchor: ASPresentationAnchor
     private var session: ASWebAuthenticationSession?
 

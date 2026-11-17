@@ -432,6 +432,20 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /overview`.
     /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
     func getOverview(_ input: Operations.GetOverview.Input) async throws -> Operations.GetOverview.Output
+    /// Get the configuration
+    ///
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /config`.
+    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
+    func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    func updateConfig(_ input: Operations.UpdateConfig.Input) async throws -> Operations.UpdateConfig.Output
     /// Replace the configuration
     ///
     /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. To change only some settings, use `PATCH`. Requires `config.manage`.
@@ -1394,6 +1408,30 @@ extension ClientProtocol {
     /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
     public func getOverview(headers: Operations.GetOverview.Input.Headers = .init()) async throws -> Operations.GetOverview.Output {
         try await getOverview(Operations.GetOverview.Input(headers: headers))
+    }
+    /// Get the configuration
+    ///
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /config`.
+    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
+    public func getConfig(headers: Operations.GetConfig.Input.Headers = .init()) async throws -> Operations.GetConfig.Output {
+        try await getConfig(Operations.GetConfig.Input(headers: headers))
+    }
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    public func updateConfig(
+        headers: Operations.UpdateConfig.Input.Headers = .init(),
+        body: Operations.UpdateConfig.Input.Body
+    ) async throws -> Operations.UpdateConfig.Output {
+        try await updateConfig(Operations.UpdateConfig.Input(
+            headers: headers,
+            body: body
+        ))
     }
     /// Replace the configuration
     ///
