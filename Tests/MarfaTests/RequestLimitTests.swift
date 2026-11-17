@@ -51,7 +51,7 @@ struct RequestLimitTests {
         #expect(report.unsent == 1, "\(report)")
         let largeVerdict = try #require(report.verdicts.first { $0.id == large.id })
         let smallVerdict = try #require(report.verdicts.first { $0.id == small.id })
-        #expect(smallVerdict.verdict == .accepted, "\(smallVerdict)")
+        #expect(smallVerdict.verdict == .accepted, "\(report)")
 
         guard case .refused(let refusal)? = largeVerdict.verdict else {
             Issue.record("expected a refusal, got \(String(describing: largeVerdict.verdict))")
@@ -91,7 +91,7 @@ struct RequestLimitTests {
         ids.set(small.itemId)
         let report = try await copy.queue.drain()
         #expect(report.unsent == 0)
-        #expect(report.verdicts.first?.verdict == .accepted)
+        #expect(report.verdicts.first?.verdict == .accepted, "\(report)")
         await copy.close()
     }
 }
