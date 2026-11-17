@@ -25,7 +25,7 @@ private func serverTaking(_ limit: Int, creating ids: CreateAnswer) async throws
                 #"{"instance_id":"test-instance","contract":\#(marfaContractVersion),"max_request_bytes":\#(limit)}"#
             )
         case ("POST", "/items"):
-            return (201, "application/json", item(ids.ids.withLock { $0.first } ?? "unknown"))
+            return (201, "application/json", #"{"item":\#(item(ids.ids.withLock { $0.first } ?? "unknown"))}"#)
         case ("GET", _) where path.hasPrefix("/items/") && ids.ids.withLock({ path == "/items/\($0.first ?? "")" }):
             return (200, "application/json", item(String(path.dropFirst("/items/".count))))
         case (_, _) where path.hasPrefix("/items/"):
