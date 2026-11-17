@@ -57,8 +57,8 @@ extension Server {
 
     /// How many confirmed sign-ins this server's credential has had in this process, read before a request is sent.
     ///
-    /// A call that the server challenges passes it to ``confirmedToken(since:challenge:)``, which tells a
-    /// sign-in made after the request was sent from a renewal, which keeps the sign-in's age.
+    /// A call that the server challenges passes it to ``confirmedToken(since:challenge:)``, so a confirmed sign-in made
+    /// since the request was sent counts and a renewal, which keeps the sign-in's old age, does not.
     package func confirmationMark() -> Int {
         credential.map { ConfirmedSignIns.shared.count(for: $0) } ?? 0
     }

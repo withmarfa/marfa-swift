@@ -239,8 +239,8 @@ export function prepare(document) {
   return { document: result, nullable, usesNull };
 }
 
-// A connector calls these with a key of its own, through the TypeScript SDK or HTTP. The owner's side of them, which
-// the server marks `x-marfa-local-command` and opens to `connectors.manage`, stays in the client.
+// A connector calls these with a key of its own, through the TypeScript SDK or HTTP. The owner's side of them stays in
+// the client: today those are exactly the ones the server's own socket takes, which it marks `x-marfa-local-command`.
 const connectorTags = new Set(["Connectors", "Connector state", "Inbound webhooks"]);
 // A working copy reads and writes these itself, offline, so the client leaves them out.
 const copyTags = new Set([
