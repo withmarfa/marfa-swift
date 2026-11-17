@@ -310,7 +310,8 @@ extension Marfa.ItemType {
     fileprivate var held: MarfaCore.ItemType {
         MarfaCore.ItemType(
             id: id, label: label, plural: plural, description: description, parent: parent, version: version,
-            fields: fields.map(\.held), titleField: titleField, bodyField: bodyField, nameFromBody: nameFromBody,
+            fields: fields.map(\.held), tables: MarfaCore.JsonObject(members: []), titleField: titleField,
+            bodyField: bodyField, nameFromBody: nameFromBody,
             icon: icon, linkField: linkField, roles: roles, compatibleWith: compatibleWith)
     }
 }
@@ -326,17 +327,17 @@ extension Marfa.TypeField {
 
 extension Marfa.EdgeType {
     fileprivate var held: MarfaCore.EdgeType {
-        let placed: MarfaCore.EdgeWrittenAt =
-            switch writtenAt {
-            case .source: .source
-            case .target: .target
+        let placed: MarfaCore.EdgeWrittenFrom =
+            switch writtenFrom {
+            case .from: .from
+            case .to: .to
             case .none: .none
             }
         return MarfaCore.EdgeType(
             id: id, label: label, reverseLabel: reverseLabel, description: description, cardinality: cardinality,
             reverseName: reverseName,
-            writtenAt: placed, sourceTypeConstraints: sourceTypeConstraints,
-            targetTypeConstraints: targetTypeConstraints, cascadeOnDelete: cascadeOnDelete,
+            writtenFrom: placed, fromTypeConstraints: fromTypeConstraints,
+            toTypeConstraints: toTypeConstraints, cascadeOnDelete: cascadeOnDelete,
             properties: properties.map(\.held), shipped: shipped, acyclic: acyclic, flat: flat)
     }
 }

@@ -15,9 +15,9 @@ public func checkImports() {
     let page = BinPage(items: [item], nextCursor: "next")
     precondition(page.items.first?.id == item.id && page.nextCursor == "next")
     let edge = Edge(
-        id: "edge", sourceId: item.id, targetId: "other", edgeType: "parent-of",
+        id: "edge", fromId: item.id, toId: "other", edgeType: "parent-of",
         properties: [:], version: 1, createdAt: "", updatedAt: "")
-    precondition(edge.sourceId == item.id)
+    precondition(edge.fromId == item.id)
     func identity<Row: Identifiable>(_ row: Row) -> Row.ID { row.id }
     precondition(identity(item) == "note" && identity(edge) == "edge")
     let hit = SearchHit(item: item, score: 1, snippet: "Note")
@@ -32,9 +32,9 @@ public func checkImports() {
     let report = DrainReport()
     let error = MarfaError.invalid(message: "consumer")
     let slice: SliceTier = .all
-    let edgeEdit = EdgeEdit(baseVersion: edge.version, move: .source("third"))
+    let edgeEdit = EdgeEdit(baseVersion: edge.version, move: .from("third"))
     precondition(queued.id == "write" && report.unsent == 0 && error.code() == "invalid")
-    precondition(slice == .all && edgeEdit.move == .source("third"))
+    precondition(slice == .all && edgeEdit.move == .from("third"))
     let group = ViewGroup(key: .string("todo"), count: 2)
     let settings = ViewSettings(
         title: "Tasks", query: ViewQuery(types: ["core.task"], tier: .all),

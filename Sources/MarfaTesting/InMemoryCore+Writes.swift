@@ -32,7 +32,7 @@ extension InMemoryCore {
                 edges.flatMap { named in
                     named.targets.map { target in
                         Proposed(
-                            edgeType: named.type, source: .made(id: id, type: draft.type), targetId: target,
+                            edgeType: named.type, source: .made(id: id, type: draft.type), toId: target,
                             replacing: nil)
                     }
                 },
@@ -72,7 +72,7 @@ extension InMemoryCore {
             let shown = edges.flatMap { named in
                 named.targets.map { target in
                     Edge(
-                        id: Self.projectedEdgeID(id, named.type, target), sourceId: id, targetId: target,
+                        id: Self.projectedEdgeID(id, named.type, target), fromId: id, toId: target,
                         edgeType: named.type, properties: JsonObject(members: []), version: 0, createdAt: at,
                         updatedAt: at, unreadableProperties: nil)
                 }
@@ -257,8 +257,9 @@ extension InMemoryCore {
                 if held.type.hasPrefix("system.") {
                     throw FakeCopyError.unsupported(call: "items.transition(to: .revoked) on a system type")
                 }
-                throw Refuse.invalid(
-                    "a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
+                throw Refuse.validation(
+                    "validation_error",
+                    "state: a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
                 )
             }
             let at = Minted.now()
@@ -282,9 +283,9 @@ extension InMemoryCore {
         try tagged(id, .removeTag, tag: tag, body: JsonObject(), .remove(tag))
     }
 
-    func replaceMetadata(id: String, tags: [String]) throws -> QueuedWrite {
+    func replaceTags(id: String, tags: [String]) throws -> QueuedWrite {
         try Checks.tags(tags)
-        return try tagged(id, .replaceMetadata, tag: nil, body: Self.tags(tags), .replace(tags))
+        return try tagged(id, .replaceTags, tag: nil, body: Self.tags(tags), .replace(tags))
     }
 
     private func tagged(
@@ -329,21 +330,21 @@ extension InMemoryCore {
             try Self.refuseUnqueueable(draft, in: state)
             let id = draft.id ?? Minted.id()
             let body = JsonObject(members: [
-                .init(key: "id", value: .string(id)), .init(key: "source_id", value: .string(draft.sourceId)),
-                .init(key: "target_id", value: .string(draft.targetId)),
+                .init(key: "id", value: .string(id)), .init(key: "from_id", value: .string(draft.fromId)),
+                .init(key: "to_id", value: .string(draft.toId)),
                 .init(key: "edge_type", value: .string(draft.edgeType)),
                 .init(key: "properties", value: .object(draft.properties)),
             ])
             try Properties.refuseTooDeep(body)
             let at = Minted.now()
             let made = Edge(
-                id: id, sourceId: draft.sourceId, targetId: draft.targetId, edgeType: draft.edgeType,
+                id: id, fromId: draft.fromId, toId: draft.toId, edgeType: draft.edgeType,
                 properties: Properties.served(draft.properties), version: 0, createdAt: at, updatedAt: at,
                 unreadableProperties: nil)
             state.add(made)
             return state.append(
-                .createEdge, item: draft.sourceId, target: draft.targetId, edge: id, body: body,
-                dependsOn: state.pendingCreates(of: draft.sourceId, draft.targetId), effect: .madeEdge(made))
+                .createEdge, item: draft.fromId, target: draft.toId, edge: id, body: body,
+                dependsOn: state.pendingCreates(of: draft.fromId, draft.toId), effect: .madeEdge(made))
         }
     }
 
@@ -364,15 +365,15 @@ extension InMemoryCore {
             var body = JsonObject(members: [
                 .init(key: "properties", value: .object(edit.properties)), .init(key: "version", value: .integer(base)),
             ])
-            if let source { body.members.append(.init(key: "source_id", value: .string(source))) }
-            if let target { body.members.append(.init(key: "target_id", value: .string(target))) }
+            if let source { body.members.append(.init(key: "from_id", value: .string(source))) }
+            if let target { body.members.append(.init(key: "to_id", value: .string(target))) }
             try Properties.refuseTooDeep(body)
             var dependsOn = state.pendingCreate(ofEdge: id)
             for waited in state.pendingCreates(of: [source, target].compactMap { $0 }) where !dependsOn.contains(waited)
             {
                 dependsOn.append(waited)
             }
-            let (from, to) = (held.sourceId, held.targetId)
+            let (from, to) = (held.fromId, held.toId)
             var members = held.properties.members
             for member in edit.properties.members {
                 if let at = members.firstIndex(where: { $0.key.utf8.elementsEqual(member.key.utf8) }) {
@@ -382,8 +383,8 @@ extension InMemoryCore {
                 }
             }
             held.properties = Properties.served(JsonObject(members: members))
-            if let source { held.sourceId = source }
-            if let target { held.targetId = target }
+            if let source { held.fromId = source }
+            if let target { held.toId = target }
             state.edges[id] = held
             return state.append(
                 .updateEdge, item: from, target: to, edge: id, baseVersion: base, body: body, dependsOn: dependsOn,
@@ -399,7 +400,7 @@ extension InMemoryCore {
             state.edges[id] = nil
             state.edgeOrder[id] = nil
             return state.append(
-                .deleteEdge, item: held.sourceId, target: held.targetId, edge: id, body: body, dependsOn: dependsOn,
+                .deleteEdge, item: held.fromId, target: held.toId, edge: id, body: body, dependsOn: dependsOn,
                 effect: .removedEdge)
         }
     }
@@ -481,25 +482,23 @@ extension InMemoryCore {
         JsonObject(members: [JsonMember(key: "tags", value: .array(tags.map { .string($0) }))])
     }
 
-    private static func sorted(_ tags: Set<String>) -> [String] {
-        tags.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
-    }
-
     static func withoutTags(_ item: Item) -> Item {
         var item = item
         item.tags = []
         return item
     }
 
-    /// A tag change, with tags told apart by their bytes as the core does.
+    /// A tag change, with tags told apart by their bytes and kept in the order they were added, as the core does.
     static func applying(_ change: InMemoryCore.TagChange, to tags: [String]) -> [String] {
-        var held = Dictionary(uniqueKeysWithValues: tags.map { (Array($0.utf8), $0) })
-        switch change {
-        case .add(let tag): held[Array(tag.utf8)] = tag
-        case .remove(let tag): held[Array(tag.utf8)] = nil
-        case .replace(let tags): held = Dictionary(tags.map { (Array($0.utf8), $0) }) { first, _ in first }
+        func unique(_ tags: [String]) -> [String] {
+            var seen = Set<[UInt8]>()
+            return tags.filter { seen.insert(Array($0.utf8)).inserted }
         }
-        return held.values.sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
+        switch change {
+        case .add(let tag): return unique(tags + [tag])
+        case .remove(let tag): return tags.filter { !$0.isBytes(tag) }
+        case .replace(let tags): return unique(tags)
+        }
     }
 
     /// The item with the title and body its type's hints name.
@@ -526,7 +525,7 @@ extension InMemoryCore.State {
                 && (edge != nil ? $0.write.edgeId == edge : $0.write.edgeId == nil && $0.write.itemId == item)
         }
         let write = QueuedWrite(
-            id: Minted.id(), kind: kind, itemId: item, targetId: target, edgeId: edge, namespace: namespace, tag: tag,
+            id: Minted.id(), kind: kind, itemId: item, toId: target, edgeId: edge, namespace: namespace, tag: tag,
             blob: nil, baseVersion: baseVersion, idempotencyKey: Minted.id(), dependsOn: dependsOn,
             follows: ahead?.write.id, verdict: nil, waiting: false, body: body, answer: nil, refusals: 0,
             environmentalStreak: 0, lastFailure: nil, queuedAt: Minted.now(), answeredAt: nil)
@@ -588,8 +587,8 @@ extension InMemoryCore.State {
             case .editEdge(let properties, let source, let target):
                 guard let id = write.edgeId, var row = edges[id] else { continue }
                 row.properties = Properties.merged(row.properties, with: properties, replacing: false, dropping: false)
-                if let source { row.sourceId = source }
-                if let target { row.targetId = target }
+                if let source { row.fromId = source }
+                if let target { row.toId = target }
                 if taken { row.version += 1 }
                 edges[id] = row
             case .removedEdge:
@@ -689,12 +688,14 @@ extension WriteKind {
         case .createEdge: "create_edge"
         case .updateEdge: "update_edge"
         case .deleteEdge: "delete_edge"
-        case .replaceMetadata: "replace_metadata"
+        case .replaceTags: "replace_tags"
         case .addTag: "add_tag"
         case .removeTag: "remove_tag"
         case .writeExtension: "write_extension"
         case .deleteExtension: "delete_extension"
         case .uploadBlob: "upload_blob"
+        case .writeRows: "write_rows"
+        case .undoRows: "undo_rows"
         }
     }
 }

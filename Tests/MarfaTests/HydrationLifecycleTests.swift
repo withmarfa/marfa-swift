@@ -102,10 +102,10 @@ struct HydrationLifecycle {
         let queued = try await Self.queueEdits(copy)
         let requestsBefore = server.log.all.count
         await #expect { _ = try await copy.queue.drain() } throws: { error in
-            if case .copyExpired(let reason, _) = error as? MarfaError { reason == "catchup_too_old" } else { false }
+            if case .copyExpired(let reason, _, _) = error as? MarfaError { reason == "catchup_too_old" } else { false }
         }
         await #expect { _ = try await copy.catchUp() } throws: { error in
-            if case .copyExpired(let reason, _) = error as? MarfaError { reason == "catchup_too_old" } else { false }
+            if case .copyExpired(let reason, _, _) = error as? MarfaError { reason == "catchup_too_old" } else { false }
         }
         #expect(server.log.all.count == requestsBefore, "a stale copy sent a catch-up or a drain")
 
@@ -161,7 +161,7 @@ struct HydrationLifecycle {
 
     private static func refused(_ reason: String) -> (any Error) -> Bool {
         { error in
-            if case .copyExpired(let given, _)? = error as? MarfaError { given == reason } else { false }
+            if case .copyExpired(let given, _, _)? = error as? MarfaError { given == reason } else { false }
         }
     }
 
@@ -259,7 +259,7 @@ struct HydrationLifecycle {
 
         // One held write is withdrawn, which reads its row from the server.
         let withdrawn = try await copy.queue.withdraw(queued[1])
-        #expect(withdrawn)
+        #expect(withdrawn == [queued[1]])
         // The other is released to the current instance and goes on the next drain.
         #expect(try await copy.queue.release(reason: .instanceChanged) == 1)
         script.set("/items/held", [.unavailable])

@@ -78,7 +78,7 @@ extension Server {
     {
         ItemSource(
             try decode(
-                try await send("GET", "/source", query: [URLQueryItem(name: "source", value: code)], timeout: timeout))
+                try await send("GET", "/sources/\(Server.segment(code))", timeout: timeout))
                 as SourceWire)
     }
 
@@ -113,7 +113,7 @@ extension Server {
         }
         let answer: SourceWire = try decode(
             try await send(
-                "PATCH", "/source", query: [URLQueryItem(name: "source", value: code)], body: body, timeout: timeout))
+                "PATCH", "/sources/\(Server.segment(code))", body: body, timeout: timeout))
         return ItemSource(answer)
     }
 

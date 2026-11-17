@@ -53,10 +53,16 @@ struct RefillInPlace {
 
     @Test func aCatchUpOfAStaleCopyNamesWhyItIsRefused() async throws {
         let core = FakeCore.writer()
-        let failure = MarfaCore.MarfaError.CopyExpired(reason: "catchup_too_old", message: "refill the copy")
+        let failure = MarfaCore.MarfaError.CopyExpired(
+            reason: "catchup_too_old", message: "refill the copy",
+            server: nil)
         core.state.withLock { $0.catchUpFails = failure }
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        await #expect(throws: Marfa.MarfaError.copyExpired(reason: "catchup_too_old", message: "refill the copy")) {
+        await #expect(
+            throws: Marfa.MarfaError.copyExpired(
+                reason: "catchup_too_old", message: "refill the copy",
+                server: nil)
+        ) {
             _ = try await copy.catchUp()
         }
         await copy.close()

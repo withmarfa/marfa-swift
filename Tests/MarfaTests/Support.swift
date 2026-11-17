@@ -486,8 +486,8 @@ final class FakeCore: Core, @unchecked Sendable {
         return try super.createEdge(draft: draft)
     }
 
-    override func withdraw(id: String) throws -> Bool {
-        state.withLock { $0.withdrawable.remove(id) != nil }
+    override func withdraw(id: String) throws -> [String] {
+        state.withLock { $0.withdrawable.remove(id) != nil ? [id] : [] }
     }
 
     override func forgetAnswered() throws -> UInt64 {
@@ -607,7 +607,7 @@ final class FakeSubscription: MarfaCore.Subscription, @unchecked Sendable {
 
 func write(_ kind: Marfa.WriteKind, item: String?, target: String? = nil, edge: String? = nil) -> Marfa.QueuedWrite {
     Marfa.QueuedWrite(
-        id: "q-\(UUID())", kind: kind, itemId: item, targetId: target, edgeId: edge, namespace: nil, tag: nil,
+        id: "q-\(UUID())", kind: kind, itemId: item, toId: target, edgeId: edge, namespace: nil, tag: nil,
         blob: nil, baseVersion: nil, idempotencyKey: "k", dependsOn: [], follows: nil, verdict: nil, answer: nil,
         refusals: 0, queuedAt: "", answeredAt: nil)
 }
@@ -804,6 +804,9 @@ final class OwnServer: Sendable {
         self.testHooks = testHooks
     }
 
+    /// A `marfa-server` built with its `test-hooks` feature, which a release does not carry: `MARFA_HOOKED_SERVER_BIN`.
+    static var hookedServer: String? { ProcessInfo.processInfo.environment["MARFA_HOOKED_SERVER_BIN"] }
+
     /// `testHooks` boots the server with `MARFA_TEST_HOOKS`, so ``advanceClock(by:)`` can move its clock.
     static func boot(testHooks: Bool = false) async throws -> OwnServer {
         let state = FileManager.default.temporaryDirectory.appending(path: "marfa-own-server-\(UUID())")
@@ -868,7 +871,10 @@ final class OwnServer: Sendable {
         environment["MARFA_SERVER_KEEP"] = keep.path
         environment["MARFA_SERVER_ENV"] = keep.appending(path: "env").path
         environment.removeValue(forKey: "PORT")
-        if testHooks { environment["MARFA_TEST_HOOKS"] = "true" }
+        if testHooks {
+            environment["MARFA_TEST_HOOKS"] = "true"
+            if let hooked = Self.hookedServer { environment["MARFA_SERVER_BIN"] = hooked }
+        }
         return try await run(
             "/bin/bash", [monorepo.appending(path: "core/scripts/\(name)").path] + arguments,
             environment: environment)

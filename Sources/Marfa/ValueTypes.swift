@@ -45,12 +45,16 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
     case createEdge
     case updateEdge
     case deleteEdge
-    case replaceMetadata
+    case replaceTags
     case addTag
     case removeTag
     case writeExtension
     case deleteExtension
     case uploadBlob
+    /// A write of cells in a table's rows.
+    case writeRows
+    /// The undoing of a write of rows.
+    case undoRows
 
     init(_ core: MarfaCore.WriteKind) {
         switch core {
@@ -62,12 +66,14 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
         case .createEdge: self = .createEdge
         case .updateEdge: self = .updateEdge
         case .deleteEdge: self = .deleteEdge
-        case .replaceMetadata: self = .replaceMetadata
+        case .replaceTags: self = .replaceTags
         case .addTag: self = .addTag
         case .removeTag: self = .removeTag
         case .writeExtension: self = .writeExtension
         case .deleteExtension: self = .deleteExtension
         case .uploadBlob: self = .uploadBlob
+        case .writeRows: self = .writeRows
+        case .undoRows: self = .undoRows
         }
     }
 
@@ -81,12 +87,14 @@ public enum WriteKind: Sendable, Hashable, CaseIterable {
         case .createEdge: .createEdge
         case .updateEdge: .updateEdge
         case .deleteEdge: .deleteEdge
-        case .replaceMetadata: .replaceMetadata
+        case .replaceTags: .replaceTags
         case .addTag: .addTag
         case .removeTag: .removeTag
         case .writeExtension: .writeExtension
         case .deleteExtension: .deleteExtension
         case .uploadBlob: .uploadBlob
+        case .writeRows: .writeRows
+        case .undoRows: .undoRows
         }
     }
 }
@@ -104,6 +112,9 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     /// The write was queued against an instance other than the one the copy has been built from since, and is sent
     /// only once released.
     case instanceChanged
+    /// The write was carried from a store set aside where a record that decides how it is sent could not be read,
+    /// and is sent only once released.
+    case recordUnread
 
     init(_ core: MarfaCore.BlockedReason) {
         switch core {
@@ -113,6 +124,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .conflictUnresolved: self = .conflictUnresolved
         case .failingAlone: self = .failingAlone
         case .instanceChanged: self = .instanceChanged
+        case .recordUnread: self = .recordUnread
         }
     }
 
@@ -124,6 +136,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .conflictUnresolved: .conflictUnresolved
         case .failingAlone: .failingAlone
         case .instanceChanged: .instanceChanged
+        case .recordUnread: .recordUnread
         }
     }
 }
@@ -137,8 +150,10 @@ public enum Verdict: Sendable, Hashable {
     case accepted
     /// The server applied the write over changes made since, field by field.
     case merged(fields: [String])
-    /// The server kept its own value and wrote the losing one to a sibling.
-    case conflicted(siblingId: String, fields: [String])
+    /// The server kept its own value and wrote the losing one to a sibling, or, for a table's rows, replaced cells.
+    ///
+    /// Only an item conflict has a sibling; a row conflict names the replaced cells in `conflicts`.
+    case conflicted(siblingId: String?, fields: [String], conflicts: [RowConflict] = [])
     case refused(Refusal)
     case blocked(reason: BlockedReason, refusal: Refusal? = nil)
     /// Refused until the ceiling; released by id. The row's `answer` holds
@@ -149,7 +164,8 @@ public enum Verdict: Sendable, Hashable {
         switch core {
         case .accepted: self = .accepted
         case .merged(let fields): self = .merged(fields: fields)
-        case .conflicted(let siblingId, let fields): self = .conflicted(siblingId: siblingId, fields: fields)
+        case .conflicted(let siblingId, let fields, let conflicts):
+            self = .conflicted(siblingId: siblingId, fields: fields, conflicts: conflicts.map(RowConflict.init))
         case .refused(let refusal): self = .refused(Refusal(refusal))
         case .blocked(let reason, let refusal):
             self = .blocked(reason: BlockedReason(reason), refusal: refusal.map(Refusal.init))
@@ -161,7 +177,8 @@ public enum Verdict: Sendable, Hashable {
         switch self {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
-        case .conflicted(let siblingId, let fields): .conflicted(siblingId: siblingId, fields: fields)
+        case .conflicted(let siblingId, let fields, let conflicts):
+            .conflicted(siblingId: siblingId, fields: fields, conflicts: conflicts.map(\.core))
         case .refused(let refusal): .refused(refusal: refusal.core)
         case .blocked(let reason, let refusal): .blocked(reason: reason.core, refusal: refusal?.core)
         case .dead: .dead
@@ -183,10 +200,12 @@ public struct Refusal: Sendable, Hashable {
     public var trashed: Bool
     /// The permission the credential's key lacks, where the refusal names one.
     public var grant: MissingGrant?
+    /// The write's size and the server's limit, where the server refused it as too large.
+    public var requestLimit: RequestLimit?
 
     public init(
         reason: String, code: String? = nil, message: String? = nil, fields: [FieldRefusal] = [],
-        trashed: Bool = false, grant: MissingGrant? = nil
+        trashed: Bool = false, grant: MissingGrant? = nil, requestLimit: RequestLimit? = nil
     ) {
         self.reason = reason
         self.code = code
@@ -194,21 +213,53 @@ public struct Refusal: Sendable, Hashable {
         self.fields = fields
         self.trashed = trashed
         self.grant = grant
+        self.requestLimit = requestLimit
     }
 
     init(_ core: MarfaCore.Refusal) {
         self.init(
             reason: core.reason, code: core.code, message: core.message,
             fields: core.fields.map { FieldRefusal(field: $0.field, message: $0.message) }, trashed: core.trashed,
-            grant: core.grant.map(MissingGrant.init))
+            grant: core.grant.map(MissingGrant.init),
+            requestLimit: core.requestLimit.map(RequestLimit.init))
     }
 
     var core: MarfaCore.Refusal {
         MarfaCore.Refusal(
             reason: reason, code: code, message: message,
             fields: fields.map { MarfaCore.FieldRefusal(field: $0.field, message: $0.message) }, trashed: trashed,
-            grant: grant?.core)
+            grant: grant?.core, requestLimit: requestLimit?.core)
     }
+}
+
+/// A cell a write replaced in a table's row.
+public struct RowConflict: Sendable, Hashable {
+    public var row: String
+    public var column: String
+
+    public init(row: String, column: String) {
+        self.row = row
+        self.column = column
+    }
+
+    init(_ core: MarfaCore.RowConflict) { self.init(row: core.row, column: core.column) }
+
+    var core: MarfaCore.RowConflict { MarfaCore.RowConflict(row: row, column: column) }
+}
+
+/// An unsent write's request size and the server's limit, in bytes.
+public struct RequestLimit: Sendable, Hashable {
+    public var size: UInt64
+    public var limit: UInt64
+
+    public init(size: UInt64, limit: UInt64) {
+        self.size = size
+        self.limit = limit
+    }
+
+    init(_ core: MarfaCore.RequestLimit) { self.init(size: core.size, limit: core.limit) }
+
+    var core: MarfaCore.RequestLimit { MarfaCore.RequestLimit(size: size, limit: limit) }
 }
 
 public struct FieldRefusal: Sendable, Hashable {
@@ -405,7 +456,7 @@ public struct QueuedWrite: Sendable, Hashable {
     public var id: String
     public var kind: WriteKind
     public var itemId: String?
-    public var targetId: String?
+    public var toId: String?
     public var edgeId: String?
     public var namespace: String?
     public var tag: String?
@@ -452,7 +503,7 @@ public struct QueuedWrite: Sendable, Hashable {
     public var answeredAt: String?
 
     public init(
-        id: String, kind: WriteKind, itemId: String? = nil, targetId: String? = nil, edgeId: String? = nil,
+        id: String, kind: WriteKind, itemId: String? = nil, toId: String? = nil, edgeId: String? = nil,
         namespace: String? = nil, tag: String? = nil, blob: String? = nil, baseVersion: Int64? = nil,
         idempotencyKey: String, dependsOn: [String] = [], follows: String? = nil, verdict: Verdict? = nil,
         waiting: Bool = false, body: JSONObject = [:], answer: JSONValue? = nil, refusals: Int64 = 0,
@@ -462,7 +513,7 @@ public struct QueuedWrite: Sendable, Hashable {
         self.id = id
         self.kind = kind
         self.itemId = itemId
-        self.targetId = targetId
+        self.toId = toId
         self.edgeId = edgeId
         self.namespace = namespace
         self.tag = tag
@@ -484,7 +535,7 @@ public struct QueuedWrite: Sendable, Hashable {
 
     package init(_ core: MarfaCore.QueuedWrite) {
         self.init(
-            id: core.id, kind: WriteKind(core.kind), itemId: core.itemId, targetId: core.targetId,
+            id: core.id, kind: WriteKind(core.kind), itemId: core.itemId, toId: core.toId,
             edgeId: core.edgeId, namespace: core.namespace, tag: core.tag, blob: core.blob,
             baseVersion: core.baseVersion, idempotencyKey: core.idempotencyKey, dependsOn: core.dependsOn,
             follows: core.follows, verdict: core.verdict.map(Verdict.init), waiting: core.waiting,
@@ -495,7 +546,7 @@ public struct QueuedWrite: Sendable, Hashable {
 
     var core: MarfaCore.QueuedWrite {
         MarfaCore.QueuedWrite(
-            id: id, kind: kind.core, itemId: itemId, targetId: targetId, edgeId: edgeId, namespace: namespace,
+            id: id, kind: kind.core, itemId: itemId, toId: toId, edgeId: edgeId, namespace: namespace,
             tag: tag, blob: blob, baseVersion: baseVersion, idempotencyKey: idempotencyKey,
             dependsOn: dependsOn, follows: follows, verdict: verdict?.core, waiting: waiting,
             body: body.core, answer: answer?.core, refusals: refusals,

@@ -69,7 +69,7 @@ struct PropertyValuesOffline {
         let copy = try await Self.open(kind)
         let id = try await Self.create(copy, ["z": 1, "a": 2, "10": 3, "2": 4, "whole": .number(2.0)])
         let held = try #require(try await copy.items.get(id))
-        #expect(held.properties.keys == ["2", "10", "z", "a", "whole"])
+        #expect(held.properties.keys == ["z", "a", "10", "2", "whole"])
         #expect(held.properties["whole"] == .integer(2))
         await copy.close()
     }
@@ -238,12 +238,12 @@ struct PropertyValuesOffline {
                 await #expect {
                     try await attempt()
                 } throws: { error in
-                    guard case MarfaError.validation("invalid_properties", let message, _) = error else {
+                    guard case MarfaError.validation("invalid_properties", let message, _, _) = error else {
                         Issue.record("\(name) threw \(error)")
                         return false
                     }
                     return message.contains("\(path): Must be a whole number") && message.contains(text)
-                        && message.hasSuffix("Send it as a string.")
+                        && message.hasSuffix("takes it as a string.")
                 }
             }
         }
@@ -269,7 +269,7 @@ struct PropertyValuesOffline {
             _ = try await copy.edges.create(
                 from: first, to: second, type: "in-thread", properties: ["position": .integer(9_007_199_254_740_993)])
         } throws: { error in
-            if case MarfaError.validation("invalid_properties", let message, _) = error {
+            if case MarfaError.validation("invalid_properties", let message, _, _) = error {
                 message.contains("position: Must be a whole number")
             } else {
                 false
@@ -280,7 +280,7 @@ struct PropertyValuesOffline {
             _ = try await copy.edges.update(
                 try #require(made.edgeId), EdgeEdit(["position": .integer(9_007_199_254_740_993)], baseVersion: 0))
         } throws: { error in
-            if case MarfaError.validation("invalid_properties", _, _) = error { true } else { false }
+            if case MarfaError.validation("invalid_properties", _, _, _) = error { true } else { false }
         }
         #expect(try await copy.queue.all().count == queued + 1)
         await copy.close()
@@ -313,12 +313,12 @@ struct PropertyValuesOffline {
         await #expect {
             _ = try await copy.edges.update(missing, EdgeEdit(beyond, baseVersion: 0))
         } throws: { error in
-            if case MarfaError.notFound("edge_not_found", _) = error { true } else { false }
+            if case MarfaError.notFound("edge_not_found", _, _) = error { true } else { false }
         }
         await #expect {
             _ = try await copy.items.create(Draft(type: "app.test.entry", properties: beyond, tags: [""]))
         } throws: { error in
-            if case MarfaError.validation("validation_error", let message, _) = error {
+            if case MarfaError.validation("validation_error", let message, _, _) = error {
                 message.contains("tags[0]: A tag must not be empty")
             } else {
                 false
@@ -327,7 +327,7 @@ struct PropertyValuesOffline {
         await #expect {
             _ = try await copy.edges.create(from: first, to: first, type: "in-thread", properties: beyond)
         } throws: { error in
-            if case MarfaError.validation("edge_cycle", _, _) = error { true } else { false }
+            if case MarfaError.validation("edge_cycle", _, _, _) = error { true } else { false }
         }
         // The same write with nothing before it to fail is refused for the number, and
         // where the core judges the number before it looks for the row, so is a write to a
@@ -343,7 +343,7 @@ struct PropertyValuesOffline {
             await #expect {
                 try await write()
             } throws: { error in
-                if case MarfaError.validation("invalid_properties", _, _) = error { true } else { false }
+                if case MarfaError.validation("invalid_properties", _, _, _) = error { true } else { false }
             }
         }
         #expect(try await copy.queue.all().count == queued)

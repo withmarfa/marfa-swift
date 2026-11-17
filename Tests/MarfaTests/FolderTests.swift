@@ -213,7 +213,8 @@ extension LiveWorkingCopies {
             let ours = FolderFixture.directory()
             _ = try await folders.add(ours, following: try await FolderFixture.settings())
             let printed = try FolderFixture.run(["--json", "folders", "list"])
-            let listed = try JSONDecoder().decode([JSONValue].self, from: printed).compactMap { $0["dir"]?.string }
+            let page = try JSONDecoder().decode(JSONValue.self, from: printed)
+            let listed = page["data"]?.array?.compactMap { $0["dir"]?.string } ?? []
             #expect(listed.contains { $0.hasSuffix(ours.lastPathComponent) }, "\(listed)")
 
             let theirs = FolderFixture.directory()
@@ -354,7 +355,7 @@ extension LiveWorkingCopies {
 
             let synced = try await FolderFixture.sync(directory)
             let conflicts = synced.pass.drain.verdicts.compactMap { write -> (item: String?, copy: String)? in
-                guard case .conflicted(let copy, _)? = write.verdict else { return nil }
+                guard case .conflicted(let copy?, _, _)? = write.verdict else { return nil }
                 return (write.itemId, copy)
             }
             let conflict = try #require(conflicts.first { $0.item == note }, "\(synced.pass.drain.verdicts)")

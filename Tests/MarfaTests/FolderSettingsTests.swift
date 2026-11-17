@@ -72,7 +72,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.changeFolder(made.id, FolderSettingsChange(title: "Again"), baseVersion: 2)
             } throws: { error in
-                if case .validation(let code, _, _) = error as? MarfaError {
+                if case .validation(let code, _, _, _) = error as? MarfaError {
                     code == "invalid_transition"
                 } else {
                     false

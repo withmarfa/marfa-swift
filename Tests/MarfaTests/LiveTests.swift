@@ -116,10 +116,10 @@ extension LiveWorkingCopies {
             let ordinary = try await Live.hydrated()
             #expect(try await ordinary.items.get(note) != nil)
             #expect(try await ordinary.items.get(file) == nil)
-            #expect(try await !ordinary.edges.to(note).contains { $0.sourceId == file })
+            #expect(try await !ordinary.edges.to(note).contains { $0.fromId == file })
             #expect(try await ordinary.pin(file) == PinReport(pinned: true, wasPinned: false))
             #expect(try await ordinary.items.get(file) != nil)
-            #expect(try await ordinary.edges.to(note).contains { $0.sourceId == file })
+            #expect(try await ordinary.edges.to(note).contains { $0.fromId == file })
             #expect(try await ordinary.status().pinned.contains(file))
             #expect(try await ordinary.unpin(file) == PinReport(pinned: false, wasPinned: true))
             #expect(try await ordinary.items.get(file) == nil)
@@ -129,12 +129,12 @@ extension LiveWorkingCopies {
             #expect(report.edgeTypes == ["attached-to"])
             #expect(try await whole.status().sliceEdgeTypes == ["attached-to"])
             #expect(try await whole.items.get(file) == nil)
-            #expect(try await whole.edges.to(note).contains { $0.sourceId == file })
+            #expect(try await whole.edges.to(note).contains { $0.fromId == file })
             _ = try await whole.pin(file)
             #expect(try await whole.items.get(file) != nil)
             _ = try await whole.unpin(file)
             #expect(try await whole.items.get(file) == nil)
-            #expect(try await whole.edges.to(note).contains { $0.sourceId == file })
+            #expect(try await whole.edges.to(note).contains { $0.fromId == file })
             await writer.close()
             await ordinary.close()
             await whole.close()
@@ -299,9 +299,9 @@ extension LiveWorkingCopies {
             #expect(!FileManager.default.fileExists(atPath: inUse.url.path))
         }
 
-        /// The server answers `404 blob_not_found` for bytes it holds none of,
-        /// as it does for bytes beyond the credential's reach.
-        @Test func bytesTheServerHoldsNoneOfAreAbsentAndTheItemStaysWhole() async throws {
+        /// The server answers `404 blob_not_found` for bytes it holds none of, as it does for bytes beyond the
+        /// credential's reach, and refuses a write that names them.
+        @Test func bytesTheServerHoldsNoneOfAreAbsentAndAWriteNamingThemIsRefused() async throws {
             let copy = try await WorkingCopy.open(store: Live.store(), server: Live.server)
             _ = try await copy.hydrate(types: ["core.file"], tier: .feed)
             let hash =
@@ -312,8 +312,12 @@ extension LiveWorkingCopies {
                     properties: ["title": "names absent bytes", "blob_ref": .string(hash), "mime_type": "text/plain"],
                     tier: .feed))
             let report = try await copy.queue.drain()
-            #expect(report.verdicts.first { $0.id == file.id }?.verdict == .accepted)
-            let id = try #require(file.itemId)
+            let verdict = try #require(report.verdicts.first { $0.id == file.id }?.verdict)
+            guard case .refused(let refusal) = verdict else {
+                Issue.record("the write naming absent bytes was not refused: \(verdict)")
+                return
+            }
+            #expect(refusal.code == "blob_not_found")
             await #expect {
                 try await copy.blobs.withFile(hash) { _ in }
             } throws: { error in
@@ -321,10 +325,8 @@ extension LiveWorkingCopies {
                 return absent == hash
             }
             #expect(try await !copy.blobs.isHeld(hash))
-            let held = try #require(try await copy.items.get(id))
-            #expect(held.title == "names absent bytes")
-            #expect(held.properties["blob_ref"] == .string(hash))
-            #expect(held.state == .active)
+            // The refused write stays in the queue, where the person can get it back.
+            #expect(try await copy.queue.all().contains { $0.id == file.id })
         }
 
         @Test func aVerdictThatAcceptsMergesOrConflictsArrivesTyped() async throws {
@@ -350,7 +352,7 @@ extension LiveWorkingCopies {
                 bodiedId, Edit(properties: ["body": "elsewhere"], baseVersion: 1))
             report = try await elsewhere.queue.drain()
             #expect(report.verdicts.first { $0.id == merged.id }?.verdict == .merged(fields: ["title"]))
-            guard case .conflicted(_, let fields) = report.verdicts.first(where: { $0.id == conflicted.id })?.verdict
+            guard case .conflicted(_, let fields, _) = report.verdicts.first(where: { $0.id == conflicted.id })?.verdict
             else {
                 Issue.record("the stale body edit was not conflicted: \(report.verdicts)")
                 return
@@ -367,7 +369,7 @@ extension LiveWorkingCopies {
                         type: "system.connection",
                         properties: ["kind": "app", "status": "active", "granted_at": "2026-01-01T00:00:00Z"]))
             } throws: { error in
-                guard case Marfa.MarfaError.forbidden(let code, _) = error else { return false }
+                guard case Marfa.MarfaError.forbidden(let code, _, _) = error else { return false }
                 return code == "type_not_permitted"
             }
             #expect(try await copy.queue.all().map(\.id) == [note.id])
@@ -386,7 +388,10 @@ extension LiveWorkingCopies {
             _ = try await copy.queue.drain()
             let lost = try await elsewhere.items.update(id, Edit(properties: ["body": "lost"], baseVersion: 1))
             let report = try await elsewhere.queue.drain()
-            guard case .conflicted(let conflictedCopy, _) = report.verdicts.first(where: { $0.id == lost.id })?.verdict
+            guard
+                case .conflicted(
+                    let conflictedCopy?, _,
+                    _) = report.verdicts.first(where: { $0.id == lost.id })?.verdict
             else {
                 Issue.record("the stale body edit was not conflicted: \(report.verdicts)")
                 return
@@ -464,7 +469,7 @@ extension LiveWorkingCopies {
             }
             #expect(reason == .credentialRefused)
             #expect(refusal?.code == "unauthorized")
-            #expect(refusal?.message == "Authentication required")
+            #expect(refusal?.message == "A valid credential is required.")
             #expect(try await verdict(second) == .blocked(reason: .credentialRefused))
             #expect(try await unkeyed.queue.release(first.id))
             #expect(try await verdict(first) == nil)
@@ -476,7 +481,7 @@ extension LiveWorkingCopies {
             let copy = try await Live.hydrated()
             let note = try await copy.items.create(Live.note("not withdrawn"))
             let heard = Heard(copy.changes())
-            #expect(try await copy.queue.withdraw(note.id) == false)
+            #expect(try await copy.queue.withdraw(note.id) == [])
             #expect(try await copy.queue.all().contains { $0.id == note.id })
             await #expect {
                 _ = try await copy.queue.withdraw("not-a-queued-write")
@@ -508,7 +513,7 @@ extension LiveWorkingCopies {
             _ = record(try await copy.extensions.delete("told", from: a))
             let edge = record(try await copy.edges.create(from: a, to: b, type: "references"))
             let edgeId = try #require(edge.edgeId)
-            #expect(edge.targetId != edgeId)
+            #expect(edge.toId != edgeId)
             let edgeVersion = try #require(try await copy.edges.from(a).first).version
             _ = record(
                 try #require(try await copy.edges.update(edgeId, EdgeEdit(["note": "told"], baseVersion: edgeVersion))))
@@ -561,7 +566,7 @@ extension LiveWorkingCopies {
             #expect(linked.edgeId == edgeId)
             let from = try await copy.edges.from(a)
             #expect(from.map(\.id) == [edgeId])
-            #expect(from.map(\.targetId) == [b])
+            #expect(from.map(\.toId) == [b])
             #expect(try await copy.edges.from(b).isEmpty)
             let to = try await copy.edges.to(b)
             #expect(to.map(\.id) == [edgeId])
@@ -819,7 +824,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.queue.discard(refused.id)
             } throws: { error in
-                guard case Marfa.MarfaError.notFound(let code, _) = error else { return false }
+                guard case Marfa.MarfaError.notFound(let code, _, _) = error else { return false }
                 return code == "queued_write_not_found"
             }
             try await bounded("close") { await copy.close() }
@@ -876,7 +881,7 @@ extension LiveWorkingCopies {
             try await Live.writeDefinition(
                 [
                     "id": inspired, "label": "Inspired by", "cardinality": "many-to-one",
-                    "reverse_name": "user.inspired-\(suffix)", "written_at": "target",
+                    "reverse_name": "user.inspired-\(suffix)", "written_from": "to",
                     "property_schema": ["since": ["type": "string"]],
                 ], at: "edge-types")
             let store = Live.store()
@@ -916,15 +921,15 @@ extension LiveWorkingCopies {
                 let server = try #require(try await Live.edgeTypes()[inspired])
                 #expect(edgeType.reverseName == "user.inspired-\(suffix)")
                 #expect(server["reverse_name"] == .string("user.inspired-\(suffix)"))
-                #expect(edgeType.writtenAt == .target)
-                #expect(server["written_at"] == "target")
+                #expect(edgeType.writtenFrom == .to)
+                #expect(server["written_from"] == "to")
                 #expect(edgeType.label == "Inspired by")
                 #expect(server["cardinality"] == .string(edgeType.cardinality))
                 #expect(server["cascade_on_delete"] == .string(edgeType.cascadeOnDelete))
                 #expect(
-                    server["source_type_constraints"] == .array(edgeType.sourceTypeConstraints.map(JSONValue.string)))
+                    server["from_type_constraints"] == .array(edgeType.fromTypeConstraints.map(JSONValue.string)))
                 #expect(
-                    server["target_type_constraints"] == .array(edgeType.targetTypeConstraints.map(JSONValue.string)))
+                    server["to_type_constraints"] == .array(edgeType.toTypeConstraints.map(JSONValue.string)))
                 #expect(server["shipped"] == .bool(edgeType.shipped))
                 #expect(!edgeType.shipped)
                 expect(edgeType.properties, as: server["property_schema"]?.object ?? [:])
@@ -937,13 +942,13 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.catalog.itemType("user.never\(suffix)")
             } throws: { error in
-                guard case Marfa.MarfaError.notFound(let code, _) = error else { return false }
+                guard case Marfa.MarfaError.notFound(let code, _, _) = error else { return false }
                 return code == "type_not_found"
             }
             await #expect {
                 _ = try await copy.catalog.edgeType("user.never-\(suffix)")
             } throws: { error in
-                guard case Marfa.MarfaError.notFound(let code, _) = error else { return false }
+                guard case Marfa.MarfaError.notFound(let code, _, _) = error else { return false }
                 return code == "edge_type_not_found"
             }
         }
@@ -967,7 +972,7 @@ extension LiveWorkingCopies {
             let late = "user.late\(UUID().uuidString.prefix(8).lowercased())"
             try await Live.writeDefinition(["id": late, "label": "Late", "fields": ["title": ["type": "string"]]])
             await #expect { try await copy.catchUp() } throws: { error in
-                if case MarfaError.copyExpired(let reason, _) = error { reason == "reach_changed" } else { false }
+                if case MarfaError.copyExpired(let reason, _, _) = error { reason == "reach_changed" } else { false }
             }
             let waiting = try #require(try await copy.queue.all().first { $0.id == queued.id })
             #expect(waiting.idempotencyKey == queued.idempotencyKey)

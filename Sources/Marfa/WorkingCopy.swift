@@ -93,6 +93,11 @@ public final class WorkingCopy: Sendable {
     /// count, call ``remove(store:unsent:)`` with it, and open again. `.replace` also leaves the store as it is and
     /// throws `readingHandle` while another process writes it.
     ///
+    /// A store SQLite cannot read is refused with `MarfaError.storeDamaged`, which names the store and counts its unsent
+    /// writes where the queue can be read. ``unsentWrites(in:)`` lists the writes of a refused store of either kind,
+    /// ``setAsideDamaged(store:)`` keeps a damaged store beside itself and carries what it can read, and
+    /// ``removeLosingAll(store:)`` gives it up.
+    ///
     /// A replacement keeps the files the copy downloaded, because they are kept by content and not by the store,
     /// and the file budget the old store recorded. What only the old store held does not stay: pins, the position
     /// in the server's events and the declared types. Hydrate the new copy as you would a new one.
@@ -778,7 +783,9 @@ public struct Items: Sendable {
     ) {
         let embed = try core.embedText(id: id, file: attached.item.itemId ?? "")
         guard let host = try core.get(id: id).map(Item.init) else {
-            throw MarfaError.notFound(code: "item_not_found", message: "\(id) is not a row this copy holds")
+            throw MarfaError.notFound(
+                code: "item_not_found", message: "\(id) is not a row this copy holds",
+                server: nil)
         }
         let field = try core.itemType(id: host.type).bodyField ?? "body"
         let body = host.properties[field]?.string ?? ""
@@ -924,7 +931,7 @@ public struct Edges: Sendable {
         from source: String, to target: String, type: String, properties: JSONObject, id: String?
     ) -> MarfaCore.EdgeDraft {
         MarfaCore.EdgeDraft(
-            sourceId: source, targetId: target, edgeType: type, properties: properties.core, id: id)
+            fromId: source, toId: target, edgeType: type, properties: properties.core, id: id)
     }
 
     /// Changes an edge's properties, moves one of its ends, or both, in one queued write.
@@ -981,7 +988,7 @@ public struct Metadata: Sendable {
     let feed: Feed
 
     public func replaceTags(of id: String, with tags: [String]) async throws -> QueuedWrite {
-        try await queued(holder, feed) { core in try core.replaceMetadata(id: id, tags: tags) }
+        try await queued(holder, feed) { core in try core.replaceTags(id: id, tags: tags) }
     }
 }
 
@@ -1126,13 +1133,14 @@ public struct Queue: Sendable {
     /// row back to what the server holds.
     ///
     /// Only a write blocked `ancestorUnavailable`, `conflictUnresolved`,
-    /// `failingAlone` or `instanceChanged` is taken; `false` for any other. Writes waiting on it
+    /// `failingAlone` or `instanceChanged` is taken; any other answers an empty list. Writes waiting on it
     /// are refused unsent. It reads the row from the server first, so it needs
-    /// the server, and returns `false` when the copy moved during the read;
-    /// ask again.
-    public func withdraw(_ id: String) async throws -> Bool {
+    /// the server, and answers an empty list when the copy moved during the read;
+    /// ask again. It answers the id of every write it took out of the queue, which holds more than `id` where
+    /// the write belonged to a batch the core withdraws whole.
+    public func withdraw(_ id: String) async throws -> [String] {
         let withdrawn = try await holder.run { core in try core.withdraw(id: id) }
-        if withdrawn {
+        if !withdrawn.isEmpty {
             feed.announce(Change(origin: .refreshed(.withdrawn), itemId: nil, edgeId: nil))
         }
         return withdrawn

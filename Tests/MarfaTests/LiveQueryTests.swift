@@ -148,7 +148,7 @@ struct LiveQueries {
     nonisolated static let silent: [Marfa.Change] = [
         told(.serverUnreachable(.network(message: "away"))),
         told(.serverReachable),
-        told(.stopped(.unauthorized(code: "c", message: "m"))),
+        told(.stopped(.unauthorized(code: "c", message: "m", server: nil))),
     ]
 
     @Test(arguments: reloading)

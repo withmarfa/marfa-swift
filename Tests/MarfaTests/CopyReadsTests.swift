@@ -345,7 +345,7 @@ struct PackedListing {
         let binned = try #require(listed.first { $0.id == ids[3] })
         #expect(binned.state == .trashed)
         let every = try #require(listed.first { $0.id == ids[1] })
-        #expect(every.tags == ["a", "b"] && every.tier == .feed && every.sourceId == "elsewhere-1")
+        #expect(every.tags == ["b", "a"] && every.tier == .feed && every.sourceId == "elsewhere-1")
         #expect(every.captureLatitude == 51.5 && every.captureLongitude == -0.125)
         await copy.close()
     }

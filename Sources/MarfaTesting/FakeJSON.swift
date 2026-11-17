@@ -32,7 +32,7 @@ enum Properties {
             let served = Integers.served(number).map { ", which it serves as \($0)" } ?? ""
             throw Refuse.validation(
                 "invalid_properties",
-                "\(path.joined(separator: ".")): Must be a whole number that Marfa serves back with the same digits, not \(number)\(served). Send it as a string."
+                "\(path.joined(separator: ".")): Must be a whole number that Marfa serves back with the same digits, not \(number)\(served). An integer field takes a whole number from -9007199254740991 to 9007199254740991, and a property that takes text takes it as a string."
             )
         case .array(let items):
             for (index, item) in items.enumerated() { try keptAsWritten(item, path: path + [String(index)]) }
@@ -84,14 +84,9 @@ enum Properties {
         }
     }
 
-    /// Properties as the copy answers them: a whole number is an integer, and
-    /// the keys that are array indexes come first, ascending, as JavaScript
-    /// orders an object's keys.
+    /// Properties as the copy answers them: a whole number is an integer, and the keys stay in the order given.
     static func served(_ object: JsonObject) -> JsonObject {
-        let members = object.members.map { JsonMember(key: $0.key, value: whole($0.value)) }
-        let indexed = members.compactMap { member in index(member.key).map { ($0, member) } }
-            .sorted { $0.0 < $1.0 }.map(\.1)
-        return JsonObject(members: indexed + members.filter { index($0.key) == nil })
+        JsonObject(members: object.members.map { JsonMember(key: $0.key, value: whole($0.value)) })
     }
 
     private static func whole(_ value: JsonValue) -> JsonValue {
@@ -103,11 +98,6 @@ enum Properties {
             .object(JsonObject(members: object.members.map { JsonMember(key: $0.key, value: whole($0.value)) }))
         case .null, .bool, .integer, .string: value
         }
-    }
-
-    private static func index(_ key: String) -> UInt32? {
-        guard let index = UInt32(key), index != .max, String(index) == key else { return nil }
-        return index
     }
 
     /// An edit's properties laid over the held ones: a null names a property
@@ -196,11 +186,11 @@ enum Refuse {
     }
 
     static func notFound(_ code: String, _ message: String) -> MarfaCore.MarfaError {
-        .NotFound(code: code, message: "not found (\(code)): \(message)")
+        .NotFound(code: code, message: "not found (\(code)): \(message)", server: nil)
     }
 
     static func validation(_ code: String, _ message: String, details: JsonValue? = nil) -> MarfaCore.MarfaError {
-        .Validation(code: code, message: "validation (\(code)): \(message)", details: details)
+        .Validation(code: code, message: "validation (\(code)): \(message)", details: details, server: nil)
     }
 
     /// A refusal's `details`, with its members in the order given, as the core writes them.
@@ -210,11 +200,11 @@ enum Refuse {
 
     /// The core's refusal of a concrete type in a list or search that its catalog does not hold.
     static func unknownTypeInQuery(_ name: String) -> MarfaCore.MarfaError {
-        .UnknownType(message: "Unknown type: \(name)")
+        .UnknownType(message: "Unknown type: \(name)", server: nil)
     }
 
     static func unknownType(_ message: String) -> MarfaCore.MarfaError {
-        .UnknownType(message: "unknown type: \(message)")
+        .UnknownType(message: "unknown type: \(message)", server: nil)
     }
 
     static func item(_ id: String) -> MarfaCore.MarfaError {

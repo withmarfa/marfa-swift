@@ -4,7 +4,7 @@ import Testing
 
 @Test func aPageOfItemsReadsEachRow() throws {
     let item =
-        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1}"#
+        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","last_activity_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1}"#
     let page = try JSONDecoder().decode(
         Components.Schemas.ItemPage.self, from: Data(#"{"data":[\#(item)],"next_cursor":null}"#.utf8))
     guard case .Item(let row)? = page.data.first else {
@@ -84,14 +84,15 @@ func thePinnedServerAnswersInTheseTypes() async throws {
     let job = try decoder.decode(
         Components.Schemas.HousekeepingJob.self,
         from: Data(
-            #"{"name":"j","interval_ms":1,"next_run_at":"now","running_since":null,"last_started_at":null,"last_finished_at":null,"last_outcome":"ok","last_error":null,"last_result":{"count":2}}"#
+            #"{"name":"j","interval_seconds":1,"next_run_at":"now","running_since":null,"last_started_at":null,"last_finished_at":null,"last_outcome":"succeeded","last_error":null,"last_result":{"count":2}}"#
                 .utf8))
-    #expect(job.lastOutcome.value == .ok)
+    #expect(job.lastOutcome.value == .succeeded)
     #expect(job.lastResult.value?.value["count"] as? Int == 2)
     let housekeepingRun = try decoder.decode(
         Components.Schemas.HousekeepingRun.self,
         from: Data(
-            #"{"name":"j","started_at":"now","finished_at":"now","outcome":"ok","result":null,"error":null}"#.utf8))
+            #"{"name":"j","started_at":"now","finished_at":"now","outcome":"succeeded","result":null,"error":null}"#
+                .utf8))
     #expect(housekeepingRun.result == .null)
     #expect(throws: DecodingError.self) {
         try decoder.decode(MarfaNullValue.self, from: Data("false".utf8))
@@ -179,7 +180,8 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
 @Test func everyNamedPermissionDecodes() throws {
     let names = [
         "schema.write", "keys.mint", "items.purge", "webhooks.manage", "config.manage", "audit.read", "grants.manage",
-        "instance.read", "instance.maintain", "connectors.manage", "blobs.manage", "keys.manage",
+        "instance.read", "instance.maintain", "connectors.manage", "blobs.manage", "backups.manage", "sign_ins.manage",
+        "keys.manage",
     ]
     let decoded = try JSONDecoder().decode([Components.Schemas.Permission].self, from: JSONEncoder().encode(names))
     #expect(decoded.map(\.rawValue) == names)
@@ -189,13 +191,13 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
 @Test func ownerPasskeyCursorRequiresAndRoundTripsNull() throws {
     let decoder = JSONDecoder()
     let list = try decoder.decode(
-        Components.Schemas.OwnerPasskeyList.self, from: Data(#"{"data":[],"next_cursor":null}"#.utf8))
+        Components.Schemas.OwnerPasskeyPage.self, from: Data(#"{"data":[],"next_cursor":null}"#.utf8))
     #expect(list.nextCursor == .null)
     let encoded = try JSONEncoder().encode(list)
     let fields = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     #expect(fields["next_cursor"] is NSNull)
     #expect(throws: DecodingError.self) {
-        try decoder.decode(Components.Schemas.OwnerPasskeyList.self, from: Data(#"{"data":[]}"#.utf8))
+        try decoder.decode(Components.Schemas.OwnerPasskeyPage.self, from: Data(#"{"data":[]}"#.utf8))
     }
 }
 
@@ -203,7 +205,7 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
 func ownerPasskeyCursorRejectsNonNull(value: String) {
     #expect(throws: DecodingError.self) {
         try JSONDecoder().decode(
-            Components.Schemas.OwnerPasskeyList.self, from: Data("{\"data\":[],\"next_cursor\":\(value)}".utf8))
+            Components.Schemas.OwnerPasskeyPage.self, from: Data("{\"data\":[],\"next_cursor\":\(value)}".utf8))
     }
 }
 

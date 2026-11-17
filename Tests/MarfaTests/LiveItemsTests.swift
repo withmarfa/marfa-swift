@@ -150,7 +150,7 @@ extension LiveWorkingCopies {
             let sent: JSONObject = ["extra": "x", "mid": "m", "10": "ten", "zeta": "z", "2": "two", "alpha": "a"]
             let id = try #require(
                 try await copy.items.create(Draft(type: type, properties: sent, tier: .library)).itemId)
-            let order = ["2", "10", "zeta", "alpha", "mid", "extra"]
+            let order = ["zeta", "alpha", "mid", "extra", "10", "2"]
             // The witness: the order sent is neither this one nor alphabetical.
             #expect(sent.keys != order)
             #expect(try await copy.items.get(id)?.properties.keys == order)
@@ -202,7 +202,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.queue.drain()
             } throws: { error in
-                if case MarfaError.copyExpired(reason: "reach_changed", _) = error { true } else { false }
+                if case MarfaError.copyExpired(reason: "reach_changed", _, _) = error { true } else { false }
             }
             #expect(try await copy.queue.all().map(\.verdict).allSatisfy { $0 == .accepted })
             let moved = try #require(try await Self.answered(id))
@@ -236,7 +236,7 @@ extension LiveWorkingCopies {
             await #expect {
                 try await copy.items.purge(id)
             } throws: { error in
-                if case MarfaError.validation(code: "invalid_transition", _, _) = error { true } else { false }
+                if case MarfaError.validation(code: "invalid_transition", _, _, _) = error { true } else { false }
             }
             _ = try await copy.items.delete(id)
             _ = try await copy.queue.drain()
@@ -248,7 +248,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.pin(id)
             } throws: { error in
-                if case MarfaError.notFound(code: "trashed", _) = error { true } else { false }
+                if case MarfaError.notFound(code: "trashed", _, _) = error { true } else { false }
             }
 
             // Restored by id, whether or not the copy still holds it.

@@ -20,8 +20,8 @@ private func signedIn(_ scripted: ScriptedAuthServer, _ keychain: Keychain) thro
         KeptSignIn(
             clientId: "client-1", grantTypes: ["refresh_token"], redirect: nil, accessToken: "at-1",
             refreshToken: "rt-1", scope: "core.note:read offline_access",
-            tokenEndpoint: "\(scripted.origin)/auth/oauth2/token",
-            revocationEndpoint: "\(scripted.origin)/auth/oauth2/revoke"))
+            tokenEndpoint: "\(scripted.origin)/oauth/token",
+            revocationEndpoint: "\(scripted.origin)/oauth/revoke"))
     return try Server(url: scripted.url, credential: #require(try authorization.credential()))
 }
 
@@ -66,18 +66,16 @@ struct ItemSourcesTests {
         }
     }
 
-    @Test func aSourceCodeTravelsInTheQueryWhateverItHolds() async throws {
+    @Test func aSourceCodeTravelsAsOnePathSegmentWhateverItHolds() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in
                 reply(#"{"source": "a/b?c#d+e ..", "name": "N", "name_from": "code"}"#)
             }
             let source = try await signedIn(scripted, keychain).source("a/b?c#d+e ..")
             #expect(source.code == "a/b?c#d+e .." && source.nameOrigin == .code && source.mark == nil)
-            let request = try #require(scripted.requests(to: "/source").first)
-            #expect(request.method == "GET")
-            #expect(request.query?.contains("+") == false, "a server reads + in a query as a space")
-            let sent = URLComponents(string: "?" + (request.query ?? ""))?.queryItems ?? []
-            #expect(sent == [URLQueryItem(name: "source", value: "a/b?c#d+e ..")])
+            let request = try #require(scripted.requests.first)
+            #expect(request.method == "GET" && request.query == nil)
+            #expect(request.path == "/sources/a%2Fb%3Fc%23d+e%20..", "one segment, however many separators it holds")
         }
     }
 
@@ -87,7 +85,7 @@ struct ItemSourcesTests {
                 .json(404, ["error": ["code": "source_not_found", "message": "no"]], headers: contract)
             }
             let error = await failure { try await signedIn(scripted, keychain).source("nope") }
-            guard case .notFound(let code, _)? = error else {
+            guard case .notFound(let code, _, _)? = error else {
                 Issue.record("expected notFound, got \(String(describing: error))")
                 return
             }
@@ -105,8 +103,8 @@ struct ItemSourcesTests {
             #expect(source == ItemSource(code: "s", name: "Named", nameOrigin: .set))
             try await server.updateSource("s", mark: .set("lucide:book-open"))
             try await server.updateSource("s", name: .clear, mark: .clear)
-            let requests = scripted.requests(to: "/source")
-            #expect(requests.count == 3 && requests.allSatisfy { $0.method == "PATCH" && $0.query == "source=s" })
+            let requests = scripted.requests(to: "/sources/s")
+            #expect(requests.count == 3 && requests.allSatisfy { $0.method == "PATCH" && $0.query == nil })
             #expect(try body(requests[0]) as NSDictionary == ["name": "Named"])
             #expect(try body(requests[1]) as NSDictionary == ["mark": "lucide:book-open"])
             #expect(try body(requests[2]) as NSDictionary == ["name": NSNull(), "mark": NSNull()])
@@ -121,7 +119,7 @@ struct ItemSourcesTests {
             let error = await failure {
                 try await signedIn(scripted, keychain).updateSource("other", name: .set("X"))
             }
-            guard case .forbidden(let code, _)? = error else {
+            guard case .forbidden(let code, _, _)? = error else {
                 Issue.record("expected forbidden, got \(String(describing: error))")
                 return
             }
@@ -137,7 +135,7 @@ struct ItemSourcesTests {
             let error = await failure {
                 try await signedIn(scripted, keychain).updateSource("s", mark: .set("nope:x"))
             }
-            guard case .validation(let code, _, _)? = error else {
+            guard case .validation(let code, _, _, _)? = error else {
                 Issue.record("expected validation, got \(String(describing: error))")
                 return
             }

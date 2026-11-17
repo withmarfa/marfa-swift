@@ -31,15 +31,17 @@ private final class RefusesRedirects: NSObject, URLSessionTaskDelegate, Sendable
 
 /// The error an answer stands for, or `nil` for a success from a server speaking this build's contract.
 ///
-/// `body` is read only for an answer that is not a success.
+/// `body` is read only for an answer that is not a success. `declaredCode` is the `X-Error-Code` header, which names
+/// a server's own refusal of the contract without the body being read.
 package func refusal(
-    status: UInt16, contract served: String?, location: String?, retryAfter: String?, origin: String, write: Bool,
-    body: () async -> String
+    status: UInt16, contract served: String?, declaredCode: String? = nil, location: String?, retryAfter: String?,
+    origin: String, write: Bool, body: () async -> String
 ) async -> MarfaError? {
     if (300..<400).contains(status) {
         return .redirected(
             origin: origin, status: status, location: location,
-            message: "\(origin) answered \(status) redirecting the request, which is never followed")
+            message: "\(origin) answered \(status) redirecting the request, which is never followed",
+            server: ServerAnswer(status: status, code: nil, details: nil))
     }
     let expected = UInt64(marfaContractVersion)
     let success = (200..<300).contains(status)
@@ -51,45 +53,64 @@ package func refusal(
         return .unnamed(
             status: status,
             message: "\(origin) answered \(status) naming no contract, taken as from something in front of the "
-                + "server" + (text.isEmpty ? "" : ": \(text.prefix(200))"))
+                + "server" + (text.isEmpty ? "" : ": \(text.prefix(200))"),
+            server: ServerAnswer(status: status, code: nil, details: nil))
     default:
         let named = served.map { "contract \($0)" } ?? "no contract"
+        let declined = status == 412 && declaredCode == "contract_mismatch"
         return .contractMismatch(
-            served: served, expected: expected, status: status, writeSent: write,
-            message: "\(origin) answered \(status) naming \(named), and this build speaks contract \(expected)")
+            served: served, expected: expected, status: status, writeSent: write && !declined,
+            message: "\(origin) answered \(status) naming \(named), and this build speaks contract \(expected)"
+                + (declined ? ". The server refused this request before it acted" : ""),
+            server: ServerAnswer(status: status, code: declined ? declaredCode : nil, details: nil))
     }
     let text = await body()
-    let (code, message) = refusalBody(text) ?? ("unknown", String(text.prefix(200)))
+    let refused = RefusalBody(text)
+    let code = refused?.code ?? "unknown"
+    let message = refused?.message ?? String(text.prefix(200))
     let shown = message.isEmpty ? "\(origin) answered \(status)" : message
+    let answer = ServerAnswer(status: status, code: refused?.code, details: refused?.details)
     switch status {
-    case 400 where code == "unknown_type": return .unknownType(message: shown)
-    case 400, 422: return .validation(code: code, message: shown, details: nil)
-    case 401: return .unauthorized(code: code, message: shown)
-    case 403: return .forbidden(code: code, message: shown)
-    case 404: return .notFound(code: code, message: shown)
-    case 409 where code == "version_conflict": return .versionConflict(message: shown)
-    case 409 where code == "instance_changed": return .instanceChanged(message: shown)
-    case 429: return .rateLimited(code: code, message: shown, retryAfterSeconds: retryAfter.flatMap { UInt64($0) })
-    default: return .server(status: status, code: code, message: shown)
+    case 400 where code == "unknown_type": return .unknownType(message: shown, server: answer)
+    case 412 where code == "contract_mismatch":
+        return .contractMismatch(
+            served: served, expected: expected, status: status, writeSent: false,
+            message: "\(origin) refused the request before it acted: \(shown)", server: answer)
+    case 400, 422: return .validation(code: code, message: shown, details: nil, server: answer)
+    case 401: return .unauthorized(code: code, message: shown, server: answer)
+    case 403: return .forbidden(code: code, message: shown, server: answer)
+    case 404: return .notFound(code: code, message: shown, server: answer)
+    case 409 where code == "version_conflict": return .versionConflict(message: shown, server: answer)
+    case 409 where code == "instance_changed": return .instanceChanged(message: shown, server: answer)
+    case 429:
+        return .rateLimited(
+            code: code, message: shown, retryAfterSeconds: retryAfter.flatMap { UInt64($0) }, server: answer)
+    default: return .server(status: status, code: code, message: shown, details: answer.details, server: answer)
     }
 }
 
-/// The `code` and `message` of a refusal's `{"error": {...}}` body, where it has one.
-///
-/// A refusal's `details` follow the message as JSON, since they say what the message alone cannot, such as which
-/// settings still name a type.
-private func refusalBody(_ text: String) -> (code: String, message: String)? {
-    guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-        let error = object["error"] as? [String: Any], let code = error["code"] as? String
-    else { return nil }
-    var message = error["message"] as? String ?? ""
-    if let details = error["details"] as? [String: Any], !details.isEmpty,
-        let data = try? JSONSerialization.data(withJSONObject: details, options: [.sortedKeys]),
-        let json = String(data: data, encoding: .utf8)
-    {
-        message += (message.isEmpty ? "" : " ") + "Details: \(json)"
+/// A refusal's `{"error": {...}}` body, where it has one: the `code`, the `message` and the `details`, which say what
+/// the message alone cannot, such as which settings still name a type.
+private struct RefusalBody {
+    let code: String
+    let message: String
+    let details: JSONValue?
+
+    private struct Envelope: Decodable {
+        struct Error: Decodable {
+            let code: String
+            let message: String?
+            let details: JSONValue?
+        }
+        let error: Error
     }
-    return (code, message)
+
+    init?(_ text: String) {
+        guard let envelope = try? JSONDecoder().decode(Envelope.self, from: Data(text.utf8)) else { return nil }
+        code = envelope.error.code
+        message = envelope.error.message ?? ""
+        details = envelope.error.details
+    }
 }
 
 /// The ``MarfaError`` a failure to send stands for, or `nil` for one that is not about the connection.
@@ -166,6 +187,7 @@ extension Server {
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        ContractHeader.apply(to: &request, path: path)
 
         let connection = Connection(base: signInSession, timeout: timeout)
         let write = method != "GET" && method != "HEAD"
@@ -199,7 +221,8 @@ extension Server {
         let (response, data) = answer
         return await Marfa.refusal(
             status: UInt16(clamping: response.statusCode),
-            contract: response.value(forHTTPHeaderField: "X-Marfa-Contract"),
+            contract: response.value(forHTTPHeaderField: ContractHeader.name),
+            declaredCode: response.value(forHTTPHeaderField: "X-Error-Code"),
             location: response.value(forHTTPHeaderField: "Location"),
             retryAfter: response.value(forHTTPHeaderField: "Retry-After"), origin: origin, write: write
         ) { String(decoding: data.prefix(64 * 1024), as: UTF8.self) }
@@ -268,6 +291,31 @@ private final class FirstAnswer<Value: Sendable>: Sendable {
                 }
                 if let ready { continuation.resume(returning: ready) }
             }
+        }
+    }
+}
+
+/// Where a request learns which contract this build was made for.
+///
+/// Every request carries it but a read of the server's root or of `/health`, so a build made for another contract
+/// can still learn which one a server speaks. A server refuses any other request that names a different contract
+/// before it acts.
+package enum ContractHeader {
+    package static let name = "X-Marfa-Contract"
+
+    /// The value to send with a request, or `nil` for one that sends none.
+    ///
+    /// `path` is the request's path under the server's own address, with or without its query.
+    package static func value(method: String, path: String) -> String? {
+        let path = path.prefix { $0 != "?" }
+        if method == "GET", path.isEmpty || path == "/" || path == "/health" { return nil }
+        return String(marfaContractVersion)
+    }
+
+    static func apply(to request: inout URLRequest, path: String) {
+        request.setValue(nil, forHTTPHeaderField: name)
+        if let value = value(method: request.httpMethod ?? "GET", path: path) {
+            request.setValue(value, forHTTPHeaderField: name)
         }
     }
 }

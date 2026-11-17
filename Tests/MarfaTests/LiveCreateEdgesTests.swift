@@ -31,7 +31,7 @@ extension LiveWorkingCopies {
                 ).itemId)
             let report = try await copy.queue.drain()
             #expect(report.verdicts.allSatisfy { $0.verdict == .accepted }, "\(report.verdicts)")
-            #expect(try await copy.edges.from(drawn).map(\.targetId) == [held])
+            #expect(try await copy.edges.from(drawn).map(\.toId) == [held])
             #expect(try await copy.items.get(lands) == nil)
             await copy.close()
         }

@@ -27,7 +27,7 @@ extension LiveWorkingCopies {
             await #expect {
                 _ = try await copy.queue.drain()
             } throws: { error in
-                if case MarfaError.copyExpired(reason: "reach_changed", _) = error { true } else { false }
+                if case MarfaError.copyExpired(reason: "reach_changed", _, _) = error { true } else { false }
             }
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         }
@@ -44,27 +44,27 @@ extension LiveWorkingCopies {
 
             let move = try #require(
                 try await copy.edges.update(
-                    tree.edge, EdgeEdit(baseVersion: held.version, move: .source(tree.other))))
+                    tree.edge, EdgeEdit(baseVersion: held.version, move: .from(tree.other))))
             #expect(try await copy.edges.from(tree.parent).isEmpty)
             #expect(try await copy.edges.from(tree.other).map(\.id) == [tree.edge])
             await copy.close()
 
             let reopened = try await WorkingCopy.open(store: store, server: Live.server)
             #expect(
-                try await reopened.edges.to(tree.child).map(\.sourceId) == [tree.other],
+                try await reopened.edges.to(tree.child).map(\.fromId) == [tree.other],
                 "the move was not held across a restart")
             try await Self.drainAfterASourceMove(reopened)
 
             #expect(try await Self.verdict(of: move, in: reopened) == .accepted)
             let answered = try #require(try await reopened.edges.to(tree.child).first)
             #expect(answered.id == tree.edge)
-            #expect(answered.sourceId == tree.other)
+            #expect(answered.fromId == tree.other)
             #expect(answered.version > held.version)
 
             let elsewhere = try await Live.hydrated()
             let served = try await elsewhere.edges.to(tree.child)
             #expect(served.map(\.id) == [tree.edge], "the server holds \(served.count) edges to the child")
-            #expect(served.first?.sourceId == tree.other)
+            #expect(served.first?.fromId == tree.other)
             #expect(try await elsewhere.edges.from(tree.parent).isEmpty)
             await reopened.close()
             await elsewhere.close()
@@ -79,13 +79,13 @@ extension LiveWorkingCopies {
 
             let move = try #require(
                 try await copy.edges.update(
-                    tree.edge, EdgeEdit(baseVersion: held.version, move: .source(newParent))))
+                    tree.edge, EdgeEdit(baseVersion: held.version, move: .from(newParent))))
             try await Self.drainAfterASourceMove(copy)
 
             #expect(try await Self.verdict(of: created, in: copy) == .accepted)
             #expect(try await Self.verdict(of: move, in: copy) == .accepted)
             let elsewhere = try await Live.hydrated()
-            #expect(try await elsewhere.edges.to(tree.child).map(\.sourceId) == [newParent])
+            #expect(try await elsewhere.edges.to(tree.child).map(\.fromId) == [newParent])
             await copy.close()
             await elsewhere.close()
         }
@@ -102,18 +102,18 @@ extension LiveWorkingCopies {
 
             let move = try #require(
                 try await copy.edges.update(
-                    edge, EdgeEdit(["note": "moved"], baseVersion: held.version, move: .target(second))))
+                    edge, EdgeEdit(["note": "moved"], baseVersion: held.version, move: .to(second))))
             let report = try await copy.queue.drain()
 
             #expect(report.verdicts.first { $0.id == move.id }?.verdict == .accepted, "\(report.verdicts)")
             let now = try #require(try await copy.edges.from(reply).first)
             #expect(now.id == edge)
-            #expect(now.targetId == second)
+            #expect(now.toId == second)
             #expect(now.version > held.version)
             let elsewhere = try await Live.hydrated()
             let served = try #require(try await elsewhere.edges.from(reply).first)
             #expect(served.id == edge)
-            #expect(served.targetId == second)
+            #expect(served.toId == second)
             #expect(served.properties["note"] == "moved")
             #expect(try await elsewhere.edges.to(first).isEmpty)
             await copy.close()
@@ -146,7 +146,7 @@ extension LiveWorkingCopies {
 
             // c above b closes the loop b, task, c, b, which the copy cannot see.
             let move = try #require(
-                try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c))))
+                try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .from(c))))
             let report = try await copy.queue.drain()
 
             guard case .refused(let refusal)? = report.verdicts.first(where: { $0.id == move.id })?.verdict else {
@@ -155,7 +155,7 @@ extension LiveWorkingCopies {
             }
             #expect(refusal.code == "edge_cycle")
             let back = try await copy.edges.to(b).filter { $0.id == ab }
-            #expect(back.map(\.sourceId) == [a], "the refused move left the edge at \(back.map(\.sourceId))")
+            #expect(back.map(\.fromId) == [a], "the refused move left the edge at \(back.map(\.fromId))")
             await copy.close()
         }
 
@@ -172,18 +172,18 @@ extension LiveWorkingCopies {
             let before = try await copy.queue.all()
 
             await #expect {
-                _ = try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c)))
+                _ = try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .from(c)))
             } throws: { error in
-                if case MarfaError.validation("edge_cycle", _, _) = error { true } else { false }
+                if case MarfaError.validation("edge_cycle", _, _, _) = error { true } else { false }
             }
             await #expect {
                 _ = try await copy.edges.create(from: c, to: a, type: "parent-of")
             } throws: { error in
-                if case MarfaError.validation("edge_cycle", _, _) = error { true } else { false }
+                if case MarfaError.validation("edge_cycle", _, _, _) = error { true } else { false }
             }
 
             #expect(try await copy.queue.all() == before, "a write the copy refused was queued")
-            #expect(try await copy.edges.to(b).map(\.sourceId) == [a])
+            #expect(try await copy.edges.to(b).map(\.fromId) == [a])
             await copy.close()
         }
 
@@ -210,35 +210,35 @@ extension LiveWorkingCopies {
 
             // `another` is already superseded by one item, and a supersedes edge is one to one at both ends.
             for refused in [
-                { try await copy.edges.check(first, moving: .target(another)) },
-                { _ = try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .target(another))) },
+                { try await copy.edges.check(first, moving: .to(another)) },
+                { _ = try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .to(another))) },
                 { _ = try await copy.edges.create(from: newer, to: another, type: "supersedes") },
             ] as [@Sendable () async throws -> Void] {
                 await #expect {
                     try await refused()
                 } throws: { error in
-                    guard case MarfaError.validation("edge_constraint_violation", _, .object(let details)?) = error
+                    guard case MarfaError.validation("edge_constraint_violation", _, .object(let details)?, _) = error
                     else { return false }
                     return details["constraint"] == "cardinality"
                 }
             }
             await #expect {
-                try await copy.edges.check(first, moving: .target(another))
+                try await copy.edges.check(first, moving: .to(another))
             } throws: { error in
-                guard case MarfaError.validation(_, _, let details) = error else { return false }
+                guard case MarfaError.validation(_, _, let details, _) = error else { return false }
                 return details
-                    == .object(["edge_type": "supersedes", "target_id": .string(another), "constraint": "cardinality"])
+                    == .object(["edge_type": "supersedes", "to_id": .string(another), "constraint": "cardinality"])
             }
             #expect(try await copy.queue.all() == before, "a write the copy refused was queued")
-            #expect(try await copy.edges.from(newer).map(\.targetId) == [old])
+            #expect(try await copy.edges.from(newer).map(\.toId) == [old])
 
-            try await copy.edges.check(first, moving: .target(free))
+            try await copy.edges.check(first, moving: .to(free))
             let move = try #require(
-                try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .target(free))))
+                try await copy.edges.update(first, EdgeEdit(baseVersion: held.version, move: .to(free))))
             let report = try await copy.queue.drain()
             #expect(report.verdicts.first { $0.id == move.id }?.verdict == .accepted, "\(report.verdicts)")
             let elsewhere = try await Live.hydrated()
-            #expect(try await elsewhere.edges.from(newer).map(\.targetId) == [free])
+            #expect(try await elsewhere.edges.from(newer).map(\.toId) == [free])
             await copy.close()
             await elsewhere.close()
         }

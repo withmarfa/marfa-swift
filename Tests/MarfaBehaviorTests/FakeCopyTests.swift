@@ -23,7 +23,7 @@ struct FakeCopyBehavior {
         occurredAt: "2026-09-27T00:00:00.000Z", createdAt: "2026-09-27T00:00:00.000Z",
         updatedAt: "2026-09-27T00:00:00.000Z", tags: [], title: "Other", body: "o")
     static let edge = Edge(
-        id: "01a1500d-78bd-73f0-8c55-2a4160c5ffe1", sourceId: note.id, targetId: other.id, edgeType: "references",
+        id: "01a1500d-78bd-73f0-8c55-2a4160c5ffe1", fromId: note.id, toId: other.id, edgeType: "references",
         properties: ["n": 1], version: 2, createdAt: "2026-09-27T00:00:00.000Z", updatedAt: "2026-09-27T00:00:00.000Z")
     static let noteType = ItemType(
         id: "core.note", fields: [TypeField(name: "body", type: "string", required: true, declaredBy: "core.note")],
@@ -431,7 +431,7 @@ struct FakeCopyBehavior {
         #expect(tag.verdict == nil && tag.waiting)
         #expect(try await copy.items.get(id) != nil, "a blocked write put its row back")
 
-        #expect(try await copy.queue.withdraw(created.id) == true)
+        #expect(try await copy.queue.withdraw(created.id) == [created.id])
 
         let left = try await copy.queue.all()
         #expect(left.map(\.id) == [tag.id])
@@ -441,7 +441,7 @@ struct FakeCopyBehavior {
         }
         #expect(refusal.reason.contains(created.id))
         #expect(try await copy.items.get(id) == nil, "withdrawing left the row")
-        #expect(try await copy.queue.withdraw(tag.id) == false)
+        #expect(try await copy.queue.withdraw(tag.id) == [])
         await copy.close()
     }
 
@@ -648,7 +648,7 @@ struct FakeCopyBehavior {
 
         let note = try #require(try await copy.items.get(Self.note.id))
         #expect(note.title == "Seed" && note.body == "B")
-        #expect(note.tags == ["kept", "seed"])
+        #expect(note.tags == ["seed", "kept"])
         #expect(try await copy.edges.from(Self.note.id).first?.properties == ["n": 1, "m": 3])
         await copy.close()
     }
@@ -701,7 +701,7 @@ struct FakeCopyBehavior {
             "2026-01-01T00:00:00.000+2460", "2026-01-01T00:00:00.000+0160", "2026-01-01T00:00:00.000+01:60",
             "2026-01-01T00:00:00.000+14:01", "2026-01-01T00:00:00.000+15:00", "2026-02-30",
             "2026-01-01T24:00:00Z", "2026-01-01T23:59:60Z", "2026-01-01T00:00:00.5Z", "2026-01-01T00:00:00,500Z",
-            "2026-01-01 00:00:00", "bogus",
+            "2026-01-01 00:00:00", "bogus", "2026-01-01", "2026-01-01T01:00:00.500+0100",
         ])
     func aTimeWhoseNormalizationWasNotCheckedAgainstTheCoreIsUnsupported(time: String) async throws {
         let copy = WorkingCopy.fake(itemTypes: [Self.noteType]).copy
@@ -743,7 +743,7 @@ struct FakeCopyBehavior {
         _ = try await copy.queue.drain()
 
         let note = try #require(try await copy.items.get(Self.note.id))
-        #expect(note.title == "Accepted" && note.tags == ["same", "seed"])
+        #expect(note.title == "Accepted" && note.tags == ["seed", "same"])
         await copy.close()
     }
 

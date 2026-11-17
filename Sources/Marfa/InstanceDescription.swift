@@ -5,20 +5,17 @@ internal import MarfaCore
 public struct InstanceDescription: Sendable, Hashable {
     public let name: String
     public let version: String
-    /// Absent when the server's build is not a numbered release.
-    public let release: String?
     public let instanceId: String
     public let contract: UInt64
     public let features: [String]
 
     /// For an app's previews and tests.
     public init(
-        name: String, version: String, release: String? = nil, instanceId: String, contract: UInt64,
+        name: String, version: String, instanceId: String, contract: UInt64,
         features: [String]
     ) {
         self.name = name
         self.version = version
-        self.release = release
         self.instanceId = instanceId
         self.contract = contract
         self.features = features
@@ -26,7 +23,7 @@ public struct InstanceDescription: Sendable, Hashable {
 
     init(_ core: MarfaCore.InstanceDescription) {
         self.init(
-            name: core.name, version: core.version, release: core.release, instanceId: core.instanceId,
+            name: core.name, version: core.version, instanceId: core.instanceId,
             contract: core.contract, features: core.features)
     }
 }

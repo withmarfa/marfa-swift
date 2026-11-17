@@ -77,7 +77,7 @@ final class TokenRenewer: CredentialRenewer {
             lease.release()
             throw .Unavailable(message: "the app is being suspended, so the sign-in was not renewed")
         }
-        let task = transport.session.dataTask(with: request) { body, response, error in
+        let task = transport.session.dataTask(with: transport.prepared(request)) { body, response, error in
             let answered: Result<Answer, any Error>
             if let error {
                 answered = .failure(error)

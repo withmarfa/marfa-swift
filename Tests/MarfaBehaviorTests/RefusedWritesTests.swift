@@ -64,7 +64,7 @@ struct RefusedWrites {
         func named(_ ids: [String]) -> [String] { ids.compactMap { names[$0] } }
 
         let move = try #require(
-            try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .source(c))))
+            try await copy.edges.update(ab, EdgeEdit(baseVersion: held.version, move: .from(c))))
         let shown = try await copy.edges.from(c).map(\.id)
         let report = try await copy.queue.drain()
 
@@ -76,10 +76,10 @@ struct RefusedWrites {
             shownBeforeTheAnswer: shown == [ab] ? ["the edge"] : [],
             refusalCode: code,
             edgesInto: [
-                "b": named(try await copy.edges.to(b).map(\.sourceId)),
-                "c": named(try await copy.edges.to(c).map(\.sourceId)),
+                "b": named(try await copy.edges.to(b).map(\.fromId)),
+                "c": named(try await copy.edges.to(c).map(\.fromId)),
             ],
-            edgesOutOfC: named(try await copy.edges.from(c).map(\.targetId)))
+            edgesOutOfC: named(try await copy.edges.from(c).map(\.toId)))
     }
 
     static let afterwards = Seen(

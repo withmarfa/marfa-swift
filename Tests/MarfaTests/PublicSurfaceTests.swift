@@ -27,14 +27,14 @@ import Testing
         #expect(Set(edits).count == 3)
         let moves = [
             EdgeEdit(baseVersion: 1), EdgeEdit(["note": "x"], baseVersion: 1),
-            EdgeEdit(baseVersion: 1, move: .source("a")), EdgeEdit(baseVersion: 1, move: .target("a")),
+            EdgeEdit(baseVersion: 1, move: .from("a")), EdgeEdit(baseVersion: 1, move: .to("a")),
         ]
         #expect(Set(moves).count == 4)
 
         let edge = Edge(
-            id: "edge", sourceId: "reply", targetId: "item", edgeType: "in-thread", properties: ["position": 1],
+            id: "edge", fromId: "reply", toId: "item", edgeType: "in-thread", properties: ["position": 1],
             version: 1, createdAt: "2026-09-26T00:00:00.000Z", updatedAt: "2026-09-26T00:00:00.000Z")
-        #expect(edge.targetId == "item")
+        #expect(edge.toId == "item")
     }
 
     @MainActor @Test func anAppReadsThroughAQueryAndOwnsItsReadings() async throws {
@@ -45,7 +45,8 @@ import Testing
         #expect(notes.connection == .connecting)
         let states: [CopyConnection] = [
             .local, .needsHydration(nil), .connecting, .following, .offline(.network(message: "away")),
-            .stopped(.network(message: "away")), .keyRefused(.unauthorized(code: "c", message: "m")), .closed,
+            .stopped(.network(message: "away")), .keyRefused(.unauthorized(code: "c", message: "m", server: nil)),
+            .closed,
         ]
         #expect(Set(states).count == 8 && states.filter(\.isFollowing) == [.following])
         let update = CopyUpdate(
@@ -145,10 +146,10 @@ import Testing
         #expect(ItemType(id: "core.note", fields: [field]).fields.map(\.id) == ["title"])
         let edgeType = EdgeType(
             id: "parent-of", label: "Children", reverseLabel: "Parent", cardinality: "one-to-many",
-            reverseName: "child-of", writtenAt: .target)
-        #expect(edgeType.writtenAt == .target)
+            reverseName: "child-of", writtenFrom: .to)
+        #expect(edgeType.writtenFrom == .to)
         #expect(
-            EdgeType(id: "in-folder", label: "In folder", cardinality: "many-to-many", writtenAt: .none).writtenAt
+            EdgeType(id: "in-folder", label: "In folder", cardinality: "many-to-many", writtenFrom: .none).writtenFrom
                 == .none)
         #expect(Status(catalogVersion: 2).catalogVersion == 2)
         #expect(Change.Refresh.catalog != .hydrated)
@@ -217,7 +218,8 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
     let errorRead: Bool =
         switch error {
         case .notFound, .unauthorized, .forbidden, .validation, .unknownType, .rateLimited, .server, .io, .network,
-            .unnamed, .decoding, .store, .storageFull, .signedOut, .noKeychain, .redirected, .noServer, .noCursor,
+            .unnamed, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain, .redirected,
+            .noServer, .noCursor,
             .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle, .unsentDiffers,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,

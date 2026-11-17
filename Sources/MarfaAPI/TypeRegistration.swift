@@ -11,7 +11,7 @@ extension Client {
     public func register(itemType definition: Components.Schemas.TypeDefinitionInput) async throws
         -> Components.Schemas.RegisteredType
     {
-        try await answer("registerType") { try await registerType(body: .json(definition)).created.body.json._type }
+        try await answer("registerType") { try await registerType(body: .json(definition)).created.body.json }
     }
 
     /// Replaces the definition of the item type `id`, and answers it as the server stored it.
@@ -19,19 +19,20 @@ extension Client {
         -> Components.Schemas.RegisteredType
     {
         try await answer("replaceType") {
-            try await replaceType(path: .init(id: id), body: .json(definition)).ok.body.json._type
+            try await replaceType(path: .init(id: id), body: .json(definition)).ok.body.json
         }
     }
 
     /// Deletes the item type `id`.
     ///
-    /// With `force`, it is deleted even while items of it exist. Without it, a type that items or a folder, view or
-    /// webhook still names is refused with `MarfaError.server` of status 409 and the code `type_in_use`, and the
+    /// With `force`, the type is deleted and the items, settings and column constraints that name it are kept; writes of
+    /// new items of it fail until it is registered again. Without it, a type that items, a folder, a view, a webhook or a
+    /// table column still names is refused with `MarfaError.server` of status 409 and the code `type_in_use`, and the
     /// message lists each setting that names it. Move the items with ``startMove(ofType:to:properties:)``, which
     /// rewrites those settings, or change the settings first.
     public func delete(itemType id: String, force: Bool = false) async throws {
         try await answer("deleteType") {
-            _ = try await deleteType(path: .init(id: id), query: .init(force: force ? ._true : nil)).ok
+            _ = try await deleteType(path: .init(id: id), query: .init(force: force ? true : nil)).ok
         }
     }
 
@@ -45,7 +46,7 @@ extension Client {
 
     /// Registers an edge type, or answers the one already registered with the same definition.
     ///
-    /// `label` names the source end and `reverseLabel` the target end. The answer's `reverseLabel` is the one
+    /// `label` names the from end and `reverseLabel` the to end. The answer's `reverseLabel` is the one
     /// registered, or its `label` for a type registered with none, which names both ends alike; a type registered
     /// with no `label` gets one derived from its id.
     public func register(edgeType definition: Components.Schemas.EdgeTypeRegistrationRequest) async throws
@@ -53,8 +54,8 @@ extension Client {
     {
         try await answer("registerEdgeType") {
             let output = try await registerEdgeType(body: .json(definition))
-            if case .created(let created) = output { return try created.body.json.edgeType }
-            return try output.ok.body.json.edgeType
+            if case .created(let created) = output { return try created.body.json }
+            return try output.ok.body.json
         }
     }
 
@@ -68,7 +69,7 @@ extension Client {
     /// With `force`, it is deleted even while edges of it exist; they keep naming it.
     public func delete(edgeType id: String, force: Bool = false) async throws {
         try await answer("deleteEdgeType") {
-            _ = try await deleteEdgeType(path: .init(id: id), query: .init(force: force ? ._true : nil)).ok
+            _ = try await deleteEdgeType(path: .init(id: id), query: .init(force: force ? true : nil)).ok
         }
     }
 }

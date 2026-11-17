@@ -81,14 +81,14 @@ func aFlaggedFileNamesTheItemAPullHeldBack(flag: String) {
 @Test func aPassCarriesAConflictedEditAndThePlacementsASecondDrainSent() {
     let edit = MarfaCore.DrainVerdict(
         id: "w1", kind: .updateItem, itemId: "item-1", edgeId: nil,
-        verdict: .conflicted(siblingId: "copy-1", fields: ["body"]), refusals: 0, replayed: false)
+        verdict: .conflicted(siblingId: "copy-1", fields: ["body"], conflicts: []), refusals: 0, replayed: false)
     let placement = MarfaCore.DrainVerdict(
         id: "w2", kind: .createEdge, itemId: "item-2", edgeId: "edge-2", verdict: .accepted, refusals: 0,
         replayed: false)
     let pass = Marfa.FolderPass(corePass(drain: coreDrain(answered: 2, verdicts: [edit, placement])))
     #expect(pass.drain.answered == 2)
     #expect(pass.drain.verdicts.map(\.id) == ["w1", "w2"])
-    guard case .conflicted(let copy, let fields)? = pass.drain.verdicts.first?.verdict else {
+    guard case .conflicted(let copy, let fields, _)? = pass.drain.verdicts.first?.verdict else {
         Issue.record("the conflicted edit was not carried: \(pass.drain.verdicts)")
         return
     }

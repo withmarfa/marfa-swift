@@ -38,6 +38,9 @@ struct Access: ClientMiddleware {
     ) async throws(MarfaError) -> (HTTPResponse, HTTPBody?) {
         var request = request
         request.headerFields[.authorization] = "Bearer \(token)"
+        request.headerFields[contractHeader] = ContractHeader.value(
+            method: request.method.rawValue,
+            path: request.path ?? "")
         do {
             return try await next(request, body, baseURL)
         } catch {
@@ -54,6 +57,7 @@ func refusal(_ answer: (HTTPResponse, HTTPBody?), origin: String, write: Bool) a
     return await Marfa.refusal(
         status: UInt16(clamping: response.status.code),
         contract: response.headerFields.first { $0.name.canonicalName == "x-marfa-contract" }?.value,
+        declaredCode: response.headerFields[xErrorCode],
         location: response.headerFields[.location], retryAfter: response.headerFields[.retryAfter], origin: origin,
         write: write
     ) { await read(body) }
@@ -71,4 +75,13 @@ private func read(_ body: HTTPBody?) async -> String {
         }
     } catch {}
     return String(decoding: data, as: UTF8.self)
+}
+
+private let contractHeader = headerName(ContractHeader.name)
+private let xErrorCode = headerName("X-Error-Code")
+
+/// A header name written in this file, which is always a valid one.
+private func headerName(_ name: String) -> HTTPField.Name {
+    guard let field = HTTPField.Name(name) else { preconditionFailure("\(name) is not a header name") }
+    return field
 }

@@ -109,7 +109,7 @@ func describe(_ verdict: Verdict?) -> String {
     case nil: "unanswered"
     case .accepted: "accepted"
     case .merged(let fields): "merged \(fields.joined(separator: ", "))"
-    case .conflicted(let sibling, _): "conflicted, sibling \(sibling)"
+    case .conflicted(let sibling, _, _): "conflicted, sibling \(sibling ?? "none")"
     case .refused(let refusal):
         "refused: \(([refusal.reason] + refusal.fields.map { "\($0.field) \($0.message)" }).joined(separator: "; "))"
     case .blocked(let reason, let refusal): "blocked: \(refusal?.message ?? String(describing: reason))"

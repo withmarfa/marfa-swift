@@ -66,7 +66,7 @@ struct Values {
             id: "i", type: "core.note", properties: [:], state: .active, tier: nil, version: 1, schemaVersion: 1,
             source: "s", sourceId: nil, occurredAt: "", createdAt: "", updatedAt: "", tags: [])
         let edge = Marfa.Edge(
-            id: "e", sourceId: "a", targetId: "b", edgeType: "t", properties: [:], version: 1, createdAt: "",
+            id: "e", fromId: "a", toId: "b", edgeType: "t", properties: [:], version: 1, createdAt: "",
             updatedAt: "")
         let notHeld = Marfa.NotHeldAttachments(reason: .absent, attachments: 1, bytes: 1, unstated: 0)
         let kept = Marfa.KeptAttachments(
@@ -150,10 +150,15 @@ struct Values {
 @Suite(.timeLimit(.minutes(1)))
 struct Errors {
     static let cases: [(MarfaCore.MarfaError, Marfa.MarfaError)] = [
-        (.NotFound(code: "c", message: "m"), .notFound(code: "c", message: "m")),
-        (.Unauthorized(code: "c", message: "m"), .unauthorized(code: "c", message: "m")),
-        (.Forbidden(code: "c", message: "m"), .forbidden(code: "c", message: "m")),
-        (.Validation(code: "c", message: "m", details: nil), .validation(code: "c", message: "m", details: nil)),
+        (.NotFound(code: "c", message: "m", server: nil), .notFound(code: "c", message: "m", server: nil)),
+        (.Unauthorized(code: "c", message: "m", server: nil), .unauthorized(code: "c", message: "m", server: nil)),
+        (.Forbidden(code: "c", message: "m", server: nil), .forbidden(code: "c", message: "m", server: nil)),
+        (
+            .Validation(code: "c", message: "m", details: nil, server: nil),
+            .validation(
+                code: "c", message: "m",
+                details: nil, server: nil)
+        ),
         (
             .Validation(
                 code: "edge_constraint_violation", message: "m",
@@ -161,20 +166,28 @@ struct Errors {
                     JsonObject(members: [
                         JsonMember(key: "edge_type", value: .string("supersedes")),
                         JsonMember(key: "constraint", value: .string("cardinality")),
-                    ]))),
+                    ])), server: nil),
             .validation(
                 code: "edge_constraint_violation", message: "m",
-                details: .object(["edge_type": "supersedes", "constraint": "cardinality"]))
+                details: .object(["edge_type": "supersedes", "constraint": "cardinality"]), server: nil)
         ),
-        (.UnknownType(message: "m"), .unknownType(message: "m")),
+        (.UnknownType(message: "m", server: nil), .unknownType(message: "m", server: nil)),
         (
-            .RateLimited(code: "c", message: "m", retryAfterSeconds: 9),
-            .rateLimited(code: "c", message: "m", retryAfterSeconds: 9)
+            .RateLimited(code: "c", message: "m", retryAfterSeconds: 9, server: nil),
+            .rateLimited(code: "c", message: "m", retryAfterSeconds: 9, server: nil)
         ),
-        (.Server(status: 503, code: "c", message: "m"), .server(status: 503, code: "c", message: "m")),
-        (.Server(status: 409, code: "version_conflict", message: "m"), .versionConflict(message: "m")),
+        (
+            .Server(status: 503, code: "c", message: "m", details: nil, server: nil),
+            .server(
+                status: 503, code: "c",
+                message: "m", details: nil, server: nil)
+        ),
+        (
+            .Server(status: 409, code: "version_conflict", message: "m", details: nil, server: nil),
+            .versionConflict(message: "m", server: nil)
+        ),
         (.Network(message: "m"), .network(message: "m")),
-        (.Unnamed(status: 429, message: "m"), .unnamed(status: 429, message: "m")),
+        (.Unnamed(status: 429, message: "m", server: nil), .unnamed(status: 429, message: "m", server: nil)),
         (.Decoding(message: "m"), .decoding(message: "m")),
         (.Store(message: "m"), .store(message: "m")),
         (.Io(message: "m"), .io(message: "m")),
@@ -185,12 +198,12 @@ struct Errors {
         ),
         (.NoKeychain(message: "m"), .noKeychain(message: "m")),
         (
-            .Redirected(origin: "https://marfa.example", status: 307, location: "/next", message: "m"),
-            .redirected(origin: "https://marfa.example", status: 307, location: "/next", message: "m")
+            .Redirected(origin: "https://marfa.example", status: 307, location: "/next", message: "m", server: nil),
+            .redirected(origin: "https://marfa.example", status: 307, location: "/next", message: "m", server: nil)
         ),
         (
-            .Redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m"),
-            .redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m")
+            .Redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m", server: nil),
+            .redirected(origin: "https://marfa.example", status: 302, location: nil, message: "m", server: nil)
         ),
         (.NoServer(message: "m"), .noServer(message: "m")),
         (.NoCursor(message: "m"), .noCursor(message: "m")),
@@ -209,9 +222,24 @@ struct Errors {
             .UnsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m"),
             .unsentDiffers(path: "p", unsent: nil, agreed: 0, message: "m")
         ),
-        (.CopyExpired(reason: "aged_out", message: "m"), .copyExpired(reason: "aged_out", message: "m")),
-        (.CopyExpired(reason: "instance_changed", message: "m"), .instanceChanged(message: "m")),
-        (.StreamIncomplete(reason: "r", message: "m"), .streamIncomplete(reason: "r", message: "m")),
+        (
+            .CopyExpired(reason: "aged_out", message: "m", server: nil),
+            .copyExpired(
+                reason: "aged_out", message: "m",
+                server: nil)
+        ),
+        (
+            .CopyExpired(reason: "instance_changed", message: "m", server: nil),
+            .instanceChanged(
+                message: "m",
+                server: nil)
+        ),
+        (
+            .StreamIncomplete(reason: "r", message: "m", server: nil),
+            .streamIncomplete(
+                reason: "r", message: "m",
+                server: nil)
+        ),
         (.WrongServer(expected: "a", got: "b", message: "m"), .wrongServer(expected: "a", got: "b", message: "m")),
         (.BytesAbsent(hash: "h", reason: "r", message: "m"), .bytesAbsent(hash: "h", reason: "r", message: "m")),
         (
@@ -219,20 +247,36 @@ struct Errors {
             .noRoom(hash: "h", size: 5, free: 3, message: "m")
         ),
         (
-            .ContractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m"),
-            .contractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m")
+            .ContractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m", server: nil),
+            .contractMismatch(served: "3", expected: 2, status: 201, writeSent: true, message: "m", server: nil)
         ),
         (
-            .ContractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m"),
-            .contractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m")
+            .ContractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m", server: nil),
+            .contractMismatch(served: nil, expected: 2, status: 200, writeSent: false, message: "m", server: nil)
         ),
         (
-            .ContractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m"),
-            .contractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m")
+            .ContractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m", server: nil),
+            .contractMismatch(served: nil, expected: 2, status: nil, writeSent: false, message: "m", server: nil)
         ),
         (.Canceled(message: "m"), .canceled(message: "m")),
         (.FirstSyncWaiting(message: "m"), .firstSyncWaiting(message: "m")),
         (.Invalid(message: "m"), .invalid(message: "m")),
+        (.StoreBusy(message: "m"), .storeBusy(message: "m")),
+        (
+            .StoreDamaged(path: "p", reason: "malformed", unsent: 3, message: "m"),
+            .storeDamaged(path: "p", reason: "malformed", unsent: 3, message: "m")
+        ),
+        (
+            .Server(
+                status: 413, code: "payload_too_large", message: "m",
+                details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])),
+                server: ServerAnswer(
+                    status: 413, code: "payload_too_large",
+                    details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])))),
+            .server(
+                status: 413, code: "payload_too_large", message: "m", details: .object(["limit": "9"]),
+                server: Marfa.ServerAnswer(status: 413, code: "payload_too_large", details: .object(["limit": "9"])))
+        ),
     ]
 
     @Test(arguments: cases)
@@ -273,8 +317,8 @@ struct OwnValueTypes {
             #expect(Marfa.SortField(field.core) == field)
         }
         for direction in Marfa.SortDirection.allCases { #expect(Marfa.SortDirection(direction.core) == direction) }
-        #expect(MarfaCore.EdgeWrittenAt.allCases.map { Marfa.EdgeWrittenAt($0) } == Marfa.EdgeWrittenAt.allCases)
-        #expect(Marfa.EdgeWrittenAt(.none) == .none)
+        #expect(MarfaCore.EdgeWrittenFrom.allCases.map { Marfa.EdgeWrittenFrom($0) } == Marfa.EdgeWrittenFrom.allCases)
+        #expect(Marfa.EdgeWrittenFrom(.none) == .none)
         for kind in Marfa.GrantKind.allCases { #expect(Marfa.GrantKind(kind.core) == kind) }
         for level in Marfa.GrantLevel.allCases { #expect(Marfa.GrantLevel(level.core) == level) }
     }
@@ -283,6 +327,7 @@ struct OwnValueTypes {
         let verdicts: [Marfa.Verdict] =
             [
                 .accepted, .merged(fields: ["a"]), .conflicted(siblingId: "s", fields: ["a", "b"]),
+                .conflicted(siblingId: nil, fields: [], conflicts: [RowConflict(row: "r1", column: "qty")]),
                 .refused(Marfa.Refusal(reason: "r")), .refused(Self.refusal), .dead,
                 .blocked(reason: .credentialRefused, refusal: Self.refusal),
             ] + Marfa.BlockedReason.allCases.map { .blocked(reason: $0) }
@@ -292,19 +337,21 @@ struct OwnValueTypes {
     static let refusal = Marfa.Refusal(
         reason: "validation_error", code: "validation_error", message: "m",
         fields: [Marfa.FieldRefusal(field: "title", message: "too long")], trashed: true,
-        grant: Marfa.MissingGrant(kind: .extension, name: "acme", level: .write))
+        grant: Marfa.MissingGrant(kind: .extension, name: "acme", level: .write),
+        requestLimit: Marfa.RequestLimit(size: 4, limit: 3))
 
     @Test func aRefusalArrivesInItsParts() {
         let core = MarfaCore.Refusal(
             reason: "validation_error", code: "validation_error", message: "m",
             fields: [MarfaCore.FieldRefusal(field: "title", message: "too long")], trashed: true,
-            grant: MarfaCore.MissingGrant(kind: .extension, name: "acme", level: .write))
+            grant: MarfaCore.MissingGrant(kind: .extension, name: "acme", level: .write),
+            requestLimit: MarfaCore.RequestLimit(size: 4, limit: 3))
         #expect(Marfa.Verdict(.refused(refusal: core)) == .refused(Self.refusal))
     }
 
     @Test func recordsCrossToTheGlueAndBack() {
         let write = Marfa.QueuedWrite(
-            id: "q", kind: .uploadBlob, itemId: "i", targetId: "t", edgeId: "e", namespace: "n", tag: "g",
+            id: "q", kind: .uploadBlob, itemId: "i", toId: "t", edgeId: "e", namespace: "n", tag: "g",
             blob: "b", baseVersion: 2, idempotencyKey: "k", dependsOn: ["d"], follows: "f",
             verdict: .refused(Self.refusal), body: ["title": "kept", "n": 1], answer: ["data": ["id": "i"]],
             refusals: 3, environmentalStreak: 4, lastFailure: Marfa.LastFailure(status: 413, text: "Too Large"),
@@ -378,6 +425,7 @@ struct CatalogTypes {
                     "serves", declaredBy: "user.dish", definition: ["type": "string", "required": true, "x": [1, 2]]),
                 Self.field("title", declaredBy: "user.recipe", definition: ["type": "string"]),
             ],
+            tables: JsonObject(members: []),
             titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
             linkField: "vendor_id", roles: ["container"], compatibleWith: ["user.meal"])
         let type = Marfa.ItemType(core)
@@ -402,8 +450,8 @@ struct CatalogTypes {
         let core = MarfaCore.EdgeType(
             id: "mentor-of", label: "Mentor of", reverseLabel: "Mentored by", description: nil,
             cardinality: "one-to-many",
-            reverseName: "mentored-by", writtenAt: .target, sourceTypeConstraints: ["core.person"],
-            targetTypeConstraints: ["*"], cascadeOnDelete: "block",
+            reverseName: "mentored-by", writtenFrom: .to, fromTypeConstraints: ["core.person"],
+            toTypeConstraints: ["*"], cascadeOnDelete: "block",
             properties: [Self.field("since", declaredBy: "mentor-of", definition: ["type": "string"])],
             shipped: false, acyclic: true, flat: true)
         let type = Marfa.EdgeType(core)
@@ -412,7 +460,7 @@ struct CatalogTypes {
                 == Marfa.EdgeType(
                     id: "mentor-of", label: "Mentor of", reverseLabel: "Mentored by", cardinality: "one-to-many",
                     reverseName: "mentored-by",
-                    writtenAt: .target, sourceTypeConstraints: ["core.person"], targetTypeConstraints: ["*"],
+                    writtenFrom: .to, fromTypeConstraints: ["core.person"], toTypeConstraints: ["*"],
                     cascadeOnDelete: "block",
                     properties: [
                         Marfa.TypeField(

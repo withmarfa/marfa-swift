@@ -10,7 +10,10 @@ struct CopyOptions {
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
         core.change(
-            0, MarfaCore.Change.watchFailed(reason: .Unauthorized(code: "invalid_key", message: "refused"), cursor: "3")
+            0,
+            MarfaCore.Change.watchFailed(
+                reason: .Unauthorized(code: "invalid_key", message: "refused", server: nil),
+                cursor: "3")
         )
         try await eventually("the credential stopped the watch") { heard.stops.count == 1 }
         _ = try await copy.pin("outside")
@@ -87,12 +90,16 @@ struct CopyOptions {
         core.change(
             0,
             MarfaCore.Change.serverUnreachable(
-                reason: .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7), cursor: "3"))
+                reason: .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7, server: nil),
+                cursor: "3"))
         core.change(0, MarfaCore.Change.serverReachable(cursor: "3"))
         try await eventually("both were told") { heard.all.count == 2 }
         #expect(
             heard.all.map(\.origin) == [
-                .serverUnreachable(.rateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7)),
+                .serverUnreachable(
+                    .rateLimited(
+                        code: "rate_limited", message: "slow down", retryAfterSeconds: 7,
+                        server: nil)),
                 .serverReachable,
             ])
         await copy.close()

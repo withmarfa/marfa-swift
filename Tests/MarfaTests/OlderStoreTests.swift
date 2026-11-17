@@ -5,9 +5,9 @@ import Testing
 
 /// A store an earlier build of the core made is refused, never discarded.
 ///
-/// The earlier store is made from one of this build's: its queue table is
-/// given back the write kind `merge_metadata`, which earlier builds queued and
-/// this one cannot send, and one of its writes takes that kind.
+/// The earlier store is made from one of this build's: its schema version is set back, its queue table is given
+/// the write kind `merge_metadata`, which earlier builds queued and this one cannot send, and one of its writes
+/// takes that kind.
 @Suite(.timeLimit(.minutes(1)))
 struct OlderStore {
     @Test func aStoreAnEarlierBuildMadeIsRefusedWithItsUnsentWritesAndKept() async throws {
@@ -20,8 +20,9 @@ struct OlderStore {
         try Self.execute(
             store,
             """
+            PRAGMA user_version = 5;
             PRAGMA writable_schema = ON;
-            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
+            UPDATE sqlite_master SET sql = replace(sql, '''undo_rows''', '''undo_rows'', ''merge_metadata''')
               WHERE type = 'table' AND name = 'queue';
             """)
         try Self.execute(store, "UPDATE queue SET kind = 'merge_metadata' WHERE kind = 'add_tag'")
@@ -33,7 +34,7 @@ struct OlderStore {
                 return false
             }
             return path.hasSuffix(store.lastPathComponent)
-                && reason.contains("its table queue is not the shape this build reads")
+                && reason.contains("it is at schema version 5, and this build reads schema version 6")
                 && reason.contains("its queue holds 1 write of kind merge_metadata, which this build cannot send")
                 && unsent == 2
                 && message.contains("It holds 2 writes the server has not taken")

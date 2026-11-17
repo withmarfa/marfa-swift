@@ -191,18 +191,18 @@ public struct TypeField: Sendable, Hashable, Identifiable {
     }
 }
 
-/// Where a folder writes an edge: in its source item's file, in its target
+/// Where a folder writes an edge: in its from item's file, in its to
 /// item's file under the edge type's reverse name, or in none.
-public enum EdgeWrittenAt: Sendable, Hashable, CaseIterable {
-    case source
-    case target
+public enum EdgeWrittenFrom: Sendable, Hashable, CaseIterable {
+    case from
+    case to
     /// No file writes the edge, as for a file's placement in a folder.
     case none
 
-    init(_ core: MarfaCore.EdgeWrittenAt) {
+    init(_ core: MarfaCore.EdgeWrittenFrom) {
         switch core {
-        case .source: self = .source
-        case .target: self = .target
+        case .from: self = .from
+        case .to: self = .to
         case .none: self = .none
         }
     }
@@ -211,23 +211,23 @@ public enum EdgeWrittenAt: Sendable, Hashable, CaseIterable {
 /// An edge type, read as the server's `GET /edge-types` lists it.
 public struct EdgeType: Sendable, Hashable, Identifiable {
     public let id: String
-    /// The name shown on the source end.
+    /// The name shown on the from end.
     ///
     /// The server derives one from the id for a type registered with none.
     public let label: String
-    /// The name shown on the target end.
+    /// The name shown on the to end.
     ///
     /// It is the ``label`` for a two-way relation, which has no reverse label of its own.
     public let reverseLabel: String
     public let description: String?
     /// `one-to-one`, `one-to-many`, `many-to-one` or `many-to-many`, from
-    /// source to target.
+    /// from end to to end.
     public let cardinality: String
-    /// The name the edge goes by read from its target.
+    /// The name the edge goes by read from its to end.
     public let reverseName: String?
-    public let writtenAt: EdgeWrittenAt
-    public let sourceTypeConstraints: [String]
-    public let targetTypeConstraints: [String]
+    public let writtenFrom: EdgeWrittenFrom
+    public let fromTypeConstraints: [String]
+    public let toTypeConstraints: [String]
     /// `cascade`, `orphan` or `block`.
     public let cascadeOnDelete: String
     /// By name.
@@ -236,14 +236,14 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     public let shipped: Bool
     /// Whether the server refuses an edge of this type that closes a cycle through other edges of the type.
     public let acyclic: Bool
-    /// Whether the server refuses a source its own target constraints admit.
+    /// Whether the server refuses a from end its own to constraints admit.
     public let flat: Bool
 
     /// For an app's previews and tests; `reverseLabel` is `label` where it is `nil`, as the server answers it.
     public init(
         id: String, label: String, reverseLabel: String? = nil, description: String? = nil, cardinality: String,
-        reverseName: String? = nil, writtenAt: EdgeWrittenAt = .source, sourceTypeConstraints: [String] = ["*"],
-        targetTypeConstraints: [String] = ["*"], cascadeOnDelete: String = "orphan", properties: [TypeField] = [],
+        reverseName: String? = nil, writtenFrom: EdgeWrittenFrom = .from, fromTypeConstraints: [String] = ["*"],
+        toTypeConstraints: [String] = ["*"], cascadeOnDelete: String = "orphan", properties: [TypeField] = [],
         shipped: Bool = false, acyclic: Bool = false, flat: Bool = false
     ) {
         self.id = id
@@ -252,9 +252,9 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
         self.description = description
         self.cardinality = cardinality
         self.reverseName = reverseName
-        self.writtenAt = writtenAt
-        self.sourceTypeConstraints = sourceTypeConstraints
-        self.targetTypeConstraints = targetTypeConstraints
+        self.writtenFrom = writtenFrom
+        self.fromTypeConstraints = fromTypeConstraints
+        self.toTypeConstraints = toTypeConstraints
         self.cascadeOnDelete = cascadeOnDelete
         self.properties = properties
         self.shipped = shipped
@@ -265,8 +265,9 @@ public struct EdgeType: Sendable, Hashable, Identifiable {
     init(_ core: MarfaCore.EdgeType) {
         self.init(
             id: core.id, label: core.label, reverseLabel: core.reverseLabel, description: core.description,
-            cardinality: core.cardinality, reverseName: core.reverseName, writtenAt: EdgeWrittenAt(core.writtenAt),
-            sourceTypeConstraints: core.sourceTypeConstraints, targetTypeConstraints: core.targetTypeConstraints,
+            cardinality: core.cardinality, reverseName: core.reverseName,
+            writtenFrom: EdgeWrittenFrom(core.writtenFrom),
+            fromTypeConstraints: core.fromTypeConstraints, toTypeConstraints: core.toTypeConstraints,
             cascadeOnDelete: core.cascadeOnDelete, properties: core.properties.map(TypeField.init),
             shipped: core.shipped, acyclic: core.acyclic, flat: core.flat)
     }

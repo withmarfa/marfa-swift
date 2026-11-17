@@ -231,6 +231,7 @@ enum Declaring {
             description: Properties.string(row, "description"),
             parent: parent, version: version,
             fields: fields.values.sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) },
+            tables: JsonObject(members: []),
             titleField: hints.flatMap { Properties.string($0, "title_field") } ?? inherited?.titleField,
             bodyField: hints.flatMap { Properties.string($0, "body_field") } ?? inherited?.bodyField,
             nameFromBody: hints.flatMap { Properties.bool($0, "name_from_body") } ?? inherited?.nameFromBody ?? true,

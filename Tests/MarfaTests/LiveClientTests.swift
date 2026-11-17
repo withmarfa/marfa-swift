@@ -96,7 +96,7 @@ extension LiveWorkingCopies {
                 let refused = await #expect(throws: MarfaError.self) {
                     try await server.setTypeIcon(refusedID, ofType: id)
                 }
-                guard case .validation(let code, _, _)? = refused else {
+                guard case .validation(let code, _, _, _)? = refused else {
                     Issue.record("expected a validation refusal for \(refusedID), got \(String(describing: refused))")
                     return
                 }
@@ -193,7 +193,7 @@ extension LiveWorkingCopies {
             try await api.delete(itemType: to, force: true)
         }
 
-        @Test func aDeleteRefusedWhileAViewNamesTheTypeSaysWhichViewDoes() async throws {
+        @Test func aDeleteRefusedWhileAViewNamesTheTypeSaysTheTypeIsInUse() async throws {
             let api = Client(try #require(Live.server))
             let (from, to) = try await Self.movable(api, count: 0)
             let view = try await Live.writeView([
@@ -201,12 +201,12 @@ extension LiveWorkingCopies {
             ])
 
             let refused = await #expect(throws: MarfaError.self) { try await api.delete(itemType: from) }
-            guard case .server(let status, let code, let message)? = refused else {
+            guard case .server(let status, let code, let message, _, _)? = refused else {
                 Issue.record("refused as \(String(describing: refused))")
                 return
             }
             #expect(status == 409 && code == "type_in_use")
-            #expect(message.contains(view) && message.contains("query.types"), "\(message)")
+            #expect(message.contains(from) && message.contains("view"), "\(message)")
 
             try await api.delete(itemType: to)  // the witness: a type no setting names is deleted
 

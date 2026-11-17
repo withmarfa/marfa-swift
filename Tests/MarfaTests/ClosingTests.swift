@@ -297,7 +297,10 @@ struct ChangingTheKey {
         let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: true)
         let heard = Heard(copy.changes())
         old.change(
-            0, MarfaCore.Change.watchFailed(reason: .Unauthorized(code: "unauthorized", message: "no"), cursor: "3"))
+            0,
+            MarfaCore.Change.watchFailed(
+                reason: .Unauthorized(code: "unauthorized", message: "no", server: nil),
+                cursor: "3"))
         try await eventually("the stream was told") { heard.stops.count == 1 }
         #expect(new.places.isEmpty)
 

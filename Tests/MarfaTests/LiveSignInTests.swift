@@ -6,7 +6,8 @@ import Testing
 /// Signs in to a server of its own with the device grant, as an app without a browser does, and follows the
 /// sign-in through an access token the server stops accepting, a renewal, and a grant the server ends.
 ///
-/// The server is booted with its test hooks, so the test can move its clock past the access token's lifetime.
+/// The first test boots a server built with its test hooks, which a release does not carry, so it can move the
+/// server's clock past the access token's lifetime; it runs only where `MARFA_HOOKED_SERVER_BIN` names one.
 @Suite(
     .serialized,
     .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"),
@@ -14,7 +15,11 @@ import Testing
 struct LiveSignIn {
     static let service = "com.withmarfa.marfa-swift.tests"
 
-    @Test func aDeviceSignInWritesRenewsAndEndsWhenTheGrantIsRevoked() async throws {
+    @Test(
+        .enabled(
+            if: OwnServer.hookedServer != nil, "set MARFA_HOOKED_SERVER_BIN to a marfa-server built with test-hooks")
+    )
+    func aDeviceSignInWritesRenewsAndEndsWhenTheGrantIsRevoked() async throws {
         let own = try await OwnServer.boot(testHooks: true)
         do {
             try await inIsolatedKeychainAsync { keychain, _ async throws in
@@ -80,9 +85,9 @@ struct LiveSignIn {
         #expect((renewed as? HTTPURLResponse)?.statusCode == 200)
     }
 
-    /// The client of every grant the owner approved, as `GET /auth/grants` lists them.
+    /// The client of every grant the owner approved, as `GET /grants` lists them.
     private static func grants(_ own: OwnServer) async throws -> [String] {
-        var request = URLRequest(url: own.url.appending(path: "auth/grants"))
+        var request = URLRequest(url: own.url.appending(path: "grants"))
         request.setValue("Bearer \(own.key)", forHTTPHeaderField: "Authorization")
         let (body, response) = try await URLSession.shared.data(for: request)
         try #require((response as? HTTPURLResponse)?.statusCode == 200, "the grants could not be listed")
@@ -117,11 +122,11 @@ struct LiveSignIn {
                 var form = URLComponents()
                 form.queryItems =
                     [
-                        URLQueryItem(name: "accept", value: "true"),
-                        URLQueryItem(name: "oauth_query", value: landed.query()),
+                        URLQueryItem(name: "decision", value: "approve"),
+                        URLQueryItem(name: "authorization_request", value: landed.query()),
                     ]
                     + scopes.map { URLQueryItem(name: "scopes", value: $0) }
-                var decision = URLRequest(url: try #require(URL(string: "\(origin)/auth/authorize/decision")))
+                var decision = URLRequest(url: try #require(URL(string: "\(origin)/auth/consent")))
                 decision.httpMethod = "POST"
                 decision.setValue(cookie, forHTTPHeaderField: "Cookie")
                 decision.setValue(origin, forHTTPHeaderField: "Origin")
@@ -201,7 +206,7 @@ struct LiveSignIn {
     private static func ownerCookie(_ own: OwnServer, _ session: URLSession) async throws -> String {
         let owner = try #require(own.owner, "the server printed no test owner")
         let origin = own.url.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        var signIn = URLRequest(url: try #require(URL(string: "\(origin)/auth/sign-in/email")))
+        var signIn = URLRequest(url: try #require(URL(string: "\(origin)/auth/sign-in")))
         signIn.httpMethod = "POST"
         signIn.setValue("application/json", forHTTPHeaderField: "Content-Type")
         signIn.setValue(origin, forHTTPHeaderField: "Origin")
@@ -211,7 +216,7 @@ struct LiveSignIn {
         try #require(response.statusCode == 200, "the owner could not sign in: \(response.statusCode)")
         let cookies = HTTPCookie.cookies(
             withResponseHeaderFields: response.allHeaderFields as? [String: String] ?? [:], for: own.url)
-        let cookie = try #require(cookies.first { $0.name.hasSuffix("session_token") })
+        let cookie = try #require(cookies.first { $0.name == "marfa_session" })
         return "\(cookie.name)=\(cookie.value)"
     }
 
@@ -265,7 +270,7 @@ struct LiveSignIn {
 
     private static func revoke(_ refreshToken: String, clientId: String, _ own: OwnServer) async throws {
         let request = try formRequest(
-            "\(own.url.absoluteString)/auth/oauth2/revoke",
+            "\(own.url.absoluteString)/oauth/revoke",
             [("token", refreshToken), ("token_type_hint", "refresh_token"), ("client_id", clientId)])
         let (_, response) = try await URLSession.shared.data(for: request)
         try #require((response as? HTTPURLResponse)?.statusCode == 200, "the revocation was refused")
