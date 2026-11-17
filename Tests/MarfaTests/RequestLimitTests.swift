@@ -112,9 +112,12 @@ struct RemovalAfterAnswers {
     }
 
     /// A store holding one unsent create of `title`, closed, and the list the person was shown of it.
-    private static func storeShown(_ title: String) async throws -> (store: URL, id: String, shown: UnsentWrites) {
+    private static func storeShown(_ title: String, on server: LocalServer) async throws -> (
+        store: URL, id: String, shown: UnsentWrites
+    ) {
         let store = temporaryStore()
-        let copy = try await WorkingCopy.open(store: store)
+        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let made = try await copy.items.create(
             Draft(type: "core.note", properties: ["title": .string(title)], tier: .feed))
         await copy.close()
@@ -122,11 +125,11 @@ struct RemovalAfterAnswers {
     }
 
     @Test func aWriteTheServerTookAfterTheListWasReadRefusesTheRemoval() async throws {
-        let (store, id, shown) = try await Self.storeShown("short")
         let ids = CreateAnswer()
-        ids.set(id)
         let server = try await serverTaking(1_500, creating: ids)
         defer { server.stop() }
+        let (store, id, shown) = try await Self.storeShown("short", on: server)
+        ids.set(id)
         let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let report = try await copy.queue.drain()
@@ -144,11 +147,11 @@ struct RemovalAfterAnswers {
     }
 
     @Test func aWriteWhoseVerdictChangedUnderTheSameIdRefusesTheRemoval() async throws {
-        let (store, id, shown) = try await Self.storeShown(String(repeating: "é", count: 1_000))
-        #expect(shown.writes.map(\.itemId) == [id])
-        #expect(shown.writes.first?.verdict == nil)
         let server = try await serverTaking(1_500, creating: CreateAnswer())
         defer { server.stop() }
+        let (store, id, shown) = try await Self.storeShown(String(repeating: "é", count: 1_000), on: server)
+        #expect(shown.writes.map(\.itemId) == [id])
+        #expect(shown.writes.first?.verdict == nil)
         let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let report = try await copy.queue.drain()
