@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import MarfaCore
+import MarfaTypes
 import Synchronization
 import Testing
 

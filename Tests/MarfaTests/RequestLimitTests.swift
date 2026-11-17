@@ -5,7 +5,7 @@ import Testing
 @testable import Marfa
 
 /// A server whose root names a small `max_request_bytes`, and which answers every create it is sent.
-private func serverTaking(_ limit: Int, creating ids: Mutex<[String]>) async throws -> LocalServer {
+private func serverTaking(_ limit: Int, creating ids: borrowing Mutex<[String]>) async throws -> LocalServer {
     try await LocalServer.start(contract: marfaContractVersion) { method, path in
         switch (method, path) {
         case (_, "/"):
