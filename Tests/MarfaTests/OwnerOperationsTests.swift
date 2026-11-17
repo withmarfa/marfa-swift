@@ -4,6 +4,7 @@ import Testing
 
 @testable import Marfa
 @testable import MarfaAPI
+@testable import MarfaTypes
 
 private let service = "com.withmarfa.marfa-swift.tests"
 private let contract = ["X-Marfa-Contract": String(marfaContractVersion)]
@@ -184,6 +185,33 @@ struct OwnerOperationsTests {
         }
     }
 
+    @Test func aPlainRenewalWhileTheCallWaitsStillLeadsToTheSheet() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer()
+            let authorization = try Authorization(
+                server: scripted.url, client: client, keychain: keychain, service: service,
+                transport: scripted.transport())
+            let renewed = KeptSignIn(
+                clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
+                redirect: client.redirect?.absoluteString, accessToken: "at-renewed", refreshToken: "rt-renewed",
+                scope: "core.note:read backups.manage config.manage offline_access",
+                tokenEndpoint: "\(scripted.origin)/oauth/token", revocationEndpoint: "\(scripted.origin)/oauth/revoke")
+            marfa(scripted) { request in
+                if request.headers["Authorization"] == "Bearer at-2" { return tags }
+                // Another call renews the token after this request was sent, which the server keeps challenging.
+                try? authorization.place.keep(renewed)
+                return challenge
+            }
+            let sheet = Sheet()
+            let api = Client(try signedIn(scripted, keychain, sheet), through: nil, timeout: .seconds(30))
+            let page = try await api.listTags().ok.body.json
+            #expect(page.data.map(\.tag) == ["reading"])
+            #expect(sheet.count == 1 && sheet.maxAge() == "300")
+            #expect(
+                scripted.requests(to: "/tags").map { $0.headers["Authorization"] } == ["Bearer at-1", "Bearer at-2"])
+        }
+    }
+
     @Test func callsWaitingOnTheSameChallengeShareOneSheet() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer()
@@ -309,11 +337,37 @@ struct OwnerOperationsTests {
 
     @Test func ownerPermissionsAreAskedForByNameAndCheckedOnTheCredential() async throws {
         #expect(client.scopes == ["core.note:read", "backups.manage", "config.manage"])
-        #expect(Set(OwnerPermission.allCases.map(\.rawValue)).contains("profile.email:write"))
+        let named = Set(OwnerPermission.allCases.map(\.rawValue))
+        #expect(named == Set(Components.Schemas.Permission.allCases.map(\.rawValue)))
+        #expect(named.count == 14 && !named.contains("profile.email:write"))
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer()
             let credential = try #require(try signedIn(scripted, keychain, nil).credential)
             #expect(credential.grants(.backupsManage) && !credential.grants(.keysManage))
         }
+    }
+
+    @Test func applyingSendsExactlyWhatWasChecked() async throws {
+        let scripted = ScriptedAuthServer { request in
+            if request.path == "/config/address-check" {
+                return .raw(
+                    200,
+                    Data(
+                        #"{"sign_in_address": "https://checked.example", "addresses": ["https://checked.example"], "requires_confirmation": true, "consequences": [], "next_steps": []}"#
+                            .utf8), headers: jsonHeaders)
+            }
+            return .raw(200, Data(#"{"instance_id": "inst"}"#.utf8), headers: jsonHeaders)
+        }
+        let api = Client(
+            Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+            timeout: .seconds(30))
+        var change = AddressChange(signInAddress: .set("https://checked.example"))
+        let check = try await api.check(change)
+        change.signInAddress = .set("https://other.example")
+        change.addresses = .set(["https://other.example"])
+        _ = try await api.apply(change, after: check)
+        let sent = try #require(scripted.requests(to: "/config").first)
+        #expect(sent.json["sign_in_address"] as? String == "https://checked.example")
+        #expect(sent.json["addresses"] == nil)
     }
 }
