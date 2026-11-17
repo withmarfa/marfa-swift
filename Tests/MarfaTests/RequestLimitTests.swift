@@ -29,7 +29,7 @@ private func serverTaking(_ limit: Int, creating ids: CreateAnswer) async throws
         case ("GET", _) where path.hasPrefix("/items/") && ids.ids.withLock({ path == "/items/\($0.first ?? "")" }):
             return (
                 200, "application/json",
-                #"{"item":\#(item(String(path.dropFirst("/items/".count)))),"metadata":{"tags":[]}}"#
+                #"{"listed":true,"item":\#(item(String(path.dropFirst("/items/".count)))),"metadata":{"tags":[]}}"#
             )
         case (_, _) where path.hasPrefix("/items/"):
             return (404, "application/json", #"{"error":{"code":"item_not_found","message":"none"}}"#)
