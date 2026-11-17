@@ -285,6 +285,62 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
     func getFolderStatus(_ input: Operations.GetFolderStatus.Input) async throws -> Operations.GetFolderStatus.Output
+    /// List connectors
+    ///
+    /// Returns your registration, or every registration if you hold `connectors.manage`, newest first.
+    ///
+    /// - Remark: HTTP `GET /connectors`.
+    /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
+    func listConnectors(_ input: Operations.ListConnectors.Input) async throws -> Operations.ListConnectors.Output
+    /// Get a connector
+    ///
+    /// Returns a connector, with when it last sent a heartbeat, its last run and any hold on it.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
+    func getConnector(_ input: Operations.GetConnector.Input) async throws -> Operations.GetConnector.Output
+    /// Delete a connector
+    ///
+    /// Deletes the connector, its runs and hold, and its inbound endpoints with every delivery they stored. Its state document and agreements stay with its source, for a later key with the same source.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
+    func deleteConnector(_ input: Operations.DeleteConnector.Input) async throws -> Operations.DeleteConnector.Output
+    /// List connector runs
+    ///
+    /// Returns the runs the connector reported, newest first.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/runs`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
+    func listConnectorRuns(_ input: Operations.ListConnectorRuns.Input) async throws -> Operations.ListConnectorRuns.Output
+    /// Delete a connector's state
+    ///
+    /// Deletes the state document, current problems and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
+    func deleteConnectorState(_ input: Operations.DeleteConnectorState.Input) async throws -> Operations.DeleteConnectorState.Output
+    /// List inbound endpoints
+    ///
+    /// Returns the connector's inbound endpoints, newest first, retired ones included.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
+    func listInboundEndpoints(_ input: Operations.ListInboundEndpoints.Input) async throws -> Operations.ListInboundEndpoints.Output
+    /// Create an inbound endpoint
+    ///
+    /// Creates an inbound endpoint for the connector and returns it. Save its `path`: this is the only response that shows it in full.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
+    func createInboundEndpoint(_ input: Operations.CreateInboundEndpoint.Input) async throws -> Operations.CreateInboundEndpoint.Output
+    /// Retire an inbound endpoint
+    ///
+    /// Retires an inbound endpoint, so its address stops accepting deliveries. It stays listed with `retired_at`, and deliveries it already stored stay readable until they age out.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
+    func retireInboundEndpoint(_ input: Operations.RetireInboundEndpoint.Input) async throws -> Operations.RetireInboundEndpoint.Output
     /// List API keys
     ///
     /// Returns key metadata without plaintext. `keys.manage` and local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or local authority.
@@ -432,6 +488,20 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /overview`.
     /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
     func getOverview(_ input: Operations.GetOverview.Input) async throws -> Operations.GetOverview.Output
+    /// Get the configuration
+    ///
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /config`.
+    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
+    func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    func updateConfig(_ input: Operations.UpdateConfig.Input) async throws -> Operations.UpdateConfig.Output
     /// Replace the configuration
     ///
     /// Replaces the instance configuration with the body and returns it. A setting you leave out goes back to its default, so send the whole configuration with your change. To change only some settings, use `PATCH`. Requires `config.manage`.
@@ -1122,6 +1192,124 @@ extension ClientProtocol {
             headers: headers
         ))
     }
+    /// List connectors
+    ///
+    /// Returns your registration, or every registration if you hold `connectors.manage`, newest first.
+    ///
+    /// - Remark: HTTP `GET /connectors`.
+    /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
+    public func listConnectors(headers: Operations.ListConnectors.Input.Headers = .init()) async throws -> Operations.ListConnectors.Output {
+        try await listConnectors(Operations.ListConnectors.Input(headers: headers))
+    }
+    /// Get a connector
+    ///
+    /// Returns a connector, with when it last sent a heartbeat, its last run and any hold on it.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
+    public func getConnector(
+        path: Operations.GetConnector.Input.Path,
+        headers: Operations.GetConnector.Input.Headers = .init()
+    ) async throws -> Operations.GetConnector.Output {
+        try await getConnector(Operations.GetConnector.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Delete a connector
+    ///
+    /// Deletes the connector, its runs and hold, and its inbound endpoints with every delivery they stored. Its state document and agreements stay with its source, for a later key with the same source.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
+    public func deleteConnector(
+        path: Operations.DeleteConnector.Input.Path,
+        headers: Operations.DeleteConnector.Input.Headers = .init()
+    ) async throws -> Operations.DeleteConnector.Output {
+        try await deleteConnector(Operations.DeleteConnector.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List connector runs
+    ///
+    /// Returns the runs the connector reported, newest first.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/runs`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
+    public func listConnectorRuns(
+        path: Operations.ListConnectorRuns.Input.Path,
+        query: Operations.ListConnectorRuns.Input.Query = .init(),
+        headers: Operations.ListConnectorRuns.Input.Headers = .init()
+    ) async throws -> Operations.ListConnectorRuns.Output {
+        try await listConnectorRuns(Operations.ListConnectorRuns.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Delete a connector's state
+    ///
+    /// Deletes the state document, current problems and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
+    public func deleteConnectorState(
+        path: Operations.DeleteConnectorState.Input.Path,
+        headers: Operations.DeleteConnectorState.Input.Headers = .init()
+    ) async throws -> Operations.DeleteConnectorState.Output {
+        try await deleteConnectorState(Operations.DeleteConnectorState.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List inbound endpoints
+    ///
+    /// Returns the connector's inbound endpoints, newest first, retired ones included.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
+    public func listInboundEndpoints(
+        path: Operations.ListInboundEndpoints.Input.Path,
+        headers: Operations.ListInboundEndpoints.Input.Headers = .init()
+    ) async throws -> Operations.ListInboundEndpoints.Output {
+        try await listInboundEndpoints(Operations.ListInboundEndpoints.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Create an inbound endpoint
+    ///
+    /// Creates an inbound endpoint for the connector and returns it. Save its `path`: this is the only response that shows it in full.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
+    public func createInboundEndpoint(
+        path: Operations.CreateInboundEndpoint.Input.Path,
+        headers: Operations.CreateInboundEndpoint.Input.Headers = .init(),
+        body: Operations.CreateInboundEndpoint.Input.Body
+    ) async throws -> Operations.CreateInboundEndpoint.Output {
+        try await createInboundEndpoint(Operations.CreateInboundEndpoint.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Retire an inbound endpoint
+    ///
+    /// Retires an inbound endpoint, so its address stops accepting deliveries. It stays listed with `retired_at`, and deliveries it already stored stay readable until they age out.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
+    public func retireInboundEndpoint(
+        path: Operations.RetireInboundEndpoint.Input.Path,
+        headers: Operations.RetireInboundEndpoint.Input.Headers = .init()
+    ) async throws -> Operations.RetireInboundEndpoint.Output {
+        try await retireInboundEndpoint(Operations.RetireInboundEndpoint.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// List API keys
     ///
     /// Returns key metadata without plaintext. `keys.manage` and local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or local authority.
@@ -1394,6 +1582,30 @@ extension ClientProtocol {
     /// - Remark: Generated from `#/paths//overview/get(getOverview)`.
     public func getOverview(headers: Operations.GetOverview.Input.Headers = .init()) async throws -> Operations.GetOverview.Output {
         try await getOverview(Operations.GetOverview.Input(headers: headers))
+    }
+    /// Get the configuration
+    ///
+    /// Returns the instance configuration: its display name, enforcement levers and live settings, with its `instance_id`. A setting nobody has set is left out. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /config`.
+    /// - Remark: Generated from `#/paths//config/get(getConfig)`.
+    public func getConfig(headers: Operations.GetConfig.Input.Headers = .init()) async throws -> Operations.GetConfig.Output {
+        try await getConfig(Operations.GetConfig.Input(headers: headers))
+    }
+    /// Update the configuration
+    ///
+    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `PATCH /config`.
+    /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
+    public func updateConfig(
+        headers: Operations.UpdateConfig.Input.Headers = .init(),
+        body: Operations.UpdateConfig.Input.Body
+    ) async throws -> Operations.UpdateConfig.Output {
+        try await updateConfig(Operations.UpdateConfig.Input(
+            headers: headers,
+            body: body
+        ))
     }
     /// Replace the configuration
     ///

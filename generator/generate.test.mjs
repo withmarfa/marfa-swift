@@ -386,9 +386,10 @@ test("optional nullable type arrays keep presence, constraints, and annotations"
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("the client keeps what an app's credential calls on the server and a working copy does not do", () => {
-  const operation = (operationId, tags, security = [{ bearerAuth: [] }]) => ({
-    operationId, tags, security, responses: {},
+  const operation = (operationId, tags, security = [{ bearerAuth: [] }], extra = {}) => ({
+    operationId, tags, security, responses: {}, ...extra,
   });
+  const owners = { "x-marfa-local-command": true };
   const input = {
     openapi: "3.1.0",
     info: { title: "Fixture", version: "1" },
@@ -400,7 +401,24 @@ test("the client keeps what an app's credential calls on the server and a workin
       "/items/bulk-actions": { post: operation("applyBulkAction", ["Bulk actions"]) },
       "/items/bulk-actions/jobs/{id}": { get: operation("getBulkActionJob", ["Bulk actions"]) },
       "/items/bulk-actions/jobs/{id}/cancel": { post: operation("cancelBulkActionJob", ["Bulk actions"]) },
-      "/connectors": { post: operation("registerConnector", ["Connectors"]) },
+      "/connectors": {
+        get: operation("listConnectors", ["Connectors"], undefined, owners),
+        post: operation("registerConnector", ["Connectors"]),
+      },
+      "/connectors/{id}": {
+        get: operation("getConnector", ["Connectors"], undefined, owners),
+        delete: operation("deleteConnector", ["Connectors"], undefined, owners),
+      },
+      "/connectors/{id}/heartbeat": { post: operation("sendConnectorHeartbeat", ["Connectors"]) },
+      "/connectors/{id}/state": {
+        get: operation("getConnectorState", ["Connector state"]),
+        delete: operation("deleteConnectorState", ["Connector state"], undefined, owners),
+      },
+      "/connectors/{id}/endpoints": {
+        get: operation("listInboundEndpoints", ["Inbound webhooks"], undefined, owners),
+        post: operation("createInboundEndpoint", ["Inbound webhooks"], undefined, owners),
+      },
+      "/connectors/{id}/deliveries": { get: operation("listInboundDeliveries", ["Inbound webhooks"]) },
       "/owner": { get: operation("getOwner", ["Owner"], [{ ownerSession: [] }]) },
       "/": { get: operation("getInstance", ["Instance"], []) },
       "/config": {
@@ -418,8 +436,9 @@ test("the client keeps what an app's credential calls on the server and a workin
     },
   };
   assert.deepEqual(clientOperations(input), [
-    "aNewServerOperation", "cancelBulkActionJob", "getBulkActionJob", "listBlobStores", "registerType",
-    "replaceConfig",
+    "aNewServerOperation", "cancelBulkActionJob", "createInboundEndpoint", "deleteConnector", "deleteConnectorState",
+    "getBulkActionJob", "getConfig", "getConnector", "listBlobStores", "listConnectors", "listInboundEndpoints",
+    "registerType", "replaceConfig", "updateConfig",
   ]);
 });
 
@@ -430,10 +449,21 @@ test("the committed client makes what the rule keeps from the pinned document", 
   const client = new Set(generated("Sources/MarfaAPI/Generated/Client.swift"));
   // The wire types describe every operation, so each absence below is the client's own.
   const wire = new Set(generated("Sources/MarfaTypes/Types.swift"));
-  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", "replaceConfig"]) assert.ok(client.has(kept), kept);
+  const owner = [
+    "getUpdate", "startUpdate", "replaceOwnerPassword", "confirmClock", "checkAddressChange", "listSettings", "getConfig",
+    "updateConfig", "replaceConfig", "listBackups", "runBackup", "adoptBackupFolder", "restoreBackup", "restoreArchive",
+    "listOwnerPasskeys", "renameOwnerPasskey", "deleteOwnerPasskey", "getPasskeyAddUrl", "listSignIns", "renameSignIn",
+    "endSignIn", "listAppGrants", "narrowAppGrant", "revokeAppGrant", "getProfile", "updateProfile", "getProfileAvatar",
+    "replaceProfileAvatar", "listTrash", "emptyTrash", "listAttention", "listConnectors", "getConnector",
+    "deleteConnector", "listConnectorRuns", "deleteConnectorState", "listInboundEndpoints", "createInboundEndpoint",
+    "retireInboundEndpoint",
+  ];
+  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", ...owner])
+    assert.ok(client.has(kept), kept);
   for (const left of [
-    "createItem", "applyBulkAction", "registerConnector", "createOwner", "getInstance", "listItemVersions", "getConfig",
-    "updateConfig", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
+    "createItem", "applyBulkAction", "registerConnector", "sendConnectorHeartbeat", "reportConnectorRun",
+    "takeConnectorHold", "replaceConnectorState", "listInboundDeliveries", "createOwner", "getInstance", "listItemVersions",
+    "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
   ]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);

@@ -150,6 +150,22 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case closed(message: String)
     /// A call that needs the server found the device offline, so nothing was sent.
     case noConnection(message: String)
+    /// The server wants the owner to confirm it is them before it acts: the owner signed in longer ago than the
+    /// act allows (401 `insufficient_user_authentication`, RFC 9470), and `maxAgeSeconds` is how recently they must
+    /// have signed in.
+    ///
+    /// A ``Server`` that was told how to show the sign-in with ``Server/confirming(from:prefersEphemeralWebBrowserSession:)``
+    /// signs the owner in again and sends the call once more, so an app sees this only when it gave no way to show
+    /// the sheet, when the sign-in has no browser redirect, or when the server asks again after the owner confirmed.
+    /// Asking again with nothing changed does not clear it. A person who cancels the sheet gets
+    /// ``canceled(message:)`` instead.
+    case confirmationRequired(maxAgeSeconds: UInt64?, message: String, server: ServerAnswer?)
+    /// An API key made a call that only an app the owner signed in to can make (403 `app_sign_in_required`), such as
+    /// restoring a backup or moving the sign-in address.
+    ///
+    /// Its `message` is fixed: do this from an app you signed in to. A key has no sign-in to renew, so asking
+    /// again with the key cannot clear it.
+    case appSignInRequired(message: String, server: ServerAnswer?)
 
     /// The server could not be reached, or its answer did not arrive.
     ///
@@ -217,7 +233,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .contractMismatch(_, _, _, _, let message, _), .canceled(let message), .firstSyncWaiting(let message),
             .invalid(let message), .fault(let message), .keyChanging(let message),
             .versionConflict(let message, _),
-            .instanceChanged(let message, _), .closed(let message), .noConnection(let message):
+            .instanceChanged(let message, _), .closed(let message), .noConnection(let message),
+            .confirmationRequired(_, let message, _), .appSignInRequired(let message, _):
             message
         }
     }
@@ -233,7 +250,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .server(_, _, _, _, let server), .unnamed(_, _, let server), .redirected(_, _, _, _, let server),
             .copyExpired(_, _, let server), .streamIncomplete(_, _, let server),
             .contractMismatch(_, _, _, _, _, let server), .versionConflict(_, let server),
-            .instanceChanged(_, let server):
+            .instanceChanged(_, let server), .confirmationRequired(_, _, let server),
+            .appSignInRequired(_, let server):
             server
         case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
             .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
@@ -315,6 +333,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .keyChanging: return "key_changing"
         case .closed: return "closed"
         case .noConnection: return "no_connection"
+        case .confirmationRequired(_, let message, let server):
+            core = .Unauthorized(code: "insufficient_user_authentication", message: message, server: server?.core)
+        case .appSignInRequired(let message, let server):
+            core = .Forbidden(code: "app_sign_in_required", message: message, server: server?.core)
         }
         return core.code()
     }

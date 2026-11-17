@@ -131,8 +131,6 @@ struct ServerCallsTests {
             createdAt: Date(timeIntervalSince1970: 0))
         let page = ItemSnapshotPage(snapshots: [snapshot], next: nil)
         #expect(page.snapshots == [snapshot])
-        let config = InstanceConfig(instanceID: "inst", name: "Home", inboundPendingRetentionDays: 7)
-        #expect(config.name == "Home" && config.inboundPendingRetentionDays == 7 && config.trashRetentionDays == nil)
     }
 
     @Test func aServerMadeFromAKeySendsTheKeyOverItsOwnConnection() async throws {
@@ -150,7 +148,7 @@ struct ServerCallsTests {
             (401, "application/json", #"{"error": {"code": "unauthorized", "message": "no"}}"#)
         }
         defer { local.stop() }
-        let error = await failure { try await Server(url: local.url, key: "mk_plain").config() }
+        let error = await failure { try await Server(url: local.url, key: "mk_plain").snapshots(ofItem: "i1") }
         #expect(error?.code() == "unauthorized", "\(String(describing: error))")
         #expect(local.log.all.count == 1)
     }
@@ -160,7 +158,7 @@ struct ServerCallsTests {
         defer { local.stop() }
         let started = ContinuousClock.now
         let error = await failure {
-            try await Server(url: local.url, key: "mk_plain").config(timeout: .milliseconds(500))
+            try await Server(url: local.url, key: "mk_plain").snapshots(ofItem: "i1", timeout: .milliseconds(500))
         }
         #expect(error?.code() == "network", "\(String(describing: error))")
         #expect(ContinuousClock.now - started < .seconds(10))
@@ -178,7 +176,7 @@ struct ServerCallsTests {
             }
             let server = try signedIn(scripted, keychain)
             let started = ContinuousClock.now
-            let error = await failure { try await server.config(timeout: .seconds(1)) }
+            let error = await failure { try await server.snapshots(ofItem: "i1", timeout: .seconds(1)) }
             #expect(error?.code() == "network", "\(String(describing: error))")
             #expect(ContinuousClock.now - started < .seconds(10), "a renewal that never ends does not hold the call")
         }
@@ -201,7 +199,7 @@ struct ServerCallsTests {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in .raw(200, Data("{}".utf8), headers: [:]) }
             let server = try signedIn(scripted, keychain)
-            let error = await failure { try await server.config() }
+            let error = await failure { try await server.snapshots(ofItem: "i1") }
             #expect(error?.code() == "contract_mismatch", "\(String(describing: error))")
         }
     }
@@ -213,25 +211,27 @@ struct ServerCallsTests {
                 switch (request.path, request.headers["Authorization"]) {
                 case ("/oauth/token", _):
                     .json(200, ["access_token": "at-2", "refresh_token": "rt-2", "token_type": "Bearer"])
-                case (_, "Bearer at-2"): reply(#"{"instance_id": "x"}"#)
+                case (_, "Bearer at-2"): reply(#"{"data": [], "next_cursor": null}"#)
                 default: refused(401, "unauthorized")
                 }
             }
             let server = try signedIn(scripted, keychain)
-            let config = try await server.config()
-            #expect(config.instanceID == "x")
+            let page = try await server.snapshots(ofItem: "i1")
+            #expect(page.snapshots.isEmpty)
             #expect(
-                scripted.requests(to: "/config").map { $0.headers["Authorization"] } == ["Bearer at-1", "Bearer at-2"])
+                scripted.requests(to: "/items/i1/versions").map { $0.headers["Authorization"] } == [
+                    "Bearer at-1", "Bearer at-2",
+                ])
         }
     }
 
     @Test func aRedirectIsNeverFollowed() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in
-                .raw(302, Data(), headers: ["Location": "https://elsewhere.example/config"])
+                .raw(302, Data(), headers: ["Location": "https://elsewhere.example/items"])
             }
             let server = try signedIn(scripted, keychain)
-            let error = await failure { try await server.config() }
+            let error = await failure { try await server.snapshots(ofItem: "i1") }
             #expect(error?.code() == "redirect", "\(String(describing: error))")
             #expect(scripted.requests.count == 1)
         }
@@ -241,87 +241,8 @@ struct ServerCallsTests {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in .failure(.notConnectedToInternet) }
             let server = try signedIn(scripted, keychain)
-            let error = await failure { try await server.config() }
+            let error = await failure { try await server.snapshots(ofItem: "i1") }
             #expect(error?.code() == "no_connection", "\(String(describing: error))")
-        }
-    }
-
-    @Test func configReadsEverySettingTheServerNames() async throws {
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { _ in
-                reply(
-                    """
-                    {"instance_id": "inst", "name": "Home", "trash_retention_days": 30, "version_recent_days": 7,
-                     "version_daily_snapshot_days": 30, "version_weekly_snapshot_days": 90, "version_max_versions": 50,
-                     "enrichment_enabled": true, "event_log_retention_days": 21, "inbound_handled_retention_days": 14,
-                     "inbound_pending_retention_days": 0, "enforcement": {"strict_mode": {"types": ["a"]}}}
-                    """)
-            }
-            let config = try await signedIn(scripted, keychain).config()
-            #expect(config.instanceID == "inst" && config.name == "Home")
-            #expect(config.trashRetentionDays == 30 && config.versionRecentDays == 7)
-            #expect(config.versionDailySnapshotDays == 30 && config.versionWeeklySnapshotDays == 90)
-            #expect(config.versionMaxVersions == 50 && config.enrichmentEnabled == true)
-            #expect(config.inboundHandledRetentionDays == 14 && config.inboundPendingRetentionDays == 0)
-            #expect(config.eventLogRetentionDays == 21)
-            #expect(config.heartbeatEnabled == nil && config.grantInactivityDays == nil)
-        }
-    }
-
-    @Test func updateConfigSendsOnlyTheChangedFieldsAndTheInstanceHeader() async throws {
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { _ in reply(#"{"instance_id": "inst", "name": "Renamed"}"#) }
-            let server = try signedIn(scripted, keychain)
-            var patch = InstanceConfigPatch()
-            patch.name = .set("Renamed")
-            patch.versionMaxVersions = .clear
-            patch.enrichmentEnabled = .set(false)
-            patch.inboundHandledRetentionDays = .set(30)
-            patch.inboundPendingRetentionDays = .clear
-            patch.eventLogRetentionDays = .set(60)
-            let stored = try await server.updateConfig(patch, expecting: "inst")
-            #expect(stored.name == "Renamed")
-            let request = try #require(scripted.requests(to: "/config").first)
-            #expect(request.method == "PATCH")
-            #expect(request.headers["X-Marfa-Instance-Id"] == "inst")
-            #expect(request.headers["Content-Type"] == "application/json")
-            let body = request.json
-            #expect(
-                Set(body.keys) == [
-                    "name", "version_max_versions", "enrichment_enabled", "inbound_handled_retention_days",
-                    "inbound_pending_retention_days", "event_log_retention_days",
-                ])
-            #expect(body["inbound_handled_retention_days"] as? Int == 30)
-            #expect(body["event_log_retention_days"] as? Int == 60)
-            #expect(body["inbound_pending_retention_days"] is NSNull)
-            #expect(body["name"] as? String == "Renamed")
-            #expect(body["version_max_versions"] is NSNull)
-            #expect(body["enrichment_enabled"] as? Bool == false)
-        }
-    }
-
-    @Test func updateConfigWithoutAnInstanceSendsNoHeader() async throws {
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { _ in reply(#"{"instance_id": "inst"}"#) }
-            let server = try signedIn(scripted, keychain)
-            _ = try await server.updateConfig(InstanceConfigPatch())
-            let request = try #require(scripted.requests(to: "/config").first)
-            #expect(request.headers["X-Marfa-Instance-Id"] == nil)
-            #expect(request.json.isEmpty)
-        }
-    }
-
-    @Test func anotherInstanceIsRefusedWhereItLands() async throws {
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { _ in refused(409, "instance_changed") }
-            let server = try signedIn(scripted, keychain)
-            var patch = InstanceConfigPatch()
-            patch.name = .clear
-            let error = await failure { try await server.updateConfig(patch, expecting: "old") }
-            guard case .instanceChanged? = error else {
-                Issue.record("expected instance_changed, got \(String(describing: error))")
-                return
-            }
         }
     }
 

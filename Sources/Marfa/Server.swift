@@ -9,6 +9,9 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// The sign-in the server was made from, which a copy or ``Folders`` renews when the server refuses its
     /// access token; `nil` for a server made from a key.
     public let credential: Credential?
+    /// How the owner is signed in again when the server asks, which ``confirming(from:prefersEphemeralWebBrowserSession:)``
+    /// sets.
+    var confirmation: Confirmation?
 
     public init(url: URL, key: String) {
         self.url = url
@@ -77,6 +80,16 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
             else { throw .notAServer }
             return Server(url: url, key: key)
         }
+    }
+
+    public static func == (lhs: Server, rhs: Server) -> Bool {
+        lhs.url == rhs.url && lhs.key == rhs.key && lhs.credential == rhs.credential
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(url)
+        hasher.combine(key)
+        hasher.combine(credential)
     }
 
     /// Never shows the key.

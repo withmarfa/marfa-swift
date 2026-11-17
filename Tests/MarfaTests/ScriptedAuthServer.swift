@@ -174,7 +174,8 @@ final class ScriptedProtocol: URLProtocol, @unchecked Sendable {
         if body.isEmpty, let stream = request.httpBodyStream {
             stream.open()
             var buffer = [UInt8](repeating: 0, count: 4096)
-            while stream.hasBytesAvailable {
+            // A stream a client feeds from elsewhere has no bytes yet at first, so a read waits for them.
+            while true {
                 let read = stream.read(&buffer, maxLength: buffer.count)
                 if read <= 0 { break }
                 body.append(buffer, count: read)

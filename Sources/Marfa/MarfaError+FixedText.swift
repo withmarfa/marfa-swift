@@ -128,6 +128,14 @@ extension MarfaError {
             FixedErrorText(type: "closed", sentence: "the working copy was closed")
         case .noConnection:
             FixedErrorText(type: "no_connection", sentence: "a call that needs the server found the device offline")
+        case .confirmationRequired:
+            FixedErrorText(
+                type: "confirmation_required", sentence: "the server asked the owner to sign in again before it acts",
+                serverCode: "insufficient_user_authentication")
+        case .appSignInRequired:
+            FixedErrorText(
+                type: "app_sign_in_required", sentence: "the call must come from an app the owner signed in to",
+                serverCode: "app_sign_in_required")
         }
     }
 }
