@@ -65,12 +65,12 @@ import Testing
     @Test func aTimedEndIsShownInTheStartsZoneWhenItNamesNone() throws {
         let dates = try #require(
             event([
-                "starts_at": .string("2026-03-11T15:00:00Z"), "ends_at": .string("2026-03-11T16:00:00+09:00"),
+                "starts_at": .string("2026-03-11T15:00:00Z"), "ends_at": .string("2026-03-12T01:00:00+09:00"),
                 "timezone": .string("Asia/Tokyo"),
             ]).eventDates())
         #expect(dates.start.timeZone?.identifier == "Asia/Tokyo")
         #expect(dates.end.timeZone?.identifier == "Asia/Tokyo")
-        #expect(dates.end.date == Date(timeIntervalSince1970: 1_773_212_400), "the end's own offset is the instant")
+        #expect(dates.end.date == Date(timeIntervalSince1970: 1_773_244_800), "the end's own offset is the instant")
     }
 
     @Test func aTimedEventWithNoZoneHasNoZoneToShow() throws {
