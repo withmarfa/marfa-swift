@@ -105,7 +105,8 @@ public struct Authorization: Sendable {
     ///
     /// Throws ``SignInError/canceled`` when the person closes the browser, ``SignInError/denied`` when they
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
-    /// ask for, ``SignInError/noRedirect`` when the client names no redirect, and
+    /// ask for, ``SignInError/issuerMismatch`` when the approval names another issuer than the server's,
+    /// ``SignInError/noRedirect`` when the client names no redirect, and
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
     /// keep the approval. When the approval cannot be kept, for that or a keychain error, it asks the server to
     /// revoke it: by its refresh token, which ends its grant, or by its access token alone when it reused the
@@ -529,6 +530,9 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     case expired
     /// The browser returned an approval whose `state` is not the one this sign-in sent, so it is refused.
     case stateMismatch
+    /// The browser returned an approval whose `iss` is not the issuer the server named, or has none although the
+    /// server says it sends one, so it is refused (RFC 9207).
+    case issuerMismatch
     /// The keychain holds no sign-in for the server.
     case notSignedIn
     /// The address is not an `http` or `https` address with a host, so it names no server to sign in to.
@@ -555,6 +559,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .denied: "The app was not approved."
         case .expired: "The code expired before the app was approved."
         case .stateMismatch: "The approval was not for this sign-in."
+        case .issuerMismatch: "The approval came from another server than the one this sign-in is for."
         case .notSignedIn: "The app is not signed in to this server."
         case .notAServer: "The address is not an http or https server address."
         case .otherServer: "The sign-in is for another server."
