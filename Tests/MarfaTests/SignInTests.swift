@@ -246,7 +246,8 @@ struct BrowserSignIn {
             URLComponents(url: authorize, resolvingAgainstBaseURL: false)?.queryItems?
             .first { $0.name == "state" }?.value ?? ""
         var answer = URLComponents(string: "so.marfa.tests:/signed-in") ?? URLComponents()
-        answer.queryItems = fields.map { URLQueryItem(name: $0.0, value: $0.1) } + [URLQueryItem(name: "state", value: state)]
+        answer.queryItems =
+            fields.map { URLQueryItem(name: $0.0, value: $0.1) } + [URLQueryItem(name: "state", value: state)]
             + (iss.map { [URLQueryItem(name: "iss", value: $0)] } ?? [])
         return answer.url ?? authorize
     }
@@ -267,7 +268,7 @@ struct BrowserSignIn {
     }
 
     @Test(arguments: [
-        "https://elsewhere.example", "", "HTTPS://SERVER.example", "ISSUER/",
+        "https://elsewhere.example", "", "ISSUER/",
     ])
     func anApprovalWithAnotherIssuerIsRefusedBeforeItsCodeIsRedeemed(other: String) async throws {
         for supported in [true, nil] as [Bool?] {

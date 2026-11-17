@@ -161,6 +161,8 @@ public struct Authorization: Sendable {
         // Nothing else in the answer is read before its state is: an answer to another request may carry a
         // code an attacker holds.
         guard value("state") == state else { throw SignInError.stateMismatch }
+        // The `iss` check covers a refusal too: a refusal from another server is not this server's answer.
+        guard discovery.accepts(issuer: value("iss")) else { throw SignInError.issuerMismatch }
         if let error = value("error") {
             if error == "access_denied" { throw SignInError.denied }
             throw SignInError.refused(code: error, message: value("error_description") ?? error)
