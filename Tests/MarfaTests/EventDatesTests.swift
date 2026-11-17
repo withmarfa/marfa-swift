@@ -200,6 +200,32 @@ import Testing
         #expect(dates.end.day == day(2011, 12, 31))
     }
 
+    /// London's clocks go forward at 01:00 UTC on 29 March 2026 and back at 01:00 UTC on 25 October 2026.
+    @Test(arguments: [
+        ("2026-03-28T23:59:59Z", 28), ("2026-03-29T00:30:00Z", 29), ("2026-03-29T23:30:00Z", 30),
+        ("2026-10-24T23:30:00Z", 25), ("2026-10-25T23:30:00Z", 25), ("2026-10-26T00:00:00Z", 26),
+    ])
+    func anAllDayInstantFallsOnTheEventsDayEitherSideOfAClockChange(instant: String, expected: Int) throws {
+        let month = instant.hasPrefix("2026-03") ? 3 : 10
+        let dates = try #require(
+            event([
+                "starts_at": .string(instant), "all_day": .bool(true), "timezone": .string("Europe/London"),
+            ]).eventDates(calendar: calendar("Pacific/Kiritimati")))
+        #expect(dates.start.day == day(2026, month, expected))
+    }
+
+    @Test func aDayThatAClockChangeShortensIsStillOneDay() throws {
+        let dates = try #require(
+            event([
+                "starts_at": .string("2026-03-28"), "ends_at": .string("2026-03-30"),
+                "timezone": .string("Europe/London"),
+            ])
+            .eventDates(calendar: calendar("Europe/London")))
+        #expect(dates.end.day == day(2026, 3, 30))
+        #expect(dates.lastDay == day(2026, 3, 29))
+        #expect(dates.end.date.timeIntervalSince(dates.start.date) == 47 * 3600, "the clocks lose an hour in the span")
+    }
+
     @Test func anUnknownZoneKeepsATimedInstantAndHidesTheZone() throws {
         let dates = try #require(
             event([
