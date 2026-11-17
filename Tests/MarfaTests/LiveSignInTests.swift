@@ -102,7 +102,7 @@ struct LiveSignIn {
 
     /// A browser that is the owner's: it approves every scope on the consent screen and answers the address the
     /// server sends it back to.
-    private static func browserApproval(on own: OwnServer) -> @MainActor @Sendable (URL, String) async throws -> URL {
+    static func browserApproval(on own: OwnServer) -> @MainActor @Sendable (URL, String) async throws -> URL {
         { authorize, scheme in
             let origin = own.url.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             let session = URLSession(configuration: .ephemeral)
