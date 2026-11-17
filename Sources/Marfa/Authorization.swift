@@ -33,17 +33,21 @@ public struct Authorization: Sendable {
         public var redirect: URL?
         /// The scopes the app asks for, such as `core.note:read` and `core.note:write`. `offline_access` is
         /// added, so the server issues a refresh token.
+        ///
+        /// ``init(name:redirect:scopes:permissions:)`` adds the instance permissions it names. A profile scope such
+        /// as `profile.email:write`, which lets the app change the owner's email address, is a scope like any other,
+        /// so it belongs here.
         public var scopes: [String]
 
-        /// - Parameter ownerPermissions: What the app asks for to look after the instance, which the owner's approval
+        /// - Parameter permissions: What the app asks for to look after the instance, which the owner's approval
         ///   page then shows as a switch each. They are added to `scopes`, and the owner may approve fewer: ask the
         ///   ``Credential`` with ``Credential/grants(_:)``.
         public init(
-            name: String, redirect: URL? = nil, scopes: [String], ownerPermissions: [OwnerPermission] = []
+            name: String, redirect: URL? = nil, scopes: [String], permissions: [InstancePermission] = []
         ) {
             self.name = name
             self.redirect = redirect
-            self.scopes = scopes + ownerPermissions.map(\.rawValue)
+            self.scopes = scopes + permissions.map(\.rawValue)
         }
 
         var scope: String {
@@ -454,7 +458,7 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     ///
     /// The owner may approve fewer permissions than the app asked for, so check before offering a control that
     /// needs one. This reads the approval kept with the credential; the server decides each call.
-    public func grants(_ permission: OwnerPermission) -> Bool { scopes.contains(permission.rawValue) }
+    public func grants(_ permission: InstancePermission) -> Bool { scopes.contains(permission.rawValue) }
 
     /// The sign-in that signs the owner in again with the registration this credential kept.
     ///
@@ -476,29 +480,41 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     public var description: String { "Credential(\(server.absoluteString))" }
 }
 
-/// What an app asks the owner for so it can look after the instance, by the name the server gives each.
+/// One of the instance's fourteen permissions, by the name the server gives it.
 ///
-/// Ask for them in ``Authorization/Client/init(name:redirect:scopes:ownerPermissions:)``. The approval page shows the
-/// owner a switch for each, and the owner may approve fewer.
-public enum OwnerPermission: String, Sendable, Hashable, CaseIterable {
+/// A permission opens the operations it names and no item; what an app reads and writes is the type, edge and
+/// profile scopes it asks for. Ask for permissions in ``Authorization/Client/init(name:redirect:scopes:permissions:)``.
+/// The approval page shows the owner a switch for each, and the owner may approve fewer.
+public enum InstancePermission: String, Sendable, Hashable, CaseIterable {
+    /// Reads the audit log.
+    case auditRead = "audit.read"
     /// Lists, makes and restores backups, and adopts a backup folder.
     case backupsManage = "backups.manage"
-    /// Lists, renames and ends the owner's sign-ins, and the owner's passkeys.
-    case signInsManage = "sign_ins.manage"
+    /// Manages blob bytes and copies across the instance, without reaching any item's content.
+    case blobsManage = "blobs.manage"
     /// Reads and changes the instance's settings, and checks a change of address.
     case configManage = "config.manage"
-    /// Updates the server, runs housekeeping and confirms the clock.
-    case instanceMaintain = "instance.maintain"
-    /// Reads the server's health, update status, settings and what needs attention.
-    case instanceRead = "instance.read"
+    /// Reads and administers connector registrations, their runs and their endpoints, deletes registrations and
+    /// clears a registration's retained state.
+    case connectorsManage = "connectors.manage"
     /// Lists, narrows and revokes other apps' access.
     case grantsManage = "grants.manage"
-    /// Lists and revokes every key.
-    case keysManage = "keys.manage"
+    /// Updates the server, runs housekeeping, cancels bulk jobs and confirms the clock.
+    case instanceMaintain = "instance.maintain"
+    /// Reads the server's health, update status, what needs attention, metrics and housekeeping status.
+    case instanceRead = "instance.read"
     /// Lists and empties the trash and purges trashed items.
     case itemsPurge = "items.purge"
-    /// Changes the owner's email address. The name and avatar need only the profile permission every app asks for.
-    case profileEmailWrite = "profile.email:write"
+    /// Lists and revokes every key, changes their metadata and narrows their access.
+    case keysManage = "keys.manage"
+    /// Makes keys within the app's own access, and lists, changes and revokes the keys within that access.
+    case keysMint = "keys.mint"
+    /// Removes and replaces type and edge type definitions the app's maps allow it to write.
+    case schemaWrite = "schema.write"
+    /// Lists, renames and ends the owner's sign-ins and passkeys, and gets the link that adds a passkey.
+    case signInsManage = "sign_ins.manage"
+    /// Reads, registers, changes and removes the outbound subscriptions that send the instance's events out.
+    case webhooksManage = "webhooks.manage"
 }
 
 /// Why a sign-in did not finish.

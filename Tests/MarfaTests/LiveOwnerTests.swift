@@ -5,7 +5,7 @@ import Testing
 @testable import Marfa
 
 /// The owner's calls against a server of the test's own: one call for each area, then an owner sign-in that asks
-/// for owner permissions by name.
+/// for instance permissions by name.
 ///
 /// The step-up test waits out the server's five minutes after the sign-in, so it runs only where
 /// `MARFA_LIVE_WAIT` is set.
@@ -14,10 +14,7 @@ import Testing
     .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"),
     .timeLimit(.minutes(10)))
 struct LiveOwner {
-    static let every: [OwnerPermission] = [
-        .backupsManage, .signInsManage, .configManage, .instanceMaintain, .instanceRead, .grantsManage, .keysManage,
-        .itemsPurge, .profileEmailWrite,
-    ]
+    static let every = InstancePermission.allCases
     static let waits = ProcessInfo.processInfo.environment["MARFA_LIVE_WAIT"] != nil
     static let service = "com.withmarfa.marfa-swift.tests"
 
@@ -62,6 +59,7 @@ struct LiveOwner {
         let authorization = try authorization(own, keychain, every: true)
         let credential = try await authorization.signIn(browser: LiveSignIn.browserApproval(on: own))
         #expect(Set(every.map(\.rawValue)).isSubset(of: Set(credential.scopes)))
+        #expect(credential.scopes.contains("profile.email:write"))
         let api = Client(try Server(url: own.url, credential: credential))
         _ = try await api.getConfig()
         _ = try await api.listSettings()
@@ -75,6 +73,7 @@ struct LiveOwner {
         _ = try await api.listAttention()
         _ = try await api.getUpdate()
         _ = try await api.listTrash()
+        _ = try await api.listConnectors()
     }
 
     private static func authorization(_ own: OwnServer, _ keychain: Keychain, every: Bool = false) throws
@@ -85,8 +84,8 @@ struct LiveOwner {
             client: Authorization.Client(
                 name: "marfa-swift owner live tests",
                 redirect: URL(string: "com.withmarfa.marfa-swift.tests:/signed-in"),
-                scopes: ["core.note:read"],
-                ownerPermissions: every ? Self.every : [.configManage]),
+                scopes: every ? ["core.note:read", "profile.email:write"] : ["core.note:read"],
+                permissions: every ? Self.every : [.configManage]),
             keychain: keychain, service: service)
     }
 

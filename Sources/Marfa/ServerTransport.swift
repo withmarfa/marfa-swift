@@ -154,13 +154,14 @@ extension Server {
         body: Data? = nil, timeout: Duration
     ) async throws(MarfaError) -> Data {
         let token = try currentToken()
+        let mark = confirmationMark()
         do {
             return try await timed(
                 method, path, query: query, headers: headers, body: body, timeout: timeout, token: token)
         } catch .confirmationRequired(let maxAge, let message, let answer) {
             // The sheet waits for a person, so the call's time limit starts again once it closes.
             let confirmed = try await confirmedToken(
-                refused: token,
+                since: mark,
                 challenge: .confirmationRequired(maxAgeSeconds: maxAge, message: message, server: answer))
             return try await timed(
                 method, path, query: query, headers: headers, body: body, timeout: timeout, token: confirmed)

@@ -17,6 +17,7 @@ struct Access: ClientMiddleware {
     ) async throws -> (HTTPResponse, HTTPBody?) {
         let origin = server.origin
         let token = try server.currentToken()
+        let mark = server.confirmationMark()
         let write = request.method != .get && request.method != .head
         let sent = try await send(request, body, baseURL, token, next)
         if let refused = await refusal(sent, origin: origin, write: write) {
@@ -28,7 +29,7 @@ struct Access: ClientMiddleware {
                 guard body?.iterationBehavior != .single else { throw refused }
             case .confirmationRequired:
                 guard body?.iterationBehavior != .single else { throw refused }
-                again = try await server.confirmedToken(refused: token, challenge: refused)
+                again = try await server.confirmedToken(since: mark, challenge: refused)
             default: again = nil
             }
             guard let again else { throw refused }

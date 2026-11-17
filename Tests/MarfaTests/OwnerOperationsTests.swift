@@ -11,7 +11,7 @@ private let contract = ["X-Marfa-Contract": String(marfaContractVersion)]
 private let jsonHeaders = contract.merging(["Content-Type": "application/json"]) { $1 }
 private let client = Authorization.Client(
     name: "Owner tests", redirect: URL(string: "so.marfa.tests:/signed-in"), scopes: ["core.note:read"],
-    ownerPermissions: [.backupsManage, .configManage])
+    permissions: [.backupsManage, .configManage])
 
 private let tags: ScriptedAuthServer.Reply = .raw(
     200, Data(#"{"data": [{"tag": "reading", "count": 2}], "next_cursor": null}"#.utf8), headers: jsonHeaders)
@@ -212,6 +212,25 @@ struct OwnerOperationsTests {
         }
     }
 
+    @Test func aSignInAnotherCallConfirmedLetsAWaitingCallGoOnWithoutASheet() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer()
+            marfa(scripted) { $0.headers["Authorization"] == "Bearer at-2" ? tags : challenge }
+            let sheet = Sheet()
+            let server = try signedIn(scripted, keychain, sheet)
+            let waiting = server.confirmationMark()
+            _ = try await Client(server, through: nil, timeout: .seconds(30)).listTags()
+            #expect(sheet.count == 1)
+            let token = try await server.confirmedToken(
+                since: waiting, challenge: .confirmationRequired(maxAgeSeconds: 300, message: "", server: nil))
+            #expect(token == "at-2" && sheet.count == 1)
+            let later = try await server.confirmedToken(
+                since: server.confirmationMark(),
+                challenge: .confirmationRequired(maxAgeSeconds: 300, message: "", server: nil))
+            #expect(later == "at-2" && sheet.count == 2)
+        }
+    }
+
     @Test func callsWaitingOnTheSameChallengeShareOneSheet() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer()
@@ -299,12 +318,13 @@ struct OwnerOperationsTests {
             timeout: .seconds(30))
         let change = AddressChange(signInAddress: .set("https://new.example"), addresses: .clear)
         let check = try await api.check(change)
-        #expect(check.requiresConfirmation && check.nextSteps.map(\.code) == [.signIn])
+        #expect(check.answer.requiresConfirmation && check.answer.nextSteps.map(\.code) == [.signIn])
+        #expect(check.change == change)
         let checkSent = try #require(scripted.requests(to: "/config/address-check").first)
         #expect(checkSent.json["sign_in_address"] as? String == "https://new.example")
         #expect(checkSent.json["addresses"] is NSNull)
         #expect(checkSent.json["confirm_sign_in_address_change"] == nil)
-        _ = try await api.apply(change, after: check, expecting: "inst")
+        _ = try await api.apply(check, expecting: "inst")
         let sent = try #require(scripted.requests(to: "/config").first)
         #expect(sent.method == "PATCH" && sent.headers["X-Marfa-Instance-Id"] == "inst")
         #expect(sent.json["confirm_sign_in_address_change"] as? Bool == true)
@@ -318,12 +338,13 @@ struct OwnerOperationsTests {
         let api = Client(
             Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
             timeout: .seconds(30))
-        let check = try JSONDecoder().decode(
+        let answer = try JSONDecoder().decode(
             Components.Schemas.AddressCheck.self,
             from: Data(
                 #"{"sign_in_address": "https://a.example", "addresses": [], "requires_confirmation": false, "consequences": [], "next_steps": []}"#
                     .utf8))
-        _ = try await api.apply(AddressChange(addresses: .set(["https://a.example"])), after: check)
+        let check = AddressChangeCheck(change: AddressChange(addresses: .set(["https://a.example"])), answer: answer)
+        _ = try await api.apply(check)
         let sent = try #require(scripted.requests(to: "/config").first)
         #expect(sent.json["confirm_sign_in_address_change"] == nil)
     }
@@ -335,9 +356,9 @@ struct OwnerOperationsTests {
         #expect(maxAge(nil) == nil)
     }
 
-    @Test func ownerPermissionsAreAskedForByNameAndCheckedOnTheCredential() async throws {
+    @Test func permissionsAreAskedForByNameAndCheckedOnTheCredential() async throws {
         #expect(client.scopes == ["core.note:read", "backups.manage", "config.manage"])
-        let named = Set(OwnerPermission.allCases.map(\.rawValue))
+        let named = Set(InstancePermission.allCases.map(\.rawValue))
         #expect(named == Set(Components.Schemas.Permission.allCases.map(\.rawValue)))
         #expect(named.count == 14 && !named.contains("profile.email:write"))
         try await inIsolatedKeychainAsync { keychain, _ async throws in
@@ -365,7 +386,7 @@ struct OwnerOperationsTests {
         let check = try await api.check(change)
         change.signInAddress = .set("https://other.example")
         change.addresses = .set(["https://other.example"])
-        _ = try await api.apply(change, after: check)
+        _ = try await api.apply(check)
         let sent = try #require(scripted.requests(to: "/config").first)
         #expect(sent.json["sign_in_address"] as? String == "https://checked.example")
         #expect(sent.json["addresses"] == nil)

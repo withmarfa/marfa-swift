@@ -1,6 +1,7 @@
 import AuthenticationServices
 import Foundation
 import SwiftUI
+import Synchronization
 
 /// How a ``Server`` shows the owner the sign-in page when the server asks them to confirm it is them.
 struct Confirmation: Sendable {
@@ -54,10 +55,20 @@ extension Server {
         return server
     }
 
-    /// The token to send again after `challenge`, which the server made of `refused`.
+    /// How many confirmed sign-ins this server's credential has had in this process, read before a request is sent.
     ///
+    /// A call that the server challenges passes it to ``confirmedToken(since:challenge:)``, which tells a
+    /// sign-in made after the request was sent from a renewal, which keeps the sign-in's age.
+    package func confirmationMark() -> Int {
+        credential.map { ConfirmedSignIns.shared.count(for: $0) } ?? 0
+    }
+
+    /// The token to send again after the server answered a request with `challenge`.
+    ///
+    /// Only a confirmed sign-in, this call's or another call's made since `since` was read, lets the call go on
+    /// without a sheet: a token another call renewed has the sign-in's old age, so the server challenges it again.
     /// Throws `challenge` where nothing can answer it.
-    package func confirmedToken(refused: String, challenge: MarfaError) async throws(MarfaError) -> String {
+    package func confirmedToken(since mark: Int, challenge: MarfaError) async throws(MarfaError) -> String {
         guard case .confirmationRequired(let maxAge, _, _) = challenge, let credential, let confirmation else {
             throw challenge
         }
@@ -65,8 +76,7 @@ extension Server {
         await gate.enter()
         do {
             let token = try await Self.confirmed(
-                refused: refused, maxAge: maxAge, credential: credential, confirmation: confirmation,
-                challenge: challenge)
+                since: mark, maxAge: maxAge, credential: credential, confirmation: confirmation, challenge: challenge)
             await gate.leave()
             return token
         } catch {
@@ -76,17 +86,22 @@ extension Server {
     }
 
     private static func confirmed(
-        refused: String, maxAge: UInt64?, credential: Credential, confirmation: Confirmation,
-        challenge: MarfaError
+        since mark: Int, maxAge: UInt64?, credential: Credential, confirmation: Confirmation, challenge: MarfaError
     ) async throws(MarfaError) -> String {
         do {
-            // A call that waited for the sheet sends again with what the first call's sign-in kept.
-            if let kept = try await background({ try credential.accessToken() }), kept != refused { return kept }
+            // A call that waited for the sheet sends again with what another call's confirmed sign-in kept.
+            if ConfirmedSignIns.shared.count(for: credential) > mark,
+                let kept = try await background({ try credential.accessToken() })
+            {
+                return kept
+            }
+            // With no age named, an age of none makes the server ask for a new sign-in whatever the old one's age.
             let signedIn = try await credential.reauthorization().signIn(
-                maxAge: maxAge, browser: confirmation.browser)
+                maxAge: maxAge ?? 0, browser: confirmation.browser)
             guard let token = try await background({ try signedIn.accessToken() }) else {
                 throw SignInError.notSignedIn
             }
+            ConfirmedSignIns.shared.record(for: credential)
             return token
         } catch let error as MarfaError {
             throw error
@@ -105,6 +120,16 @@ extension Server {
             throw .invalid(message: "the owner's sign-in was not confirmed: \(error)")
         }
     }
+}
+
+/// How many sign-ins made with a `max_age` each credential has had, so a call can tell that another call confirmed
+/// the owner since its request was sent.
+private final class ConfirmedSignIns: Sendable {
+    static let shared = ConfirmedSignIns()
+    private let counts = Mutex<[Credential: Int]>([:])
+
+    func count(for credential: Credential) -> Int { counts.withLock { $0[credential] ?? 0 } }
+    func record(for credential: Credential) { counts.withLock { $0[credential, default: 0] += 1 } }
 }
 
 /// Lets one confirmation run at a time, whichever server asks.
