@@ -134,6 +134,7 @@ struct Discovery: Sendable, Decodable {
     let deviceAuthorizationEndpoint: String
     let registrationEndpoint: String
     let revocationEndpoint: String?
+    let authorizationResponseIssParameterSupported: Bool?
 
     enum CodingKeys: String, CodingKey {
         case issuer
@@ -142,6 +143,17 @@ struct Discovery: Sendable, Decodable {
         case deviceAuthorizationEndpoint = "device_authorization_endpoint"
         case registrationEndpoint = "registration_endpoint"
         case revocationEndpoint = "revocation_endpoint"
+        case authorizationResponseIssParameterSupported = "authorization_response_iss_parameter_supported"
+    }
+
+    /// RFC 9207 section 2.4: an authorization response names the issuer it came from, and the app refuses one
+    /// that names another, or none when the metadata says the server sends it.
+    ///
+    /// The comparison is a plain string comparison against `issuer`, as the RFC says, so the same issuer
+    /// written another way is another issuer.
+    func accepts(issuer returned: String?) -> Bool {
+        guard let returned else { return authorizationResponseIssParameterSupported != true }
+        return returned == issuer
     }
 
     /// RFC 8414 section 3.3: the document must name the server it was read from as its issuer, because the

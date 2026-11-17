@@ -13,9 +13,10 @@ private let client = Authorization.Client(
 
 /// Answers discovery and registration as Marfa does, and hands every other request to `rest`.
 private func marfa(
-    _ server: ScriptedAuthServer, _ rest: @escaping @Sendable (ScriptedAuthServer.Request) -> ScriptedAuthServer.Reply
+    _ server: ScriptedAuthServer, issParameter: Bool? = nil,
+    _ rest: @escaping @Sendable (ScriptedAuthServer.Request) -> ScriptedAuthServer.Reply
 ) {
-    let discovery = server.discovery()
+    let discovery = server.discovery(issParameter: issParameter)
     server.answer { request in
         switch request.path {
         case "/.well-known/oauth-authorization-server": discovery
@@ -234,6 +235,100 @@ struct BrowserSignIn {
             }
             #expect(server.requests(to: "/oauth/token").isEmpty)
             #expect(try authorization.credential() == nil)
+        }
+    }
+
+    /// The address the browser returns to: `state` as the authorization address carried it, and `iss` when given.
+    private static func returned(
+        to authorize: URL, _ fields: [(String, String)], iss: String?
+    ) -> URL {
+        let state =
+            URLComponents(url: authorize, resolvingAgainstBaseURL: false)?.queryItems?
+            .first { $0.name == "state" }?.value ?? ""
+        var answer = URLComponents(string: "so.marfa.tests:/signed-in") ?? URLComponents()
+        answer.queryItems =
+            fields.map { URLQueryItem(name: $0.0, value: $0.1) } + [URLQueryItem(name: "state", value: state)]
+            + (iss.map { [URLQueryItem(name: "iss", value: $0)] } ?? [])
+        return answer.url ?? authorize
+    }
+
+    @Test func anApprovalWithTheServersIssuerIsRedeemed() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server, issParameter: true) { _ in tokens("at-1", "rt-1") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            _ = try await authorization.signIn { url, _ in
+                Self.returned(to: url, [("code", "the-code")], iss: server.origin)
+            }
+            #expect(server.requests(to: "/oauth/token").count == 1)
+            #expect(try authorization.credential() != nil)
+        }
+    }
+
+    @Test(arguments: [
+        "https://elsewhere.example", "", "ISSUER/",
+    ])
+    func anApprovalWithAnotherIssuerIsRefusedBeforeItsCodeIsRedeemed(other: String) async throws {
+        for supported in [true, nil] as [Bool?] {
+            let server = ScriptedAuthServer()
+            marfa(server, issParameter: supported) { _ in tokens("at-1", "rt-1") }
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                let authorization = try Authorization(
+                    server: server.url, client: client, keychain: keychain, service: service,
+                    transport: server.transport())
+                let iss = other == "ISSUER/" ? server.origin + "/" : other
+                await #expect(throws: SignInError.issuerMismatch) {
+                    try await authorization.signIn { url, _ in
+                        Self.returned(to: url, [("code", "planted")], iss: iss)
+                    }
+                }
+                #expect(server.requests(to: "/oauth/token").isEmpty)
+                #expect(try authorization.credential() == nil)
+            }
+        }
+    }
+
+    @Test func anApprovalWithNoIssuerIsRefusedWhenTheServerSaysItSendsOne() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server, issParameter: true) { _ in tokens("at-1", "rt-1") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            await #expect(throws: SignInError.issuerMismatch) {
+                try await authorization.signIn { url, _ in Self.returned(to: url, [("code", "planted")], iss: nil) }
+            }
+            #expect(server.requests(to: "/oauth/token").isEmpty)
+        }
+    }
+
+    @Test(arguments: [false, nil] as [Bool?])
+    func anApprovalWithNoIssuerIsRedeemedWhenTheServerDoesNotSayItSendsOne(supported: Bool?) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server, issParameter: supported) { _ in tokens("at-1", "rt-1") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            _ = try await authorization.signIn { url, _ in Self.returned(to: url, [("code", "the-code")], iss: nil) }
+            #expect(server.requests(to: "/oauth/token").count == 1)
+        }
+    }
+
+    @Test func aRefusalFromAnotherIssuerIsNotTakenForTheServersOwn() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server, issParameter: true) { _ in tokens("at-1", "rt-1") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            await #expect(throws: SignInError.issuerMismatch) {
+                try await authorization.signIn { url, _ in
+                    Self.returned(to: url, [("error", "access_denied")], iss: "https://elsewhere.example")
+                }
+            }
         }
     }
 

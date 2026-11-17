@@ -243,7 +243,8 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
         #expect(Keychain(accessGroup: "a") == Keychain(accessGroup: "a"))
         #expect(Keychain(accessGroup: "a") != Keychain.system)
         let errors: [SignInError] = [
-            .canceled, .denied, .expired, .stateMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect,
+            .canceled, .denied, .expired, .stateMismatch, .issuerMismatch, .notSignedIn, .notAServer, .otherServer,
+            .noRedirect,
             .refused(code: "invalid_scope", message: "m"),
             .unavailable(message: "offline"), .heldElsewhere, .unreadable(message: "unreadable"),
         ]

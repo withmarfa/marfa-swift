@@ -85,17 +85,19 @@ final class ScriptedAuthServer: Sendable {
     }
 
     /// What `/.well-known/oauth-authorization-server` answers, naming this server.
-    func discovery(issuer: String? = nil) -> Reply {
-        .json(
-            200,
-            [
-                "issuer": issuer ?? origin,
-                "authorization_endpoint": "\(origin)/oauth/authorize",
-                "token_endpoint": "\(origin)/oauth/token",
-                "device_authorization_endpoint": "\(origin)/oauth/device-authorization",
-                "registration_endpoint": "\(origin)/oauth/register",
-                "revocation_endpoint": "\(origin)/oauth/revoke",
-            ])
+    ///
+    /// `issParameter` sets `authorization_response_iss_parameter_supported`, and leaves it out when `nil`.
+    func discovery(issuer: String? = nil, issParameter: Bool? = nil) -> Reply {
+        var metadata: [String: any Sendable] = [
+            "issuer": issuer ?? origin,
+            "authorization_endpoint": "\(origin)/oauth/authorize",
+            "token_endpoint": "\(origin)/oauth/token",
+            "device_authorization_endpoint": "\(origin)/oauth/device-authorization",
+            "registration_endpoint": "\(origin)/oauth/register",
+            "revocation_endpoint": "\(origin)/oauth/revoke",
+        ]
+        if let issParameter { metadata["authorization_response_iss_parameter_supported"] = issParameter }
+        return .json(200, metadata)
     }
 
     fileprivate static let servers = Mutex<[String: ScriptedAuthServer]>([:])
