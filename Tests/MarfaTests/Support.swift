@@ -657,8 +657,11 @@ struct LocalServer: Sendable {
                     let received = received + (data ?? Data())
                     let text = String(decoding: received, as: UTF8.self)
                     if let end = text.range(of: "\r\n\r\n"), data != nil {
-                        let length = text[..<end.lowerBound].lowercased().components(separatedBy: "content-length:")
-                            .dropFirst().first.flatMap { Int($0.prefix { $0 != "\r" }.trimmingCharacters(in: .whitespaces)) }
+                        let length =
+                            text[..<end.lowerBound].lowercased().components(separatedBy: "content-length:")
+                            .dropFirst().first.flatMap {
+                                Int($0.prefix { $0 != "\r" }.trimmingCharacters(in: .whitespaces))
+                            }
                             ?? 0
                         if received.count < text[..<end.upperBound].utf8.count + length {
                             read(received)
@@ -673,7 +676,8 @@ struct LocalServer: Sendable {
                     let (status, type, body) = answer(method, path)
                     let response = Data(
                         ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
-                            + (method == "GET" ? headers : "") + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
+                            + (method == "GET" ? headers : "")
+                            + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
                     connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
                 }
             }
