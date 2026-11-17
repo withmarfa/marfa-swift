@@ -239,7 +239,8 @@ export function prepare(document) {
   return { document: result, nullable, usesNull };
 }
 
-// A connector calls these with a key of its own, through the TypeScript SDK or HTTP.
+// A connector calls these with a key of its own, through the TypeScript SDK or HTTP. The owner's side of them, which
+// the server marks `x-marfa-local-command` and opens to `connectors.manage`, stays in the client.
 const connectorTags = new Set(["Connectors", "Connector state", "Inbound webhooks"]);
 // A working copy reads and writes these itself, offline, so the client leaves them out.
 const copyTags = new Set([
@@ -279,15 +280,15 @@ function* operations(document) {
       if (item[method]?.operationId) yield { path, method, operation: item[method] };
 }
 
-// The operations the client makes: those an app's key or access token may call, less a connector's, what
-// a working copy does and what `Server` calls.
+// The operations the client makes: those an app's key or access token may call, less what a connector calls with
+// its own key, what a working copy does and what `Server` calls.
 export function clientOperations(document) {
   const kept = [];
   for (const { operation } of operations(document)) {
     const security = operation.security ?? document.security ?? [];
     if (!security.some((requirement) => "bearerAuth" in requirement)) continue;
     const tags = operation.tags ?? [];
-    if (tags.some((tag) => connectorTags.has(tag))) continue;
+    if (tags.some((tag) => connectorTags.has(tag)) && !operation["x-marfa-local-command"]) continue;
     if (tags.some((tag) => copyTags.has(tag)) && !serverOnly.has(operation.operationId)) continue;
     if (bulkWrites.has(operation.operationId)) continue;
     if (copyBlobs.has(operation.operationId)) continue;

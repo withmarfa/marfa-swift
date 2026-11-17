@@ -3573,6 +3573,680 @@ public struct Client: ClientProtocol {
             }
         )
     }
+    /// List connectors
+    ///
+    /// Returns your registration, or every registration if you hold `connectors.manage`, newest first.
+    ///
+    /// - Remark: HTTP `GET /connectors`.
+    /// - Remark: Generated from `#/paths//connectors/get(listConnectors)`.
+    public func listConnectors(_ input: Operations.ListConnectors.Input) async throws -> Operations.ListConnectors.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListConnectors.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListConnectors.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListConnectors.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConnectorPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get a connector
+    ///
+    /// Returns a connector, with when it last sent a heartbeat, its last run and any hold on it.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/get(getConnector)`.
+    public func getConnector(_ input: Operations.GetConnector.Input) async throws -> Operations.GetConnector.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetConnector.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetConnector.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetConnector.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Connector.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Delete a connector
+    ///
+    /// Deletes the connector, its runs and hold, and its inbound endpoints with every delivery they stored. Its state document and agreements stay with its source, for a later key with the same source.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/delete(deleteConnector)`.
+    public func deleteConnector(_ input: Operations.DeleteConnector.Input) async throws -> Operations.DeleteConnector.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DeleteConnector.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.DeleteConnector.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DeleteConnector.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Ok.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List connector runs
+    ///
+    /// Returns the runs the connector reported, newest first.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/runs`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/runs/get(listConnectorRuns)`.
+    public func listConnectorRuns(_ input: Operations.ListConnectorRuns.Input) async throws -> Operations.ListConnectorRuns.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListConnectorRuns.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}/runs",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "limit",
+                    value: input.query.limit
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "cursor",
+                    value: input.query.cursor
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListConnectorRuns.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListConnectorRuns.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConnectorRunPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Delete a connector's state
+    ///
+    /// Deletes the state document, current problems and every agreement of the connector's source, which every registration of that source reads. No hold is needed.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/state`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/state/delete(deleteConnectorState)`.
+    public func deleteConnectorState(_ input: Operations.DeleteConnectorState.Input) async throws -> Operations.DeleteConnectorState.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DeleteConnectorState.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}/state",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.DeleteConnectorState.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DeleteConnectorState.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.Ok.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List inbound endpoints
+    ///
+    /// Returns the connector's inbound endpoints, newest first, retired ones included.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/get(listInboundEndpoints)`.
+    public func listInboundEndpoints(_ input: Operations.ListInboundEndpoints.Input) async throws -> Operations.ListInboundEndpoints.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListInboundEndpoints.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}/endpoints",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListInboundEndpoints.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListInboundEndpoints.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.InboundEndpointPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Create an inbound endpoint
+    ///
+    /// Creates an inbound endpoint for the connector and returns it. Save its `path`: this is the only response that shows it in full.
+    ///
+    /// - Remark: HTTP `POST /connectors/{id}/endpoints`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/post(createInboundEndpoint)`.
+    public func createInboundEndpoint(_ input: Operations.CreateInboundEndpoint.Input) async throws -> Operations.CreateInboundEndpoint.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.CreateInboundEndpoint.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}/endpoints",
+                    parameters: [
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 201:
+                    let headers: Operations.CreateInboundEndpoint.Output.Created.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.CreateInboundEndpoint.Output.Created.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.InboundEndpoint.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .created(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Retire an inbound endpoint
+    ///
+    /// Retires an inbound endpoint, so its address stops accepting deliveries. It stays listed with `retired_at`, and deliveries it already stored stay readable until they age out.
+    ///
+    /// - Remark: HTTP `DELETE /connectors/{id}/endpoints/{endpoint_id}`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/endpoints/{endpoint_id}/delete(retireInboundEndpoint)`.
+    public func retireInboundEndpoint(_ input: Operations.RetireInboundEndpoint.Input) async throws -> Operations.RetireInboundEndpoint.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RetireInboundEndpoint.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/connectors/{}/endpoints/{}",
+                    parameters: [
+                        input.path.id,
+                        input.path.endpointId
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RetireInboundEndpoint.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RetireInboundEndpoint.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.InboundEndpoint.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// List API keys
     ///
     /// Returns key metadata without plaintext. `keys.manage` and local authority list all keys; `keys.mint` lists keys within the caller's current reach. Requires `keys.mint`, `keys.manage`, or local authority.
