@@ -561,7 +561,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .denied: "The app was not approved."
         case .expired: "The code expired before the app was approved."
         case .stateMismatch: "The approval was not for this sign-in."
-        case .issuerMismatch: "The approval came from another server than the one this sign-in is for."
+        case .issuerMismatch: "The approval did not come from the server this sign-in is for."
         case .notSignedIn: "The app is not signed in to this server."
         case .notAServer: "The address is not an http or https server address."
         case .otherServer: "The sign-in is for another server."
