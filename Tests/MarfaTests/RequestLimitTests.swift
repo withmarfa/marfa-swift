@@ -24,7 +24,7 @@ private func serverTaking(_ limit: Int, creating ids: CreateAnswer) async throws
             let id = ids.ids.withLock { $0.first } ?? "unknown"
             return (
                 201, "application/json",
-                #"{"id":"\#(id)","type":"core.note","properties":{},"version":1,"state":"active"}"#
+                #"{"id":"\#(id)","type":"core.note","properties":{"title":"short"},"tier":"feed","version":1,"state":"active","created_at":"2026-11-17T12:00:00.000Z","updated_at":"2026-11-17T12:00:00.000Z"}"#
             )
         case (_, _) where path.hasPrefix("/items/"):
             return (404, "application/json", #"{"error":{"code":"item_not_found","message":"none"}}"#)
