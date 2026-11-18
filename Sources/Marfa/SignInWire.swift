@@ -156,13 +156,18 @@ struct Discovery: Sendable, Decodable {
         return returned == issuer
     }
 
-    /// RFC 8414 section 3.3: the document must name the server it was read from as its issuer, because the
-    /// app is about to send a person's approval to the addresses it names.
     static func read(_ server: String, _ transport: SignInTransport) async throws(SignInError) -> Discovery {
         guard let at = URL(string: "\(server)/.well-known/oauth-authorization-server") else {
             throw .unreadable(message: "\(server) is not an address a sign-in can use")
         }
-        let answer = try await send(URLRequest(url: at), transport)
+        return try parse(try await send(URLRequest(url: at), transport), from: server)
+    }
+
+    /// The metadata `answer` holds, read from `server` and held to it.
+    ///
+    /// RFC 8414 section 3.3: the document must name the server it was read from as its issuer, because the
+    /// app is about to send a person's approval to the addresses it names.
+    static func parse(_ answer: Answer, from server: String) throws(SignInError) -> Discovery {
         guard answer.status == 200 else { throw answer.refusal() }
         let discovery: Discovery
         do {
@@ -193,11 +198,13 @@ struct Answer: Sendable {
 
     var object: [String: Any]? { (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] }
 
-    /// The OAuth error code: RFC 6749's `error` string, or the code of Marfa's error envelope.
+    /// RFC 6749's `error` string, which only an OAuth endpoint's own refusal carries.
+    var oauthError: String? { object?["error"] as? String }
+
+    /// The OAuth error code, or the code of Marfa's error envelope.
     var code: String? {
-        guard let object else { return nil }
-        if let code = object["error"] as? String { return code }
-        return (object["error"] as? [String: Any])?["code"] as? String
+        if let oauthError { return oauthError }
+        return (object?["error"] as? [String: Any])?["code"] as? String
     }
 
     var message: String {
