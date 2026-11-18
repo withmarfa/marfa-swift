@@ -105,8 +105,9 @@ extension WorkingCopy {
     /// items, naming no state, would show. The copy answers links where it can be sure of the number; where it
     /// cannot, it asks the server it was opened with, under the key it holds now, and ``ItemCount/held`` says which
     /// answered. Rows come from the copy for a table it holds whole, and from the server otherwise. More than 100 ids
-    /// go in batches of 100. A ``useKey(_:)`` waits until the call is done, so no answer under the earlier key
-    /// arrives after it.
+    /// go in batches of 100, and a canceled task asks for no further batch. Every count returned was answered under
+    /// the key the copy holds when it returns: where ``useKey(_:)`` replaced the key during the call, the counts are
+    /// asked again under the new one, and while the key is still changing this throws `keyChanging`.
     ///
     /// Throws ``CountError/unavailable(cause:)`` where the copy could not answer and has no server or cannot reach it,
     /// and the app shows no count rather than 0. Any other failure, such as a server's refusal or a failed renewal of
@@ -118,15 +119,28 @@ extension WorkingCopy {
             Array(unique[$0..<min($0 + Self.countBatch, unique.count)])
         }
         let asked = counted.core
+        let holder = holder
         do {
-            return try await holder.runBlocking { core in
-                try batches.flatMap { batch in
-                    do {
-                        return try core.counts(ids: batch, counted: asked).map(ItemCount.init)
-                    } catch MarfaCore.MarfaError.NotAnswerable {
-                        return try core.servedCounts(ids: batch, counted: asked).map(ItemCount.init)
+            asking: while true {
+                var counts: [ItemCount] = []
+                var generation: Int?
+                // One call per batch, so a canceled task stops before the next batch.
+                for batch in batches {
+                    let (answer, answeredUnder) = try await holder.runBlocking { core in
+                        let answer: [MarfaCore.ItemCount]
+                        do {
+                            answer = try core.counts(ids: batch, counted: asked)
+                        } catch MarfaCore.MarfaError.NotAnswerable {
+                            answer = try core.servedCounts(ids: batch, counted: asked)
+                        }
+                        return (answer.map(ItemCount.init), holder.generation)
                     }
+                    if generation.map({ $0 != answeredUnder }) == true { continue asking }
+                    generation = answeredUnder
+                    counts += answer
                 }
+                if let generation, holder.keyChanged(since: generation) { continue asking }
+                return counts
             }
         } catch let error as MarfaError where error.isUnreachable {
             throw CountError.unavailable(cause: error)
@@ -150,7 +164,8 @@ extension Server {
     /// For up to 100 ids; the server answers each once, in the order they first appear. Every ``ItemCount/held`` is
     /// `false`. A working copy's ``WorkingCopy/counts(of:_:)`` asks its own server for what it cannot answer, so call
     /// this only without a copy. Throws ``MarfaError/decoding(message:)`` for an answer that is not the asked ids
-    /// once each in that order, a link count without its four status groups or a count of rows with any.
+    /// once each in that order, a negative count, a link count without its four status groups or with groups that
+    /// are negative or add up to more than its total, or a count of rows with `status_groups`, `null` included.
     public func itemCounts(
         of ids: [String], _ counted: Counted, timeout: Duration = Server.defaultTimeout
     ) async throws(MarfaError) -> [ItemCount] {
@@ -171,19 +186,23 @@ extension Server {
             throw .decoding(message: "\(origin) answered counts that are not the asked ids, once each and in order")
         }
         return try answer.counts.map { wire throws(MarfaError) in
+            guard wire.total >= 0 else { throw .decoding(message: "\(origin) answered a negative count") }
             switch (linked, wire.statusGroups) {
             case (true, nil):
                 throw .decoding(message: "\(origin) answered a count of links without its status groups")
             case (false, .some):
                 throw .decoding(message: "\(origin) answered a count of rows with status groups")
-            case (_, let groups):
+            case (false, nil):
+                return ItemCount(id: wire.id, total: wire.total, held: false)
+            case (true, .some(let groups)):
+                guard groups.fit(wire.total) else {
+                    throw .decoding(message: "\(origin) answered status groups that do not fit their count")
+                }
                 return ItemCount(
                     id: wire.id, total: wire.total,
-                    statusGroups: groups.map {
-                        StatusGroupCounts(
-                            notStarted: $0.notStarted, inProgress: $0.inProgress, completed: $0.completed,
-                            canceled: $0.canceled)
-                    }, held: false)
+                    statusGroups: StatusGroupCounts(
+                        notStarted: groups.notStarted, inProgress: groups.inProgress, completed: groups.completed,
+                        canceled: groups.canceled), held: false)
             }
         }
     }
@@ -200,14 +219,35 @@ private struct CountsWire: Decodable {
             case inProgress = "in_progress"
             case completed, canceled
         }
+
+        /// Whether every group is zero or more and together they are no more than `total`.
+        func fit(_ total: Int) -> Bool {
+            var sum = 0
+            for group in [notStarted, inProgress, completed, canceled] {
+                guard group >= 0 else { return false }
+                let (added, overflow) = sum.addingReportingOverflow(group)
+                guard !overflow, added <= total else { return false }
+                sum = added
+            }
+            return true
+        }
     }
     struct One: Decodable {
         let id: String
         let total: Int
+        /// `status_groups` present as `null` is refused, not read as absent.
         let statusGroups: Groups?
         enum CodingKeys: String, CodingKey {
             case id, total
             case statusGroups = "status_groups"
+        }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            total = try container.decode(Int.self, forKey: .total)
+            statusGroups =
+                container.contains(.statusGroups) ? try container.decode(Groups.self, forKey: .statusGroups) : nil
         }
     }
     let counts: [One]

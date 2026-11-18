@@ -25,6 +25,7 @@ final class CoreHolder: Sendable {
         var drained: CheckedContinuation<Void, Never>?
         var closers: [CheckedContinuation<Void, Never>] = []
         var handle: Handle
+        var generation = 0
     }
 
     private let state: Mutex<State>
@@ -49,6 +50,16 @@ final class CoreHolder: Sendable {
     var handle: Handle { state.withLock { $0.handle } }
 
     var isClosed: Bool { state.withLock { $0.phase == .released } }
+
+    /// Which core, and so which key, the holder holds: each core a new key opens is one more.
+    ///
+    /// Read during a call, it names the core that call holds, since a replacement waits for the call.
+    var generation: Int { state.withLock { $0.generation } }
+
+    /// Whether a new key has replaced the core held at `generation`, or has begun to.
+    func keyChanged(since generation: Int) -> Bool {
+        state.withLock { $0.phase == .replacing || $0.generation != generation }
+    }
 
     /// Throws what `replace(key:)` would throw before it starts: `closed`, or
     /// `noServer` where there is no key to change.
@@ -164,6 +175,7 @@ final class CoreHolder: Sendable {
         let (elected, closedMeanwhile) = state.withLock { state -> (Bool, Bool) in
             if case .success(let core) = reopened {
                 state.core = core
+                state.generation += 1
                 if !state.closing {
                     state.handle = Handle(core.heldHandle())
                     state.phase = .open

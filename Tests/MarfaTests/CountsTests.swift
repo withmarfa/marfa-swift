@@ -139,32 +139,53 @@ struct Counts {
         await copy.close()
     }
 
-    @Test func aKeyChangeWaitsForEveryBatchAskedOfTheServerUnderTheEarlierKey() async throws {
+    /// One batch, where the key changes after the answer and before it is returned, and two, where it changes between them.
+    @Test(arguments: [50, 150])
+    func noCountAnsweredUnderAKeyBeingReplacedIsReturned(asking: Int) async throws {
         let gate = DispatchSemaphore(value: 0)
         let old = CountingCore(servedGate: gate)
         old.refuseCounts()
         let new = CountingCore()
         let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: false)
-        let order = Mutex([String]())
-        let ids = (0..<150).map { "item-\($0)" }
-        let counting = Task {
-            let counts = try await copy.counts(of: ids, counted)
-            order.withLock { $0.append("counted") }
-            return counts
-        }
+        let ids = (0..<asking).map { "item-\($0)" }
+        let counting = Task { try await copy.counts(of: ids, counted) }
         try await eventually("the first batch is asked of the server") { old.served.count == 1 }
-        let changing = Task {
-            try await copy.useKey("new-key")
-            order.withLock { $0.append("key changed") }
+        let changing = Task { try await copy.useKey("new-key") }
+        try await eventually("the key is changing") {
+            do {
+                _ = try await copy.status()
+                return false
+            } catch Marfa.MarfaError.keyChanging {
+                return true
+            }
         }
         gate.signal()
-        try await eventually("the second batch is asked under the same key") { old.served.count == 2 }
-        #expect(order.withLock { $0 }.isEmpty, "the key changed while a count was asked under the earlier key")
-        gate.signal()
-        let counts = try await counting.value
         try await changing.value
-        #expect(counts.count == 150 && new.asked.isEmpty && new.served.isEmpty)
-        #expect(order.withLock { $0 } == ["counted", "key changed"])
+        // Asked again under the new key, or refused while the key changed: never the earlier key's answer.
+        do {
+            let counts = try await counting.value
+            #expect(counts.map(\.id) == ids && counts.allSatisfy { $0.held && $0.total == 7 })
+        } catch Marfa.MarfaError.keyChanging {}
+        #expect(old.served.count == 1)
+        await copy.close()
+    }
+
+    @Test func aCanceledCountAsksForNoFurtherBatch() async throws {
+        let gate = DispatchSemaphore(value: 0)
+        let core = CountingCore(servedGate: gate)
+        core.refuseCounts()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let ids = (0..<250).map { "item-\($0)" }
+        let counting = Task { try await copy.counts(of: ids, counted) }
+        try await eventually("the first batch is asked of the server") { core.served.count == 1 }
+        counting.cancel()
+        gate.signal()
+        await #expect(throws: Marfa.MarfaError.self) { try await counting.value }
+        #expect(core.served.count == 1)
+        // The witness: uncanceled, every batch is asked.
+        let open = Task { try await copy.counts(of: ids, counted) }
+        for _ in 0..<3 { gate.signal() }
+        #expect(try await open.value.count == 250 && core.served.count == 4)
         await copy.close()
     }
 
@@ -205,7 +226,7 @@ struct Counts {
         }
     }
 
-    @Test func aServersCountsAreRefusedUnlessTheyAreTheAskedIdsOnceEachInOrderWithFittingGroups() async throws {
+    @Test func aServersCountsAreRefusedUnlessTheyAreTheAskedIdsOnceEachInOrderWithPossibleNumbers() async throws {
         let groups = #""status_groups":{"not_started":1,"in_progress":0,"completed":0,"canceled":0}"#
         let a = #"{"id":"a","total":1,\#(groups)}"#
         let b = #"{"id":"b","total":1,\#(groups)}"#
@@ -218,6 +239,22 @@ struct Counts {
             ("extra", link, "[\(a),\(b),\(a)]"),
             ("a link without groups", link, #"[\#(a),{"id":"b","total":1}]"#),
             ("rows with groups", rows, #"[{"id":"a","total":1},\#(b)]"#),
+            ("rows with null groups", rows, #"[{"id":"a","total":1},{"id":"b","total":1,"status_groups":null}]"#),
+            ("a link with null groups", link, #"[\#(a),{"id":"b","total":1,"status_groups":null}]"#),
+            ("a negative total", rows, #"[{"id":"a","total":-1},{"id":"b","total":1}]"#),
+            ("a fractional total", rows, #"[{"id":"a","total":1.5},{"id":"b","total":1}]"#),
+            (
+                "a negative group", link,
+                #"[\#(a),{"id":"b","total":1,"status_groups":{"not_started":2,"in_progress":-1,"completed":0,"canceled":0}}]"#
+            ),
+            (
+                "groups above the total", link,
+                #"[\#(a),{"id":"b","total":1,"status_groups":{"not_started":1,"in_progress":1,"completed":0,"canceled":0}}]"#
+            ),
+            (
+                "groups that overflow", link,
+                #"[\#(a),{"id":"b","total":9223372036854775807,"status_groups":{"not_started":9223372036854775807,"in_progress":9223372036854775807,"completed":0,"canceled":0}}]"#
+            ),
         ]
         for (what, counted, answer) in cases {
             let server = try await serverAnswering(#"{"counts":\#(answer)}"#)
