@@ -8,6 +8,9 @@ import Testing
 /// A core whose answer to a hold a test scripts.
 private final class HoldingCore: Core, @unchecked Sendable {
     private let answer = Mutex(MarfaCore.TableHold(type: "t", table: "steps", wasHeld: false, fill: nil))
+    private let filled = Mutex(
+        MarfaCore.TableFill(
+            whole: 0, online: 0, unfilled: 0, pages: 0, rows: 0, failed: 0, failure: nil))
 
     init() { super.init(noHandle: .init()) }
     required init(unsafeFromHandle handle: UInt64) { fatalError("a fake core has no handle") }
@@ -16,11 +19,14 @@ private final class HoldingCore: Core, @unchecked Sendable {
         answer.withLock { $0 = MarfaCore.TableHold(type: "t", table: "steps", wasHeld: wasHeld, fill: fill) }
     }
 
+    func answerFill(_ fill: MarfaCore.TableFill) { filled.withLock { $0 = fill } }
+
     override func heldHandle() -> MarfaCore.Handle { .writer }
     override func status() throws -> MarfaCore.Status { emptyStatus() }
     override func holdTable(typeId: String, table: String, stop: MarfaCore.Stop?) throws -> MarfaCore.TableHold {
         answer.withLock { $0 }
     }
+    override func fillTables(stop: MarfaCore.Stop?) throws -> MarfaCore.TableFill { filled.withLock { $0 } }
 }
 
 private func fill(whole: UInt64 = 0, online: UInt64 = 0, rows: UInt64 = 0) -> MarfaCore.TableFill {
@@ -54,6 +60,30 @@ struct TableHolds {
         }
         try await eventually("each fill that changed a table is told") { heard.all.count == 4 }
         #expect(heard.all == Array(repeating: tables, count: 4))
+        heard.stop()
+        await copy.close()
+    }
+
+    @Test func aFillTellsTheStreamsOnlyWhenItChangedATable() async throws {
+        let core = HoldingCore()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let heard = Heard(copy.changes())
+        let tables = Marfa.Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil)
+
+        // A pass that changed nothing is not told; one that found a table past the cap is.
+        core.answerFill(fill())
+        _ = try await copy.tables.fill()
+        core.answerFill(fill(online: 1))
+        #expect(try await copy.tables.fill().online == 1)
+        try await eventually("the table past the cap is told") { heard.all == [tables] }
+
+        // So is one that read rows or left a table whole.
+        for changed in [fill(rows: 3), fill(whole: 1)] {
+            core.answerFill(changed)
+            _ = try await copy.tables.fill()
+        }
+        try await eventually("each fill that changed a table is told") { heard.all.count == 3 }
+        #expect(heard.all == Array(repeating: tables, count: 3))
         heard.stop()
         await copy.close()
     }
