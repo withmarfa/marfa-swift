@@ -519,6 +519,7 @@ public final class WorkingCopy: Sendable {
                 key: try server.openingToken(), renewer: server.credential.map(TokenRenewer.init))
         } catch {
             holder.endKeyChange()
+            feed.rejoin(readsOnly: holder.handle == .reader)
             throw error
         }
         lifecycle.keyWillChange()
@@ -526,6 +527,7 @@ public final class WorkingCopy: Sendable {
             try await feed.suspend()
         } catch {
             holder.endKeyChange()
+            feed.rejoin(readsOnly: holder.handle == .reader)
             lifecycle.keyChanged()
             throw error
         }

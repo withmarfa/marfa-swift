@@ -539,6 +539,49 @@ struct Changes {
         try await eventually("the save was told") { heard.saves.count == 1 }
         try await bounded("close") { await copy.close() }
     }
+
+    @Test func aStreamAddedAfterTheKeyChangeBeganIsHeldNotEnded() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.writer() }), hasServer: true)
+        try copy.holder.beginKeyChange(to: URL(string: "http://127.0.0.1:1")!)
+        let heard = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.stops.isEmpty, "a stream was ended for the key change")
+        #expect(copy.feed.count == 1)
+        #expect(core.places.isEmpty)
+        copy.holder.endKeyChange()
+        copy.feed.rejoin(readsOnly: false)
+        try await eventually("the stream was joined") { core.places.count == 1 }
+        #expect(heard.stops.isEmpty)
+        await copy.close()
+    }
+
+    @Test func aReaderStreamAddedAfterTheKeyChangeBeganIsToldOneSaveWhenItEnds() async throws {
+        let core = FakeCore.reader()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.reader() }), hasServer: true)
+        try copy.holder.beginKeyChange(to: URL(string: "http://127.0.0.1:1")!)
+        let heard = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        copy.holder.endKeyChange()
+        copy.feed.rejoin(readsOnly: true)
+        try await eventually("the stream was told to read again") { heard.saves.count == 1 }
+        try await eventually("the stream was joined") { core.places.count == 1 }
+        copy.feed.rejoin(readsOnly: true)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.saves.count == 1, "a second pass told the stream again")
+        await copy.close()
+    }
+
+    @Test func aStreamHeldForAKeyChangeEndsWhenTheCopyCloses() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.writer() }), hasServer: true)
+        try copy.holder.beginKeyChange(to: URL(string: "http://127.0.0.1:1")!)
+        var heard = copy.changes().makeAsyncIterator()
+        copy.holder.endKeyChange()
+        try await bounded("close") { await copy.close() }
+        #expect(await heard.next() == nil)
+        #expect(copy.feed.count == 0)
+    }
 }
 
 /// A follow the core stopped because the server's event log let the copy's cursor go.

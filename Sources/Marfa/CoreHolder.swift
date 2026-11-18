@@ -95,6 +95,9 @@ final class CoreHolder: Sendable {
         }
     }
 
+    /// Whether no key change runs and none is replacing the core, or the copy is closing.
+    var isSettled: Bool { state.withLock { $0.isSettled } }
+
     func endKeyChange() {
         let settled = state.withLock { state in
             state.keyChanges -= 1
