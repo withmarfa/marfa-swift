@@ -7,7 +7,7 @@ import Testing
 
 private func client(_ scripted: ScriptedAuthServer) -> Client {
     Client(
-        Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+        try! Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
         timeout: .seconds(30))
 }
 

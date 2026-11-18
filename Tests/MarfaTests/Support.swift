@@ -812,7 +812,7 @@ final class OwnServer: Sendable {
     let url: URL
     let key: String
     let owner: (email: String, password: String)?
-    var server: Server { Server(url: url, key: key) }
+    var server: Server { try! Server(url: url, key: key) }
     private var env: URL { state.appending(path: "env") }
 
     private init(state: URL, exports: [String: String]) throws {

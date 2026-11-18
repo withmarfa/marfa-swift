@@ -87,7 +87,7 @@ struct Changes {
     /// one, asking the server nothing, so the streams hear no failure.
     @Test func aFollowBeforeTheFirstHydrationWaitsRatherThanFailing() async throws {
         let copy = try await WorkingCopy.open(
-            store: temporaryStore(), server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "k"))
+            store: temporaryStore(), server: try Server(url: URL(string: "http://127.0.0.1:9")!, key: "k"))
         let heard = Heard(copy.changes())
         try await Task.sleep(for: .milliseconds(300))
         #expect(heard.all.isEmpty, "\(heard.all)")

@@ -17,7 +17,7 @@ private func refused(_ status: Int, _ code: String) -> ScriptedAuthServer.Reply 
 /// A client for `scripted` that sends `key`, with requests that never leave the process.
 private func client(_ scripted: ScriptedAuthServer, timeout: Duration = .seconds(30)) -> Client {
     Client(
-        Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session, timeout: timeout)
+        try! Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session, timeout: timeout)
 }
 
 /// A client signed in to `scripted` with the access token `at-1` and the refresh token `rt-1`.

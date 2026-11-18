@@ -45,7 +45,7 @@ struct AddedFiles {
 @Suite(.timeLimit(.minutes(1)))
 struct ServerCatalogUnreachable {
     @Test func aServerThatCannotBeReachedGivesANetworkError() async throws {
-        let server = Server(url: URL(string: "http://127.0.0.1:1")!, key: "unused")
+        let server = try Server(url: URL(string: "http://127.0.0.1:1")!, key: "unused")
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: server)
         await #expect {
             _ = try await copy.catalog.fromServer()
@@ -288,7 +288,7 @@ struct ReplacedRefusedCopy {
         try OlderStore.execute(
             store, "INSERT OR REPLACE INTO meta (key, value) VALUES ('server_origin', 'http://127.0.0.1:2');")
 
-        let server = Server(url: URL(string: "http://127.0.0.1:1")!, key: "unused")
+        let server = try Server(url: URL(string: "http://127.0.0.1:1")!, key: "unused")
         let moved = try await WorkingCopy.open(store: store, server: server, ifRefused: .replace)
         #expect(try await moved.items.get(id) != nil)
         await #expect {

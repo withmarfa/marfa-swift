@@ -366,8 +366,9 @@ struct Counts {
         for (what, counted, answer) in cases {
             let server = try await serverAnswering(#"{"counts":\#(answer)}"#)
             defer { server.stop() }
+            let client = try Server(url: server.url, key: "k")
             do {
-                _ = try await Server(url: server.url, key: "k").itemCounts(of: ["a", "b", "a"], counted)
+                _ = try await client.itemCounts(of: ["a", "b", "a"], counted)
                 Issue.record("\(what) was accepted")
             } catch {
                 guard case .decoding = error else {

@@ -265,7 +265,7 @@ struct LiveRestart {
                     "expires_at": ISO8601DateFormatter().string(from: expires),
                 ])
             let copy = try await WorkingCopy.open(
-                store: Live.store(), server: Server(url: own.url, key: try #require(minted["key"]?.string)))
+                store: Live.store(), server: try Server(url: own.url, key: try #require(minted["key"]?.string)))
             _ = try await copy.hydrate(types: ["core.note"], tier: .library)
             let heard = Heard(copy.changes())
             try await Task.sleep(for: .milliseconds(500))

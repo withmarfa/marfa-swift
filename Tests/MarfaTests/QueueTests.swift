@@ -32,7 +32,7 @@ struct Waiting {
     @Test func aWriteBehindAnUnansweredCreateWaitsWithNoVerdict() async throws {
         let server = try await LocalServer.start(contract: marfaContractVersion, answer: Self.hydrating)
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         server.stop()
 

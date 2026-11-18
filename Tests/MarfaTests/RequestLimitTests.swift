@@ -44,7 +44,7 @@ struct RequestLimitTests {
         let sendable = CreateAnswer()
         let server = try await serverTaking(1_500, creating: sendable)
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
 
         let large = try await copy.items.create(
@@ -92,7 +92,7 @@ struct RequestLimitTests {
         let ids = CreateAnswer()
         let server = try await serverTaking(1_500, creating: ids)
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let small = try await copy.items.create(Draft(type: "core.note", properties: ["title": "short"], tier: .feed))
         ids.set(small.itemId)
@@ -117,7 +117,7 @@ struct RemovalAfterAnswers {
         store: URL, id: String, shown: UnsentWrites
     ) {
         let store = temporaryStore()
-        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: store, server: try Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let made = try await copy.items.create(
             Draft(type: "core.note", properties: ["title": .string(title)], tier: .feed))
@@ -131,7 +131,7 @@ struct RemovalAfterAnswers {
         defer { server.stop() }
         let (store, id, shown) = try await Self.storeShown("short", on: server)
         ids.set(id)
-        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: store, server: try Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let report = try await copy.queue.drain()
         #expect(report.verdicts.first?.verdict == .accepted, "\(report)")
@@ -153,7 +153,7 @@ struct RemovalAfterAnswers {
         let (store, id, shown) = try await Self.storeShown(String(repeating: "é", count: 1_000), on: server)
         #expect(shown.writes.map(\.itemId) == [id])
         #expect(shown.writes.first?.verdict == nil)
-        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: store, server: try Server(url: server.url, key: "k"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let report = try await copy.queue.drain()
         #expect(report.unsent == 1, "the over-limit write stays unsent: \(report)")

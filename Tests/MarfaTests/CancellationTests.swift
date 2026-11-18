@@ -44,7 +44,7 @@ struct Cancellation {
     @Test func cancellationOfHydrationWithAnUnansweredPeerKeepsTheQueue() async throws {
         let server = try await LocalServer.start(contract: marfaContractVersion, holdsResponse: true)
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "k"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "k"))
         try await copy.declareTypes([DeclaredTypes.definition])
         let queued = try await copy.items.create(Draft(type: "app.readinglist.entry", properties: ["title": "Kept"]))
         let task = Task { try await copy.hydrate(types: ["app.readinglist.entry"], tier: .library) }

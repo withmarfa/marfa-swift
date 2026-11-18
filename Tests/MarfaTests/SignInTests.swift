@@ -1263,6 +1263,29 @@ struct UntidyAddresses {
         }
     }
 
+    @Test(arguments: [
+        "https://owner@marfa.example.com", "https://owner:hunter2@marfa.example.com/",
+        "https://a%40b:c%3Ad@marfa.example.com",
+    ])
+    func anAddressWithUserInfoIsRefused(address: String) throws {
+        let url = try #require(URL(string: address))
+        #expect(throws: SignInError.notAServer) {
+            try Authorization(server: url, client: client, keychain: Keychain(), service: service)
+        }
+    }
+
+    @Test func aCredentialIsRefusedForAnAddressWithUserInfo() async throws {
+        let server = ScriptedAuthServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (_, credential) = try signedIn(server, keychain, transport: server.transport())
+            var parts = try #require(URLComponents(url: server.url, resolvingAgainstBaseURL: false))
+            parts.user = "owner"
+            parts.password = "hunter2"
+            let withUser = try #require(parts.url)
+            #expect(throws: SignInError.notAServer) { try Server(url: withUser, credential: credential) }
+        }
+    }
+
     @Test func aCredentialIsRefusedOnAnotherServer() async throws {
         let server = ScriptedAuthServer()
         try await inIsolatedKeychainAsync { keychain, _ async throws in

@@ -6,7 +6,7 @@ import Testing
 @Suite
 struct ServerCleartext {
     private func server(_ address: String) throws -> Server {
-        Server(url: try #require(URL(string: address)), key: "unused")
+        try Server(url: try #require(URL(string: address)), key: "unused")
     }
 
     @Test(arguments: [

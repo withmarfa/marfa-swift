@@ -9,7 +9,7 @@ import Testing
         for prefix in ["/instance", "/instance/"] {
             let (url, request) = try rootServer(body: description(name: name))
             let address = try #require(URL(string: "\(url.absoluteString)\(prefix)?ignored=1#fragment"))
-            let server = Server(url: address, key: "marfa_k1_unused")
+            let server = try Server(url: address, key: "marfa_k1_unused")
             let instance: InstanceDescription = try await server.instanceDescription()
             #expect(instance.name == name)
             #expect(instance.version == "build-test")

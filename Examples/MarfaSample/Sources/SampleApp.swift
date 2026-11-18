@@ -45,7 +45,7 @@ struct Configuration: Sendable {
             arguments.firstIndex(of: flag).flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
         }
         let named = value("--server").flatMap(URL.init(string:)).flatMap { url in
-            value("--key").map { Server(url: url, key: $0) }
+            value("--key").flatMap { try? Server(url: url, key: $0) }
         }
         let folder = URL.applicationSupportDirectory.appending(path: "MarfaSample")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

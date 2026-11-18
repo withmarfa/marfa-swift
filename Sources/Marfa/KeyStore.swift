@@ -9,7 +9,8 @@ import Foundation
 ///
 /// A store keeps one key for each server, and one server can be written several ways: addresses that differ only
 /// in the case of the scheme or host, in naming the scheme's default port, or in a trailing `/`, are one server,
-/// as ``account(for:)`` writes it.
+/// as ``account(for:)`` writes it. A user or password in an address is never part of the account: a key is
+/// never kept under a password.
 public protocol KeyStore: Sendable {
     /// Keeps `key` for the server at `address`, replacing the one kept.
     func save(_ key: String, for address: URL) throws
@@ -23,12 +24,14 @@ public protocol KeyStore: Sendable {
 
 extension KeyStore {
     /// The address of a server written one way, which a store keeps its key under: the scheme and host in lowercase,
-    /// no port where it is the scheme's default, and no trailing `/`.
+    /// no user or password, no port where it is the scheme's default, and no trailing `/`.
     public static func account(for address: URL) -> String {
         guard var parts = URLComponents(url: address, resolvingAgainstBaseURL: true) else {
             return address.absoluteString
         }
         parts.scheme = parts.scheme?.lowercased()
+        parts.user = nil
+        parts.password = nil
         parts.percentEncodedHost = parts.percentEncodedHost?.lowercased()
         switch (parts.scheme, parts.port) {
         case ("http", 80), ("https", 443): parts.port = nil
