@@ -343,7 +343,10 @@ extension LiveSignIn {
                 }
 
                 // The app signs in again and hands the copy the new sign-in; the same copy goes on.
-                let second = try await Self.deviceSignIn(authorization, own)
+                let left = try authorization.place.read()
+                // It is a separate sign-in, kept in its own keychain item, so a renewal can tell which one it read.
+                let replacement = try Self.authorization(own, keychain, service: Self.service + ".replacement")
+                let second = try await Self.deviceSignIn(replacement, own)
                 try await bounded("use") { try await copy.use(try Server(url: own.url, credential: second)) }
                 // A sign-in is a new reach, so the copy is filled again from the server and keeps its queue.
                 try await eventually("the copy asks to be hydrated") {
@@ -355,12 +358,13 @@ extension LiveSignIn {
                 #expect(try await Self.read(try #require(waiting.itemId), own) == 200)
 
                 // A renewal after the swap goes through the new sign-in.
-                let signedIn = try #require(try authorization.place.read())
+                let signedIn = try #require(try replacement.place.read())
                 try await Self.revoke(signedIn.accessToken, hint: "access_token", clientId: signedIn.clientId, own)
                 try await Self.drained(copy, "written after a renewal under the new sign-in")
-                let renewed = try #require(try authorization.place.read())
+                let renewed = try #require(try replacement.place.read())
                 #expect(renewed.accessToken != signedIn.accessToken)
                 #expect(renewed.refreshToken != signedIn.refreshToken)
+                #expect(try authorization.place.read() == left, "the renewal read the sign-in the copy left")
                 await copy.close()
             }
         } catch {
