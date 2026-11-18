@@ -48,6 +48,9 @@ public struct TableFill: Sendable, Hashable {
         self.failure = failure
     }
 
+    /// Whether the pass read rows or settled a table, so a view of the tables should read them again.
+    var changedTables: Bool { rows > 0 || whole > 0 || online > 0 }
+
     init(_ core: MarfaCore.TableFill) {
         self.init(
             whole: core.whole, online: core.online, unfilled: core.unfilled, pages: core.pages, rows: core.rows,

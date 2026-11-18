@@ -68,7 +68,8 @@ struct RequestLimitTests {
         // 1,000 two-byte characters are under the limit as characters and over it as bytes.
         #expect(limit.size >= 2_000, "the size counts bytes, not characters: \(limit.size)")
         #expect(refusal.reason.hasPrefix("This write is "), "\(refusal.reason)")
-        #expect(refusal.code == nil)
+        // The code a direct write of that size is refused with.
+        #expect(refusal.code == "over_request_limit")
 
         // Only the small save reached the server.
         let posts = server.log.all.filter { $0.hasPrefix("POST /items ") }

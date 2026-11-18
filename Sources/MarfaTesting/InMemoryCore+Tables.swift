@@ -32,6 +32,14 @@ extension InMemoryCore {
         try unsupported("tables.row")
     }
 
+    func counts(ids: [String], counted: Counted) throws -> [ItemCount] {
+        try unsupported("counts")
+    }
+
+    func servedCounts(ids: [String], counted: Counted) throws -> [ItemCount] {
+        try unsupported("servedCounts")
+    }
+
     func tableTotals(itemId: String, table: String, filter: String?) throws -> JsonObject {
         try unsupported("tables.totals")
     }

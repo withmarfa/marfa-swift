@@ -54,7 +54,7 @@ import Synchronization
 ///   ``FakeCopyError/unsupported(call:)`` until the test scripts the answer with ``displays`` or ``linkCandidates``.
 ///
 /// Every other call throws ``FakeCopyError/unsupported(call:)``, including
-/// `changes(since:most:)`, since the fake records no changes to name, and the
+/// `changes(since:most:)`, since the fake records no changes to name, `counts(of:_:)`, and the
 /// reads of body links.
 ///
 /// The fake is not a second engine. A call, or an input to a call, that it

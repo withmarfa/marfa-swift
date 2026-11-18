@@ -81,7 +81,7 @@ public enum Reread: Sendable, Hashable {
 
     /// The parts of a copy an update can name.
     public struct Parts: Sendable, Hashable {
-        /// The items and edges to read again, each by ID.
+        /// The items, edges, and held tables to read again.
         public var rows: ChangedRows
         /// Read ``Queue/all()`` again.
         public var queue: Bool

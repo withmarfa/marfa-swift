@@ -134,6 +134,43 @@ extension LiveWorkingCopies {
             }
         }
 
+        @Test func aTableTheFollowFillsIsToldToTheStreamsWithItsItem() async throws {
+            let suffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+            let type = "app.swift\(suffix).steps"
+            let minted = try await mintKey(for: type, suffix: suffix)
+            let (copy, item) = try await copyHoldingSteps(minted.server, type: type, item: nil)
+            let heard = Heard(copy.changes())
+            do {
+                // The follow holds the stream once it tells an event another writer made.
+                let witness = try await request(
+                    "POST", "items", body: ["type": type, "properties": ["title": "Witness"], "tier": "library"])
+                let witnessId = try #require(witness["item"]?.object?["id"]?.string)
+                try await eventually("the follow told the other writer's item", within: 30) {
+                    heard.all.contains { if case .server = $0.origin { $0.itemId == witnessId } else { false } }
+                }
+
+                let hold = try await copy.tables.hold("steps", ofType: type)
+                #expect(hold.fill == nil, "the hold filled the table itself: \(hold)")
+                let filled = Change(origin: .refreshed(.tables), itemId: item, edgeId: nil)
+                try await eventually("the follow told the table it filled", within: 30) {
+                    heard.all.contains(filled)
+                }
+                #expect(heard.all.filter { $0 == filled }.count == 1)
+                #expect(
+                    try await copy.tables.held().tables.contains {
+                        $0.itemId == item && $0.table == "steps" && $0.state == .whole
+                    })
+                heard.stop()
+                await copy.close()
+                _ = try await request("DELETE", "keys/\(minted.id)")
+            } catch {
+                heard.stop()
+                await copy.close()
+                _ = try? await request("DELETE", "keys/\(minted.id)")
+                throw error
+            }
+        }
+
         @Test func aPutWithNoIdIsGivenOneAndShownAtOnce() async throws {
             let suffix = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
             let type = "app.swift\(suffix).steps"

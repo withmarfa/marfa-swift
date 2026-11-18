@@ -651,6 +651,8 @@ final class Feed: Sendable {
             return [Change(origin: .saved(dataVersion: dataVersion), itemId: nil, edgeId: nil)]
         case .watchFailed(let reason, _):
             return [stopped(MarfaError(reason))]
+        case .tableFilled(let itemId, _, _):
+            return [Change(origin: .refreshed(.tables), itemId: itemId, edgeId: nil)]
         }
     }
 }

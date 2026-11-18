@@ -19555,6 +19555,1379 @@ public enum Operations {
             }
         }
     }
+    /// Count linked items and rows
+    ///
+    /// Returns, for each of up to 100 items, how many active items an edge type links to it, by status group, or how many rows it holds in one table. Name exactly one of `backref`, `edge` and `table`.
+    ///
+    /// - Remark: HTTP `POST /items/counts`.
+    /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)`.
+    public enum CountItemLinks {
+        public static let id: Swift.String = "countItemLinks"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/items/counts/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                /// The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///
+                /// - Remark: Generated from `#/paths/items/counts/POST/header/X-Marfa-Instance-Id`.
+                public var xMarfaInstanceId: Swift.String?
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CountItemLinks.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - xMarfaInstanceId: The ID of the instance you expect, as `GET /` returns it. If another instance answers at this address, Marfa returns `409 instance_changed` and doesn't write. Leave it out to send the request to whichever instance answers.
+                ///   - accept:
+                public init(
+                    xMarfaInstanceId: Swift.String? = nil,
+                    accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CountItemLinks.AcceptableContentType>] = .defaultValues()
+                ) {
+                    self.xMarfaInstanceId = xMarfaInstanceId
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CountItemLinks.Input.Headers
+            /// - Remark: Generated from `#/paths/items/counts/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/requestBody/json`.
+                public struct JsonPayload: Codable, Hashable, Sendable {
+                    /// The IDs of the items to count for, at most 100. An ID named twice is answered once.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/requestBody/json/ids`.
+                    public var ids: [Swift.String]
+                    /// An edge type. Counts the active items that edges of this type leave each item for, as `backref[<edge type>]` selects them: `parent-of` counts children.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/requestBody/json/backref`.
+                    public var backref: Swift.String?
+                    /// An edge type. Counts the active items that have an edge of this type to each item, as `edge[<edge type>]` selects them: `in-collection` counts a collection's members.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/requestBody/json/edge`.
+                    public var edge: Swift.String?
+                    /// A table name. Counts the rows each item holds in that table. An item whose type declares no such table counts 0.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/requestBody/json/table`.
+                    public var table: Swift.String?
+                    /// Creates a new `JsonPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - ids: The IDs of the items to count for, at most 100. An ID named twice is answered once.
+                    ///   - backref: An edge type. Counts the active items that edges of this type leave each item for, as `backref[<edge type>]` selects them: `parent-of` counts children.
+                    ///   - edge: An edge type. Counts the active items that have an edge of this type to each item, as `edge[<edge type>]` selects them: `in-collection` counts a collection's members.
+                    ///   - table: A table name. Counts the rows each item holds in that table. An item whose type declares no such table counts 0.
+                    public init(
+                        ids: [Swift.String],
+                        backref: Swift.String? = nil,
+                        edge: Swift.String? = nil,
+                        table: Swift.String? = nil
+                    ) {
+                        self.ids = ids
+                        self.backref = backref
+                        self.edge = edge
+                        self.table = table
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case ids
+                        case backref
+                        case edge
+                        case table
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.ids = try container.decode(
+                            [Swift.String].self,
+                            forKey: .ids
+                        )
+                        self.backref = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .backref
+                        )
+                        self.edge = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .edge
+                        )
+                        self.table = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .table
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "ids",
+                            "backref",
+                            "edge",
+                            "table"
+                        ])
+                    }
+                }
+                /// - Remark: Generated from `#/paths/items/counts/POST/requestBody/content/application\/json`.
+                case json(Operations.CountItemLinks.Input.Body.JsonPayload)
+            }
+            public var body: Operations.CountItemLinks.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.CountItemLinks.Input.Headers = .init(),
+                body: Operations.CountItemLinks.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.Ok.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// The counts of one item.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload`.
+                        public struct CountsPayloadPayload: Codable, Hashable, Sendable {
+                            /// The ID of the item counted for.
+                            ///
+                            /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/id`.
+                            public var id: Swift.String
+                            /// How many items, or rows, the item links to or holds. 0 for an item that doesn't exist or that you can't read.
+                            ///
+                            /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/total`.
+                            public var total: Swift.Int
+                            /// How many of the counted items are in each status group. Items with no status, or a status word their type doesn't declare, are in none. Absent for a table's rows.
+                            ///
+                            /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/status_groups`.
+                            public struct StatusGroupsPayload: Codable, Hashable, Sendable {
+                                /// Items in the `not_started` group.
+                                ///
+                                /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/status_groups/not_started`.
+                                public var notStarted: Swift.Int
+                                /// Items in the `in_progress` group.
+                                ///
+                                /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/status_groups/in_progress`.
+                                public var inProgress: Swift.Int
+                                /// Items in the `completed` group.
+                                ///
+                                /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/status_groups/completed`.
+                                public var completed: Swift.Int
+                                /// Items in the `canceled` group.
+                                ///
+                                /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/status_groups/canceled`.
+                                public var canceled: Swift.Int
+                                /// Creates a new `StatusGroupsPayload`.
+                                ///
+                                /// - Parameters:
+                                ///   - notStarted: Items in the `not_started` group.
+                                ///   - inProgress: Items in the `in_progress` group.
+                                ///   - completed: Items in the `completed` group.
+                                ///   - canceled: Items in the `canceled` group.
+                                public init(
+                                    notStarted: Swift.Int,
+                                    inProgress: Swift.Int,
+                                    completed: Swift.Int,
+                                    canceled: Swift.Int
+                                ) {
+                                    self.notStarted = notStarted
+                                    self.inProgress = inProgress
+                                    self.completed = completed
+                                    self.canceled = canceled
+                                }
+                                public enum CodingKeys: String, CodingKey {
+                                    case notStarted = "not_started"
+                                    case inProgress = "in_progress"
+                                    case completed
+                                    case canceled
+                                }
+                                public init(from decoder: any Swift.Decoder) throws {
+                                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                                    self.notStarted = try container.decode(
+                                        Swift.Int.self,
+                                        forKey: .notStarted
+                                    )
+                                    self.inProgress = try container.decode(
+                                        Swift.Int.self,
+                                        forKey: .inProgress
+                                    )
+                                    self.completed = try container.decode(
+                                        Swift.Int.self,
+                                        forKey: .completed
+                                    )
+                                    self.canceled = try container.decode(
+                                        Swift.Int.self,
+                                        forKey: .canceled
+                                    )
+                                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                        "not_started",
+                                        "in_progress",
+                                        "completed",
+                                        "canceled"
+                                    ])
+                                }
+                            }
+                            /// How many of the counted items are in each status group. Items with no status, or a status word their type doesn't declare, are in none. Absent for a table's rows.
+                            ///
+                            /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/CountsPayload/status_groups`.
+                            public var statusGroups: Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayloadPayload.StatusGroupsPayload?
+                            /// Creates a new `CountsPayloadPayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - id: The ID of the item counted for.
+                            ///   - total: How many items, or rows, the item links to or holds. 0 for an item that doesn't exist or that you can't read.
+                            ///   - statusGroups: How many of the counted items are in each status group. Items with no status, or a status word their type doesn't declare, are in none. Absent for a table's rows.
+                            public init(
+                                id: Swift.String,
+                                total: Swift.Int,
+                                statusGroups: Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayloadPayload.StatusGroupsPayload? = nil
+                            ) {
+                                self.id = id
+                                self.total = total
+                                self.statusGroups = statusGroups
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case id
+                                case total
+                                case statusGroups = "status_groups"
+                            }
+                            public init(from decoder: any Swift.Decoder) throws {
+                                let container = try decoder.container(keyedBy: CodingKeys.self)
+                                self.id = try container.decode(
+                                    Swift.String.self,
+                                    forKey: .id
+                                )
+                                self.total = try container.decode(
+                                    Swift.Int.self,
+                                    forKey: .total
+                                )
+                                self.statusGroups = try container.decodeIfPresent(
+                                    Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayloadPayload.StatusGroupsPayload.self,
+                                    forKey: .statusGroups
+                                )
+                                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                    "id",
+                                    "total",
+                                    "status_groups"
+                                ])
+                            }
+                        }
+                        /// The counts, in the order `ids` named them, each ID once.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/counts`.
+                        public typealias CountsPayload = [Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayloadPayload]
+                        /// The counts, in the order `ids` named them, each ID once.
+                        ///
+                        /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/json/counts`.
+                        public var counts: Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayload
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - counts: The counts, in the order `ids` named them, each ID once.
+                        public init(counts: Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayload) {
+                            self.counts = counts
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case counts
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.counts = try container.decode(
+                                Operations.CountItemLinks.Output.Ok.Body.JsonPayload.CountsPayload.self,
+                                forKey: .counts
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "counts"
+                            ])
+                        }
+                    }
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/200/content/application\/json`.
+                    case json(Operations.CountItemLinks.Output.Ok.Body.JsonPayload)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Operations.CountItemLinks.Output.Ok.Body.JsonPayload {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.Ok.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.Ok.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// Returns one count for each ID, in the order `ids` named them.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.CountItemLinks.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.CountItemLinks.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct BadRequest: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/400/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/400/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/400/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/400/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.BadRequest.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/400/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/400/content/application\/json`.
+                    case json(Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InvalidIdOrMissingRequiredFieldOrValidationErrorRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.BadRequest.Body
+                /// Creates a new `BadRequest`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.BadRequest.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.BadRequest.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `missing_required_field`: `ids` is missing.
+            /// - `validation_error`: `ids` is not a list or has more than 100 IDs, none or more than one of `backref`, `edge` and `table` is named, an edge type or a table name is blank or malformed, or the body has a field this endpoint doesn't take.
+            /// - `invalid_id`: an ID in `ids` is not a valid item ID.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/400`.
+            ///
+            /// HTTP response code: `400 badRequest`.
+            case badRequest(Operations.CountItemLinks.Output.BadRequest)
+            /// The associated value of the enum case if `self` is `.badRequest`.
+            ///
+            /// - Throws: An error if `self` is not `.badRequest`.
+            /// - SeeAlso: `.badRequest`.
+            public var badRequest: Operations.CountItemLinks.Output.BadRequest {
+                get throws {
+                    switch self {
+                    case let .badRequest(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "badRequest",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Unauthorized: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/401/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/401/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/401/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/401/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.Unauthorized.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/401/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/401/content/application\/json`.
+                    case json(Components.Schemas.UnauthorizedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.UnauthorizedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.Unauthorized.Body
+                /// Creates a new `Unauthorized`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.Unauthorized.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.Unauthorized.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/401`.
+            ///
+            /// HTTP response code: `401 unauthorized`.
+            case unauthorized(Operations.CountItemLinks.Output.Unauthorized)
+            /// The associated value of the enum case if `self` is `.unauthorized`.
+            ///
+            /// - Throws: An error if `self` is not `.unauthorized`.
+            /// - SeeAlso: `.unauthorized`.
+            public var unauthorized: Operations.CountItemLinks.Output.Unauthorized {
+                get throws {
+                    switch self {
+                    case let .unauthorized(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "unauthorized",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Forbidden: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/403/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/403/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/403/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/403/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.Forbidden.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/403/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/403/content/application\/json`.
+                    case json(Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.EdgePermissionDeniedOrTypeNotPermittedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.Forbidden.Body
+                /// Creates a new `Forbidden`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.Forbidden.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.Forbidden.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// - `type_not_permitted`: your credential reaches no type. If it reaches some types, items of the others are left out instead.
+            /// - `edge_type_not_permitted`: you can't read the edge type.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/403`.
+            ///
+            /// HTTP response code: `403 forbidden`.
+            case forbidden(Operations.CountItemLinks.Output.Forbidden)
+            /// The associated value of the enum case if `self` is `.forbidden`.
+            ///
+            /// - Throws: An error if `self` is not `.forbidden`.
+            /// - SeeAlso: `.forbidden`.
+            public var forbidden: Operations.CountItemLinks.Output.Forbidden {
+                get throws {
+                    switch self {
+                    case let .forbidden(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "forbidden",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct RequestTimeout: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/408/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/408/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/408/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/408/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.RequestTimeout.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/408/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/408/content/application\/json`.
+                    case json(Components.Schemas.RequestTimeoutRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RequestTimeoutRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.RequestTimeout.Body
+                /// Creates a new `RequestTimeout`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.RequestTimeout.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.RequestTimeout.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `request_timeout`: the request body didn't arrive whole within 180 seconds. Nothing changed, and Marfa closed the connection. Send the request again. A body larger than about 21 MiB can't arrive in that time over a 1 Mbit/s link, so send it in smaller requests.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/408`.
+            ///
+            /// HTTP response code: `408 requestTimeout`.
+            case requestTimeout(Operations.CountItemLinks.Output.RequestTimeout)
+            /// The associated value of the enum case if `self` is `.requestTimeout`.
+            ///
+            /// - Throws: An error if `self` is not `.requestTimeout`.
+            /// - SeeAlso: `.requestTimeout`.
+            public var requestTimeout: Operations.CountItemLinks.Output.RequestTimeout {
+                get throws {
+                    switch self {
+                    case let .requestTimeout(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "requestTimeout",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/409/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/409/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/409/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/409/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.Conflict.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/409/content/application\/json`.
+                    case json(Components.Schemas.InstanceChangedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InstanceChangedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.Conflict.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.Conflict.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.CountItemLinks.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.CountItemLinks.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct PreconditionFailed: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/412/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/412/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/412/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/412/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.PreconditionFailed.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/412/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/412/content/application\/json`.
+                    case json(Components.Schemas.ContractMismatchRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.ContractMismatchRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.PreconditionFailed.Body
+                /// Creates a new `PreconditionFailed`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.PreconditionFailed.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.PreconditionFailed.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `contract_mismatch`: `X-Marfa-Contract` names another contract version than this instance speaks, or is not a whole number. Nothing was done.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/412`.
+            ///
+            /// HTTP response code: `412 preconditionFailed`.
+            case preconditionFailed(Operations.CountItemLinks.Output.PreconditionFailed)
+            /// The associated value of the enum case if `self` is `.preconditionFailed`.
+            ///
+            /// - Throws: An error if `self` is not `.preconditionFailed`.
+            /// - SeeAlso: `.preconditionFailed`.
+            public var preconditionFailed: Operations.CountItemLinks.Output.PreconditionFailed {
+                get throws {
+                    switch self {
+                    case let .preconditionFailed(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "preconditionFailed",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ContentTooLarge: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/413/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/413/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/413/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/413/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.ContentTooLarge.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/413/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/413/content/application\/json`.
+                    case json(Components.Schemas.RequestTooLargeRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RequestTooLargeRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.ContentTooLarge.Body
+                /// Creates a new `ContentTooLarge`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.ContentTooLarge.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.ContentTooLarge.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `request_too_large`: the request body is larger than this instance accepts.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/413`.
+            ///
+            /// HTTP response code: `413 contentTooLarge`.
+            case contentTooLarge(Operations.CountItemLinks.Output.ContentTooLarge)
+            /// The associated value of the enum case if `self` is `.contentTooLarge`.
+            ///
+            /// - Throws: An error if `self` is not `.contentTooLarge`.
+            /// - SeeAlso: `.contentTooLarge`.
+            public var contentTooLarge: Operations.CountItemLinks.Output.ContentTooLarge {
+                get throws {
+                    switch self {
+                    case let .contentTooLarge(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "contentTooLarge",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct TooManyRequests: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Whole seconds to wait before retrying, sent with a rate limit's refusal and with a write turned away while a restore runs. For a rate limit it is rounded up from the time left until the latest end among the limits that are spent, and never fewer than 1, so a client that honors it needs no backoff of its own. While a restore runs it is always 5.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/headers/Retry-After`.
+                    public var retryAfter: Components.Headers.RetryAfter?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - retryAfter: Whole seconds to wait before retrying, sent with a rate limit's refusal and with a write turned away while a restore runs. For a rate limit it is rounded up from the time left until the latest end among the limits that are spent, and never fewer than 1, so a client that honors it needs no backoff of its own. While a restore runs it is always 5.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        retryAfter: Components.Headers.RetryAfter? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                        self.retryAfter = retryAfter
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.TooManyRequests.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/429/content/application\/json`.
+                    case json(Components.Schemas.RateLimitedRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.RateLimitedRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.TooManyRequests.Body
+                /// Creates a new `TooManyRequests`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.TooManyRequests.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.TooManyRequests.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `rate_limited`: you sent too many requests. Wait for the number of seconds in `Retry-After`, then try again.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/429`.
+            ///
+            /// HTTP response code: `429 tooManyRequests`.
+            case tooManyRequests(Operations.CountItemLinks.Output.TooManyRequests)
+            /// The associated value of the enum case if `self` is `.tooManyRequests`.
+            ///
+            /// - Throws: An error if `self` is not `.tooManyRequests`.
+            /// - SeeAlso: `.tooManyRequests`.
+            public var tooManyRequests: Operations.CountItemLinks.Output.TooManyRequests {
+                get throws {
+                    switch self {
+                    case let .tooManyRequests(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "tooManyRequests",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct InternalServerError: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/500/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/500/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/500/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/500/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.InternalServerError.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/500/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/500/content/application\/json`.
+                    case json(Components.Schemas.InternalErrorRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InternalErrorRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.InternalServerError.Body
+                /// Creates a new `InternalServerError`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.InternalServerError.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.InternalServerError.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `internal_error`: Marfa failed in a way it didn't expect, and the request may not have completed. Read what you changed before you repeat a write.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/500`.
+            ///
+            /// HTTP response code: `500 internalServerError`.
+            case internalServerError(Operations.CountItemLinks.Output.InternalServerError)
+            /// The associated value of the enum case if `self` is `.internalServerError`.
+            ///
+            /// - Throws: An error if `self` is not `.internalServerError`.
+            /// - SeeAlso: `.internalServerError`.
+            public var internalServerError: Operations.CountItemLinks.Output.InternalServerError {
+                get throws {
+                    switch self {
+                    case let .internalServerError(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "internalServerError",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct ServiceUnavailable: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Whole seconds to wait before retrying, sent with a rate limit's refusal and with a write turned away while a restore runs. For a rate limit it is rounded up from the time left until the latest end among the limits that are spent, and never fewer than 1, so a client that honors it needs no backoff of its own. While a restore runs it is always 5.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/headers/Retry-After`.
+                    public var retryAfter: Components.Headers.RetryAfter?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - retryAfter: Whole seconds to wait before retrying, sent with a rate limit's refusal and with a write turned away while a restore runs. For a rate limit it is rounded up from the time left until the latest end among the limits that are spent, and never fewer than 1, so a client that honors it needs no backoff of its own. While a restore runs it is always 5.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        retryAfter: Components.Headers.RetryAfter? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                        self.retryAfter = retryAfter
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.ServiceUnavailable.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/503/content/application\/json`.
+                    case json(Components.Schemas.WriteContentionRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WriteContentionRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.ServiceUnavailable.Body
+                /// Creates a new `ServiceUnavailable`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.ServiceUnavailable.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.ServiceUnavailable.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `write_contention`: the database was busy, and Marfa couldn't complete the request in time. Nothing changed. Try the request again. While a restore runs, `details.reason` is `restore_running`.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/503`.
+            ///
+            /// HTTP response code: `503 serviceUnavailable`.
+            case serviceUnavailable(Operations.CountItemLinks.Output.ServiceUnavailable)
+            /// The associated value of the enum case if `self` is `.serviceUnavailable`.
+            ///
+            /// - Throws: An error if `self` is not `.serviceUnavailable`.
+            /// - SeeAlso: `.serviceUnavailable`.
+            public var serviceUnavailable: Operations.CountItemLinks.Output.ServiceUnavailable {
+                get throws {
+                    switch self {
+                    case let .serviceUnavailable(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "serviceUnavailable",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Code507: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/507/headers`.
+                public struct Headers: Sendable, Hashable {
+                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/507/headers/X-Marfa-Contract`.
+                    public var xMarfaContract: Components.Headers.XMarfaContract?
+                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/507/headers/X-Request-ID`.
+                    public var xRequestID: Components.Headers.XRequestID?
+                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/507/headers/X-Error-Code`.
+                    public var xErrorCode: Components.Headers.XErrorCode?
+                    /// Creates a new `Headers`.
+                    ///
+                    /// - Parameters:
+                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
+                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
+                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    public init(
+                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
+                        xRequestID: Components.Headers.XRequestID? = nil,
+                        xErrorCode: Components.Headers.XErrorCode? = nil
+                    ) {
+                        self.xMarfaContract = xMarfaContract
+                        self.xRequestID = xRequestID
+                        self.xErrorCode = xErrorCode
+                    }
+                }
+                /// Received HTTP response headers
+                public var headers: Operations.CountItemLinks.Output.Code507.Headers
+                /// - Remark: Generated from `#/paths/items/counts/POST/responses/507/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/items/counts/POST/responses/507/content/application\/json`.
+                    case json(Components.Schemas.InsufficientStorageRefusal)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.InsufficientStorageRefusal {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CountItemLinks.Output.Code507.Body
+                /// Creates a new `Code507`.
+                ///
+                /// - Parameters:
+                ///   - headers: Received HTTP response headers
+                ///   - body: Received HTTP response body
+                public init(
+                    headers: Operations.CountItemLinks.Output.Code507.Headers = .init(),
+                    body: Operations.CountItemLinks.Output.Code507.Body
+                ) {
+                    self.headers = headers
+                    self.body = body
+                }
+            }
+            /// `insufficient_storage`: the disk that holds the instance's data has no room for the request, or the request would leave less free than the instance keeps in reserve. Nothing changed, unless `details.write_outcome` is `unknown`, which means the write may have landed: read what you changed before you repeat it. Free space on the disk, then try the request again.
+            ///
+            /// - Remark: Generated from `#/paths//items/counts/post(countItemLinks)/responses/507`.
+            ///
+            /// HTTP response code: `507 code507`.
+            case code507(Operations.CountItemLinks.Output.Code507)
+            /// The associated value of the enum case if `self` is `.code507`.
+            ///
+            /// - Throws: An error if `self` is not `.code507`.
+            /// - SeeAlso: `.code507`.
+            public var code507: Operations.CountItemLinks.Output.Code507 {
+                get throws {
+                    switch self {
+                    case let .code507(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "code507",
+                            response: self
+                        )
+                    }
+                }
+            }
+            /// Undocumented response.
+            ///
+            /// A response with a code that is not documented in the OpenAPI document.
+            case undocumented(statusCode: Swift.Int, OpenAPIRuntime.UndocumentedPayload)
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json
+                ]
+            }
+        }
+    }
     /// Upsert items in bulk
     ///
     /// Creates or updates up to 5,000 items in one call, matching existing items on `(source, source_id)`. The batch is atomic by default: one failed entry rolls it all back. Returns each entry's outcome.

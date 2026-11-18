@@ -311,7 +311,7 @@ public final class WorkingCopy: Sendable {
     /// last hydration or catch-up.
     ///
     /// A catch-up that applied no event can still have moved rows, which `readOnlyHeld` counts; every held stream is
-    /// told `.refreshed(.caughtUp)` for either.
+    /// told `.refreshed(.caughtUp)` for either, and `.refreshed(.tables)` for a held table it filled or changed.
     ///
     /// A catch-up made while a hydration runs, such as the refill a held
     /// `changes()` stream starts, waits for it and then catches up from the
@@ -421,9 +421,9 @@ public final class WorkingCopy: Sendable {
     /// sequence is held.
     ///
     /// The first update asks to read everything and says the copy's ``CopyConnection``. Each later one names what
-    /// changed since the one before: rows by ID, the queue, the views, the type catalog, or everything. Updates are
-    /// coalesced: however many changes arrive while the app reads, at most one update waits, holding all of them, and
-    /// more than 1,000 changed items or edges are delivered as ``Reread/everything``. An update can also carry no
+    /// changed since the one before, including items, edges, held tables, the queue, views, and the type catalog.
+    /// At most one update waits while the app reads. It includes all pending changes, or ``Reread/everything``
+    /// when more than 1,000 items, 1,000 edges, or 1,000 tables changed. An update can also carry no
     /// reread, when only its `connection`, `fill` or `lastSynced` changed. Iterate the sequence once; ask again for
     /// another consumer.
     ///
@@ -504,7 +504,8 @@ public final class WorkingCopy: Sendable {
     /// opened again the error is thrown and the copy is closed, its streams
     /// ended.
     public func useKey(_ key: String) async throws {
-        try holder.checkKeyCanChange()
+        try holder.beginKeyChange()
+        defer { holder.endKeyChange() }
         lifecycle.keyWillChange()
         do {
             try await feed.suspend()
@@ -602,8 +603,9 @@ public struct Change: Sendable, Hashable {
         /// The app replaced its declarations, or a refresh read a changed
         /// item type or edge type catalog; read `catalog` again.
         case catalog
-        /// The tables the copy holds, or the rows it holds of them, changed through ``Tables/hold(_:ofType:)``,
-        /// ``Tables/letGo(_:ofType:)`` or ``Tables/fill()``; read ``Tables/held()`` and the rows again.
+        /// The copy's held tables or their rows changed. Read ``Tables/held()`` and the rows again.
+        /// A follow that fills a table sets ``Change/itemId`` to the item's ID. A catch-up lists the tables it
+        /// changed in ``CatchUpReport/changedTables``.
         case tables
     }
 
@@ -1256,6 +1258,9 @@ func caughtUp(
     let report = try caughtUp.get()
     if report.applied > 0 || report.readOnlyHeld > 0 {
         feed.announce(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+    }
+    if !report.changedTables.isEmpty {
+        feed.announce(Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil))
     }
     return report
 }

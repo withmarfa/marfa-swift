@@ -1,3 +1,4 @@
+import Foundation
 package import MarfaCore
 import Synchronization
 
@@ -25,6 +26,20 @@ final class CoreHolder: Sendable {
         var drained: CheckedContinuation<Void, Never>?
         var closers: [CheckedContinuation<Void, Never>] = []
         var handle: Handle
+        /// Moves whenever a key change begins or ends, so a call can tell it spanned part of one.
+        var epoch = 0
+        /// Key changes begun and not yet ended, counted from before the feed lets go of the store.
+        var keyChanges = 0
+        var settling: [UUID: CheckedContinuation<Void, Never>] = [:]
+
+        var isClosing: Bool { closing || phase == .dropping || phase == .released }
+        var isSettled: Bool { isClosing || (keyChanges == 0 && phase != .replacing) }
+
+        mutating func takeSettled() -> [CheckedContinuation<Void, Never>] {
+            guard isSettled else { return [] }
+            defer { settling = [:] }
+            return Array(settling.values)
+        }
     }
 
     private let state: Mutex<State>
@@ -50,14 +65,70 @@ final class CoreHolder: Sendable {
 
     var isClosed: Bool { state.withLock { $0.phase == .released } }
 
-    /// Throws what `replace(key:)` would throw before it starts: `closed`, or
-    /// `noServer` where there is no key to change.
-    func checkKeyCanChange() throws {
+    /// Marks a key change as begun, until `endKeyChange()`.
+    ///
+    /// Throws what `replace(key:)` would throw before it starts: `closed`, or `noServer` where there is no key to
+    /// change.
+    func beginKeyChange() throws {
         try state.withLock { state in
-            if state.closing || state.phase == .dropping || state.phase == .released {
-                throw MarfaError.closed(message: Self.closedMessage)
-            }
+            if state.isClosing { throw MarfaError.closed(message: Self.closedMessage) }
             if reopen == nil { throw Self.noKey }
+            state.keyChanges += 1
+            state.epoch += 1
+        }
+    }
+
+    func endKeyChange() {
+        let settled = state.withLock { state in
+            state.keyChanges -= 1
+            state.epoch += 1
+            return state.takeSettled()
+        }
+        for waiter in settled { waiter.resume() }
+    }
+
+    /// The epoch a call that must not span a key change starts from.
+    ///
+    /// Throws `closed` once the copy is closing, and `keyChanging` while a key change runs.
+    func steadyEpoch() throws -> Int {
+        try state.withLock { state in
+            if state.isClosing { throw MarfaError.closed(message: Self.closedMessage) }
+            if !state.isSettled { throw MarfaError.keyChanging(message: Self.replacingMessage) }
+            return state.epoch
+        }
+    }
+
+    /// Whether the open core of `epoch` still holds the same key, with no key change begun since.
+    ///
+    /// Throws `closed` once the copy is closing, or closed by a reopen that failed.
+    func isSteady(since epoch: Int) throws -> Bool {
+        try state.withLock { state in
+            if state.isClosing { throw MarfaError.closed(message: Self.closedMessage) }
+            return state.keyChanges == 0 && state.phase == .open && state.epoch == epoch
+        }
+    }
+
+    /// Waits for every key change running to end, then gives the epoch to start again from.
+    ///
+    /// Throws `closed` once the copy is closing, and `canceled` for a canceled task.
+    func steadyEpochAfterKeyChange() async throws -> Int {
+        let waiter = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let ready = state.withLock { state -> Bool in
+                    guard !state.isSettled, !Task.isCancelled else { return true }
+                    state.settling[waiter] = continuation
+                    return false
+                }
+                if ready { continuation.resume() }
+            }
+        } onCancel: {
+            state.withLock { $0.settling.removeValue(forKey: waiter) }?.resume()
+        }
+        return try state.withLock { state in
+            if state.isClosing { throw MarfaError.closed(message: Self.closedMessage) }
+            if Task.isCancelled { throw CoreQueue.canceled }
+            return state.epoch
         }
     }
 
@@ -110,10 +181,11 @@ final class CoreHolder: Sendable {
     ///
     /// Every caller returns only after the drop, whichever of them did it.
     func close() async {
-        let elected = state.withLock { state in
+        let (elected, settled) = state.withLock { state in
             state.closing = true
-            return elect(&state)
+            return (elect(&state), state.takeSettled())
         }
+        for waiter in settled { waiter.resume() }
         if elected {
             await releaseOffThread()
             return
@@ -161,18 +233,20 @@ final class CoreHolder: Sendable {
         } catch {
             reopened = .failure(error)
         }
-        let (elected, closedMeanwhile) = state.withLock { state -> (Bool, Bool) in
+        let (elected, closedMeanwhile, settled) = state.withLock {
+            state -> (Bool, Bool, [CheckedContinuation<Void, Never>]) in
             if case .success(let core) = reopened {
                 state.core = core
                 if !state.closing {
                     state.handle = Handle(core.heldHandle())
                     state.phase = .open
-                    return (false, false)
+                    return (false, false, state.takeSettled())
                 }
             }
             state.phase = .dropping
-            return (true, state.closing)
+            return (true, state.closing, state.takeSettled())
         }
+        for waiter in settled { waiter.resume() }
         if elected { await releaseOffThread() }
         if closedMeanwhile { throw MarfaError.closed(message: Self.closedMessage) }
         if case .failure(let error) = reopened { throw error }

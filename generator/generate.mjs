@@ -262,6 +262,7 @@ const serverOnly = new Set([
   "getItemExtension",
   "listItemExtensions",
   "getFolderStatus",
+  "countItemLinks",
 ]);
 // A bulk action writes items on the server, a second path for item writes. An app follows and cancels the job
 // a type move starts, so reading and cancelling a job stay.
@@ -271,6 +272,7 @@ const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
 // `Server` in the Marfa module makes these itself, so an app has one way to call each.
 const serverCalls = new Set([
   "listItemVersions", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
+  "countItemLinks",
 ]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 
