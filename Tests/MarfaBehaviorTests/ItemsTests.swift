@@ -515,7 +515,7 @@ struct ItemsOffline {
     func aCopyWithNoServerRefusesAKeyAndTellsItsOwnWrites(kind: CopyKind) async throws {
         let copy = try await kind.open()
         await #expect {
-            try await copy.useKey("k")
+            try await copy.use(Server(url: URL(string: "http://127.0.0.1:1")!, key: "k"))
         } throws: { error in
             if case .noServer? = error as? MarfaError { true } else { false }
         }

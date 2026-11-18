@@ -86,7 +86,7 @@ struct Closing {
         await refused("queue.discard") { _ = try await copy.queue.discard("a") }
         await refused("catalog.itemTypes") { _ = try await copy.catalog.itemTypes() }
         await refused("catalog.edgeType") { _ = try await copy.catalog.edgeType("attached-to") }
-        await refused("useKey") { try await copy.useKey("k") }
+        await refused("use") { try await copy.use(.stub("k")) }
 
         var heard = copy.changes().makeAsyncIterator()
         #expect(await heard.next() == nil, "a stream from a closed copy was left open")
@@ -190,7 +190,7 @@ struct ChangingTheKey {
             Marfa.Draft(type: "core.note", properties: ["title": "a"], tier: .feed))
         #expect(try await copy.queue.all().map(\.id) == [created.id])
 
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(Server(url: server.url, key: "new-key")) }
 
         #expect(copy.handle == .writer)
         #expect(try await copy.queue.all().map(\.id) == [created.id], "the queued write did not survive")
@@ -223,7 +223,7 @@ struct ChangingTheKey {
         }
         let before = server.log.all.count
 
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(Server(url: server.url, key: "new-key")) }
 
         #expect(copy.handle == .writer, "the store was still held when it was reopened")
         try await eventually("the follow started with the new key") {
@@ -242,7 +242,7 @@ struct ChangingTheKey {
         #expect(server.log.all.last?.contains("old-key") == true, "the old key was never sent, so this proves nothing")
         let before = server.log.all.count
 
-        try await copy.useKey("new-key")
+        try await copy.use(Server(url: server.url, key: "new-key"))
         _ = try await copy.catchUp()
 
         let after = Array(server.log.all.dropFirst(before))
@@ -254,7 +254,7 @@ struct ChangingTheKey {
     @Test func aCopyWithNoServerHasNoKeyToChange() async throws {
         let copy = try await WorkingCopy.open(store: temporaryStore())
         do {
-            try await copy.useKey("k")
+            try await copy.use(.stub("k"))
             Issue.record("a copy with no server took a key")
         } catch Marfa.MarfaError.noServer {
         }
@@ -269,8 +269,8 @@ struct ChangingTheKey {
         let copy = WorkingCopy(
             holder: CoreHolder(
                 old,
-                reopen: { key in
-                    keys.withLock { $0.append(key) }
+                reopen: { opening in
+                    keys.withLock { $0.append(opening.key) }
                     #expect(old.places[0].ended, "the old place in the watch still held the store when it was reopened")
                     return new
                 }),
@@ -278,7 +278,7 @@ struct ChangingTheKey {
         let heard = Heard(copy.changes())
         #expect(old.places.count == 1)
 
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
 
         #expect(keys.withLock { $0 } == ["new-key"])
         #expect(new.places.count == 1)
@@ -302,7 +302,7 @@ struct ChangingTheKey {
         try await eventually("the stream was told") { heard.stops.count == 1 }
         #expect(new.places.isEmpty)
 
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
         #expect(new.places.count == 1)
         new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "4"))
         try await eventually("the stream heard the new core") { heard.all.count == 2 }
@@ -318,7 +318,7 @@ struct ChangingTheKey {
         old.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
         try await eventually("the old core's save was told") { heard.saves.count == 1 }
 
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
         new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
         try await eventually("the new core's save was told") { heard.saves.count == 2 }
         try await bounded("close") { await copy.close() }
@@ -332,7 +332,7 @@ struct ChangingTheKey {
         var heard = copy.changes().makeAsyncIterator()
 
         do {
-            try await bounded("useKey") { try await copy.useKey("k") }
+            try await bounded("use") { try await copy.use(.stub("k")) }
             Issue.record("a store that could not be opened was reported opened")
         } catch let error as Marfa.MarfaError {
             #expect(error == .store(message: "cannot open"))
@@ -351,7 +351,7 @@ struct ChangingTheKey {
                     return FakeCore.writer()
                 }),
             hasServer: false)
-        let changing = Task { try await copy.holder.replace(key: "k") }
+        let changing = Task { try await copy.holder.replace(.init(key: "k", renewer: nil)) }
         try await eventually("the store was being reopened") {
             do {
                 _ = try await copy.status()
@@ -363,7 +363,7 @@ struct ChangingTheKey {
             }
         }
         await #expect {
-            try await copy.holder.replace(key: "again")
+            try await copy.holder.replace(.init(key: "again", renewer: nil))
         } throws: { error in
             if case .keyChanging? = error as? Marfa.MarfaError { true } else { false }
         }
@@ -386,12 +386,12 @@ struct ChangingTheKey {
                     return new
                 }),
             hasServer: true)
-        let changing = Task { try await copy.useKey("new-key") }
+        let changing = Task { try await copy.use(.stub("new-key")) }
         try await eventually("the store is being reopened") { reopening.hasStarted }
         let heard = Heard(copy.changes())
         new.save()
         reopening.gate.signal()
-        try await bounded("useKey") { try await changing.value }
+        try await bounded("use") { try await changing.value }
 
         try await eventually("the stream was told to read again") { heard.saves.count == 1 }
         #expect(new.places.count == 1)
@@ -417,7 +417,7 @@ struct ChangingTheKey {
         #expect(feed.count == 0)
     }
 
-    @Test func aCloseDuringAFailingReopenMakesUseKeyThrowClosed() async throws {
+    @Test func aCloseDuringAFailingReopenMakesUseThrowClosed() async throws {
         let reopening = DropProbe()
         let copy = WorkingCopy(
             holder: CoreHolder(
@@ -428,15 +428,15 @@ struct ChangingTheKey {
                     throw MarfaCore.MarfaError.Store(message: "cannot open")
                 }),
             hasServer: true)
-        let changing = Task { try await copy.useKey("k") }
+        let changing = Task { try await copy.use(.stub("k")) }
         try await eventually("the store is being reopened") { reopening.hasStarted }
         let closing = Task { await copy.close() }
         try await Task.sleep(for: .milliseconds(100))
         reopening.gate.signal()
         await closing.value
         do {
-            try await bounded("useKey") { try await changing.value }
-            Issue.record("useKey reported success")
+            try await bounded("use") { try await changing.value }
+            Issue.record("use reported success")
         } catch {
             #expect(isClosed(error), "\(error)")
         }

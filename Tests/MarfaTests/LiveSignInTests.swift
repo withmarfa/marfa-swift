@@ -290,3 +290,180 @@ private final class NoRedirect: NSObject, URLSessionTaskDelegate, Sendable {
         nil
     }
 }
+
+/// What an open copy does when its sign-in changes under it.
+extension LiveSignIn {
+    static func authorization(_ own: OwnServer, _ keychain: Keychain, service: String) throws -> Authorization {
+        try Authorization(
+            server: own.url,
+            client: Authorization.Client(
+                name: "marfa-swift live tests", redirect: URL(string: "com.withmarfa.marfa-swift.tests:/signed-in"),
+                scopes: ["core.note:read", "core.note:write"]),
+            keychain: keychain, service: service)
+    }
+
+    static func deviceSignIn(_ authorization: Authorization, _ own: OwnServer) async throws -> Credential {
+        let started = try await authorization.startDeviceSignIn()
+        try await approve(started.userCode, on: own)
+        return try await started.credential()
+    }
+
+    static func drained(_ copy: WorkingCopy, _ title: String) async throws {
+        _ = try await copy.items.create(Self.note(title))
+        #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
+    }
+
+    @Test func aCopyWhoseGrantEndedFollowsAgainWithANewSignInGivenToUse() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                let authorization = try Self.authorization(own, keychain, service: Self.service)
+                let first = try await Self.deviceSignIn(authorization, own)
+                let copy = try await WorkingCopy.open(
+                    store: temporaryStore(), server: try Server(url: own.url, credential: first))
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+                let updates = Updates(copy.updates())
+                try await eventually("following") { updates.connection == .following }
+                try await Self.drained(copy, "written before the grant ended")
+
+                // The owner revokes the app: the grant ends with its refresh token.
+                let kept = try #require(try authorization.place.read())
+                try await Self.revoke(kept.accessToken, hint: "access_token", clientId: kept.clientId, own)
+                let refresh = try #require(kept.refreshToken)
+                try await Self.revoke(refresh, hint: "refresh_token", clientId: kept.clientId, own)
+                let waiting = try await copy.items.create(Self.note("queued while signed out"))
+                await #expect {
+                    try await copy.queue.drain()
+                } throws: { error in
+                    guard case MarfaError.signedOut = error else { return false }
+                    return true
+                }
+                try await eventually("the copy shows its key refused") {
+                    if case .keyRefused? = updates.connection { true } else { false }
+                }
+
+                // The app signs in again and hands the copy the new sign-in; the same copy goes on.
+                let left = try authorization.place.read()
+                // It is a separate sign-in, kept in its own keychain item, so a renewal can tell which one it read.
+                let replacement = try Self.authorization(own, keychain, service: Self.service + ".replacement")
+                let second = try await Self.deviceSignIn(replacement, own)
+                try await bounded("use") { try await copy.use(try Server(url: own.url, credential: second)) }
+                // A sign-in is a new reach, so the copy is filled again from the server and keeps its queue.
+                try await eventually("the copy asks to be hydrated") {
+                    if case .needsHydration? = updates.connection { true } else { false }
+                }
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+                try await eventually("following again") { updates.connection == .following }
+                #expect(try await copy.queue.drain().verdicts.map(\.verdict) == [.accepted])
+                #expect(try await Self.read(try #require(waiting.itemId), own) == 200)
+
+                // A renewal after the swap goes through the new sign-in.
+                let signedIn = try #require(try replacement.place.read())
+                try await Self.revoke(signedIn.accessToken, hint: "access_token", clientId: signedIn.clientId, own)
+                try await Self.drained(copy, "written after a renewal under the new sign-in")
+                let renewed = try #require(try replacement.place.read())
+                #expect(renewed.accessToken != signedIn.accessToken)
+                #expect(renewed.refreshToken != signedIn.refreshToken)
+                #expect(try authorization.place.read() == left, "the renewal read the sign-in the copy left")
+                await copy.close()
+            }
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    @Test func aCopyMovesFromAKeyToACredentialAndBack() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                let authorization = try Self.authorization(own, keychain, service: Self.service)
+                let copy = try await WorkingCopy.open(store: temporaryStore(), server: own.server)
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+                try await Self.drained(copy, "written with the key")
+
+                let credential = try await Self.deviceSignIn(authorization, own)
+                try await copy.use(try Server(url: own.url, credential: credential))
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+                try await Self.drained(copy, "written with the sign-in")
+                let signedIn = try #require(try authorization.place.read())
+                try await Self.revoke(signedIn.accessToken, hint: "access_token", clientId: signedIn.clientId, own)
+                try await Self.drained(copy, "written after the sign-in renewed")
+                #expect(try authorization.place.read()?.accessToken != signedIn.accessToken)
+
+                // Back to a key: nothing renews, and the sign-in the copy left is not touched.
+                let left = try #require(try authorization.place.read())
+                try await copy.use(own.server)
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+                try await Self.drained(copy, "written with the key again")
+                #expect(try authorization.place.read()?.accessToken == left.accessToken)
+                await copy.close()
+            }
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    @Test func aCopyRefusesAServerAtAnotherAddressAndChangesNothing() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            let copy = try await WorkingCopy.open(store: temporaryStore(), server: own.server)
+            _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+            let updates = Updates(copy.updates())
+            try await eventually("following") { updates.connection == .following }
+            let count = updates.all.count
+            let elsewhere = try Server(url: URL(string: "http://127.0.0.1:1")!, key: "other")
+            await #expect {
+                try await copy.use(elsewhere)
+            } throws: { error in
+                guard case MarfaError.wrongServer(let expected, let got, _) = error else { return false }
+                return expected == origin(of: own.url) && got == "http://127.0.0.1:1"
+            }
+            #expect(updates.all.count == count, "a refused server changed the copy")
+            try await Self.drained(copy, "written after the refusal")
+            #expect(updates.connection == .following)
+            await copy.close()
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    /// An owner who confirms a sign-in leaves the same credential holding new tokens; the open copy's renewal reads
+    /// them, so the app does nothing.
+    @Test func aConfirmedSignInOfTheSameCredentialReachesAnOpenCopyWithoutUse() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                let authorization = try Self.authorization(own, keychain, service: Self.service)
+                let credential = try await authorization.signIn(browser: Self.browserApproval(on: own))
+                let copy = try await WorkingCopy.open(
+                    store: temporaryStore(), server: try Server(url: own.url, credential: credential))
+                _ = try await copy.hydrate(types: ["core.note"], tier: .library)
+                try await Self.drained(copy, "written before the confirmation")
+                let before = try #require(try authorization.place.read())
+
+                let confirmed = try await credential.reauthorization().signIn(
+                    maxAge: 300, browser: Self.browserApproval(on: own))
+                #expect(confirmed == credential)
+                let after = try #require(try authorization.place.read())
+                try await Self.revoke(before.accessToken, hint: "access_token", clientId: before.clientId, own)
+                #expect(try await Self.itemsStatus(before.accessToken, own) == 401)
+
+                try await Self.drained(copy, "written after the confirmation")
+                #expect(
+                    try authorization.place.read() == after,
+                    "the copy renewed again instead of taking the confirmed sign-in")
+                await copy.close()
+            }
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+}

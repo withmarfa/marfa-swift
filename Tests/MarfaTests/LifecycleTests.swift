@@ -194,7 +194,7 @@ struct ALifecycle {
         }
         #expect(clock.waiting == 0, "a refused key was asked again")
 
-        try await copy.useKey("new-key")
+        try await copy.use(.stub("new-key"))
         try await eventually("following with the new key") { updates.connection == .following }
         #expect(Self.catchUps(new) == 1)
         await copy.close()
@@ -210,7 +210,7 @@ struct ALifecycle {
         let updates = Updates(copy.updates())
         _ = try await Self.wait(clock, after: 0)
 
-        try await copy.useKey("new-key")
+        try await copy.use(.stub("new-key"))
         try await eventually("following with the new key") { updates.connection == .following }
         #expect(Self.catchUps(new) == 1)
         try await eventually("the old wait ended") { clock.waiting == 0 }

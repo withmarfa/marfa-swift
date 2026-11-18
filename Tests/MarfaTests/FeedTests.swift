@@ -231,7 +231,7 @@ struct Changes {
         core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
         copy.feed.announce(write(.addTag, item: "n1"))
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
         #expect(core.places.count == 1, "a recovery took a new place for a stream the fault ended")
         #expect(next.places.isEmpty, "a key change revived a stream the fault ended")
         try await bounded("close") { await copy.close() }
@@ -517,7 +517,7 @@ struct Changes {
         #expect(await heard.next() == stopped(.invalid(message: "gone")))
         #expect(await heard.next() == nil, "the stream stayed open after it was refused")
         #expect(copy.feed.count == 0)
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
         #expect(next.places.isEmpty, "a key change revived a stream that was refused")
         try await bounded("close") { await copy.close() }
     }
@@ -538,6 +538,49 @@ struct Changes {
         core.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
         try await eventually("the save was told") { heard.saves.count == 1 }
         try await bounded("close") { await copy.close() }
+    }
+
+    @Test func aStreamAddedAfterTheKeyChangeBeganIsHeldNotEnded() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.writer() }), hasServer: true)
+        try copy.holder.beginKeyChange(to: URL(string: "http://127.0.0.1:1")!)
+        let heard = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(heard.stops.isEmpty, "a stream was ended for the key change")
+        #expect(copy.feed.count == 1)
+        #expect(core.places.isEmpty)
+        copy.holder.endKeyChange()
+        copy.feed.rejoin(readsOnly: false)
+        try await eventually("the stream was joined") { core.places.count == 1 }
+        #expect(heard.stops.isEmpty)
+        await copy.close()
+    }
+
+    @Test func aReaderStreamAddedAfterTheKeyChangeBeganIsToldOneSaveWhenItEnds() async throws {
+        let core = FakeCore.reader()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.reader() }), hasServer: true)
+        try copy.holder.beginKeyChange(to: URL(string: "http://127.0.0.1:1")!)
+        let heard = Heard(copy.changes())
+        try await Task.sleep(for: .milliseconds(300))
+        copy.holder.endKeyChange()
+        copy.feed.rejoin(readsOnly: true)
+        try await eventually("the stream was told to read again") { heard.saves.count == 1 }
+        try await eventually("the stream was joined") { core.places.count == 1 }
+        copy.feed.rejoin(readsOnly: true)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.saves.count == 1, "a second pass told the stream again")
+        await copy.close()
+    }
+
+    @Test func aStreamHeldForAKeyChangeEndsWhenTheCopyCloses() async throws {
+        let core = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.writer() }), hasServer: true)
+        try copy.holder.beginKeyChange(to: URL(string: "http://127.0.0.1:1")!)
+        var heard = copy.changes().makeAsyncIterator()
+        copy.holder.endKeyChange()
+        try await bounded("close") { await copy.close() }
+        #expect(await heard.next() == nil)
+        #expect(copy.feed.count == 0)
     }
 }
 

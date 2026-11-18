@@ -107,9 +107,9 @@ extension WorkingCopy {
     /// answered. Rows come from the copy for a table it holds whole, and from the server otherwise. More than 100 ids
     /// go in batches of 100, and a canceled task asks for no further batch. Every count returned was answered by the
     /// open copy under the key it holds when it returns, with no key change begun since the call began. Where
-    /// ``useKey(_:)`` began during the call, the counts are asked again once it ends, under the key it leaves.
+    /// ``use(_:)`` began during the call, the counts are asked again once it ends, under the sign-in it leaves.
     /// A call made while the key is changing throws `keyChanging`, and a call on a copy that is closing, or that
-    /// closed because ``useKey(_:)`` could not open its store again, throws `closed`, whatever the ids.
+    /// closed because ``use(_:)`` could not open its store again, throws `closed`, whatever the ids.
     ///
     /// Throws ``CountError/unavailable(cause:)`` where the copy could not answer and has no server or cannot reach it,
     /// and the app shows no count rather than 0. Any other failure, such as a server's refusal or a failed renewal of

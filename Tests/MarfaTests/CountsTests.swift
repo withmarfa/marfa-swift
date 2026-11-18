@@ -168,7 +168,7 @@ struct Counts {
         let ids = (0..<asking).map { "item-\($0)" }
         let counting = Task { try await copy.counts(of: ids, counted) }
         try await eventually("the first batch is asked of the server") { old.served.count == 1 }
-        let changing = Task { try await copy.useKey("new-key") }
+        let changing = Task { try await copy.use(.stub("new-key")) }
         try await eventually("the key is changing") {
             do {
                 _ = try await copy.status()
@@ -185,8 +185,8 @@ struct Counts {
         await copy.close()
     }
 
-    /// `useKey` waits for the feed to let go of the store before the holder starts replacing the core.
-    @Test func aCountAnsweredOnceUseKeyBeganIsAskedAgainUnderTheNewKey() async throws {
+    /// `use` waits for the feed to let go of the store before the holder starts replacing the core.
+    @Test func aCountAnsweredOnceUseBeganIsAskedAgainUnderTheNewKey() async throws {
         let gate = DispatchSemaphore(value: 0)
         let old = CountingCore(servedGate: gate)
         old.refuseCounts()
@@ -201,7 +201,7 @@ struct Counts {
             finished.withLock { $0 = true }
         }
         try await eventually("the count is asked of the server") { old.served.count == 1 }
-        let changing = Task { try await copy.useKey("new-key") }
+        let changing = Task { try await copy.use(.stub("new-key")) }
         try await eventually("the feed is letting go of the store") { old.watchesStopped == 1 }
         gate.signal()
         try await eventually("the server answered") { old.servedAnswers == 1 }
@@ -228,7 +228,7 @@ struct Counts {
             hasServer: false)
         let counting = Task { try await copy.counts(of: ["a"], counted) }
         try await eventually("the count is asked of the server") { old.served.count == 1 }
-        let changing = Task { try await copy.useKey("new-key") }
+        let changing = Task { try await copy.use(.stub("new-key")) }
         try await eventually("the key is changing") {
             do {
                 _ = try await copy.status()

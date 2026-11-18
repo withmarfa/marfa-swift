@@ -258,8 +258,16 @@ final class Feed: Sendable {
     /// A reader's stream added meanwhile could take no baseline, and a save
     /// since may have gone unseen, so each is told one `.saved` to read again.
     func resume(readsOnly: Bool) {
-        let (joining, late) = locked { state -> ([UUID], [UUID]) in
+        let ended = locked { state -> Bool in
             state.suspends -= 1
+            return state.suspends == 0 && !state.closed
+        }
+        if ended { rejoin(readsOnly: readsOnly) }
+    }
+
+    /// Gives every stream that holds no place one, once a key change that ended without `suspend()` having run is over.
+    func rejoin(readsOnly: Bool) {
+        let (joining, late) = locked { state -> ([UUID], [UUID]) in
             guard state.suspends == 0, !state.closed else { return ([], []) }
             let late = state.streams.filter { $0.value.addedWhileSuspended }.map(\.key)
             for token in late { state.streams[token]?.addedWhileSuspended = false }
@@ -307,13 +315,27 @@ final class Feed: Sendable {
             }
             if unwanted { subscription.stop() }
         case .failure(let error):
-            let waiters = locked { state -> [CheckedContinuation<Void, Never>] in
+            // A key change refuses the call without ending the stream: it stays held, and is joined by
+            // `resume(readsOnly:)` or `rejoin(readsOnly:)`, or here when the change ended before this ran.
+            let keyChanging = if case MarfaError.keyChanging = error { true } else { false }
+            let (waiters, again) = locked { state -> ([CheckedContinuation<Void, Never>], Bool) in
+                var again = false
                 if state.streams[token]?.registration == claim.registration {
-                    end(&state, token, with: error as? MarfaError ?? .store(message: "\(error)"))
+                    if keyChanging, !state.closed {
+                        state.streams[token]?.registration = nil
+                        if holder.isSettled {
+                            again = true
+                        } else {
+                            state.streams[token]?.addedWhileSuspended = true
+                        }
+                    } else {
+                        end(&state, token, with: error as? MarfaError ?? .store(message: "\(error)"))
+                    }
                 }
-                return release(&state, claim.registration)
+                return (release(&state, claim.registration), again)
             }
             for waiter in waiters { waiter.resume() }
+            if again { join(token) }
         }
     }
 
