@@ -132,8 +132,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case firstSyncWaiting(message: String)
     /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
-    /// The copy does not hold what a count needs, so only the server can answer it. No other failure carries it.
-    /// ``WorkingCopy/counts(of:_:)`` asks the copy's server on it, so an app does not see it from there.
+    /// The copy lacks data needed for a local count. ``WorkingCopy/counts(of:_:)`` handles this error by asking
+    /// the copy's server.
     case notAnswerable(message: String)
     /// The core itself went wrong, such as a panic it caught at its boundary, so the call ended without an answer.
     ///
