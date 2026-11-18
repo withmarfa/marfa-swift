@@ -513,19 +513,26 @@ public final class WorkingCopy: Sendable {
     /// When the store cannot be opened again the error is thrown and the copy is closed, its streams ended.
     public func use(_ server: Server) async throws {
         try holder.beginKeyChange(to: server.url)
-        defer { holder.endKeyChange() }
-        let opening = CoreHolder.Opening(
-            key: try server.openingToken(), renewer: server.credential.map(TokenRenewer.init))
+        let opening: CoreHolder.Opening
+        do {
+            opening = CoreHolder.Opening(
+                key: try server.openingToken(), renewer: server.credential.map(TokenRenewer.init))
+        } catch {
+            holder.endKeyChange()
+            throw error
+        }
         lifecycle.keyWillChange()
         do {
             try await feed.suspend()
         } catch {
+            holder.endKeyChange()
             lifecycle.keyChanged()
             throw error
         }
         do {
             try await holder.replace(opening)
         } catch {
+            holder.endKeyChange()
             if holder.isClosed {
                 lifecycle.close()
                 await feed.close()
@@ -534,6 +541,8 @@ public final class WorkingCopy: Sendable {
             lifecycle.keyChanged()
             throw error
         }
+        // The feed takes its places in the new core through the holder, which refuses calls until the key change ends.
+        holder.endKeyChange()
         feed.resume(readsOnly: holder.handle == .reader)
         lifecycle.keyChanged()
     }

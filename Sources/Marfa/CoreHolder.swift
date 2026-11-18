@@ -83,9 +83,9 @@ final class CoreHolder: Sendable {
         try state.withLock { state in
             if state.isClosing { throw MarfaError.closed(message: Self.closedMessage) }
             if reopen == nil { throw Self.noKey }
-            if let address, Self.trimmed(address) != Self.trimmed(url.absoluteString) {
-                let expected = URL(string: address).flatMap(Marfa.origin(of:)) ?? address
-                let got = Marfa.origin(of: url) ?? url.absoluteString
+            if let address, Self.canonical(address) != KeychainKeyStore.account(for: url) {
+                let expected = Self.canonical(address)
+                let got = KeychainKeyStore.account(for: url)
                 throw MarfaError.wrongServer(
                     expected: expected, got: got,
                     message: "this working copy is for \(expected), not \(got), so it cannot use that server")
@@ -217,10 +217,8 @@ final class CoreHolder: Sendable {
         }
     }
 
-    private static func trimmed(_ address: String) -> String {
-        var text = Substring(address)
-        while text.hasSuffix("/") { text = text.dropLast() }
-        return String(text)
+    private static func canonical(_ address: String) -> String {
+        URL(string: address).map(KeychainKeyStore.account(for:)) ?? address
     }
 
     /// Waits for the running calls, closes the old core, then opens the store
@@ -292,6 +290,7 @@ final class CoreHolder: Sendable {
                 guard !state.closing, let core = state.core else {
                     throw MarfaError.closed(message: Self.closedMessage)
                 }
+                if state.keyChanges > 0 { throw MarfaError.keyChanging(message: Self.replacingMessage) }
                 state.leases += 1
                 return core
             }
