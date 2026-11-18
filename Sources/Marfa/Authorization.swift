@@ -592,8 +592,8 @@ extension ASWebAuthenticationSession: BrowserSession {}
 final class WebSession: NSObject, ASWebAuthenticationPresentationContextProviding {
     /// Makes the session for an address, answering through `completion` on whichever queue it likes.
     ///
-    /// `completion` is `Sendable` so that no closure written in a main-actor function can stand in for it: the
-    /// system calls it on a queue of its own, where a main-actor closure stops the app.
+    /// `completion` is `Sendable` so it does not inherit main-actor isolation. The system calls it on a queue
+    /// of its own, where a main-actor closure stops the app.
     typealias Maker =
         @MainActor (
             _ url: URL, _ scheme: String, _ ephemeral: Bool, _ context: WebSession,
