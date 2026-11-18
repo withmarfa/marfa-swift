@@ -6,15 +6,34 @@ import Testing
 
 @testable import Marfa
 
-/// A core whose counts, and the tables its catch-up changed, a test scripts.
+/// A core whose counts, its answers from the server, and the tables its catch-up changed, a test scripts.
 private final class CountingCore: Core, @unchecked Sendable {
-    private let state = Mutex((asked: [[String]](), refuses: false, tables: [MarfaCore.ChangedTable]()))
+    struct Script {
+        var asked: [[String]] = []
+        var served: [[String]] = []
+        /// What the copy's own count throws; `NotAnswerable` sends the count to the server.
+        var refusal: MarfaCore.MarfaError?
+        /// What asking the server throws.
+        var servedFailure: MarfaCore.MarfaError?
+        var tables: [MarfaCore.ChangedTable] = []
+    }
 
-    init() { super.init(noHandle: .init()) }
+    private let state = Mutex(Script())
+    /// Holds each answer from the server until it is signaled, where set.
+    let servedGate: DispatchSemaphore?
+
+    init(servedGate: DispatchSemaphore? = nil) {
+        self.servedGate = servedGate
+        super.init(noHandle: .init())
+    }
     required init(unsafeFromHandle handle: UInt64) { fatalError("a fake core has no handle") }
 
     var asked: [[String]] { state.withLock { $0.asked } }
-    func refuseCounts() { state.withLock { $0.refuses = true } }
+    var served: [[String]] { state.withLock { $0.served } }
+    func refuseCounts(_ refusal: MarfaCore.MarfaError = .NotAnswerable(message: "the copy may lack an item")) {
+        state.withLock { $0.refusal = refusal }
+    }
+    func failServed(_ failure: MarfaCore.MarfaError) { state.withLock { $0.servedFailure = failure } }
     func changeTables(_ tables: [MarfaCore.ChangedTable]) { state.withLock { $0.tables = tables } }
 
     override func heldHandle() -> MarfaCore.Handle { .writer }
@@ -22,16 +41,31 @@ private final class CountingCore: Core, @unchecked Sendable {
     override func status() throws -> MarfaCore.Status { emptyStatus() }
 
     override func counts(ids: [String], counted: MarfaCore.Counted) throws -> [MarfaCore.ItemCount] {
-        let refuses = state.withLock { state -> Bool in
+        let refusal = state.withLock { state in
             state.asked.append(ids)
-            return state.refuses
+            return state.refusal
         }
-        if refuses { throw MarfaCore.MarfaError.Invalid(message: "the copy may lack an item the server counts") }
+        if let refusal { throw refusal }
         return ids.map {
             MarfaCore.ItemCount(
                 id: $0, total: 7,
                 statusGroups: MarfaCore.StatusGroups(notStarted: 1, inProgress: 2, completed: 3, canceled: 1),
                 held: true)
+        }
+    }
+
+    override func servedCounts(ids: [String], counted: MarfaCore.Counted) throws -> [MarfaCore.ItemCount] {
+        let failure = state.withLock { state in
+            state.served.append(ids)
+            return state.servedFailure
+        }
+        servedGate?.wait()
+        if let failure { throw failure }
+        return ids.map {
+            MarfaCore.ItemCount(
+                id: $0, total: 4,
+                statusGroups: MarfaCore.StatusGroups(notStarted: 1, inProgress: 0, completed: 2, canceled: 1),
+                held: false)
         }
     }
 
@@ -52,13 +86,11 @@ private final class CountingCore: Core, @unchecked Sendable {
 struct Counts {
     private let counted = Marfa.Counted.backref(edgeType: "parent-of")
 
-    private func serverCounting() async throws -> LocalServer {
+    /// A server that answers every `POST /items/counts` with `body`.
+    private func serverAnswering(_ body: String) async throws -> LocalServer {
         try await LocalServer.start(contract: marfaContractVersion) { method, path in
             guard (method, path) == ("POST", "/items/counts") else { return LocalServer.emptyPage(method, path) }
-            return (
-                200, "application/json",
-                #"{"counts":[{"id":"a","total":4,"status_groups":{"not_started":1,"in_progress":0,"completed":2,"canceled":1}}]}"#
-            )
+            return (200, "application/json", body)
         }
     }
 
@@ -70,6 +102,7 @@ struct Counts {
         #expect(counts[0].total == 7)
         let groups = Marfa.StatusGroupCounts(notStarted: 1, inProgress: 2, completed: 3, canceled: 1)
         #expect(counts[0].statusGroups == groups)
+        #expect(core.served.isEmpty)
         await copy.close()
     }
 
@@ -83,35 +116,129 @@ struct Counts {
         await copy.close()
     }
 
-    @Test func aRefusalByTheCopyIsAskedOfTheServer() async throws {
+    @Test func aCountTheCopyCannotAnswerIsAskedOfItsOwnServerBatchByBatch() async throws {
         let core = CountingCore()
         core.refuseCounts()
-        let server = try await serverCounting()
-        defer { server.stop() }
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        let asked = Server(url: server.url, key: "k")
-        let counts: [Marfa.ItemCount] = try await copy.counts(of: ["a"], counted, server: asked)
-        #expect(counts.count == 1 && !counts[0].held && counts[0].total == 4)
+        let ids = (0..<150).map { "item-\($0)" }
+        let counts: [Marfa.ItemCount] = try await copy.counts(of: ids, counted)
+        #expect(counts.map { $0.id } == ids && counts.allSatisfy { !$0.held && $0.total == 4 })
         #expect(counts[0].statusGroups?[.completed] == 2 && counts[0].statusGroups?[.canceled] == 1)
-        #expect(server.log.all.contains { $0.hasPrefix("POST /items/counts ") })
+        #expect(core.served.map { $0.count } == [100, 50])
         await copy.close()
     }
 
-    @Test func noCountIsAnErrorNeverAZero() async throws {
+    @Test func onlyACountTheCopyCannotAnswerIsAskedOfTheServer() async throws {
         let core = CountingCore()
-        core.refuseCounts()
+        core.refuseCounts(.Invalid(message: "the renewal failed"))
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
-        // Refused by the copy, with no server to ask.
-        await #expect(throws: CountError.self) { try await copy.counts(of: ["a"], counted) }
-
-        // Refused by the copy, with a server that cannot be reached.
-        let gone = try await serverCounting()
-        let url = gone.url
-        gone.stop()
-        await #expect(throws: CountError.self) {
-            try await copy.counts(of: ["a"], counted, server: Server(url: url, key: "k"))
+        await #expect(throws: Marfa.MarfaError.invalid(message: "the renewal failed")) {
+            try await copy.counts(of: ["a"], counted)
         }
+        #expect(core.asked == [["a"]] && core.served.isEmpty)
         await copy.close()
+    }
+
+    @Test func aKeyChangeWaitsForEveryBatchAskedOfTheServerUnderTheEarlierKey() async throws {
+        let gate = DispatchSemaphore(value: 0)
+        let old = CountingCore(servedGate: gate)
+        old.refuseCounts()
+        let new = CountingCore()
+        let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: false)
+        let order = Mutex([String]())
+        let ids = (0..<150).map { "item-\($0)" }
+        let counting = Task {
+            let counts = try await copy.counts(of: ids, counted)
+            order.withLock { $0.append("counted") }
+            return counts
+        }
+        try await eventually("the first batch is asked of the server") { old.served.count == 1 }
+        let changing = Task {
+            try await copy.useKey("new-key")
+            order.withLock { $0.append("key changed") }
+        }
+        gate.signal()
+        try await eventually("the second batch is asked under the same key") { old.served.count == 2 }
+        #expect(order.withLock { $0 }.isEmpty, "the key changed while a count was asked under the earlier key")
+        gate.signal()
+        let counts = try await counting.value
+        try await changing.value
+        #expect(counts.count == 150 && new.asked.isEmpty && new.served.isEmpty)
+        #expect(order.withLock { $0 } == ["counted", "key changed"])
+        await copy.close()
+    }
+
+    @Test func noCountIsUnavailableOnlyWhereTheServerIsAbsentOrOutOfReach() async throws {
+        for failure: MarfaCore.MarfaError in [
+            .NoServer(message: "no server"), .Network(message: "offline"),
+        ] {
+            let core = CountingCore()
+            core.refuseCounts()
+            core.failServed(failure)
+            let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+            await #expect(throws: CountError.unavailable(cause: Marfa.MarfaError(failure))) {
+                try await copy.counts(of: ["a"], counted)
+            }
+            await copy.close()
+        }
+        // The copy's own count of rows, which needs the server, with none.
+        let core = CountingCore()
+        core.refuseCounts(.NoServer(message: "no server"))
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        await #expect(throws: CountError.self) { try await copy.counts(of: ["a"], .rows(table: "lines")) }
+        await copy.close()
+    }
+
+    @Test func aServersRefusalOfACountIsTheRefusalItself() async throws {
+        let refusals: [MarfaCore.MarfaError] = [
+            .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 5, server: nil),
+            .Server(status: 503, code: "unavailable", message: "down", details: nil, server: nil),
+            .Unauthorized(code: "unauthorized", message: "no", server: nil),
+        ]
+        for refusal in refusals {
+            let core = CountingCore()
+            core.refuseCounts()
+            core.failServed(refusal)
+            let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+            await #expect(throws: Marfa.MarfaError(refusal)) { try await copy.counts(of: ["a"], counted) }
+            await copy.close()
+        }
+    }
+
+    @Test func aServersCountsAreRefusedUnlessTheyAreTheAskedIdsOnceEachInOrderWithFittingGroups() async throws {
+        let groups = #""status_groups":{"not_started":1,"in_progress":0,"completed":0,"canceled":0}"#
+        let a = #"{"id":"a","total":1,\#(groups)}"#
+        let b = #"{"id":"b","total":1,\#(groups)}"#
+        let link = Marfa.Counted.backref(edgeType: "parent-of")
+        let rows = Marfa.Counted.rows(table: "lines")
+        let cases: [(String, Marfa.Counted, String)] = [
+            ("missing", link, "[\(a)]"),
+            ("reordered", link, "[\(b),\(a)]"),
+            ("repeated", link, "[\(a),\(a)]"),
+            ("extra", link, "[\(a),\(b),\(a)]"),
+            ("a link without groups", link, #"[\#(a),{"id":"b","total":1}]"#),
+            ("rows with groups", rows, #"[{"id":"a","total":1},\#(b)]"#),
+        ]
+        for (what, counted, answer) in cases {
+            let server = try await serverAnswering(#"{"counts":\#(answer)}"#)
+            defer { server.stop() }
+            do {
+                _ = try await Server(url: server.url, key: "k").itemCounts(of: ["a", "b", "a"], counted)
+                Issue.record("\(what) was accepted")
+            } catch {
+                guard case .decoding = error else {
+                    Issue.record("\(what) was refused \(error), not decoding")
+                    continue
+                }
+            }
+        }
+        // The witness: whole answers of each kind are accepted.
+        for (counted, answer) in [(link, "[\(a),\(b)]"), (rows, #"[{"id":"a","total":1},{"id":"b","total":2}]"#)] {
+            let server = try await serverAnswering(#"{"counts":\#(answer)}"#)
+            defer { server.stop() }
+            let counts = try await Server(url: server.url, key: "k").itemCounts(of: ["a", "b", "a"], counted)
+            #expect(counts.map(\.id) == ["a", "b"] && counts.allSatisfy { !$0.held })
+        }
     }
 
     @Test func aCatchUpNamesTheTablesItChangedAndTellsTheStreams() async throws {

@@ -132,6 +132,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case firstSyncWaiting(message: String)
     /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
+    /// The copy does not hold what a count needs, so only the server can answer it. No other failure carries it.
+    /// ``WorkingCopy/counts(of:_:)`` asks the copy's server on it, so an app does not see it from there.
+    case notAnswerable(message: String)
     /// The core itself went wrong, such as a panic it caught at its boundary, so the call ended without an answer.
     ///
     /// It is never the app's input or the server's answer, so it is neither ``isTransient`` nor the caller's mistake:
@@ -232,7 +235,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .streamIncomplete(_, let message, _), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message, _), .canceled(let message), .firstSyncWaiting(let message),
-            .invalid(let message), .fault(let message), .keyChanging(let message),
+            .invalid(let message), .notAnswerable(let message), .fault(let message), .keyChanging(let message),
             .versionConflict(let message, _),
             .instanceChanged(let message, _), .closed(let message), .noConnection(let message),
             .confirmationRequired(_, let message, _), .appSignInRequired(let message, _):
@@ -256,7 +259,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             server
         case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
             .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
-            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .fault, .keyChanging,
+            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .notAnswerable, .fault,
+            .keyChanging,
             .closed, .noConnection:
             nil
         }
@@ -324,6 +328,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
+        case .notAnswerable(let message): core = .NotAnswerable(message: message)
         case .fault(let message): core = .Fault(message: message)
         case .versionConflict(let message, let server):
             core = .Server(
@@ -414,6 +419,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
         case .Invalid(let message): self = .invalid(message: message)
+        case .NotAnswerable(let message): self = .notAnswerable(message: message)
         case .Fault(let message): self = .fault(message: message)
         }
     }

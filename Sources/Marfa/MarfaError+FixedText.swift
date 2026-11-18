@@ -113,6 +113,8 @@ extension MarfaError {
             FixedErrorText(type: "first_sync_waiting", sentence: "a folder's first sync waits for confirmation")
         case .invalid:
             FixedErrorText(type: "invalid", sentence: "a value was not accepted")
+        case .notAnswerable:
+            FixedErrorText(type: "not_answerable", sentence: "the working copy does not hold what a count needs")
         case .fault:
             FixedErrorText(type: "fault", sentence: "the core failed inside, and the call ended without an answer")
         case .keyChanging:
