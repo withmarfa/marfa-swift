@@ -1403,21 +1403,12 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func writeExtension(id: String, namespace: String, body: JsonObject) throws  -> QueuedWrite
     
     /**
-     * Counts linked items or table rows for up to 100 IDs, once per distinct ID in request order.
-     * Link counts use the anchored listing's default state and include status groups.
-     * They throw `NotAnswerable` if the copy lacks edges or items needed for the count,
-     * and no other failure throws it, so a caller calls `served_counts` on it and on nothing else.
-     * For row counts, `held` is true when the copy answered and false when the server answered.
+     * Counts from the copy where possible. On `NotAnswerable`, call `servedCounts(ids:counted:)`.
      */
     func counts(ids: [String], counted: Counted) throws  -> [ItemCount]
     
     /**
-     * Asks the copy's own server for the counts of up to 100 IDs, once per distinct ID in
-     * request order, with `held` false. The request carries the copy's current key and
-     * goes only to the server the copy was opened with, after the instance check a moved
-     * copy makes, so it throws `WrongServer` rather than send an ID elsewhere. It throws
-     * `Decoding` for an answer that is not the asked IDs once each in order, a link count
-     * without its four status groups or a count of rows with any.
+     * Requests every count from the copy's server. Each result has `held` set to false.
      */
     func servedCounts(ids: [String], counted: Counted) throws  -> [ItemCount]
     
@@ -2594,11 +2585,7 @@ open func writeExtension(id: String, namespace: String, body: JsonObject)throws 
 }
     
     /**
-     * Counts linked items or table rows for up to 100 IDs, once per distinct ID in request order.
-     * Link counts use the anchored listing's default state and include status groups.
-     * They throw `NotAnswerable` if the copy lacks edges or items needed for the count,
-     * and no other failure throws it, so a caller calls `served_counts` on it and on nothing else.
-     * For row counts, `held` is true when the copy answered and false when the server answered.
+     * Counts from the copy where possible. On `NotAnswerable`, call `servedCounts(ids:counted:)`.
      */
 open func counts(ids: [String], counted: Counted)throws  -> [ItemCount]  {
     return try  FfiConverterSequenceTypeItemCount.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2611,12 +2598,7 @@ open func counts(ids: [String], counted: Counted)throws  -> [ItemCount]  {
 }
     
     /**
-     * Asks the copy's own server for the counts of up to 100 IDs, once per distinct ID in
-     * request order, with `held` false. The request carries the copy's current key and
-     * goes only to the server the copy was opened with, after the instance check a moved
-     * copy makes, so it throws `WrongServer` rather than send an ID elsewhere. It throws
-     * `Decoding` for an answer that is not the asked IDs once each in order, a link count
-     * without its four status groups or a count of rows with any.
+     * Requests every count from the copy's server. Each result has `held` set to false.
      */
 open func servedCounts(ids: [String], counted: Counted)throws  -> [ItemCount]  {
     return try  FfiConverterSequenceTypeItemCount.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -12627,8 +12609,7 @@ public enum Change: Equatable, Hashable {
     case watchFailed(reason: MarfaError, cursor: String
     )
     /**
-     * A follow's fill left `table` of the item whole, or found it past the
-     * cap, so reads of it now answer as `heldTables` says.
+     * The follow finished filling this table or found it over the cap.
      */
     case tableFilled(itemId: String, table: String, cursor: String
     )
@@ -14812,8 +14793,7 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case Invalid(message: String
     )
     /**
-     * The copy does not hold what a count needs, so only the server can
-     * answer it. No other failure is this case.
+     * The working copy lacks the edges or items needed for a link count.
      */
     case NotAnswerable(message: String
     )
@@ -19013,10 +18993,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_counts() != 32892) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_counts() != 27637) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_served_counts() != 27107) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_served_counts() != 17816) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_change_folder() != 57042) {
