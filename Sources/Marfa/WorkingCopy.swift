@@ -603,8 +603,9 @@ public struct Change: Sendable, Hashable {
         /// item type or edge type catalog; read `catalog` again.
         case catalog
         /// The tables the copy holds, or the rows it holds of them, changed through ``Tables/hold(_:ofType:)``,
-        /// ``Tables/letGo(_:ofType:)`` or ``Tables/fill()``, or a catch-up filled or changed a held table, which
-        /// ``CatchUpReport/changedTables`` names; read ``Tables/held()`` and the rows again.
+        /// ``Tables/letGo(_:ofType:)`` or ``Tables/fill()``, a catch-up filled or changed a held table, which
+        /// ``CatchUpReport/changedTables`` names, or a held `updates()` sequence's follow filled a table of the item
+        /// `itemId` names; read ``Tables/held()`` and the rows again.
         case tables
     }
 

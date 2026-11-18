@@ -17,13 +17,17 @@ public struct Tables: Sendable {
     /// it. The copy keeps the choice and holds the table of an item that arrives later. The fill needs the server and
     /// runs where no other call holds the copy's stream; where one does, `fill` is `nil` and that call's own fill
     /// takes the table. Throws `invalid` for a table that no type `type` names declares. Tells every held stream
-    /// `.refreshed(.tables)` once the choice is kept. When ``WorkingCopy/catchUp()`` fills the table, it names the
-    /// table in ``CatchUpReport/changedTables``.
+    /// `.refreshed(.tables)` when the choice is new or its fill read rows or settled a table, and tells nothing for a
+    /// choice the copy already held with nothing left to fill. When ``WorkingCopy/catchUp()`` fills the table, it
+    /// names the table in ``CatchUpReport/changedTables``; when a held `updates()` sequence fills it, every held stream
+    /// is told `.refreshed(.tables)` with the item in `itemId`.
     public func hold(_ table: String, ofType type: String) async throws -> TableHold {
         let hold = try await holder.runUntilCanceled { core, stop in
             TableHold(try core.holdTable(typeId: type, table: table, stop: stop))
         }
-        feed.announce(Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil))
+        if !hold.wasHeld || hold.fill?.changedTables == true {
+            feed.announce(Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil))
+        }
         return hold
     }
 
@@ -46,10 +50,10 @@ public struct Tables: Sendable {
     ///
     /// A catch-up or a held `updates()` sequence fills them too; this is for an app that wants a table whole now. A
     /// table whose read failed is left for the next pass, which ``TableFill/failed`` counts. Tells every held stream
-    /// `.refreshed(.tables)` when it read rows or finished filling a table, including an empty one.
+    /// `.refreshed(.tables)` when it read rows or settled a table, whole (an empty one included) or past the cap.
     public func fill() async throws -> TableFill {
         let fill = try await holder.runUntilCanceled { core, stop in TableFill(try core.fillTables(stop: stop)) }
-        if fill.rows > 0 || fill.whole > 0 {
+        if fill.changedTables {
             feed.announce(Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil))
         }
         return fill
