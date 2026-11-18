@@ -61,7 +61,9 @@ final class TokenRenewer: CredentialRenewer {
     ///
     /// A stored token endpoint the server no longer has answers 404 or 410 with no OAuth error. The renewal
     /// then reads the server's metadata again and sends the same request once to the endpoint it names, so a
-    /// sign-in kept against an earlier address of the token endpoint still renews.
+    /// sign-in kept against an earlier address of the token endpoint still renews. Before that retry it checks
+    /// again that it holds the lease and that the kept refresh token is the one it captured, and sends nothing
+    /// if not.
     private func ask(
         _ request: URLRequest, sent: String, kept: KeptSignIn, lease: RenewalLease, transport: SignInTransport
     ) throws(RenewalError) -> String {
@@ -108,6 +110,20 @@ final class TokenRenewer: CredentialRenewer {
                     retry = try Self.refresh(at: advertised.tokenEndpoint, kept: kept, sent: sent)
                 } catch {
                     finish(.failure(error))
+                    return
+                }
+                // Reading the metadata took time with the lease held, but nothing stops the lease lapsing in that
+                // time, so the retry is admitted only while this renewal still holds it and the kept refresh
+                // token is still the one it captured. Otherwise another holder has renewed or ended the sign-in.
+                let admitted: Bool
+                do {
+                    admitted = try lease.whileHeld { try place.read()?.refreshToken == sent } ?? false
+                } catch {
+                    finish(.failure(.Failed(message: "the keychain could not be read: \(error)")))
+                    return
+                }
+                guard admitted else {
+                    finish(Self.settledElsewhere(sent: sent, place: place))
                     return
                 }
                 step(retry) { second in
@@ -182,6 +198,9 @@ final class TokenRenewer: CredentialRenewer {
     }
 
     /// The metadata the server advertises now, read from its answer.
+    ///
+    /// A client error on the metadata read itself, such as a proxy's 403 or 404, does not prove the grant ended,
+    /// so it fails the renewal and keeps the sign-in.
     private static func advertised(_ answer: Answer, origin: String) throws(RenewalError) -> Discovery {
         if answer.status == 429 || answer.status >= 500 {
             throw .Unavailable(message: "\(origin) could not give its sign-in metadata now (\(answer.status))")
@@ -258,6 +277,16 @@ final class TokenRenewer: CredentialRenewer {
                 return write(current)
             }
             if let decided = decided ?? nil { return decided }
+            return settledElsewhere(sent: sent, place: place)
+        } catch {
+            return .failure(.Failed(message: "the keychain could not be read: \(error)"))
+        }
+    }
+
+    /// What a renewal answers when it no longer holds the lease or the kept refresh token is no longer the one
+    /// it sent: the token another holder wrote, and nothing sent.
+    private static func settledElsewhere(sent: String, place: SignInPlace) -> Result<String, RenewalError> {
+        do {
             guard let current = try place.read() else {
                 return .failure(.Ended(message: "the app is no longer signed in to \(place.account)"))
             }

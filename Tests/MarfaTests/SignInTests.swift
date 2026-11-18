@@ -715,6 +715,72 @@ struct TokenRenewal {
         }
     }
 
+    @Test func aRenewalThatLostItsLeaseWhileReadingTheMetadataSendsNothingAndAnswersTheNewerToken() async throws {
+        let server = ScriptedAuthServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            let place = authorization.place
+            let metadata = server.discovery()
+            server.answer { request in
+                guard request.path == "/.well-known/oauth-authorization-server" else { return .json(404, [:]) }
+                // Another process takes the lease and rotates the tokens while the metadata loads.
+                var rotated = try! place.read()!
+                rotated.accessToken = "at-other"
+                rotated.refreshToken = "rt-other"
+                try! place.keep(rotated)
+                try! keychain.delete(service: place.service, account: place.leaseAccount)
+                _ = try! keychain.add(label: "other-holder", service: place.service, account: place.leaseAccount)
+                return metadata
+            }
+            #expect(try await renew(credential, refused: "at-1") == "at-other")
+            #expect(
+                server.requests(to: "/oauth/token").isEmpty,
+                "the spent refresh token was sent: \(server.requests(to: "/oauth/token").map(\.form))")
+            #expect(try place.read()?.refreshToken == "rt-other")
+        }
+    }
+
+    @Test func aRenewalWhoseKeptRefreshTokenChangedWhileReadingTheMetadataSendsNothing() async throws {
+        let server = ScriptedAuthServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            let place = authorization.place
+            let metadata = server.discovery()
+            server.answer { request in
+                guard request.path == "/.well-known/oauth-authorization-server" else { return .json(404, [:]) }
+                // The lease is still this renewal's, but the kept sign-in was rotated under it.
+                var rotated = try! place.read()!
+                rotated.accessToken = "at-other"
+                rotated.refreshToken = "rt-other"
+                try! place.keep(rotated)
+                return metadata
+            }
+            #expect(try await renew(credential, refused: "at-1") == "at-other")
+            #expect(server.requests(to: "/oauth/token").isEmpty)
+            #expect(try place.read()?.refreshToken == "rt-other")
+        }
+    }
+
+    @Test(arguments: [400, 403, 404, 410])
+    func aClientErrorOnTheMetadataReadItselfFailsTheRenewalAndKeepsTheSignIn(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        server.answer { request in
+            .json(request.path == "/.well-known/oauth-authorization-server" ? status : 404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Failed = error else { return false }
+                return true
+            }
+            // A proxy's 403 or 404 on the metadata does not show that the grant ended.
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            #expect(server.requests(to: "/oauth/token").isEmpty)
+        }
+    }
+
     @Test func aServerThatDoesNotAnswerInTimeIsUnavailableAndTheSignInKept() async throws {
         let replies: [ScriptedAuthServer.Reply] = [
             .silence, .failure(.notConnectedToInternet), oauthError("server_error", status: 503),
