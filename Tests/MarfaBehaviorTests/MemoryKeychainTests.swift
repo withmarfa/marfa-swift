@@ -134,7 +134,7 @@ import Testing
         let server = try Server(url: home, credential: credential)
         do {
             _ = try await server.renewedToken(refused: "at-1")
-            Issue.record("a renewal with no sign-in kept answered a token")
+            Issue.record("a renewal with no refresh token answered a token")
         } catch {
             if case .signedOut = error {} else { Issue.record("expected signedOut, got \(error)") }
         }

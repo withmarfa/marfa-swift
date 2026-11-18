@@ -4,8 +4,8 @@ import Marfa
 import Security
 import Synchronization
 
-/// A ``Keychain`` that keeps its items in memory for the life of the object, so a test never reaches the
-/// Security framework and never raises a dialog.
+/// A ``Keychain`` that keeps its items in memory for the life of the object, so a test never reads or writes a
+/// system keychain and never raises a dialog.
 ///
 /// ``keychain`` runs ``KeychainKeyStore``, ``Authorization`` and ``Credential`` through the same code a real
 /// keychain does. ``failReads(with:)`` and ``failWrites(with:)`` make it refuse, which is how a test drives an app's
@@ -61,7 +61,7 @@ public final class MemoryKeychain: Sendable {
     ///   cannot be reached does: ``MarfaError/network(message:)``, with the sign-in kept.
     ///
     /// Throws ``SignInError/notAServer`` for an address that is not an `http` or `https` address with a host and no
-    /// user or password, and a ``Keychain/Failure`` when the keychain refuses a write.
+    /// user or password, and a ``Keychain/Failure`` when the keychain refuses a read or write.
     public func signIn(
         to server: URL, service: String = "com.withmarfa.marfa-testing", accessToken: String = "memory-access-token",
         refreshToken: String? = nil, scopes: [String] = []

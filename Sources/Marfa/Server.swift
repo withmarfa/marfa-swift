@@ -3,7 +3,6 @@ internal import MarfaCore
 
 /// A working copy holds the key in memory and never writes it to its store.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    ///
     /// Never holds a user or password: an address that names either is refused where a server is made.
     public private(set) var url: URL
     /// An API key, or for a server made from a credential, the access token kept when it was made.
