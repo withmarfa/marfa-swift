@@ -1446,7 +1446,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func folder(id: String) throws  -> FolderRow?
     
     /**
-     * What the folder's query holds, as a folder on disk holds it. A
+     * The listed items that match the folder's query. A
      * query the slice cannot answer whole is `MarfaError.Invalid`, never
      * answered in part; a folder the copy does not hold is
      * `MarfaError.NotFound` with the code `not_held`. While a hydration
@@ -2678,7 +2678,7 @@ open func folder(id: String)throws  -> FolderRow?  {
 }
     
     /**
-     * What the folder's query holds, as a folder on disk holds it. A
+     * The listed items that match the folder's query. A
      * query the slice cannot answer whole is `MarfaError.Invalid`, never
      * answered in part; a folder the copy does not hold is
      * `MarfaError.NotFound` with the code `not_held`. While a hydration
@@ -19028,7 +19028,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_folder() != 48388) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_folder() != 30479) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_list_in_folder() != 53981) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_revoke_folder() != 58152) {
