@@ -247,7 +247,7 @@ struct OwnerOperationsTests {
     @Test func aKeyIsRefusedWithItsOwnErrorAndFixedText() async throws {
         let scripted = ScriptedAuthServer { _ in refused(403, "app_sign_in_required") }
         let api = Client(
-            Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+            try Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
             timeout: .seconds(30))
         let error = await failure { try await api.listTags() }
         guard case .appSignInRequired(let message, _)? = error else {
@@ -267,7 +267,7 @@ struct OwnerOperationsTests {
                 ? .raw(200, Data(answer.utf8), headers: jsonHeaders) : .json(404, [:])
         }
         let api = Client(
-            Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+            try Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
             timeout: .seconds(30))
         let stored = try await api.updateConfig(
             body: .json(.init(objectStoreSecretAccessKey: .value("hunter2")))
@@ -287,7 +287,7 @@ struct OwnerOperationsTests {
                 refused(409, code, details: ["step": "Run the installer on the host."])
             }
             let api = Client(
-                Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+                try Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
                 timeout: .seconds(30))
             let error = await failure { try await api.startUpdate() }
             guard case .server(let status, let got, _, let details, _)? = error else {
@@ -314,7 +314,7 @@ struct OwnerOperationsTests {
             return .raw(200, Data(#"{"instance_id": "inst"}"#.utf8), headers: jsonHeaders)
         }
         let api = Client(
-            Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+            try Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
             timeout: .seconds(30))
         let change = AddressChange(signInAddress: .set("https://new.example"), addresses: .clear)
         let check = try await api.check(change)
@@ -336,7 +336,7 @@ struct OwnerOperationsTests {
             .raw(200, Data(#"{"instance_id": "inst"}"#.utf8), headers: jsonHeaders)
         }
         let api = Client(
-            Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+            try Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
             timeout: .seconds(30))
         let answer = try JSONDecoder().decode(
             Components.Schemas.AddressCheck.self,
@@ -380,7 +380,7 @@ struct OwnerOperationsTests {
             return .raw(200, Data(#"{"instance_id": "inst"}"#.utf8), headers: jsonHeaders)
         }
         let api = Client(
-            Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
+            try Server(url: scripted.url, key: "marfa_k1_test"), through: scripted.transport().session,
             timeout: .seconds(30))
         var change = AddressChange(signInAddress: .set("https://checked.example"))
         let check = try await api.check(change)

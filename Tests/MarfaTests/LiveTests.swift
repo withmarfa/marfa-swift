@@ -1012,5 +1012,9 @@ extension LiveWorkingCopies {
 }
 
 extension Server {
-    func with(key: String) -> Server { Server(url: url, key: key) }
+    func with(key: String) -> Server {
+        var other = self
+        other.key = key
+        return other
+    }
 }

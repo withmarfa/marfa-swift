@@ -105,7 +105,7 @@ struct LiveQueries {
 
     @Test(arguments: [false, true])
     func theRowsUpdateOfflineWithNoServerAndWithOneThatIsAway(hasServer: Bool) async throws {
-        let server = hasServer ? Server(url: URL(string: "http://127.0.0.1:9")!, key: "k") : nil
+        let server = hasServer ? try Server(url: URL(string: "http://127.0.0.1:9")!, key: "k") : nil
         let copy = try await Self.open(server: server)
         let query = LiveQuery(copy, reading: Self.entries)
         try await Self.settled(query)

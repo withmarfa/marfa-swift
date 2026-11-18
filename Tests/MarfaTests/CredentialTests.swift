@@ -7,7 +7,8 @@ import Testing
 @Suite struct ServerFromTheEnvironment {
     @Test func bothNamesSetAreTheServer() throws {
         let server = try Server.fromEnvironment(["MARFA_API_URL": "http://127.0.0.1:8787", "MARFA_API_KEY": "mk_k"])
-        #expect(server == Server(url: try #require(URL(string: "http://127.0.0.1:8787")), key: "mk_k"))
+        let expected = try Server(url: try #require(URL(string: "http://127.0.0.1:8787")), key: "mk_k")
+        #expect(server == expected)
     }
 
     @Test func neitherNameSetIsNoServer() throws {
@@ -36,6 +37,23 @@ import Testing
             }
         }
         #expect(!Server.EnvironmentError.notAServer.description.contains("mk_"))
+    }
+}
+
+@Suite struct ServerAddresses {
+    @Test(arguments: [
+        "http://owner@127.0.0.1:8787", "https://owner:hunter2@marfa.example", "https://my%40mail:p%3Aw@marfa.example",
+    ])
+    func anAddressWithUserInfoIsRefusedWithoutRepeatingIt(address: String) throws {
+        let url = try #require(URL(string: address))
+        let error = #expect(throws: Server.AddressError.userInfo) { try Server(url: url, key: "mk_k") }
+        let text = try #require(error?.description)
+        #expect(!text.contains("hunter2") && !text.contains("owner"))
+    }
+
+    @Test func anAddressWithNoUserInfoIsAServer() throws {
+        let url = try #require(URL(string: "https://marfa.example:8443/api"))
+        #expect(try Server(url: url, key: "mk_k").url == url)
     }
 }
 

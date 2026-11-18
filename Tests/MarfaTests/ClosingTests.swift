@@ -180,13 +180,11 @@ struct Closing {
 
 @Suite(.timeLimit(.minutes(1)))
 struct ChangingTheKey {
-    private static let elsewhere = Server(url: URL(string: "http://127.0.0.1:9")!, key: "old-key")
-
     @Test func aQueuedWriteSurvivesTheSwapAndIsSentWithTheNewKey() async throws {
         let server = try await LocalServer.start(contract: marfaContractVersion, answer: Waiting.hydrating)
         defer { server.stop() }
         let store = temporaryStore()
-        let copy = try await WorkingCopy.open(store: store, server: Server(url: server.url, key: "old-key"))
+        let copy = try await WorkingCopy.open(store: store, server: try Server(url: server.url, key: "old-key"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let created = try await copy.items.create(
             Marfa.Draft(type: "core.note", properties: ["title": "a"], tier: .feed))
@@ -217,7 +215,7 @@ struct ChangingTheKey {
         let server = try await LocalServer.start(contract: marfaContractVersion, answer: Waiting.hydrating)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(
-            store: temporaryStore(), server: Server(url: server.url, key: "old-key"))
+            store: temporaryStore(), server: try Server(url: server.url, key: "old-key"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         let heard = Heard(copy.changes())
         try await eventually("the follow asked for events") {
@@ -239,7 +237,7 @@ struct ChangingTheKey {
         let server = try await LocalServer.start(contract: marfaContractVersion, answer: Waiting.hydrating)
         defer { server.stop() }
         let copy = try await WorkingCopy.open(
-            store: temporaryStore(), server: Server(url: server.url, key: "old-key"))
+            store: temporaryStore(), server: try Server(url: server.url, key: "old-key"))
         _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         #expect(server.log.all.last?.contains("old-key") == true, "the old key was never sent, so this proves nothing")
         let before = server.log.all.count

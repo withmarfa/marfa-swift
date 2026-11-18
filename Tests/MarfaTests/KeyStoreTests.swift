@@ -58,9 +58,18 @@ struct KeychainKeyStoreBehavior {
         ("http://a.example:80/", "http://a.example"), ("http://a.example:443", "http://a.example:443"),
         ("https://a.example:8443/marfa/", "https://a.example:8443/marfa"),
         ("https://a.example/Marfa", "https://a.example/Marfa"),
+        ("https://owner@a.example", "https://a.example"),
+        ("https://owner:hunter2@a.example:443/", "https://a.example"),
+        ("https://my%40mail.example:p%3Aw%2Fd@a.example:8443/marfa/", "https://a.example:8443/marfa"),
     ])
     func theAccountIsTheAddressWrittenOneWay(address: String, account: String) throws {
         #expect(KeychainKeyStore.account(for: try #require(URL(string: address))) == account)
+    }
+
+    @Test func aPasswordInTheAddressIsNeverPartOfTheAccount() throws {
+        let host = try #require(address.host())
+        let account = KeychainKeyStore.account(for: try #require(URL(string: "https://owner:hunter2@\(host)")))
+        #expect(!account.contains("hunter2") && !account.contains("owner") && !account.contains("@"))
     }
 
     @Test func twoServicesKeepTheirOwnKeys() throws {

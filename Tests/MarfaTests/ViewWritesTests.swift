@@ -71,7 +71,7 @@ import Testing
     }
 
     @Test func aServerThatIsAwayFailsTheWriteAndQueuesNothing() async throws {
-        let away = Server(url: URL(string: "http://127.0.0.1:9")!, key: "k")
+        let away = try Server(url: URL(string: "http://127.0.0.1:9")!, key: "k")
         let copy = try await WorkingCopy.open(store: temporaryStore(), server: away)
         let id = "01a00000-0000-7000-8000-000000000001"
         let writes: [(String, () async throws -> Void)] = [

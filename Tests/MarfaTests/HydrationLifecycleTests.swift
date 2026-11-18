@@ -13,7 +13,7 @@ struct HydrationLifecycle {
         let script = HydrationScript()
         let server = try await script.start()
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         if refilling {
             script.set("/items", [.page(["held", "gone"])])
             _ = try await copy.hydrate(types: ["*"], tier: .library)
@@ -44,7 +44,7 @@ struct HydrationLifecycle {
         let script = HydrationScript()
         let server = try await script.start()
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         script.set("/items", [.page(["held"], next: "next"), .unavailable])
         await #expect(throws: MarfaError.self) { _ = try await copy.hydrate(types: ["*"], tier: .library) }
 
@@ -84,7 +84,7 @@ struct HydrationLifecycle {
         let script = HydrationScript()
         let server = try await script.start()
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         script.set("/items", [.page(["held", "gone"])])
         _ = try await copy.hydrate(types: ["*"], tier: .library)
         #expect(try await copy.items.list().completeness == .complete)
@@ -134,7 +134,7 @@ struct HydrationLifecycle {
         let script = HydrationScript()
         let server = try await script.start()
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         script.set("/items", [.page(["held", "gone"])])
         _ = try await copy.hydrate(types: ["*"], tier: .library)
         script.set("/events", [.agedOut, .stream(cursor: "60")])
@@ -150,7 +150,7 @@ struct HydrationLifecycle {
     }
 
     private static func staleCopy(_ script: HydrationScript, _ server: LocalServer) async throws -> WorkingCopy {
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         script.set("/items", [.page(["held", "gone"])])
         _ = try await copy.hydrate(types: ["*"], tier: .library)
         script.set("/events", [.agedOut])
@@ -202,7 +202,7 @@ struct HydrationLifecycle {
         let script = HydrationScript()
         let server = try await script.start()
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         script.set("/items", [.page(["held", "gone"])])
         _ = try await copy.hydrate(types: ["*"], tier: .library)
 
@@ -235,7 +235,7 @@ struct HydrationLifecycle {
         let script = HydrationScript()
         let server = try await script.start()
         defer { server.stop() }
-        let copy = try await WorkingCopy.open(store: temporaryStore(), server: Server(url: server.url, key: "test"))
+        let copy = try await WorkingCopy.open(store: temporaryStore(), server: try Server(url: server.url, key: "test"))
         script.set("/items", [.page(["held", "gone"])])
         _ = try await copy.hydrate(types: ["*"], tier: .library)
         let queued = try await Self.queueEdits(copy)

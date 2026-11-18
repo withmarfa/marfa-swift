@@ -68,7 +68,8 @@ public struct Authorization: Sendable {
     ///
     /// Choose a `service` of the app's own, such as its bundle identifier, so no other app's items share it.
     ///
-    /// Throws ``SignInError/notAServer`` when `server` is not an `http` or `https` address with a host.
+    /// Throws ``SignInError/notAServer`` when `server` is not an `http` or `https` address with a host, or holds a
+    /// user or a password.
     public init(server: URL, client: Client, keychain: Keychain = .system, service: String) throws(SignInError) {
         try self.init(server: server, client: client, keychain: keychain, service: service, transport: .standard)
     }
@@ -84,7 +85,9 @@ public struct Authorization: Sendable {
     init(server: URL, client: Client, keychain: Keychain, service: String, transport: SignInTransport)
         throws(SignInError)
     {
-        guard let origin = origin(of: server), let url = URL(string: origin) else { throw .notAServer }
+        guard server.user() == nil, server.password() == nil, let origin = origin(of: server),
+            let url = URL(string: origin)
+        else { throw .notAServer }
         self.server = url
         self.client = client
         place = SignInPlace(keychain: keychain, service: service, account: origin)
@@ -537,7 +540,8 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     case issuerMismatch
     /// The keychain holds no sign-in for the server.
     case notSignedIn
-    /// The address is not an `http` or `https` address with a host, so it names no server to sign in to.
+    /// The address is not an `http` or `https` address with a host, or it holds a user or a password, so it names
+    /// no server to sign in to.
     case notAServer
     /// The address is on another server than the one the sign-in is for.
     case otherServer

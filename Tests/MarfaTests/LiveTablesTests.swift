@@ -34,7 +34,7 @@ extension LiveWorkingCopies {
                 ])
             return (
                 try #require(minted["id"]?.string),
-                Server(url: try #require(Live.server).url, key: try #require(minted["key"]?.string))
+                try Server(url: try #require(Live.server).url, key: try #require(minted["key"]?.string))
             )
         }
 

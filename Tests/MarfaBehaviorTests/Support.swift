@@ -98,7 +98,7 @@ enum LiveServer {
         guard let url = environment["MARFA_API_URL"].flatMap(URL.init(string:)),
             let key = environment["MARFA_API_KEY"]
         else { return nil }
-        return Server(url: url, key: key)
+        return try? Server(url: url, key: key)
     }
 
     static var isRequired: Bool { ProcessInfo.processInfo.environment["MARFA_LIVE_REQUIRED"] != nil }

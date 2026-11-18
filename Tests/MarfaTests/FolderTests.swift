@@ -164,7 +164,7 @@ func theFolderTestsHaveTheCommandLineWhereTheyAreRequired() {
 func addingAFolderAgainstAServerOutOfReachThrowsAndLeavesNoFile() async throws {
     _ = FolderFixture.registry
     let directory = FolderFixture.directory()
-    let folders = Folders(server: Server(url: URL(string: "http://127.0.0.1:9")!, key: "unused"))
+    let folders = Folders(server: try Server(url: URL(string: "http://127.0.0.1:9")!, key: "unused"))
     await #expect {
         try await folders.add(directory, following: "01a00000-0000-7000-8000-000000000001")
     } throws: { error in
@@ -573,7 +573,7 @@ extension LiveWorkingCopies {
         @Test func aWatchWhoseCredentialIsRefusedEndsByThrowing() async throws {
             let directory = try await FolderFixture.synced()
             let server = try #require(Live.server)
-            let refused = Folders(server: Server(url: server.url, key: "marfa_not_a_key"))
+            let refused = Folders(server: try Server(url: server.url, key: "marfa_not_a_key"))
             let watch = try await refused.watch(directory)
             let ended = try await bounded("the refused watch to end", within: 60) {
                 do {

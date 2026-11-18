@@ -3,7 +3,9 @@ internal import MarfaCore
 
 /// A working copy holds the key in memory and never writes it to its store.
 public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
-    public var url: URL
+    ///
+    /// Never holds a user or password: an address that names either is refused where a server is made.
+    public private(set) var url: URL
     /// An API key, or for a server made from a credential, the access token kept when it was made.
     public var key: String
     /// The sign-in the server was made from, which a copy or ``Folders`` renews when the server refuses its
@@ -13,7 +15,24 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// sets.
     var confirmation: Confirmation?
 
-    public init(url: URL, key: String) {
+    /// Why an address cannot name a server.
+    public enum AddressError: Error, Hashable, CustomStringConvertible {
+        /// The address holds a user or a password, which a server address never carries: it would be kept
+        /// and shown wherever the address is.
+        case userInfo
+
+        public var description: String {
+            switch self {
+            case .userInfo: "A server address holds no user or password."
+            }
+        }
+    }
+
+    /// The server at `url`, reached with the API key `key`.
+    ///
+    /// Throws ``AddressError/userInfo`` when `url` holds a user or a password.
+    public init(url: URL, key: String) throws(AddressError) {
+        try Self.refuseUserInfo(url)
         self.url = url
         self.key = key
         credential = nil
@@ -25,14 +44,20 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
     /// whenever the server refuses it. Once the server ends the sign-in, calls throw
     /// ``MarfaError/signedOut(origin:message:)`` until the app signs in again.
     ///
-    /// Throws ``SignInError/otherServer`` when `url` is not on the server the credential is for, and
-    /// ``SignInError/notSignedIn`` when the keychain no longer holds the sign-in.
+    /// Throws ``SignInError/notAServer`` when `url` holds a user or a password, ``SignInError/otherServer`` when
+    /// it is not on the server the credential is for, and ``SignInError/notSignedIn`` when the keychain no
+    /// longer holds the sign-in.
     public init(url: URL, credential: Credential) throws {
+        guard url.user() == nil, url.password() == nil else { throw SignInError.notAServer }
         guard Marfa.origin(of: url) == credential.place.account else { throw SignInError.otherServer }
         guard let token = try credential.accessToken() else { throw SignInError.notSignedIn }
         self.url = url
         key = token
         self.credential = credential
+    }
+
+    private static func refuseUserInfo(_ url: URL) throws(AddressError) {
+        guard url.user() == nil, url.password() == nil else { throw .userInfo }
     }
 
     /// The token a copy or ``Folders`` opens with: the key, or the access token the keychain holds now.
@@ -76,9 +101,13 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
         case (_, nil): throw .incomplete(missing: "MARFA_API_KEY")
         case (let text?, let key?):
             guard let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased()),
-                let host = url.host(), !host.isEmpty, url.user() == nil, url.password() == nil
+                let host = url.host(), !host.isEmpty
             else { throw .notAServer }
-            return Server(url: url, key: key)
+            do {
+                return try Server(url: url, key: key)
+            } catch {
+                throw .notAServer
+            }
         }
     }
 

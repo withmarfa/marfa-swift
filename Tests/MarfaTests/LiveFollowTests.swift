@@ -12,7 +12,7 @@ import Testing
 struct LiveFollow {
     /// A copy that reaches `own` only through `relay`, hydrated and holding a stream with its follow running.
     static func following(_ own: OwnServer, through relay: Relay) async throws -> (WorkingCopy, Heard) {
-        let copy = try await WorkingCopy.open(store: Live.store(), server: Server(url: relay.url, key: own.key))
+        let copy = try await WorkingCopy.open(store: Live.store(), server: try Server(url: relay.url, key: own.key))
         _ = try await copy.hydrate(types: ["core.note"], tier: .library)
         let heard = Heard(copy.changes())
         try await Task.sleep(for: .milliseconds(500))

@@ -134,8 +134,8 @@ struct Values {
         #expect(read["d"] == .number(1.5))
     }
 
-    @Test func aServerNeverShowsItsKey() {
-        let server = Server(url: URL(string: "https://marfa.example")!, key: "mk_secret")
+    @Test func aServerNeverShowsItsKey() throws {
+        let server = try Server(url: URL(string: "https://marfa.example")!, key: "mk_secret")
         var dumped = ""
         dump(server, to: &dumped)
         let shown = ["\(server)", String(reflecting: server), dumped]
