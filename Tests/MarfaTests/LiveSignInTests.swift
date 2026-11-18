@@ -415,7 +415,7 @@ extension LiveSignIn {
             let updates = Updates(copy.updates())
             try await eventually("following") { updates.connection == .following }
             let count = updates.all.count
-            let elsewhere = Server(url: URL(string: "http://127.0.0.1:1")!, key: "other")
+            let elsewhere = try Server(url: URL(string: "http://127.0.0.1:1")!, key: "other")
             await #expect {
                 try await copy.use(elsewhere)
             } throws: { error in

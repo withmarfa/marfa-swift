@@ -6,8 +6,8 @@ import Testing
 
 extension Server {
     /// A server made from a key, for tests that never reach it.
-    static func stub(_ key: String) -> Server {
-        Server(url: URL(string: "http://127.0.0.1:1")!, key: key)
+    static func stub(_ key: String) throws -> Server {
+        try Server(url: URL(string: "http://127.0.0.1:1")!, key: key)
     }
 }
 
