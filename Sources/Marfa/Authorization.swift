@@ -577,12 +577,31 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     }
 }
 
+/// A browser session that shows a sign-in page and answers once.
+@MainActor
+protocol BrowserSession: AnyObject {
+    func start() -> Bool
+    func cancel()
+}
+
+extension ASWebAuthenticationSession: BrowserSession {}
+
 /// Presents one `ASWebAuthenticationSession` and keeps it, and its presentation context, alive until it
 /// answers.
 @MainActor
 final class WebSession: NSObject, ASWebAuthenticationPresentationContextProviding {
+    /// Makes the session for an address, answering through `completion` on whichever queue it likes.
+    ///
+    /// `completion` is `Sendable` so that no closure written in a main-actor function can stand in for it: the
+    /// system calls it on a queue of its own, where a main-actor closure stops the app.
+    typealias Maker =
+        @MainActor (
+            _ url: URL, _ scheme: String, _ ephemeral: Bool, _ context: WebSession,
+            _ completion: @escaping @Sendable (URL?, (any Error)?) -> Void
+        ) -> any BrowserSession
+
     private let anchor: ASPresentationAnchor
-    private var session: ASWebAuthenticationSession?
+    private var session: (any BrowserSession)?
 
     private init(anchor: ASPresentationAnchor) {
         self.anchor = anchor
@@ -592,23 +611,40 @@ final class WebSession: NSObject, ASWebAuthenticationPresentationContextProvidin
         MainActor.assumeIsolated { anchor }
     }
 
-    static func present(_ url: URL, scheme: String, anchor: ASPresentationAnchor, ephemeral: Bool) async throws
-        -> URL
-    {
+    /// The system's session, which gives its context the presentation anchor.
+    static let system: Maker = { url, scheme, ephemeral, context, completion in
+        let session = ASWebAuthenticationSession(
+            url: url, callback: .customScheme(scheme), completionHandler: completion)
+        session.presentationContextProvider = context
+        session.prefersEphemeralWebBrowserSession = ephemeral
+        return session
+    }
+
+    /// What the continuation of a sign-in takes from a session's answer.
+    ///
+    /// Not isolated to an actor, because the system calls it on a queue of its own, where a main-actor closure
+    /// stops the app.
+    nonisolated static func completion(
+        resuming continuation: CheckedContinuation<URL, any Error>
+    ) -> @Sendable (URL?, (any Error)?) -> Void {
+        { returned, error in
+            if let returned {
+                continuation.resume(returning: returned)
+            } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                continuation.resume(throwing: SignInError.canceled)
+            } else {
+                continuation.resume(throwing: error ?? SignInError.canceled)
+            }
+        }
+    }
+
+    static func present(
+        _ url: URL, scheme: String, anchor: ASPresentationAnchor, ephemeral: Bool, make: Maker = system
+    ) async throws -> URL {
         let context = WebSession(anchor: anchor)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-                let started = ASWebAuthenticationSession(url: url, callback: .customScheme(scheme)) { returned, error in
-                    if let returned {
-                        continuation.resume(returning: returned)
-                    } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-                        continuation.resume(throwing: SignInError.canceled)
-                    } else {
-                        continuation.resume(throwing: error ?? SignInError.canceled)
-                    }
-                }
-                started.presentationContextProvider = context
-                started.prefersEphemeralWebBrowserSession = ephemeral
+                let started = make(url, scheme, ephemeral, context, completion(resuming: continuation))
                 context.session = started
                 if !started.start() {
                     continuation.resume(throwing: SignInError.unavailable(message: "The browser could not open."))
