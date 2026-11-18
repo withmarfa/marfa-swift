@@ -3,7 +3,7 @@ package import MarfaCore
 import Synchronization
 
 /// The one place a working copy and all its parts reach the core, so the copy
-/// can let it go and, for a new key, replace it.
+/// can let it go and, for a new sign-in or key, replace it.
 ///
 /// A call holds a lease on the core while it runs. Closing or replacing waits
 /// for the leases, then drops the core, and a core's store is released when it
@@ -43,19 +43,29 @@ final class CoreHolder: Sendable {
     }
 
     private let state: Mutex<State>
-    private let reopen: (@Sendable (String) throws -> any CoreProtocol)?
+    private let reopen: (@Sendable (Opening) throws -> any CoreProtocol)?
+    /// The server address the copy was opened on, which a new server must share; `nil` where it is not checked.
+    private let address: String?
     /// Whether a long call gets a `Stop` to raise on cancellation.
     ///
     /// A core with no Rust behind it takes none, and so makes no call into the glue.
     private let stops: Bool
 
-    /// `reopen` makes the core again from a new key; `nil` where the copy has
-    /// no server and so no key.
+    /// What a core is opened with: the token to send and, for a sign-in, what renews it.
+    struct Opening: Sendable {
+        let key: String
+        let renewer: TokenRenewer?
+    }
+
+    /// `reopen` makes the core again from a new opening; `nil` where the copy has no server and so no key.
+    /// `address` is the server's address; a new server at another one is refused before anything changes.
     init(
-        _ core: any CoreProtocol, reopen: (@Sendable (String) throws -> any CoreProtocol)? = nil, stops: Bool = true
+        _ core: any CoreProtocol, reopen: (@Sendable (Opening) throws -> any CoreProtocol)? = nil,
+        address: String? = nil, stops: Bool = true
     ) {
         state = Mutex(State(core: core, handle: Handle(core.heldHandle())))
         self.reopen = reopen
+        self.address = address
         self.stops = stops
     }
 
@@ -67,12 +77,19 @@ final class CoreHolder: Sendable {
 
     /// Marks a key change as begun, until `endKeyChange()`.
     ///
-    /// Throws what `replace(key:)` would throw before it starts: `closed`, or `noServer` where there is no key to
-    /// change.
-    func beginKeyChange() throws {
+    /// Throws what `replace(_:)` would throw before it starts: `closed`, `noServer` where there is no key to
+    /// change, or `wrongServer` where `url` is not the address the copy was opened on.
+    func beginKeyChange(to url: URL) throws {
         try state.withLock { state in
             if state.isClosing { throw MarfaError.closed(message: Self.closedMessage) }
             if reopen == nil { throw Self.noKey }
+            if let address, Self.trimmed(address) != Self.trimmed(url.absoluteString) {
+                let expected = URL(string: address).flatMap(Marfa.origin(of:)) ?? address
+                let got = Marfa.origin(of: url) ?? url.absoluteString
+                throw MarfaError.wrongServer(
+                    expected: expected, got: got,
+                    message: "this working copy is for \(expected), not \(got), so it cannot use that server")
+            }
             state.keyChanges += 1
             state.epoch += 1
         }
@@ -200,13 +217,19 @@ final class CoreHolder: Sendable {
         }
     }
 
+    private static func trimmed(_ address: String) -> String {
+        var text = Substring(address)
+        while text.hasSuffix("/") { text = text.dropLast() }
+        return String(text)
+    }
+
     /// Waits for the running calls, closes the old core, then opens the store
-    /// again with `key` and holds that.
+    /// again with `opening` and holds that.
     ///
     /// From the start until the new core is held, every call throws
     /// `keyChanging`. When the store cannot be opened again the holder is closed,
     /// and a `close()` that arrived meanwhile closes it: this throws `closed`.
-    func replace(key: String) async throws {
+    func replace(_ opening: Opening) async throws {
         try state.withLock { state in
             switch state.phase {
             case .dropping, .released: throw MarfaError.closed(message: Self.closedMessage)
@@ -229,7 +252,7 @@ final class CoreHolder: Sendable {
         _ = state.withLock { $0.core.take() }
         let reopened: Result<any CoreProtocol, any Error>
         do {
-            reopened = .success(try await background { try reopen(key) })
+            reopened = .success(try await background { try reopen(opening) })
         } catch {
             reopened = .failure(error)
         }

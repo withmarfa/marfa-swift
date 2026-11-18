@@ -17,7 +17,7 @@ public enum CopyConnection: Sendable, Hashable {
     /// `.offline` instead, and when its wait ends the copy is `.needsHydration` again with the same reason, so the
     /// app hydrates again. Only a hydration or a catch-up that succeeds shows it following.
     case needsHydration(MarfaError?)
-    /// The copy is asking its server: as updates begin, after ``WorkingCopy/useKey(_:)``, and while a refill fills
+    /// The copy is asking its server: as updates begin, after ``WorkingCopy/use(_:)``, and while a refill fills
     /// a stale copy again.
     case connecting
     /// The copy reached its server and follows its events.
@@ -41,8 +41,8 @@ public enum CopyConnection: Sendable, Hashable {
     /// For a reader, the core ended its watch of the writer's saves on a fault. The reader takes it again by itself,
     /// further apart each time, and is `.local` once it has.
     case stopped(MarfaError)
-    /// The server refused the copy's key. Nothing is tried again until ``WorkingCopy/useKey(_:)`` gives the copy a
-    /// new one.
+    /// The server refused the copy's key or sign-in. Nothing is tried again until ``WorkingCopy/use(_:)`` gives the
+    /// copy a new one.
     case keyRefused(MarfaError)
     /// The copy was closed. It is the last update.
     case closed

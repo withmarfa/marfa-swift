@@ -231,7 +231,7 @@ struct Changes {
         core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
         copy.feed.announce(write(.addTag, item: "n1"))
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
         #expect(core.places.count == 1, "a recovery took a new place for a stream the fault ended")
         #expect(next.places.isEmpty, "a key change revived a stream the fault ended")
         try await bounded("close") { await copy.close() }
@@ -517,7 +517,7 @@ struct Changes {
         #expect(await heard.next() == stopped(.invalid(message: "gone")))
         #expect(await heard.next() == nil, "the stream stayed open after it was refused")
         #expect(copy.feed.count == 0)
-        try await bounded("useKey") { try await copy.useKey("new-key") }
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
         #expect(next.places.isEmpty, "a key change revived a stream that was refused")
         try await bounded("close") { await copy.close() }
     }

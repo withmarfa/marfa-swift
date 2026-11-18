@@ -145,11 +145,10 @@ public final class WorkingCopy: Sendable {
         }
         let copy: WorkingCopy
         if let url {
-            // A key the app switches to replaces the credential, so the reopened copy has nothing to renew.
-            let reopen: @Sendable (String) throws -> any CoreProtocol = { key in
-                try Core.open(path: path, url: url, key: key)
+            let reopen: @Sendable (CoreHolder.Opening) throws -> any CoreProtocol = { opening in
+                try Core.open(path: path, url: url, key: opening.key, renewer: opening.renewer)
             }
-            copy = WorkingCopy(holder: CoreHolder(core, reopen: reopen), hasServer: true)
+            copy = WorkingCopy(holder: CoreHolder(core, reopen: reopen, address: url), hasServer: true)
         } else {
             copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
         }
@@ -396,7 +395,7 @@ public final class WorkingCopy: Sendable {
     /// `head_past_log` for a server restored to an earlier point, or
     /// `not_stale` for a copy that is not waiting to be filled again), and
     /// when the copy was already stale as the follow began, such as after
-    /// `useKey` or on a store opened stale (`copyExpired` with the reason
+    /// ``use(_:)`` or on a store opened stale (`copyExpired` with the reason
     /// `catchup_too_old`). For a `.stale` copy, hydrate the same slice to fill
     /// it again. A stopped stream stays stopped until the app's next hydration
     /// or catch-up, or until a stream is asked for while none is held. On a
@@ -452,8 +451,8 @@ public final class WorkingCopy: Sendable {
     /// - A reader is `.local` while it watches the writer's saves. When the core ends that watch on a fault, the
     ///   reader is `.stopped` and takes the watch again after the same waits as `.offline`, then asks to read
     ///   everything.
-    /// - A key the server refused is `.keyRefused`, and nothing is tried until ``useKey(_:)``, which catches up at
-    ///   once with the new key.
+    /// - A key or sign-in the server refused is `.keyRefused`, and nothing is tried until ``use(_:)``, which catches up at
+    ///   once with the new sign-in.
     /// - A copy that must be hydrated first is `.needsHydration`, and the app hydrates it; nothing else is tried until
     ///   a hydration completes. When the app's own hydration or catch-up of such a copy fails with a failure that may
     ///   mend itself, the copy is `.offline`, waits as above, and is `.needsHydration` again, so the app hydrates
@@ -484,28 +483,35 @@ public final class WorkingCopy: Sendable {
         await holder.close()
     }
 
-    /// Gives the copy a new key for its server: the store is closed and
-    /// opened again with `key`, and the copy goes on with it.
+    /// Gives the copy a new sign-in or key for its server: the store is closed and
+    /// opened again with the token of `server`, and the copy goes on with it.
     ///
-    /// The key is held in memory only, as when opening. Held `changes()`
-    /// streams keep going: a follow stopped by the old key, such as an
+    /// A server made from a credential keeps renewing: the copy renews its access token as it did when opened, now
+    /// through `server`'s credential. A server made from a key has nothing to renew. Either may replace the
+    /// other. A copy opened with a credential needs no call when the same credential signs in again, because a
+    /// renewal reads the sign-in kept now; this is for another credential or a key.
+    ///
+    /// The token is held in memory only, as when opening. Held `changes()`
+    /// streams keep going: a follow stopped by the old sign-in, such as an
     /// `unauthorized` one, starts again with the new one, and a stream is
     /// told nothing of the change itself, except that a reader's stream added
     /// during it is told one `.saved`, to read again.
     ///
     /// The store cannot be reopened while a call is running, so this waits for
     /// the slowest running call, and from the moment it starts until the new
-    /// key is in use every call on the copy, new ones included, throws
+    /// token is in use every call on the copy, new ones included, throws
     /// `keyChanging`: ask again. The role the copy holds, `handle`, is taken again,
     /// so it is a reader if another opener took the writer role in between.
     ///
-    /// Throws `noServer` for a copy opened without a server, and `closed` for
-    /// a closed one, or one closed while this ran. When the store cannot be
-    /// opened again the error is thrown and the copy is closed, its streams
-    /// ended.
-    public func useKey(_ key: String) async throws {
-        try holder.beginKeyChange()
+    /// Throws `noServer` for a copy opened without a server, `wrongServer` for a server at another address than
+    /// the copy's, `SignInError.notSignedIn` for a credential whose sign-in the keychain no longer holds, and
+    /// `closed` for a closed copy, or one closed while this ran. In each of these but the last, nothing changes.
+    /// When the store cannot be opened again the error is thrown and the copy is closed, its streams ended.
+    public func use(_ server: Server) async throws {
+        try holder.beginKeyChange(to: server.url)
         defer { holder.endKeyChange() }
+        let opening = CoreHolder.Opening(
+            key: try server.openingToken(), renewer: server.credential.map(TokenRenewer.init))
         lifecycle.keyWillChange()
         do {
             try await feed.suspend()
@@ -514,7 +520,7 @@ public final class WorkingCopy: Sendable {
             throw error
         }
         do {
-            try await holder.replace(key: key)
+            try await holder.replace(opening)
         } catch {
             if holder.isClosed {
                 lifecycle.close()

@@ -140,7 +140,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// It is never the app's input or the server's answer, so it is neither ``isTransient`` nor the caller's mistake:
     /// asking again with nothing changed is not known to help. Report it.
     case fault(message: String)
-    /// The call came while ``WorkingCopy/useKey(_:)`` replaced the copy's key, and was not made. Ask again once
+    /// The call came while ``WorkingCopy/use(_:)`` replaced the copy's sign-in, and was not made. Ask again once
     /// the change is done.
     case keyChanging(message: String)
     /// The server refused a write made against a version of the row that is no longer current (409
