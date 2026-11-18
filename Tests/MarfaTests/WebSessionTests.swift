@@ -1,5 +1,6 @@
 import AuthenticationServices
 import Foundation
+import ObjectiveC
 import Synchronization
 import Testing
 
@@ -48,7 +49,17 @@ private final class QueueSession: BrowserSession {
     }
 }
 
-@Suite(.timeLimit(.minutes(1)))
+/// The system's completion handler as the Objective-C runtime holds it.
+private typealias SystemCompletion = @convention(block) (NSURL?, NSError?) -> Void
+
+/// Holds the system's completion handler, which the runtime gives out as a value that is not `Sendable`.
+private final class HeldCompletion: @unchecked Sendable {
+    let call: SystemCompletion
+    init(_ call: @escaping SystemCompletion) { self.call = call }
+}
+
+// Serialized because one test replaces methods of `ASWebAuthenticationSession` for as long as it runs.
+@Suite(.timeLimit(.minutes(1)), .serialized)
 @MainActor
 struct WebSessionTests {
     private let address = URL(string: "https://marfa.example.com/oauth/authorize")!
@@ -115,5 +126,48 @@ struct WebSessionTests {
                 return QueueSession(answer: .returned(returned), completion: completion)
             })
         #expect(given.withLock { $0 } === window)
+    }
+
+    /// Crosses the Objective-C boundary the system's session calls back over.
+    ///
+    /// It runs the real `WebSession.system` and the real `ASWebAuthenticationSession` initializer, with `start`
+    /// replaced so that no browser opens, and calls the completion handler the system was given from a queue of
+    /// its own. A handler that is a main-actor closure stops the process at that call (signal 5), so a
+    /// regression shows as the test run dying, not as one failed expectation.
+    @Test func theCompletionHandlerTheSystemIsGivenRunsOnAnyQueue() async throws {
+        let held = Mutex<HeldCompletion?>(nil)
+        let initializer = NSSelectorFromString("initWithURL:callback:completionHandler:")
+        let initialize = try #require(class_getInstanceMethod(ASWebAuthenticationSession.self, initializer))
+        let start = try #require(
+            class_getInstanceMethod(ASWebAuthenticationSession.self, NSSelectorFromString("start")))
+        let originalInitialize = method_getImplementation(initialize)
+        typealias Initialize = @convention(c) (AnyObject, Selector, NSURL, AnyObject, SystemCompletion) -> AnyObject
+        let callOriginal = unsafeBitCast(originalInitialize, to: Initialize.self)
+        let interceptInitialize:
+            @convention(block) (AnyObject, NSURL, AnyObject, @escaping SystemCompletion) -> AnyObject =
+                { receiver, url, callback, completion in
+                    held.withLock { $0 = HeldCompletion(completion) }
+                    return callOriginal(receiver, initializer, url, callback, completion)
+                }
+        let answerFromAnotherQueue: @convention(block) (AnyObject) -> Bool = { _ in
+            let completion = held.withLock { $0! }
+            DispatchQueue.global().async {
+                completion.call(NSURL(string: "so.marfa.tests:/signed-in?code=abc&state=xyz"), nil)
+            }
+            return true
+        }
+        let initializeHook = imp_implementationWithBlock(interceptInitialize)
+        let startHook = imp_implementationWithBlock(answerFromAnotherQueue)
+        method_setImplementation(initialize, initializeHook)
+        let originalStart = method_setImplementation(start, startHook)
+        defer {
+            method_setImplementation(initialize, originalInitialize)
+            method_setImplementation(start, originalStart)
+            imp_removeBlock(initializeHook)
+            imp_removeBlock(startHook)
+        }
+        #expect(
+            try await WebSession.present(address, scheme: "so.marfa.tests", anchor: anchor(), ephemeral: true)
+                == returned)
     }
 }
