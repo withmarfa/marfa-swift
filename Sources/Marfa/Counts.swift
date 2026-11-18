@@ -220,7 +220,6 @@ private struct CountsWire: Decodable {
             case completed, canceled
         }
 
-        /// Whether every group is zero or more and together they are no more than `total`.
         func fit(_ total: Int) -> Bool {
             var sum = 0
             for group in [notStarted, inProgress, completed, canceled] {

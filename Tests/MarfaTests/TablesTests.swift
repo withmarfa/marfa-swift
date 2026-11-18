@@ -5,7 +5,7 @@ import Testing
 
 @testable import Marfa
 
-/// A core whose answer to a hold a test scripts.
+/// Supplies scripted answers for table holds and fills.
 private final class HoldingCore: Core, @unchecked Sendable {
     private let answer = Mutex(MarfaCore.TableHold(type: "t", table: "steps", wasHeld: false, fill: nil))
     private let filled = Mutex(
@@ -70,14 +70,12 @@ struct TableHolds {
         let heard = Heard(copy.changes())
         let tables = Marfa.Change(origin: .refreshed(.tables), itemId: nil, edgeId: nil)
 
-        // A pass that changed nothing is not told; one that found a table past the cap is.
-        core.answerFill(fill())
-        _ = try await copy.tables.fill()
         core.answerFill(fill(online: 1))
         #expect(try await copy.tables.fill().online == 1)
         try await eventually("the table past the cap is told") { heard.all == [tables] }
 
-        // So is one that read rows or left a table whole.
+        core.answerFill(fill())
+        _ = try await copy.tables.fill()
         for changed in [fill(rows: 3), fill(whole: 1)] {
             core.answerFill(changed)
             _ = try await copy.tables.fill()

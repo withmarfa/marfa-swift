@@ -51,12 +51,9 @@ final class CoreHolder: Sendable {
 
     var isClosed: Bool { state.withLock { $0.phase == .released } }
 
-    /// Which core, and so which key, the holder holds: each core a new key opens is one more.
-    ///
-    /// Read during a call, it names the core that call holds, since a replacement waits for the call.
+    /// Identifies the current core and stays constant while a batch holds its lease.
     var generation: Int { state.withLock { $0.generation } }
 
-    /// Whether a new key has replaced the core held at `generation`, or has begun to.
     func keyChanged(since generation: Int) -> Bool {
         state.withLock { $0.phase == .replacing || $0.generation != generation }
     }

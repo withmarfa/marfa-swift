@@ -139,7 +139,6 @@ struct Counts {
         await copy.close()
     }
 
-    /// One batch, where the key changes after the answer and before it is returned, and two, where it changes between them.
     @Test(arguments: [50, 150])
     func noCountAnsweredUnderAKeyBeingReplacedIsReturned(asking: Int) async throws {
         let gate = DispatchSemaphore(value: 0)
@@ -161,7 +160,7 @@ struct Counts {
         }
         gate.signal()
         try await changing.value
-        // Asked again under the new key, or refused while the key changed: never the earlier key's answer.
+        // Either task may resume first when the batch releases its lease.
         do {
             let counts = try await counting.value
             #expect(counts.map(\.id) == ids && counts.allSatisfy { $0.held && $0.total == 7 })
