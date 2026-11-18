@@ -186,7 +186,7 @@ struct Counts {
     }
 
     /// `use` waits for the feed to let go of the store before the holder starts replacing the core.
-    @Test func aCountAnsweredOnceUseKeyBeganIsAskedAgainUnderTheNewKey() async throws {
+    @Test func aCountAnsweredOnceUseBeganIsAskedAgainUnderTheNewKey() async throws {
         let gate = DispatchSemaphore(value: 0)
         let old = CountingCore(servedGate: gate)
         old.refuseCounts()

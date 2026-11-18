@@ -488,10 +488,14 @@ public final class WorkingCopy: Sendable {
     ///
     /// A server made from a credential keeps renewing: the copy renews its access token as it did when opened, now
     /// through `server`'s credential. A server made from a key has nothing to renew. Either may replace the
-    /// other. A copy opened with a credential needs no call when the same credential signs in again, because a
-    /// renewal reads the sign-in kept now; this is for another credential or a key.
+    /// other. Confirming an active sign-in of the same credential needs no call: the next renewal reads the
+    /// tokens kept by the confirmation. After `signedOut` or `.keyRefused`, call this method even if the
+    /// credential is unchanged.
     ///
-    /// The token is held in memory only, as when opening. Held `changes()`
+    /// If the new sign-in changes the copy's reach, `updates()` reports `.needsHydration`; hydrate the copy
+    /// again. Its queued writes remain.
+    ///
+    /// The core holds the token in memory only, as when opening. Held `changes()`
     /// streams keep going: a follow stopped by the old sign-in, such as an
     /// `unauthorized` one, starts again with the new one, and a stream is
     /// told nothing of the change itself, except that a reader's stream added

@@ -417,7 +417,7 @@ struct ChangingTheKey {
         #expect(feed.count == 0)
     }
 
-    @Test func aCloseDuringAFailingReopenMakesUseKeyThrowClosed() async throws {
+    @Test func aCloseDuringAFailingReopenMakesUseThrowClosed() async throws {
         let reopening = DropProbe()
         let copy = WorkingCopy(
             holder: CoreHolder(
