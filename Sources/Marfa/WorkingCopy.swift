@@ -504,7 +504,8 @@ public final class WorkingCopy: Sendable {
     /// opened again the error is thrown and the copy is closed, its streams
     /// ended.
     public func useKey(_ key: String) async throws {
-        try holder.checkKeyCanChange()
+        try holder.beginKeyChange()
+        defer { holder.endKeyChange() }
         lifecycle.keyWillChange()
         do {
             try await feed.suspend()

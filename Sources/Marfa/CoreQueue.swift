@@ -123,7 +123,7 @@ final class CoreQueue: Sendable {
         }
     }
 
-    private static let canceled = MarfaError.canceled(message: "the call was canceled")
+    static let canceled = MarfaError.canceled(message: "the call was canceled")
 
     /// Takes a job still waiting out of the queue and tells its caller; does nothing for a job that has started.
     private func abandon(_ sequence: UInt64) {

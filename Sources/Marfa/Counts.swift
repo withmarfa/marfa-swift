@@ -105,9 +105,11 @@ extension WorkingCopy {
     /// items, naming no state, would show. The copy answers links where it can be sure of the number; where it
     /// cannot, it asks the server it was opened with, under the key it holds now, and ``ItemCount/held`` says which
     /// answered. Rows come from the copy for a table it holds whole, and from the server otherwise. More than 100 ids
-    /// go in batches of 100, and a canceled task asks for no further batch. Every count returned was answered under
-    /// the key the copy holds when it returns: where ``useKey(_:)`` replaced the key during the call, the counts are
-    /// asked again under the new one, and while the key is still changing this throws `keyChanging`.
+    /// go in batches of 100, and a canceled task asks for no further batch. Every count returned was answered by the
+    /// open copy under the key it holds when it returns, with no key change begun since the call began. Where
+    /// ``useKey(_:)`` began during the call, the counts are asked again once it ends, under the key it leaves.
+    /// A call made while the key is changing throws `keyChanging`, and a call on a copy that is closing, or that
+    /// closed because ``useKey(_:)`` could not open its store again, throws `closed`, whatever the ids.
     ///
     /// Throws ``CountError/unavailable(cause:)`` where the copy could not answer and has no server or cannot reach it,
     /// and the app shows no count rather than 0. Any other failure, such as a server's refusal or a failed renewal of
@@ -119,27 +121,25 @@ extension WorkingCopy {
             Array(unique[$0..<min($0 + Self.countBatch, unique.count)])
         }
         let asked = counted.core
-        let holder = holder
+        var epoch = try holder.steadyEpoch()
         do {
             asking: while true {
                 var counts: [ItemCount] = []
-                var generation: Int?
                 // One call per batch, so a canceled task stops before the next batch.
                 for batch in batches {
-                    let (answer, answeredUnder) = try await holder.runBlocking { core in
-                        let answer: [MarfaCore.ItemCount]
+                    let answer = try await holder.runBlocking { core in
                         do {
-                            answer = try core.counts(ids: batch, counted: asked)
+                            return try core.counts(ids: batch, counted: asked).map(ItemCount.init)
                         } catch MarfaCore.MarfaError.NotAnswerable {
-                            answer = try core.servedCounts(ids: batch, counted: asked)
+                            return try core.servedCounts(ids: batch, counted: asked).map(ItemCount.init)
                         }
-                        return (answer.map(ItemCount.init), holder.generation)
                     }
-                    if generation.map({ $0 != answeredUnder }) == true { continue asking }
-                    generation = answeredUnder
+                    guard try holder.isSteady(since: epoch) else {
+                        epoch = try await holder.steadyEpochAfterKeyChange()
+                        continue asking
+                    }
                     counts += answer
                 }
-                if let generation, holder.keyChanged(since: generation) { continue asking }
                 return counts
             }
         } catch let error as MarfaError where error.isUnreachable {

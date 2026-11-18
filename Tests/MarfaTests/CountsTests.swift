@@ -16,6 +16,9 @@ private final class CountingCore: Core, @unchecked Sendable {
         /// What asking the server throws.
         var servedFailure: MarfaCore.MarfaError?
         var tables: [MarfaCore.ChangedTable] = []
+        var servedAnswers = 0
+        var watchers: [any MarfaCore.ChangeListener] = []
+        var watchesStopped = 0
     }
 
     private let state = Mutex(Script())
@@ -30,6 +33,10 @@ private final class CountingCore: Core, @unchecked Sendable {
 
     var asked: [[String]] { state.withLock { $0.asked } }
     var served: [[String]] { state.withLock { $0.served } }
+    /// How many answers from the server got past the gate.
+    var servedAnswers: Int { state.withLock { $0.servedAnswers } }
+    var watching: Int { state.withLock { $0.watchers.count } }
+    var watchesStopped: Int { state.withLock { $0.watchesStopped } }
     func refuseCounts(_ refusal: MarfaCore.MarfaError = .NotAnswerable(message: "the copy may lack an item")) {
         state.withLock { $0.refusal = refusal }
     }
@@ -60,6 +67,7 @@ private final class CountingCore: Core, @unchecked Sendable {
             return state.servedFailure
         }
         servedGate?.wait()
+        state.withLock { $0.servedAnswers += 1 }
         if let failure { throw failure }
         return ids.map {
             MarfaCore.ItemCount(
@@ -67,6 +75,17 @@ private final class CountingCore: Core, @unchecked Sendable {
                 statusGroups: MarfaCore.StatusGroups(notStarted: 1, inProgress: 0, completed: 2, canceled: 1),
                 held: false)
         }
+    }
+
+    /// A watch the core lets go of only once the test ends it, so a feed letting go of the store waits.
+    override func watch(toldUnreachable: Bool, listener: any MarfaCore.ChangeListener) throws -> MarfaCore.Subscription
+    {
+        state.withLock { $0.watchers.append(listener) }
+        return FakeSubscription { [self] in state.withLock { $0.watchesStopped += 1 } }
+    }
+
+    func endWatches() {
+        for listener in state.withLock({ $0.watchers.drain() }) { listener.ended(error: nil) }
     }
 
     override func changesSince(cursor: String?, most: UInt32) throws -> MarfaCore.CopyChanges {
@@ -160,13 +179,102 @@ struct Counts {
         }
         gate.signal()
         try await changing.value
-        // Either task may resume first when the batch releases its lease.
-        do {
-            let counts = try await counting.value
-            #expect(counts.map(\.id) == ids && counts.allSatisfy { $0.held && $0.total == 7 })
-        } catch Marfa.MarfaError.keyChanging {}
+        let counts = try await counting.value
+        #expect(counts.map(\.id) == ids && counts.allSatisfy { $0.held && $0.total == 7 })
         #expect(old.served.count == 1)
         await copy.close()
+    }
+
+    /// `useKey` waits for the feed to let go of the store before the holder starts replacing the core.
+    @Test func aCountAnsweredOnceUseKeyBeganIsAskedAgainUnderTheNewKey() async throws {
+        let gate = DispatchSemaphore(value: 0)
+        let old = CountingCore(servedGate: gate)
+        old.refuseCounts()
+        let new = CountingCore()
+        let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: true)
+        let stream = Heard(copy.changes())
+        try await eventually("the stream is in the watch") { old.watching == 1 }
+        let counting = Task { try await copy.counts(of: ["a"], counted) }
+        let finished = Mutex(false)
+        Task {
+            _ = try? await counting.value
+            finished.withLock { $0 = true }
+        }
+        try await eventually("the count is asked of the server") { old.served.count == 1 }
+        let changing = Task { try await copy.useKey("new-key") }
+        try await eventually("the feed is letting go of the store") { old.watchesStopped == 1 }
+        gate.signal()
+        try await eventually("the server answered") { old.servedAnswers == 1 }
+        // The old answer must not be returned while the key change waits on the feed.
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(!finished.withLock { $0 })
+        old.endWatches()
+        try await changing.value
+        let counts = try await counting.value
+        #expect(counts.map(\.id) == ["a"] && counts.allSatisfy { $0.held && $0.total == 7 })
+        #expect(new.asked == [["a"]])
+        stream.stop()
+        try await eventually("the new core's watch is stopped") { new.watchesStopped == 1 }
+        new.endWatches()
+        await copy.close()
+    }
+
+    @Test func aCountInFlightWhenTheReopenFailsThrowsClosed() async throws {
+        let gate = DispatchSemaphore(value: 0)
+        let old = CountingCore(servedGate: gate)
+        old.refuseCounts()
+        let copy = WorkingCopy(
+            holder: CoreHolder(old, reopen: { _ in throw MarfaCore.MarfaError.Io(message: "the store is gone") }),
+            hasServer: false)
+        let counting = Task { try await copy.counts(of: ["a"], counted) }
+        try await eventually("the count is asked of the server") { old.served.count == 1 }
+        let changing = Task { try await copy.useKey("new-key") }
+        try await eventually("the key is changing") {
+            do {
+                _ = try await copy.status()
+                return false
+            } catch Marfa.MarfaError.keyChanging {
+                return true
+            }
+        }
+        gate.signal()
+        await #expect(throws: Marfa.MarfaError.self) { try await changing.value }
+        await #expect(throws: Marfa.MarfaError.closed(message: CoreHolder.closedMessage)) {
+            try await counting.value
+        }
+    }
+
+    @Test func aCountInFlightWhenTheCopyClosesThrowsClosed() async throws {
+        let gate = DispatchSemaphore(value: 0)
+        let core = CountingCore(servedGate: gate)
+        core.refuseCounts()
+        let copy = WorkingCopy(holder: CoreHolder(core), hasServer: false)
+        let counting = Task { try await copy.counts(of: ["a"], counted) }
+        try await eventually("the count is asked of the server") { core.served.count == 1 }
+        let closing = Task { await copy.close() }
+        try await eventually("the copy is closing") {
+            do {
+                _ = try await copy.status()
+                return false
+            } catch Marfa.MarfaError.closed {
+                return true
+            }
+        }
+        gate.signal()
+        await closing.value
+        await #expect(throws: Marfa.MarfaError.closed(message: CoreHolder.closedMessage)) {
+            try await counting.value
+        }
+    }
+
+    @Test func aCountOfNoIdsChecksTheCopyFirst() async throws {
+        let copy = WorkingCopy(holder: CoreHolder(CountingCore()), hasServer: false)
+        // The witness: an open copy answers no ids with no counts.
+        #expect(try await copy.counts(of: [], counted).isEmpty)
+        await copy.close()
+        await #expect(throws: Marfa.MarfaError.closed(message: CoreHolder.closedMessage)) {
+            try await copy.counts(of: [], counted)
+        }
     }
 
     @Test func aCanceledCountAsksForNoFurtherBatch() async throws {
