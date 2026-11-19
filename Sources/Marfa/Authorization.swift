@@ -224,9 +224,10 @@ public struct Authorization: Sendable {
     /// The keychain no longer holds the sign-in whatever the answer is. A server whose revocation address moved
     /// is asked again at the address its metadata names now, and one that holds no grant for the app's client
     /// counts as having ended it. A renewal of the sign-in under way, in this process or another, is waited for
-    /// first, so the refresh token revoked is the newest one. A sign-in whose last renewal was sent and cut off
-    /// with no answer is revoked too, but the outcome is ``SignOutOutcome/notConfirmed`` whatever the server
-    /// answers, because it may hold a rotated grant that no refresh token kept here names.
+    /// first, so the refresh token revoked is the newest one. A sign-in marked uncertain (a renewal cut off with
+    /// no answer, or answered with tokens that could not be read) is revoked too, but the outcome is
+    /// ``SignOutOutcome/notConfirmed`` whatever the server answers, because it may hold a rotated grant that no
+    /// refresh token kept here names.
     ///
     /// Throws ``SignInError/heldElsewhere``, changing nothing, when another process sharing the keychain holds the
     /// sign-in too long.

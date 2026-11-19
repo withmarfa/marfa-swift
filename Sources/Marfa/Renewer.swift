@@ -66,8 +66,10 @@ final class TokenRenewer: CredentialRenewer {
     /// The requests run on after the wait gives up, holding the lease, until they answer or the renewal reaches
     /// the transport's request limit, which bounds the first request, the metadata read and the retry together.
     /// So an answer that arrives late is still kept and no other renewal sends the same refresh token meanwhile,
-    /// and the lease is always let go well within the time a waiter for it gives up after. Only a request that
-    /// never answers can leave the refresh token spent, which the kept sign-in records as uncertain.
+    /// and the lease is always let go well within the time a waiter for it gives up after. A request that never
+    /// answers, or a 200 whose tokens cannot be read, can leave the server holding a refresh token the app does
+    /// not have; the renewal records that the kept sign-in is uncertain, under the lease, and a renewal that
+    /// keeps usable tokens clears it.
     ///
     /// A stored token endpoint the server no longer has answers 404 or 410 with no OAuth error. The renewal
     /// then reads the server's metadata again and sends the same request once to the endpoint it names, so a

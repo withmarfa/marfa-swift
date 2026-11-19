@@ -2727,6 +2727,7 @@ struct RenewalRefusalReachesAnApp {
     @Test(arguments: [
         (ScriptedAuthServer.Reply.json(400, ["error": "invalid_request"]), RenewalRefusalReason.refused),
         (.json(302, [:], headers: ["Location": "https://elsewhere.example/oauth/token"]), .redirected),
+        (.json(200, [:]), .unreadable),
     ])
     func aCopysCallTheRenewerRefusedThrowsTheRenewalRefusalWithItsReason(
         answer: ScriptedAuthServer.Reply, reason: RenewalRefusalReason
