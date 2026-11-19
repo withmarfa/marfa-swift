@@ -25,7 +25,10 @@ import Testing
 
     @Test func theTextCarriesNothingTheErrorHolds() {
         let error = MarfaError.closed(message: "/Users/x/diary.md")
-        #expect(!error.fixedText.sentence.contains("diary"))
-        #expect(!error.fixedText.type.contains("Users"))
+        #expect(error.errorDescription?.contains("diary") == true)
+        let text = error.fixedText
+        for field in [text.type, text.sentence, text.code] {
+            #expect(!field.contains("diary") && !field.contains("Users"), "\(field)")
+        }
     }
 }
