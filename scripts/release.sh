@@ -113,7 +113,7 @@ import MarfaTypes
 
 public func check(store: URL) async throws -> String {
     checkImports()
-    _ = Client(Server(url: store, key: "unused"))
+    _ = Client(try Server(url: store, key: "unused"))
     let copy = try await WorkingCopy.open(store: store)
     let status = try await copy.status()
     await copy.close()
