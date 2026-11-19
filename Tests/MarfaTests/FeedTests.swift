@@ -578,6 +578,37 @@ struct Changes {
         await copy.close()
     }
 
+    @Test func aReaderStreamHeldBeforeAKeyChangeIsToldOneSaveAfterIt() async throws {
+        let core = FakeCore.reader()
+        let next = FakeCore.reader()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
+        let heard = Heard(copy.changes())
+        try await eventually("the place was taken and the baseline told") { heard.saves.count == 1 }
+
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
+
+        try await eventually("the stream was told to read again") { heard.saves.count == 2 }
+        try await eventually("the stream was joined") { next.places.count == 1 }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.saves.count == 2, "the stream was told more than once")
+        await copy.close()
+    }
+
+    @Test func aWritersStreamIsToldNothingOfAKeyChange() async throws {
+        let core = FakeCore.writer()
+        let next = FakeCore.writer()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
+        let heard = Heard(copy.changes())
+        try await eventually("the place was taken") { core.places.count == 1 }
+
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
+
+        try await eventually("the stream was joined") { next.places.count == 1 }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(heard.saves.isEmpty)
+        await copy.close()
+    }
+
     @Test func aStreamHeldForAKeyChangeEndsWhenTheCopyCloses() async throws {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in FakeCore.writer() }), hasServer: true)

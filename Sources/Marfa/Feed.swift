@@ -320,22 +320,24 @@ final class Feed: Sendable {
     /// Gives every stream a place in the new core's watch, told what it was
     /// last told of the server.
     ///
-    /// A reader's stream added meanwhile could take no baseline, and a save
-    /// since may have gone unseen, so each is told one `.saved` to read again,
-    /// once the places are taken.
+    /// A reader's streams could take no baseline from before the key change until now, and a save by the writer
+    /// since may have gone unseen, so each is told one `.saved` to read again, once the places are taken.
     func resume(readsOnly: Bool) {
         let ended = locked { state -> Bool in
             state.suspends -= 1
             return state.suspends == 0 && !state.closed
         }
-        if ended { rejoin(readsOnly: readsOnly) }
+        if ended { rejoin(readsOnly: readsOnly, afterSuspension: true) }
     }
 
-    /// Gives every stream that holds no place one, once a key change that ended without `suspend()` having run is over.
-    func rejoin(readsOnly: Bool) {
+    /// Gives every stream that holds no place one, once a key change is over.
+    ///
+    /// `afterSuspension` is whether `suspend()` ran, which let go every place. Otherwise only a stream added
+    /// during the change holds none, and only a reader's is told one `.saved`.
+    func rejoin(readsOnly: Bool, afterSuspension: Bool = false) {
         let (joining, late) = locked { state -> ([UUID], [UUID]) in
             guard state.suspends == 0, !state.closed else { return ([], []) }
-            let late = state.streams.filter { $0.value.addedWhileSuspended }.map(\.key)
+            let late = state.streams.filter { afterSuspension || $0.value.addedWhileSuspended }.map(\.key)
             for token in late { state.streams[token]?.addedWhileSuspended = false }
             return (Array(state.streams.keys), late)
         }

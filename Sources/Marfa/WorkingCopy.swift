@@ -505,8 +505,9 @@ public final class WorkingCopy: Sendable {
     /// The core holds the token in memory only, as when opening. Held `changes()`
     /// streams keep going: a follow stopped by the old sign-in, such as an
     /// `unauthorized` one, starts again with the new one, and a stream is
-    /// told nothing of the change itself, except that a reader's stream added
-    /// during it is told one `.saved`, to read again.
+    /// told nothing of the change itself, except that a reader's stream is told
+    /// one `.saved` once the change ends, to read again, since a save by the
+    /// writer meanwhile may have gone unseen.
     ///
     /// The store cannot be reopened while a call is running, so this waits for
     /// the slowest running call, and from the moment it starts until the new
@@ -1150,15 +1151,7 @@ public struct Queue: Sendable {
     /// sequence also drains again, while the copy follows, after a drain
     /// left a write undelivered. Otherwise nothing drains on its own.
     public func drain() async throws -> DrainReport {
-        let key = lifecycle.keyEpoch
-        do {
-            let report = try await drainQueue(holder, feed)
-            lifecycle.drained(report, keyEpoch: key)
-            return report
-        } catch {
-            lifecycle.drainFailed(error, keyEpoch: key)
-            throw error
-        }
+        try await drainQueue(holder, feed, reporting: lifecycle)
     }
 
     /// Queues a blocked or dead write to go again on the next drain, under a fresh key.
@@ -1297,10 +1290,36 @@ func caughtUp(
 }
 
 /// Sends what the queue holds once, and tells every held stream what the drain answered.
-func drainQueue(_ holder: CoreHolder, _ feed: Feed) async throws -> DrainReport {
-    let report = DrainReport(try await holder.runUntilCanceled { core, stop in try core.drain(stop: stop) })
-    for change in report.changes() { feed.announce(change) }
-    return report
+///
+/// It tells `lifecycle` how the drain ended.
+///
+/// The key the drain ran under is read once the core is leased, so a key change that completes while the drain waits
+/// for room cannot give its result to the old key. A drain refused before it had a lease says nothing to `lifecycle`.
+func drainQueue(_ holder: CoreHolder, _ feed: Feed, reporting lifecycle: Lifecycle, epoch: Int? = nil) async throws
+    -> DrainReport
+{
+    let leasedKey = Mutex<Int?>(nil)
+    let outcome: Result<DrainReport, any Error>
+    do {
+        outcome = .success(
+            DrainReport(
+                try await holder.runUntilCanceled { core, stop in
+                    leasedKey.withLock { $0 = lifecycle.leasedKeyEpoch }
+                    return try core.drain(stop: stop)
+                }))
+    } catch {
+        outcome = .failure(error)
+    }
+    let key = leasedKey.withLock { $0 }
+    switch outcome {
+    case .success(let report):
+        for change in report.changes() { feed.announce(change) }
+        lifecycle.drained(report, epoch: epoch, keyEpoch: key)
+        return report
+    case .failure(let error):
+        if key != nil { lifecycle.drainFailed(error, epoch: epoch, keyEpoch: key) }
+        throw error
+    }
 }
 
 /// Queues one write and tells every held stream of it.

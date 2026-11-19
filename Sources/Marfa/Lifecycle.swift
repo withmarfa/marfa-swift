@@ -377,6 +377,13 @@ final class Lifecycle: Sendable {
     /// nothing of the new key's copy.
     var keyEpoch: Int { state.withLock { $0.keyChanging ? -1 : $0.keyEpoch } }
 
+    /// The key the core a call holds a lease on was opened with, read once the lease is held.
+    ///
+    /// A call is leased the old core until the key change replaces it, which waits for the call to end, and the
+    /// new core once the change lets calls begin again, so the value read under a lease is the key of the core the
+    /// call ran on, a change still ending included.
+    var leasedKeyEpoch: Int { state.withLock { $0.keyEpoch } }
+
     /// What the copy is doing with its server now.
     var connection: CopyConnection { state.withLock { $0.connection } }
 
@@ -930,8 +937,8 @@ final class Lifecycle: Sendable {
         if pulled { self.pulled(epoch: epoch) }
         if let failure { failed(failure, epoch: epoch, claim: claim) }
         switch drain {
-        case .success(let report): drained(report)
-        case .failure(let error): drainFailed(error)
+        case .success(let report): drained(report, epoch: epoch)
+        case .failure(let error): drainFailed(error, epoch: epoch)
         case nil: break
         }
     }
@@ -1047,11 +1054,7 @@ final class Lifecycle: Sendable {
                 return true
             }
             guard runs else { return }
-            do {
-                self.drained(try await drainQueue(holder, feed), epoch: epoch)
-            } catch {
-                self.drainFailed(error, epoch: epoch)
-            }
+            _ = try? await drainQueue(holder, feed, reporting: self, epoch: epoch)
         }
     }
 

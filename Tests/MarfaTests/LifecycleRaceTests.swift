@@ -164,4 +164,58 @@ struct ADrainUnderAnOldKey {
         try await eventually("key refused") { isRefused(run.updates.connection) }
         await run.copy.close()
     }
+
+    /// A drain the app began while the old key was in use, and which waited for room until the key had changed, ran
+    /// under the new key, and its result is the new key's.
+    @Test func anAppsDrainThatWaitedForRoomUntilTheKeyChangedIsTheNewKeysResult() async throws {
+        let (old, new) = (FakeCore.writer(), FakeCore.writer())
+        let clock = ManualClock()
+        let room = CoreQueue(limit: 2)
+        let copy = WorkingCopy(
+            holder: CoreHolder(old, reopen: { _ in new }, blocking: room), hasServer: true, refillClock: .init(clock))
+        let updates = Updates(copy.updates())
+        try await eventually("following") { updates.connection == .following }
+        new.state.withLock { $0.drained = report(undelivered: 1) }
+        let inCore = new.holdNextDrain()
+        defer { inCore.signal() }
+
+        let fillers = [DispatchSemaphore(value: 0), DispatchSemaphore(value: 0)]
+        defer { for filler in fillers { filler.signal() } }
+        for filler in fillers { room.perform { filler.wait() } }
+        let draining = Task { try? await copy.queue.drain() }
+        try await eventually("the drain waits for room") { room.waitingCount == 1 }
+
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
+        for filler in fillers { filler.signal() }
+        try await eventually("the drain holds the new core") { new.aDrainWasHeld }
+        try await eventually("following under the new key") {
+            new.state.withLock { $0.catchUps } == 1 && copy.lifecycle.connection == .following
+        }
+        #expect(clock.waiting == 0, "something else was already waiting on the clock")
+        inCore.signal()
+        _ = try await bounded("drain") { await draining.value }
+
+        try await eventually("a retry waits for the writes the drain left", within: 5) { clock.waiting > 0 }
+        await copy.close()
+    }
+
+    /// What the core's stream told, still being handed to the lifecycle when the key change ends, is the old key's.
+    @Test(arguments: [true, false])
+    func aResultFromTheStreamStillBeingDeliveredWhenTheKeyChangeEndsDoesNotRefuseTheNewKey(thrown: Bool) async throws {
+        let run = try await Self.following()
+        let held = HeldReport(on: run.copy.lifecycle)
+        await run.old.change(
+            0,
+            thrown
+                ? .queueNotDrained(error: unauthorized, cursor: "9")
+                : .queueDrained(report: report(stopped: "unauthorized"), cursor: "9"))
+        try await eventually("the result is held") { held.isHeld }
+
+        try await Self.replaceKey(run)
+        held.release()
+        try await Task.sleep(for: .milliseconds(300))
+
+        #expect(run.copy.lifecycle.connection == .following, "the old key's result marked the new key refused")
+        await run.copy.close()
+    }
 }

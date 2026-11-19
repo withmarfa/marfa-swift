@@ -325,6 +325,23 @@ struct ALifecycle {
         await copy.close()
     }
 
+    @Test func aReaderIsAskedToReadEverythingAfterAKeyChange() async throws {
+        let core = FakeCore.reader()
+        let next = FakeCore.reader()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
+        let updates = Updates(copy.updates())
+        try await eventually("watching the writer's saves") { updates.connection == .local && core.places.count == 1 }
+        let before = updates.all.count
+
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
+
+        // A save made while the places were let go went unseen.
+        try await eventually("asked to read everything") {
+            updates.all[before...].contains { $0.reread == .everything }
+        }
+        await copy.close()
+    }
+
     @Test func aRefillThatFailsForNowShowsTheCopyOfflineUntilItSucceeds() async throws {
         let core = FakeCore.writer()
         let clock = ManualClock()
