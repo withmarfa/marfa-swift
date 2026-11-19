@@ -15,11 +15,11 @@ public struct TrashPreview: Sendable, Hashable {
         public let type: String
         /// The version the server read the item at.
         public let version: Int64
-        /// What the trash takes with this item.
+        /// Items the key can read that the trash takes with this item.
         ///
         /// Leaves first, at most 100, and never the item itself.
         public let takes: [Taken]
-        /// How many items the trash takes for this one, the item itself included.
+        /// How many items the key can read that the trash takes for this one, the item itself included.
         public let count: UInt64
         /// `takes` was cut at its limit, so it lists only part of what the trash takes.
         public let truncated: Bool
@@ -34,7 +34,7 @@ public struct TrashPreview: Sendable, Hashable {
 
     /// Each named item once, in the order named.
     public let items: [Entry]
-    /// How many distinct items the trash would take, counting every item it takes with a named one.
+    /// How many distinct items the key can read that the trash would take, including those taken with a named one.
     public let count: UInt64
     let digest: String
 
@@ -92,18 +92,18 @@ extension Items {
         try await holder.runBlocking { core in TrashPreview(try core.previewTrash(ids: ids)) }
     }
 
-    /// Moves what `preview` shows to the bin on the server now, in one request that either takes all of it or
-    /// none.
+    /// Moves the preview's named items and everything their trash takes to the bin on the server now, all or none.
     ///
     /// Never queued: it needs the server, and an offline app uses the single queued ``delete(_:)`` for each item
-    /// instead. The key needs write on every type the preview shows.
+    /// instead. The key needs write on each named item's type. A cascade can also take items the key cannot read;
+    /// the preview lists and counts only items it can read.
     ///
     /// Refused before anything is sent, with the copy and the queue as they were:
     ///
     /// - `invalid` while a write to a named or taken item waits, a create that names such an item's `source_id`
-    ///   included, and for any item where a preview cut `takes`. Its message names, for each waiting write, the
-    ///   commands that take it out of its wait: ``Queue/drain()``, ``Queue/release(_:)`` or ``Queue/withdraw(_:)``. Clear them and
-    ///   trash again.
+    ///   included. Where a preview cut `takes`, a waiting write to any item refuses the trash. Its message names,
+    ///   for each waiting write, the commands that take it out of its wait: ``Queue/drain()``, ``Queue/release(_:)``
+    ///   or ``Queue/withdraw(_:)``. Clear them and trash again.
     /// - ``MarfaError/itemBeingRemoved(id:message:)`` while a trash or a purge already holds one of the items.
     /// - `readingHandle` for a copy that only reads, and `noServer` for a copy with no server.
     ///

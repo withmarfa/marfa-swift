@@ -133,8 +133,7 @@ extension WorkingCopy {
         return try await background { SetAside(try MarfaCore.setAsideDamaged(path: path)) }
     }
 
-    /// Removes the store at `store` as ``remove(store:confirming:)`` does, agreeing to lose every write it holds that the
-    /// server has not taken, whatever they are and whether or not they can be read.
+    /// Removes the store at `store` without a list of confirmed writes only when its queue is unreadable or empty.
     ///
     /// It is for a store `open` refuses with ``MarfaError/storeDamaged(path:reason:unsent:setAsideStopped:message:)``, whose
     /// queue cannot always be read. It reads the queue under the store's writer lock and removes the store only

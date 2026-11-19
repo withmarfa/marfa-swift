@@ -98,7 +98,8 @@ public final class WorkingCopy: Sendable {
     /// A store SQLite cannot read is refused with `MarfaError.storeDamaged`, which names the store and counts its unsent
     /// writes where the queue can be read. ``unsentWrites(in:)`` lists the writes of a refused store of either kind,
     /// ``setAsideDamaged(store:)`` keeps a damaged store beside itself and carries what it can read, and
-    /// ``removeLosingAll(store:)`` gives it up.
+    /// ``removeLosingAll(store:)`` gives it up only if the queue is unreadable or empty. A readable queue holding
+    /// writes needs ``remove(store:confirming:)`` with the list the person agreed to lose.
     ///
     /// A replacement keeps the files the copy downloaded, because they are kept by content and not by the store,
     /// and the file budget the old store recorded. What only the old store held does not stay: pins, the position
