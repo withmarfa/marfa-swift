@@ -307,6 +307,8 @@ final class Lifecycle: Sendable {
     let started = Mutex<(@Sendable () -> Void)?>(nil)
     /// Runs when a drain's result reaches the lifecycle, before it is applied, so a test can hold that moment.
     let reporting = Mutex<(@Sendable () -> Void)?>(nil)
+    /// Runs when a drain that holds a lease asks for its key, before the answer, so a test can hold that moment.
+    let leasing = Mutex<(@Sendable () -> Void)?>(nil)
     #endif
 
     init(holder: CoreHolder, feed: Feed, hasServer: Bool, pace: Pace, clock: Feed.RefillClock) {
@@ -379,10 +381,15 @@ final class Lifecycle: Sendable {
 
     /// The key the core a call holds a lease on was opened with, read once the lease is held.
     ///
-    /// A call is leased the old core until the key change replaces it, which waits for the call to end, and the
-    /// new core once the change lets calls begin again, so the value read under a lease is the key of the core the
-    /// call ran on, a change still ending included.
-    var leasedKeyEpoch: Int { state.withLock { $0.keyEpoch } }
+    /// The number changes in ``keyReplaced()``, which the key change calls once the old core is gone and before it
+    /// lets calls lease the new one. A lease on the old core ends before then, and one on the new core begins after,
+    /// so the value read under a lease is the key of the core the call runs on, however late it is read.
+    var leasedKeyEpoch: Int {
+        #if DEBUG
+        leasing.withLock { $0 }?()
+        #endif
+        return state.withLock { $0.keyEpoch }
+    }
 
     /// What the copy is doing with its server now.
     var connection: CopyConnection { state.withLock { $0.connection } }
@@ -1064,10 +1071,14 @@ final class Lifecycle: Sendable {
         locked { state in
             state.keyChanging = true
             state.epoch += 1
-            state.keyEpoch += 1
             cancelRetry(&state)
             cancelDrain(&state)
         }
+    }
+
+    /// The core now holds the new key and no call has leased it yet.
+    func keyReplaced() {
+        locked { $0.keyEpoch += 1 }
     }
 
     /// The key change ended, with the new key or, where it failed, the old one: catch up at once.

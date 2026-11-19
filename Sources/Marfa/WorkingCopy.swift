@@ -551,6 +551,7 @@ public final class WorkingCopy: Sendable {
             lifecycle.keyChanged()
             throw error
         }
+        lifecycle.keyReplaced()
         // The feed takes its places in the new core through the holder, which refuses calls until the key change ends.
         holder.endKeyChange()
         feed.resume(readsOnly: holder.handle == .reader)
@@ -1294,7 +1295,9 @@ func caughtUp(
 /// It tells `lifecycle` how the drain ended.
 ///
 /// The key the drain ran under is read once the core is leased, so a key change that completes while the drain waits
-/// for room cannot give its result to the old key. A drain refused before it had a lease says nothing to `lifecycle`.
+/// for room cannot give its result to the old key. The app's own drain refused before it had a lease says nothing to
+/// `lifecycle`; a retry's refusal is judged by its `epoch`, so a retry refused while a key change is failing still
+/// schedules the next one.
 func drainQueue(_ holder: CoreHolder, _ feed: Feed, reporting lifecycle: Lifecycle, epoch: Int? = nil) async throws
     -> DrainReport
 {
@@ -1317,7 +1320,7 @@ func drainQueue(_ holder: CoreHolder, _ feed: Feed, reporting lifecycle: Lifecyc
         lifecycle.drained(report, epoch: epoch, keyEpoch: key)
         return report
     case .failure(let error):
-        if key != nil { lifecycle.drainFailed(error, epoch: epoch, keyEpoch: key) }
+        if key != nil || epoch != nil { lifecycle.drainFailed(error, epoch: epoch, keyEpoch: key) }
         throw error
     }
 }
