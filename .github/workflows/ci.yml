@@ -212,6 +212,20 @@ jobs:
           fi
           node --test generator/generate.test.mjs
 
+      - name: Temporary upload of what the pin generates
+        if: always()
+        run: |
+          git add -N Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
+          git diff --binary -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated > "${RUNNER_TEMP}/generated.patch"
+          mkdir -p "${RUNNER_TEMP}/gen"
+          cp "${RUNNER_TEMP}/generated.patch" "${RUNNER_TEMP}/gen/"
+          cp -R Sources/MarfaCore Sources/MarfaTypes "${RUNNER_TEMP}/gen/"
+          mkdir -p "${RUNNER_TEMP}/gen/MarfaAPI" && cp -R Sources/MarfaAPI/Generated "${RUNNER_TEMP}/gen/MarfaAPI/"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: generated
+          path: ${{ runner.temp }}/gen
       - name: Check what the pin generates
         run: |
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated)" ]]; then
