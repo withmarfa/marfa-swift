@@ -3081,6 +3081,9 @@ public func FfiConverterTypeCore_lower(_ value: Core) -> UInt64 {
  * differs from it, as when a copy was opened with a token since renewed.
  * - Throw `Ended`, and delete the refresh token, on a token endpoint's
  * `invalid_grant` or `invalid_client`.
+ * - Throw `Refused` with the `RenewalFailure` that fits, and keep the
+ * refresh token, when the endpoint refuses the renewal any other way,
+ * answers a redirect or answers what the renewer cannot read.
  * - Give the token request a time limit, and throw `Unavailable` when it
  * times out or there is no network: stopping a watch waits for a renewal
  * under way.
@@ -3119,6 +3122,9 @@ public protocol CredentialRenewer: AnyObject, Sendable {
  * differs from it, as when a copy was opened with a token since renewed.
  * - Throw `Ended`, and delete the refresh token, on a token endpoint's
  * `invalid_grant` or `invalid_client`.
+ * - Throw `Refused` with the `RenewalFailure` that fits, and keep the
+ * refresh token, when the endpoint refuses the renewal any other way,
+ * answers a redirect or answers what the renewer cannot read.
  * - Give the token request a time limit, and throw `Unavailable` when it
  * times out or there is no network: stopping a watch waits for a renewal
  * under way.
@@ -15132,6 +15138,15 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
      */
     case FirstSyncWaiting(message: String
     )
+    /**
+     * The app's `CredentialRenewer` threw `Refused`: the renewal failed for
+     * `reason` and the sign-in still stands, which is neither the app's own
+     * bad arguments nor a network failure. Queued writes stay queued and the
+     * next refusal asks the renewer again. `message` is the renewer's own
+     * text, for logs.
+     */
+    case RenewalRefused(reason: RenewalFailure, message: String
+    )
     case Invalid(message: String
     )
     /**
@@ -15338,13 +15353,17 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 34: return .FirstSyncWaiting(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 35: return .Invalid(
+        case 35: return .RenewalRefused(
+            reason: try FfiConverterTypeRenewalFailure.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 36: return .NotAnswerable(
+        case 36: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 37: return .Fault(
+        case 37: return .NotAnswerable(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 38: return .Fault(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -15580,18 +15599,24 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Invalid(message):
+        case let .RenewalRefused(reason,message):
             writeInt(&buf, Int32(35))
+            FfiConverterTypeRenewalFailure.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NotAnswerable(message):
+        case let .Invalid(message):
             writeInt(&buf, Int32(36))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Fault(message):
+        case let .NotAnswerable(message):
             writeInt(&buf, Int32(37))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Fault(message):
+            writeInt(&buf, Int32(38))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -15846,8 +15871,16 @@ public enum RenewalError: Swift.Error, Equatable, Hashable, Foundation.Localized
     case Unavailable(message: String
     )
     /**
-     * Any other failure. The call throws `Invalid` with `message`, queued
-     * writes stay queued, and the next refusal asks the renewer again.
+     * The renewal failed for `reason` without ending the sign-in. The call
+     * throws `RenewalRefused` with `reason` and `message`, queued writes stay
+     * queued, and the next refusal asks the renewer again.
+     */
+    case Refused(reason: RenewalFailure, message: String
+    )
+    /**
+     * A failure of the renewer's own that no `RenewalFailure` names. The
+     * call throws `Invalid` with `message`, queued writes stay queued, and
+     * the next refusal asks the renewer again.
      */
     case Failed(message: String
     )
@@ -15886,7 +15919,11 @@ public struct FfiConverterTypeRenewalError: FfiConverterRustBuffer {
         case 2: return .Unavailable(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 3: return .Failed(
+        case 3: return .Refused(
+            reason: try FfiConverterTypeRenewalFailure.read(from: &buf), 
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 4: return .Failed(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -15911,8 +15948,14 @@ public struct FfiConverterTypeRenewalError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Failed(message):
+        case let .Refused(reason,message):
             writeInt(&buf, Int32(3))
+            FfiConverterTypeRenewalFailure.write(reason, into: &buf)
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Failed(message):
+            writeInt(&buf, Int32(4))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -15933,6 +15976,97 @@ public func FfiConverterTypeRenewalError_lift(_ buf: RustBuffer) throws -> Renew
 public func FfiConverterTypeRenewalError_lower(_ value: RenewalError) -> RustBuffer {
     return FfiConverterTypeRenewalError.lower(value)
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Why a renewal failed without ending the sign-in, as a closed set an app
+ * can word. `message` on the error is for logs.
+ */
+
+public enum RenewalFailure: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * The server refused the renewal and the sign-in still stands, as a
+     * token endpoint's `invalid_request`, `invalid_scope` or
+     * `unauthorized_client` says.
+     */
+    case refused
+    /**
+     * The token endpoint answered a redirect, which the renewer does not
+     * follow.
+     */
+    case redirected
+    /**
+     * The renewer could not read the answer, or the server is not a sign-in
+     * server.
+     */
+    case unreadable
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RenewalFailure: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRenewalFailure: FfiConverterRustBuffer {
+    typealias SwiftType = RenewalFailure
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RenewalFailure {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .refused
+        
+        case 2: return .redirected
+        
+        case 3: return .unreadable
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RenewalFailure, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .refused:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .redirected:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unreadable:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenewalFailure_lift(_ buf: RustBuffer) throws -> RenewalFailure {
+    return try FfiConverterTypeRenewalFailure.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRenewalFailure_lower(_ value: RenewalFailure) -> RustBuffer {
+    return FfiConverterTypeRenewalFailure.lower(value)
+}
+
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
