@@ -141909,7 +141909,7 @@ public enum Operations {
     }
     /// Narrow an app grant
     ///
-    /// Narrows an app's standing access. Requires `grants.manage`. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    /// Narrows an app's standing access. Requires `grants.manage`. Tokens, refresh chains and keys the app made that reach beyond the new access end, with pending codes; the rest keep working. The app may need to reconnect.
     ///
     /// - Remark: HTTP `PATCH /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/patch(narrowAppGrant)`.
@@ -164235,7 +164235,7 @@ public enum Operations {
     }
     /// Update the configuration
     ///
-    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    /// Updates the named settings and returns the configuration. Unnamed settings stay, except the store secret when its bucket or endpoint changes; `null` removes a setting. Send all `enforcement` levers you want on; requires `config.manage`.
     ///
     /// - Remark: HTTP `PATCH /config`.
     /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
@@ -164355,27 +164355,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/skip_sign_in_address_check`.
                     public var skipSignInAddressCheck: Swift.Bool?
-                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder. `null` removes it, so the server's default applies.
+                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/backup_path`.
                     public var backupPath: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
-                    /// The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store. `null` removes it, so the server's default applies.
+                    /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_bucket`.
                     public var objectStoreBucket: Components.Schemas.MarfaNullableMarfaInline099cb398ed5d68c2?
-                    /// The region of the object store. Absent: `us-east-1`. `null` removes it, so the server's default applies.
+                    /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_region`.
-                    public var objectStoreRegion: Components.Schemas.MarfaNullableMarfaInlined856c03b0c724c83?
-                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
+                    public var objectStoreRegion: Components.Schemas.MarfaNullableMarfaInline7d7d6f95a5c460e0?
+                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_endpoint`.
                     public var objectStoreEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
-                    /// `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`. `null` removes it, so the server's default applies.
+                    /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_path_style`.
                     public var objectStorePathStyle: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
-                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`. `null` removes it, so the server's default applies.
+                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_prefix`.
                     public var objectStorePrefix: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
@@ -164387,7 +164387,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/allow_private_addresses`.
                     public var allowPrivateAddresses: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
-                    /// The secret access key for the object store, with no whitespace around it. Marfa never returns it. `null` or an empty string removes it.
+                    /// The secret access key for the object store, with no whitespace around it. Marfa never returns it. `null` or an empty string removes it, and so does a change to `object_store_bucket` or `object_store_endpoint` that doesn't set it.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_secret_access_key`.
                     public var objectStoreSecretAccessKey: Components.Schemas.MarfaNullableMarfaInline66f34441032fb10a?
@@ -164552,15 +164552,15 @@ public enum Operations {
                     ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address. `null` removes it, so the server's default applies.
                     ///   - confirmSignInAddressChange: `true` to confirm a change that moves the sign-in address of a claimed instance. It sets nothing.
                     ///   - skipSignInAddressCheck: `true` moves the sign-in address without first checking that it answers as this instance, for a host that answers only after the move. Only the private local command can send it.
-                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder. `null` removes it, so the server's default applies.
-                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store. `null` removes it, so the server's default applies.
-                    ///   - objectStoreRegion: The region of the object store. Absent: `us-east-1`. `null` removes it, so the server's default applies.
-                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
-                    ///   - objectStorePathStyle: `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`. `null` removes it, so the server's default applies.
-                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`. `null` removes it, so the server's default applies.
+                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder. `null` removes it, so the server's default applies.
+                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store. `null` removes it, so the server's default applies.
+                    ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`. `null` removes it, so the server's default applies.
+                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
+                    ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`. `null` removes it, so the server's default applies.
+                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
                     ///   - objectStoreAccessKeyId: The access key ID for the object store. `null` removes it, so the server's default applies.
                     ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
-                    ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. `null` or an empty string removes it, and so does a change to `object_store_bucket` or `object_store_endpoint` that doesn't set it.
                     ///   - heartbeatUrl: The `http` or `https` URL Marfa requests on a schedule, so that something else can notice when the requests stop. Marfa never returns it. `null` or an empty string removes it.
                     ///   - errorWebhookUrl: The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. `null` or an empty string removes it.
                     ///   - secretsSet: The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
@@ -164620,7 +164620,7 @@ public enum Operations {
                         skipSignInAddressCheck: Swift.Bool? = nil,
                         backupPath: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
                         objectStoreBucket: Components.Schemas.MarfaNullableMarfaInline099cb398ed5d68c2? = nil,
-                        objectStoreRegion: Components.Schemas.MarfaNullableMarfaInlined856c03b0c724c83? = nil,
+                        objectStoreRegion: Components.Schemas.MarfaNullableMarfaInline7d7d6f95a5c460e0? = nil,
                         objectStoreEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
                         objectStorePathStyle: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754? = nil,
                         objectStorePrefix: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
@@ -164894,7 +164894,7 @@ public enum Operations {
                             forKey: .objectStoreBucket
                         )
                         self.objectStoreRegion = try container.decodeIfPresent(
-                            Components.Schemas.MarfaNullableMarfaInlined856c03b0c724c83.self,
+                            Components.Schemas.MarfaNullableMarfaInline7d7d6f95a5c460e0.self,
                             forKey: .objectStoreRegion
                         )
                         self.objectStoreEndpoint = try container.decodeIfPresent(
@@ -165476,7 +165476,7 @@ public enum Operations {
                 }
             }
             /// - `forbidden`: you don't hold `config.manage`, which `details.required_scope` names, or the body sets `skip_sign_in_address_check`, which only the private local command can send.
-            /// - `app_sign_in_required`: the change moves the sign-in address or changes `allow_private_addresses`, and you are an API key. A person makes it from an app they signed in to, or with the private local command.
+            /// - `app_sign_in_required`: the change needs a recent sign-in, and you are an API key. A person makes it from an app they signed in to, or with the private local command.
             ///
             /// - Remark: Generated from `#/paths//config/patch(updateConfig)/responses/403`.
             ///
@@ -166430,27 +166430,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/skip_sign_in_address_check`.
                     public var skipSignInAddressCheck: Swift.Bool?
-                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder.
+                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/backup_path`.
                     public var backupPath: Swift.String?
-                    /// The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store.
+                    /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_bucket`.
                     public var objectStoreBucket: Swift.String?
-                    /// The region of the object store. Absent: `us-east-1`.
+                    /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_region`.
                     public var objectStoreRegion: Swift.String?
-                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it.
+                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_endpoint`.
                     public var objectStoreEndpoint: Swift.String?
-                    /// `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`.
+                    /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_path_style`.
                     public var objectStorePathStyle: Swift.Bool?
-                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`.
+                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_prefix`.
                     public var objectStorePrefix: Swift.String?
@@ -166462,7 +166462,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/allow_private_addresses`.
                     public var allowPrivateAddresses: Swift.Bool?
-                    /// The secret access key for the object store, with no whitespace around it. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    /// The secret access key for the object store, with no whitespace around it. Marfa never returns it. A `PUT` that leaves it out keeps it, unless the `PUT` changes `object_store_bucket` or `object_store_endpoint`; `PATCH` with `null` removes it.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_secret_access_key`.
                     public var objectStoreSecretAccessKey: Swift.String?
@@ -166627,15 +166627,15 @@ public enum Operations {
                     ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address.
                     ///   - confirmSignInAddressChange: `true` to confirm a change that moves the sign-in address of a claimed instance. It sets nothing.
                     ///   - skipSignInAddressCheck: `true` moves the sign-in address without first checking that it answers as this instance, for a host that answers only after the move. Only the private local command can send it.
-                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder.
-                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store.
-                    ///   - objectStoreRegion: The region of the object store. Absent: `us-east-1`.
-                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it.
-                    ///   - objectStorePathStyle: `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`.
-                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`.
+                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
+                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store.
+                    ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
+                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it.
+                    ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
+                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
                     ///   - objectStoreAccessKeyId: The access key ID for the object store.
                     ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
-                    ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. A `PUT` that leaves it out keeps it, unless the `PUT` changes `object_store_bucket` or `object_store_endpoint`; `PATCH` with `null` removes it.
                     ///   - heartbeatUrl: The `http` or `https` URL Marfa requests on a schedule, so that something else can notice when the requests stop. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///   - errorWebhookUrl: The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///   - secretsSet: The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
@@ -167551,7 +167551,7 @@ public enum Operations {
                 }
             }
             /// - `forbidden`: you don't hold `config.manage`, which `details.required_scope` names, or the body sets `skip_sign_in_address_check`, which only the private local command can send.
-            /// - `app_sign_in_required`: the change moves the sign-in address or changes `allow_private_addresses`, and you are an API key. A person makes it from an app they signed in to, or with the private local command.
+            /// - `app_sign_in_required`: the change needs a recent sign-in, and you are an API key. A person makes it from an app they signed in to, or with the private local command.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/403`.
             ///
@@ -179670,7 +179670,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `blob_store_unavailable`: a blob store failed, or didn't answer in time, while Marfa checked a blob's copy. Try again later.
+            /// - `blob_store_unavailable`: a blob store failed, or didn't answer in time, while Marfa checked a blob's copy, or Marfa couldn't write the archive's working files in the blob folder. Try again later.
             /// - `write_contention`: the database was busy. Nothing changed. Try the request again.
             ///
             /// - Remark: Generated from `#/paths//export/get(exportArchive)/responses/503`.
@@ -179827,7 +179827,7 @@ public enum Operations {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage` and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -180568,7 +180568,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `backups.manage`. `details.required_scope` names it.
+            /// - `forbidden`: you don't hold `backups.manage`, or the archive would store settings and you don't hold `config.manage`. `details.required_scope` names the missing permission. For `config.manage`, `details.settings` lists the settings.
             /// - `app_sign_in_required`: you are an API key. A person restores from an app they signed in to, or with the private local command.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/403`.
@@ -183398,7 +183398,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `blob_store_unavailable`: the backup folder or object store failed, or didn't answer in time. Try again later.
+            /// `blob_store_unavailable`: the backup folder, the object store or the blob folder failed, or didn't answer in time. Try again later.
             ///
             /// - Remark: Generated from `#/paths//backups/post(runBackup)/responses/503`.
             ///
@@ -184597,7 +184597,7 @@ public enum Operations {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage` and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -185402,7 +185402,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `backups.manage`. `details.required_scope` names it.
+            /// - `forbidden`: you don't hold `backups.manage`, or the archive would store settings and you don't hold `config.manage`. `details.required_scope` names the missing permission. For `config.manage`, `details.settings` lists the settings.
             /// - `app_sign_in_required`: you are an API key. A person restores from an app they signed in to, or with the private local command.
             ///
             /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)/responses/403`.

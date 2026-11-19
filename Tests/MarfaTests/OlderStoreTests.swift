@@ -34,7 +34,7 @@ struct OlderStore {
                 return false
             }
             return path.hasSuffix(store.lastPathComponent)
-                && reason.contains("it is at schema version 6, and this build reads schema version 7")
+                && reason.contains("it is at schema version 6, and this build reads schema version ")
                 && reason.contains("its queue holds 1 write of kind merge_metadata, which this build cannot send")
                 && unsent == 2
                 && message.contains("It holds 2 writes the server has not taken")

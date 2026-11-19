@@ -105,6 +105,94 @@ private final class KeychainFault: Sendable {
     }
 }
 
+/// A keychain in memory that can refuse to replace what an item holds, as one that is full or locked does, while
+/// it still reads, adds and deletes.
+private final class RefusesWrites: Sendable {
+    private struct Key: Hashable {
+        let service: String
+        let account: String
+    }
+
+    private struct State {
+        var data: [Key: Data] = [:]
+        var labels: [Key: String] = [:]
+        var refusing = false
+    }
+
+    private final class Items: KeychainBackend {
+        let state = Mutex(State())
+
+        func data(service: String, account: String) throws -> Data? {
+            state.withLock { $0.data[Key(service: service, account: account)] }
+        }
+
+        func put(_ data: Data, service: String, account: String) throws {
+            try state.withLock { state in
+                let key = Key(service: service, account: account)
+                if state.refusing, state.data[key] != nil {
+                    throw Keychain.Failure(status: errSecInteractionNotAllowed)
+                }
+                state.data[key] = data
+            }
+        }
+
+        func delete(service: String, account: String) throws {
+            state.withLock {
+                $0.data[Key(service: service, account: account)] = nil
+                $0.labels[Key(service: service, account: account)] = nil
+            }
+        }
+
+        func holds(service: String, account: String?) throws -> Bool {
+            state.withLock { state in
+                state.data.keys.contains { $0.service == service && (account == nil || $0.account == account) }
+                    || state.labels.keys.contains { $0.service == service && (account == nil || $0.account == account) }
+            }
+        }
+
+        func add(label: String, service: String, account: String) throws -> Bool {
+            state.withLock { state in
+                let key = Key(service: service, account: account)
+                guard state.labels[key] == nil else { return false }
+                state.labels[key] = label
+                return true
+            }
+        }
+
+        func label(service: String, account: String) throws -> String? {
+            state.withLock { $0.labels[Key(service: service, account: account)] }
+        }
+
+        func delete(label: String, service: String, account: String) throws {
+            state.withLock { state in
+                let key = Key(service: service, account: account)
+                if state.labels[key] == label { state.labels[key] = nil }
+            }
+        }
+
+        func relabel(from: String, to: String, service: String, account: String) throws -> Bool {
+            state.withLock { state in
+                let key = Key(service: service, account: account)
+                guard state.labels[key] == from else { return false }
+                state.labels[key] = to
+                return true
+            }
+        }
+    }
+
+    private let items: Items
+    let keychain: Keychain
+
+    init() {
+        let items = Items()
+        self.items = items
+        keychain = Keychain(backend: items)
+    }
+
+    func refuse() { items.state.withLock { $0.refusing = true } }
+    func allow() { items.state.withLock { $0.refusing = false } }
+}
+
 /// A keychain stand-in that counts the lookups of a lease and can hold back the next read of a sign-in until the
 /// test lets it go, as a keychain that is slow to answer does.
 private final class KeychainProbe: Sendable {
@@ -733,7 +821,7 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
                 return true
             }
             #expect(server.requests(to: "/.well-known/oauth-authorization-server").isEmpty)
@@ -751,12 +839,262 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
                 return true
             }
             let kept = try #require(try authorization.place.read())
             #expect(kept.refreshToken == "rt-1")
             #expect(kept.tokenEndpoint == "\(server.origin)/auth/oauth2/token")
+        }
+    }
+
+    @Test(arguments: [401, 403, 400])
+    func anAnswerFromTheAdvertisedEndpointThatIsNoOAuthErrorOrMissingEndpointKeepsTheSignIn(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in request.path == "/oauth/token" ? .json(status, [:]) : .json(404, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
+                return true
+            }
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.refreshToken == "rt-1")
+            #expect(kept.tokenEndpoint == "\(server.origin)/auth/oauth2/token")
+        }
+    }
+
+    @Test func aTimeoutFromTheAdvertisedEndpointIsUnavailableAndKeepsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in request.path == "/oauth/token" ? .json(408, [:]) : .json(404, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test(arguments: [404, 410])
+    func aMissingAdvertisedEndpointEndsTheSignIn(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(status, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Ended = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test(arguments: ["invalid_request", "invalid_scope", "unauthorized_client"])
+    func aRefusalWithAnOAuthErrorThatEndsNothingIsRefusedAndKeepsTheSignIn(code: String) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in oauthError(code) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.refused, let message) = error else { return false }
+                return !message.contains("rt-1")
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func aTokenAnswerThatCannotBeReadIsUnreadableAndKeepsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(200, ["unexpected": true]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.unreadable, _) = error else { return false }
+                return true
+            }
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.refreshToken == "rt-1")
+            #expect(kept.uncertain, "the server may have rotated the refresh token in an answer nothing could read")
+            server.answer { _ in .json(200, [:]) }
+            #expect(try await authorization.signOut() == .notConfirmed)
+        }
+    }
+
+    @Test(arguments: [
+        ScriptedAuthServer.Reply.json(401, ["error": ["code": "invalid_client", "message": "no such client"]]),
+        .json(400, ["error": ["code": "invalid_grant", "message": "spent"]]),
+    ])
+    func aMarfaErrorCodeInsideTheEnvelopeNeverEndsTheSignIn(answer: ScriptedAuthServer.Reply) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in answer }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func aMarfaErrorCodeInsideTheEnvelopeFromTheAdvertisedEndpointNeverEndsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in
+            request.path == "/oauth/token"
+                ? .json(401, ["error": ["code": "invalid_client", "message": "no such client"]]) : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            #expect(server.requests(to: "/oauth/token").count == 1)
+        }
+    }
+
+    @Test func aTimeoutWithAnOAuthBodyIsUnavailableAtTheStoredEndpoint() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in oauthError("invalid_request", status: 408) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func aTimeoutWithAnOAuthBodyIsUnavailableAtTheAdvertisedEndpoint() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in
+            request.path == "/oauth/token" ? oauthError("invalid_request", status: 408) : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    private static let renewedWithoutANewRefreshToken = ScriptedAuthServer.Reply.json(
+        200, ["access_token": "at-2", "token_type": "Bearer", "expires_in": 3600])
+
+    @Test func aRenewedSignInThatCannotBeKeptKeepsTheOldRefreshTokenWhenTheServerIssuedNoNewOne() async throws {
+        let server = ScriptedAuthServer()
+        let keychain = RefusesWrites()
+        marfa(server) { _ in
+            keychain.refuse()
+            return Self.renewedWithoutANewRefreshToken
+        }
+        let (authorization, credential) = try signedIn(
+            server, keychain.keychain, transport: server.transport())
+        await #expect {
+            try await renew(credential, refused: "at-1")
+        } throws: { error in
+            guard case RenewalError.Unavailable = error else { return false }
+            return true
+        }
+        keychain.allow()
+        #expect(try authorization.place.read()?.refreshToken == "rt-1", "the refresh token was never spent")
+    }
+
+    @Test func aRenewedSignInThatCannotBeKeptEndsWhenTheServerSpentTheOldRefreshToken() async throws {
+        let server = ScriptedAuthServer()
+        let keychain = RefusesWrites()
+        marfa(server) { _ in
+            keychain.refuse()
+            return tokens("at-2", "rt-2")
+        }
+        let (authorization, credential) = try signedIn(
+            server, keychain.keychain, transport: server.transport())
+        await #expect {
+            try await renew(credential, refused: "at-1")
+        } throws: { error in
+            guard case RenewalError.Ended = error else { return false }
+            return true
+        }
+        keychain.allow()
+        #expect(try authorization.place.read() == nil, "the spent refresh token is not kept")
+    }
+
+    @Test func aRenewedSignInWithNoNewRefreshTokenIsKeptWithTheOldOne() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in Self.renewedWithoutANewRefreshToken }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await renew(credential, refused: "at-1") == "at-2")
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.accessToken == "at-2" && kept.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func metadataThatCannotBeReadIsUnreadable() async throws {
+        let server = ScriptedAuthServer()
+        server.answer { request in
+            request.path == "/.well-known/oauth-authorization-server" ? .json(200, ["issuer": 1]) : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.unreadable, _) = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test(arguments: [
+        (ScriptedAuthServer.Reply.json(400, ["error": "invalid_request"]), RenewalRefusalReason.refused),
+        (.json(200, ["unexpected": true]), .unreadable),
+    ])
+    func aFailedRenewalReachesAnAppAsItsOwnErrorWithItsReason(
+        answer: ScriptedAuthServer.Reply, reason: RenewalRefusalReason
+    ) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in answer }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (_, credential) = try signedIn(server, keychain, transport: server.transport())
+            let app = try Server(url: server.url, credential: credential)
+            do {
+                _ = try await app.renewedToken(refused: "at-1")
+                Issue.record("a failed renewal answered a token")
+            } catch let error as Marfa.MarfaError {
+                guard case .renewalRefused(let said, _) = error else {
+                    Issue.record("expected renewalRefused, got \(error)")
+                    return
+                }
+                #expect(said == reason)
+            } catch {
+                Issue.record("expected a MarfaError, got \(error)")
+            }
         }
     }
 
@@ -838,7 +1176,7 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
                 return true
             }
             // A proxy's 403 or 404 on the metadata does not show that the grant ended.
@@ -1167,6 +1505,31 @@ struct TokenRenewal {
             server: server.url, client: client, keychain: fault.on(keychain, account: place.leaseAccount),
             service: service, transport: transport)
         return (place, try #require(try faulty.credential()))
+    }
+
+    @Test func aKeychainThatCannotBeReadDuringARenewalIsUnavailableAndKeepsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let place = authorization.place
+            let faulty = try Authorization(
+                server: server.url, client: client, keychain: fault.on(keychain, account: place.account),
+                service: service, transport: server.transport())
+            let credential = try #require(try faulty.credential())
+            marfa(server) { _ in tokens("at-2", "rt-2") }
+            fault.fail()
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(fault.failed > 0)
+            fault.stop()
+            #expect(server.requests(to: "/oauth/token").isEmpty)
+            #expect(try place.read()?.refreshToken == "rt-1")
+        }
     }
 
     @Test func aKeychainErrorWhileTheLeaseIsMovedOnKeepsTheRenewedSignIn() async throws {
@@ -2201,7 +2564,7 @@ struct SignInRequestsRefuseRedirects {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.redirected, _) = error else { return false }
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
@@ -2220,7 +2583,7 @@ struct SignInRequestsRefuseRedirects {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.redirected, _) = error else { return false }
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
@@ -2299,5 +2662,112 @@ struct SignInRequestsRefuseRedirects {
             #expect(try authorization.place.read() == nil)
         }
         try await origins.expectUntouched()
+    }
+}
+
+/// What an app catches when the core asks the package's own renewer, through a working copy's call.
+@Suite(.timeLimit(.minutes(1)))
+struct RenewalRefusalReachesAnApp {
+    /// A copy opened on a server that answers, with the sign-in's token endpoint on `scripted`, whose next calls
+    /// the server then refuses with 401 to the drain of a queued write so the core asks the renewer.
+    private func refusedCopy(
+        _ scripted: ScriptedAuthServer, _ keychain: Keychain, fault: KeychainFault? = nil
+    ) async throws -> (WorkingCopy, LocalServer) {
+        let refusing = Mutex(false)
+        let local = try await LocalServer.start(contract: marfaContractVersion) { _, path in
+            if path != "/", refusing.withLock({ $0 }) {
+                return (401, "application/json", #"{"error":{"code":"invalid_token","message":"expired"}}"#)
+            }
+            let json = "application/json"
+            switch path {
+            case "/":
+                return (
+                    200, json,
+                    #"{"name":"t","version":"1","release":null,"instance_id":"test-instance","contract":\#(marfaContractVersion),"features":[]}"#
+                )
+            case "/types":
+                return (
+                    200, json,
+                    #"{"data":[{"id":"core.note","display_hints":{"title_field":"title"},"fields":{"title":{"type":"string"}}}],"next_cursor":null}"#
+                )
+            case "/keys/current": return (200, json, #"{"type_permissions":{"*":"write"}}"#)
+            case "/items/stats": return (200, json, #"{"core.note":0}"#)
+            case "/events":
+                let marker = { (kind: String) in
+                    "event: \(kind)\ndata: {\"event_type\":\"\(kind)\",\"cursor\":\"10\",\"instance_id\":\"test-instance\",\"reach\":\"\(LocalServer.reach)\"}\n\n"
+                }
+                return (200, "text/event-stream", marker("stream_cursor") + marker("stream_live"))
+            case "/items/bulk-get": return (200, json, #"{"items":[],"metadata":[],"listed":[]}"#)
+            default: return (200, json, #"{"data":[],"next_cursor":null}"#)
+            }
+        }
+        let transport = scripted.transport()
+        let authorization = try Authorization(
+            server: local.url, client: client, keychain: keychain, service: service, transport: transport)
+        try authorization.place.keep(
+            KeptSignIn(
+                clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
+                redirect: client.redirect?.absoluteString, accessToken: "at-1", refreshToken: "rt-1",
+                scope: "core.note:read offline_access", tokenEndpoint: "\(scripted.origin)/oauth/token",
+                revocationEndpoint: "\(scripted.origin)/oauth/revoke"))
+        let opened =
+            try fault.map {
+                try Authorization(
+                    server: local.url, client: client, keychain: $0.on(keychain, account: authorization.place.account),
+                    service: service, transport: transport)
+            } ?? authorization
+        let copy = try await WorkingCopy.open(
+            store: temporaryStore(), server: try Server(url: local.url, credential: #require(try opened.credential())))
+        _ = try await copy.hydrate(types: ["*"], tier: .library)
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Kept"]))
+        refusing.withLock { $0 = true }
+        return (copy, local)
+    }
+
+    @Test(arguments: [
+        (ScriptedAuthServer.Reply.json(400, ["error": "invalid_request"]), RenewalRefusalReason.refused),
+        (.json(302, [:], headers: ["Location": "https://elsewhere.example/oauth/token"]), .redirected),
+        (.json(200, [:]), .unreadable),
+    ])
+    func aCopysCallTheRenewerRefusedThrowsTheRenewalRefusalWithItsReason(
+        answer: ScriptedAuthServer.Reply, reason: RenewalRefusalReason
+    ) async throws {
+        let scripted = ScriptedAuthServer { _ in answer }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (copy, local) = try await refusedCopy(scripted, keychain)
+            defer { local.stop() }
+            do {
+                _ = try await copy.queue.drain()
+                Issue.record("a call the renewer refused succeeded")
+            } catch let error as Marfa.MarfaError {
+                guard case .renewalRefused(let said, _) = error else {
+                    Issue.record("expected renewalRefused, got \(error)")
+                    return
+                }
+                #expect(said == reason)
+            } catch {
+                Issue.record("expected a MarfaError, got \(error)")
+            }
+            #expect(scripted.requests(to: "/oauth/token").count == 1, "the core asked the package's renewer")
+            await copy.close()
+        }
+    }
+
+    @Test func aCopysCallWhoseKeychainReadFailsIsTransientAndReportedUnavailable() async throws {
+        let scripted = ScriptedAuthServer { _ in .json(200, [:]) }
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (copy, local) = try await refusedCopy(scripted, keychain, fault: fault)
+            defer { local.stop() }
+            fault.fail()
+            // The core takes the renewer's `Unavailable` as a network failure, which a drain reports.
+            let report = try await copy.queue.drain()
+            #expect(report.unavailable != nil, "the drain reported nothing unavailable")
+            #expect(fault.failed > 0)
+            fault.stop()
+            #expect(scripted.requests(to: "/oauth/token").isEmpty)
+            #expect(try await copy.queue.all().count == 1, "the write stays queued")
+            await copy.close()
+        }
     }
 }

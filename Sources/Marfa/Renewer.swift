@@ -34,7 +34,7 @@ final class TokenRenewer: CredentialRenewer {
         } catch is RenewalLease.Held {
             throw RenewalError.Unavailable(message: "another process is renewing the sign-in to \(origin)")
         } catch {
-            throw RenewalError.Failed(message: "the keychain could not be read: \(error)")
+            throw RenewalError.Unavailable(message: "the keychain could not be read: \(error)")
         }
         let kept: KeptSignIn
         let sent: String
@@ -66,8 +66,10 @@ final class TokenRenewer: CredentialRenewer {
     /// The requests run on after the wait gives up, holding the lease, until they answer or the renewal reaches
     /// the transport's request limit, which bounds the first request, the metadata read and the retry together.
     /// So an answer that arrives late is still kept and no other renewal sends the same refresh token meanwhile,
-    /// and the lease is always let go well within the time a waiter for it gives up after. Only a request that
-    /// never answers can leave the refresh token spent, which the kept sign-in records as uncertain.
+    /// and the lease is always let go well within the time a waiter for it gives up after. A request that never
+    /// answers, or a 200 whose tokens cannot be read, can leave the server holding a refresh token the app does
+    /// not have; the renewal records that the kept sign-in is uncertain, under the lease, and a renewal that
+    /// keeps usable tokens clears it.
     ///
     /// A stored token endpoint the server no longer has answers 404 or 410 with no OAuth error. The renewal
     /// then reads the server's metadata again and sends the same request once to the endpoint it names, so a
@@ -150,7 +152,7 @@ final class TokenRenewer: CredentialRenewer {
                 do {
                     admitted = try lease.whileHeld { try place.read()?.refreshToken == sent } ?? false
                 } catch {
-                    finish(.failure(.Failed(message: "the keychain could not be read: \(error)")))
+                    finish(.failure(.Unavailable(message: "the keychain could not be read: \(error)")))
                     return
                 }
                 guard admitted else {
@@ -289,13 +291,21 @@ final class TokenRenewer: CredentialRenewer {
     /// A client error on the metadata read itself, such as a proxy's 403 or 404, does not prove the grant ended,
     /// so it fails the renewal and keeps the sign-in.
     private static func advertised(_ answer: Answer, origin: String) throws(RenewalError) -> Discovery {
-        if answer.status == 429 || answer.status >= 500 {
+        let gave = "\(origin) gave no sign-in metadata to renew with"
+        switch answer.status {
+        case 408, 429, 500...:
             throw .Unavailable(message: "\(origin) could not give its sign-in metadata now (\(answer.status))")
+        case 300..<400:
+            throw .Refused(reason: .redirected, message: "\(gave): the server answered \(answer.status)")
+        case 400..<500:
+            throw .Refused(reason: .refused, message: "\(gave): the server answered \(answer.status)")
+        default:
+            break
         }
         do {
             return try Discovery.parse(answer, from: origin)
         } catch {
-            throw .Failed(message: "\(origin) gave no sign-in metadata to renew with: \(error)")
+            throw .Refused(reason: .unreadable, message: "\(gave): \(error)")
         }
     }
 
@@ -307,8 +317,8 @@ final class TokenRenewer: CredentialRenewer {
     /// is unavailable rather than answering the token the server refused.
     ///
     /// `advertised` is the metadata a renewal retried with, which its success keeps beside the new tokens. A
-    /// retry that is refused with a client error that is no OAuth error ends the sign-in: the server has no
-    /// token endpoint to renew it at.
+    /// retry that is refused with a 404 or 410 that is no OAuth error ends the sign-in: the server has no
+    /// token endpoint to renew it at. Any other answer there that names no OAuth error keeps the sign-in.
     private static func settle(
         _ answer: Answer, sent: String, kept: KeptSignIn, place: SignInPlace, lease: RenewalLease,
         advertised: Discovery?
@@ -319,8 +329,11 @@ final class TokenRenewer: CredentialRenewer {
         }
         let origin = place.account
         guard let token = try? TokenAnswer.read(answer) else {
+            // The server answered 200, so it may have rotated the refresh token in a body nothing could read.
+            markUncertain(sent: sent, place: place, lease: lease)
             return Settlement(
-                result: .failure(.Failed(message: "\(origin) answered a renewal this package cannot read")))
+                result: .failure(
+                    .Refused(reason: .unreadable, message: "\(origin) answered a renewal this package cannot read")))
         }
         let result = written(sent: sent, place: place, lease: lease) { current in
             var renewed = current
@@ -335,6 +348,11 @@ final class TokenRenewer: CredentialRenewer {
             do {
                 try place.keep(renewed)
             } catch {
+                // With no new refresh token the server spent none, so the kept entry still renews.
+                guard token.refreshToken != nil else {
+                    return .failure(
+                        .Unavailable(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
+                }
                 // The server has spent the old refresh token, so the kept one cannot renew again.
                 try? place.drop()
                 return .failure(.Ended(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
@@ -360,7 +378,9 @@ final class TokenRenewer: CredentialRenewer {
         _ answer: Answer, sent: String, place: SignInPlace, lease: RenewalLease, advertised: Discovery?
     ) -> Result<String, RenewalError> {
         let origin = place.account
-        switch (answer.status, answer.code) {
+        switch (answer.status, answer.oauthError) {
+        case (408, _):
+            return .failure(.Unavailable(message: "\(origin) timed out renewing the sign-in (408)"))
         case (_, "invalid_grant"), (_, "invalid_client"):
             return written(sent: sent, place: place, lease: lease) { _ in
                 try? place.drop()
@@ -368,15 +388,22 @@ final class TokenRenewer: CredentialRenewer {
             }
         case (429, _), (500..., _):
             return .failure(.Unavailable(message: "\(origin) could not renew the sign-in now (\(answer.status))"))
-        case (400..<500, _) where advertised != nil && answer.oauthError == nil:
+        case (404, _), (410, _):
+            guard advertised != nil, answer.oauthError == nil else { return refused(answer, origin: origin) }
             return written(sent: sent, place: place, lease: lease) { _ in
                 try? place.drop()
                 return .failure(
                     .Ended(message: "\(origin) has no token endpoint to renew the sign-in at: \(answer.message)"))
             }
         default:
-            return .failure(.Failed(message: "\(origin) refused to renew the sign-in: \(answer.message)"))
+            return refused(answer, origin: origin)
         }
+    }
+
+    /// A renewal the server answered without ending the sign-in: a redirect, or a refusal that names no ended grant.
+    private static func refused(_ answer: Answer, origin: String) -> Result<String, RenewalError> {
+        let reason: RenewalFailure = (300..<400).contains(answer.status) ? .redirected : .refused
+        return .failure(.Refused(reason: reason, message: "\(origin) refused to renew the sign-in: \(answer.message)"))
     }
 
     /// What a renewal came to, and the grant it received that the sign-in could not take, if any.
@@ -409,7 +436,7 @@ final class TokenRenewer: CredentialRenewer {
             if let decided = decided ?? nil { return decided }
             return settledElsewhere(sent: sent, place: place)
         } catch {
-            return .failure(.Failed(message: "the keychain could not be read: \(error)"))
+            return .failure(.Unavailable(message: "the keychain could not be read: \(error)"))
         }
     }
 
@@ -427,7 +454,7 @@ final class TokenRenewer: CredentialRenewer {
             }
             return .success(current.accessToken)
         } catch {
-            return .failure(.Failed(message: "the keychain could not be read: \(error)"))
+            return .failure(.Unavailable(message: "the keychain could not be read: \(error)"))
         }
     }
 
@@ -435,7 +462,7 @@ final class TokenRenewer: CredentialRenewer {
         do {
             return try place.read()
         } catch {
-            throw .Failed(message: "the keychain could not be read: \(error)")
+            throw .Unavailable(message: "the keychain could not be read: \(error)")
         }
     }
 }

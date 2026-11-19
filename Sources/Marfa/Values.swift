@@ -152,6 +152,11 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case firstSyncWaiting(message: String)
     /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
+    /// The app's renewer could not renew the sign-in, and the sign-in is kept. ``RenewalRefusalReason`` says why.
+    ///
+    /// Queued writes stay queued, and the renewer is asked again on the next attempt. Use `reason` to choose text
+    /// for people. `message` is diagnostic and can include an address.
+    case renewalRefused(reason: RenewalRefusalReason, message: String)
     /// The copy lacks data needed for a local count. ``WorkingCopy/counts(of:_:)`` handles this error by asking
     /// the copy's server.
     case notAnswerable(message: String)
@@ -239,7 +244,13 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         }
     }
 
-    /// Fit to show a person.
+    var isRenewalRefused: Bool {
+        if case .renewalRefused = self { true } else { false }
+    }
+
+    /// The error's message.
+    ///
+    /// For a renewal refusal, use `reason` to choose text for people.
     public var message: String {
         switch self {
         case .notFound(_, let message, _), .unauthorized(_, let message, _), .forbidden(_, let message, _),
@@ -257,7 +268,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .contractMismatch(_, _, _, _, let message, _), .serverTooOld(_, _, let message),
             .trashPlanChanged(let message, _), .itemBeingRemoved(_, let message),
             .canceled(let message), .firstSyncWaiting(let message),
-            .invalid(let message), .notAnswerable(let message), .fault(let message), .keyChanging(let message),
+            .invalid(let message), .renewalRefused(_, let message), .notAnswerable(let message), .fault(let message),
+            .keyChanging(let message),
             .versionConflict(let message, _),
             .instanceChanged(let message, _), .closed(let message), .noConnection(let message),
             .confirmationRequired(_, let message, _), .appSignInRequired(let message, _):
@@ -281,8 +293,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             server
         case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
             .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
-            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .notAnswerable, .fault,
-            .keyChanging, .serverTooOld, .itemBeingRemoved,
+            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .renewalRefused,
+            .notAnswerable,
+            .fault, .keyChanging, .serverTooOld, .itemBeingRemoved,
             .closed, .noConnection:
             nil
         }
@@ -361,6 +374,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
+        case .renewalRefused(let reason, let message):
+            core = .RenewalRefused(reason: reason.core, message: message)
         case .notAnswerable(let message): core = .NotAnswerable(message: message)
         case .fault(let message): core = .Fault(message: message)
         case .versionConflict(let message, let server):
@@ -459,8 +474,36 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
         case .Invalid(let message): self = .invalid(message: message)
+        case .RenewalRefused(let reason, let message):
+            self = .renewalRefused(reason: RenewalRefusalReason(reason), message: message)
         case .NotAnswerable(let message): self = .notAnswerable(message: message)
         case .Fault(let message): self = .fault(message: message)
+        }
+    }
+}
+
+/// Why a renewal of the sign-in failed with ``MarfaError/renewalRefused(reason:message:)``.
+public enum RenewalRefusalReason: Sendable, Hashable, CaseIterable {
+    /// The server refused the renewal without ending the sign-in.
+    case refused
+    /// The server answered the renewal with a redirect, which is never followed.
+    case redirected
+    /// The server's answer to the renewal, or its sign-in metadata, could not be read.
+    case unreadable
+
+    init(_ core: RenewalFailure) {
+        switch core {
+        case .refused: self = .refused
+        case .redirected: self = .redirected
+        case .unreadable: self = .unreadable
+        }
+    }
+
+    var core: RenewalFailure {
+        switch self {
+        case .refused: .refused
+        case .redirected: .redirected
+        case .unreadable: .unreadable
         }
     }
 }

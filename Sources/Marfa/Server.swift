@@ -154,6 +154,8 @@ extension Server {
             throw .signedOut(origin: origin, message: message)
         } catch RenewalError.Unavailable(let message) {
             throw .network(message: message)
+        } catch RenewalError.Refused(let reason, let message) {
+            throw .renewalRefused(reason: RenewalRefusalReason(reason), message: message)
         } catch RenewalError.Failed(let message) {
             throw .invalid(message: message)
         } catch {

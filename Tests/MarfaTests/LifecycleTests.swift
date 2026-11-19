@@ -175,6 +175,34 @@ struct ALifecycle {
         await copy.close()
     }
 
+    @Test func aDrainTheRenewerRefusedIsTriedAgainAfterABackedOffWaitUntilItDeliversTheQueue() async throws {
+        let core = FakeCore.writer()
+        let clock = ManualClock()
+        let copy = Self.copy(core, clock)
+        let updates = Updates(copy.updates())
+        try await eventually("following") { updates.connection == .following }
+
+        core.state.withLock { $0.drainFails = .RenewalRefused(reason: .refused, message: "refused") }
+        await #expect(throws: Marfa.MarfaError.renewalRefused(reason: .refused, message: "refused")) {
+            try await copy.queue.drain()
+        }
+        #expect(try await Self.wait(clock, after: 0) == .seconds(5))
+        #expect(core.state.withLock { $0.drains } == 1, "the retry waits for its time")
+        clock.advance(by: .seconds(5))
+        try await eventually("tried again") { core.state.withLock { $0.drains } == 2 }
+        #expect(try await Self.wait(clock, after: 1) == .seconds(10), "a repeated refusal waits longer")
+
+        core.state.withLock {
+            $0.drainFails = nil
+            $0.drained = Self.report(undelivered: 0, retryAfterSeconds: nil)
+        }
+        clock.advance(by: .seconds(10))
+        try await eventually("the queue drained") { core.state.withLock { $0.drains } == 3 }
+        try await eventually("no drain waits") { clock.waiting == 0 }
+        #expect(updates.connection == .following)
+        await copy.close()
+    }
+
     @Test func aRefusedKeyIsNotAskedAgainUntilAKeyChangeWhichCatchesUpAtOnce() async throws {
         let old = FakeCore.writer()
         let new = FakeCore.writer()

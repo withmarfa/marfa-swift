@@ -98,10 +98,10 @@ struct KeptSignIn: Codable, Sendable, Equatable {
     var scope: String?
     var tokenEndpoint: String
     var revocationEndpoint: String?
-    /// Whether a renewal's request was cut off with no answer.
+    /// Whether a renewal's request was cut off with no answer, or answered 200 with tokens that could not be read.
     ///
     /// The server may then have rotated the grant to a refresh token this sign-in does not hold. A renewal that
-    /// is answered clears it.
+    /// keeps usable tokens clears it.
     var uncertain = false
 
     enum CodingKeys: String, CodingKey {
