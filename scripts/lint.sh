@@ -32,6 +32,6 @@ case "${1:-}" in
 esac
 
 swift format lint --strict --configuration "${configuration}" -r \
-  Package.swift Sources/Marfa Sources/MarfaAPI/*.swift Sources/MarfaTesting Sources/MarfaTelemetry \
+  Package.swift Sources/Marfa Sources/MarfaAPI/*.swift Sources/MarfaTesting \
   Sources/MarfaIcons Sources/MarfaBrandIcons Tests Examples/MarfaSample/Sources \
   generator/MarfaNullValue.swift generator/MarfaNullable.swift

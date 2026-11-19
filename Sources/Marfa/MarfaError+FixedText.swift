@@ -1,4 +1,5 @@
-/// What an error report may say of a ``MarfaError``: a type and a sentence fixed in the source, and a code.
+/// What an app's own error reporting may say of a ``MarfaError``: a type and a sentence fixed in the source, and a
+/// code.
 ///
 /// An error's own `message`, `path`, `origin`, `location`, `hash` and every other value it carries can hold a note's
 /// words, a file name, an address or an id, so none of them reaches `type` or `sentence`: both are `StaticString`s
@@ -14,7 +15,7 @@ public struct FixedErrorText: Sendable, Hashable {
     /// The server's refusal code where the error carries one and it has the shape of a code, otherwise `type`.
     ///
     /// A code is lowercase letters and underscores only, at most 48 characters, so an id, a hash, a path or a
-    /// sentence that arrived in its place is never sent.
+    /// sentence that arrived in its place never reaches it.
     public let code: String
 
     init(type: StaticString, sentence: StaticString, serverCode: String? = nil) {
@@ -35,7 +36,7 @@ public struct FixedErrorText: Sendable, Hashable {
 }
 
 extension MarfaError {
-    /// The text an error report may carry for this error.
+    /// The text an app's own error reporting may carry for this error.
     ///
     /// See ``FixedErrorText``.
     public var fixedText: FixedErrorText {
