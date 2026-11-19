@@ -105,6 +105,50 @@ private final class KeychainFault: Sendable {
     }
 }
 
+/// A keychain stand-in that counts the lookups of a lease and can hold back the next read of a sign-in until the
+/// test lets it go, as a keychain that is slow to answer does.
+private final class KeychainProbe: Sendable {
+    private struct State {
+        var leaseLookups = 0
+        var holdNextRead = false
+        var holding = false
+    }
+
+    private let state = Mutex(State())
+    private let released = DispatchSemaphore(value: 0)
+
+    /// How many times a holder looked at the lease item, as one waiting for it does.
+    var leaseLookups: Int { state.withLock { $0.leaseLookups } }
+    /// Whether a read of the sign-in is waiting for ``release()``.
+    var holding: Bool { state.withLock { $0.holding } }
+
+    func holdNextRead() { state.withLock { $0.holdNextRead = true } }
+    func release() { released.signal() }
+
+    /// `keychain`, the same place, as seen by one sign-in at `account`.
+    func on(_ keychain: Keychain, account: String) -> Keychain {
+        Keychain(identity: keychain.identity) { query, forNewItem in
+            if !forNewItem {
+                let asked = query[kSecAttrAccount] as? String
+                if asked == "\(account) renewing" {
+                    self.state.withLock { $0.leaseLookups += 1 }
+                } else if asked == account {
+                    let wait = self.state.withLock { state in
+                        defer { state.holdNextRead = false }
+                        if state.holdNextRead { state.holding = true }
+                        return state.holdNextRead
+                    }
+                    if wait {
+                        self.released.wait()
+                        self.state.withLock { $0.holding = false }
+                    }
+                }
+            }
+            try keychain.narrow(&query, forNewItem)
+        }
+    }
+}
+
 /// Takes the lease on `place` as another process sharing its keychain would, sharing no lock of this one.
 ///
 /// It stays held for as long as the test runs, since a test's leases lapse only when the test moves their clock.
@@ -175,7 +219,7 @@ struct BrowserSignIn {
         }
     }
 
-    @Test func aSignInReusesTheKeptRegistrationOnlyWhenItHoldsTheGrantTheFlowNeeds() async throws {
+    @Test func aSignInRegistersAClientOfItsOwnAndOnlyAConfirmationReusesTheKeptOneItsGrantAllows() async throws {
         let server = ScriptedAuthServer()
         let origin = server.origin
         marfa(server) { request in
@@ -203,18 +247,23 @@ struct BrowserSignIn {
             }
             _ = try await authorization.signIn(browser: approve)
             _ = try await authorization.signIn(browser: approve)
-            #expect(server.requests(to: "/oauth/register").count == 1)
+            #expect(server.requests(to: "/oauth/register").count == 2)
+
+            // A confirmation names the grant it confirms, so it reuses the kept client.
+            _ = try await authorization.signIn(maxAge: 0, browser: approve)
+            #expect(server.requests(to: "/oauth/register").count == 2)
 
             _ = try await authorization.startDeviceSignIn().credential()
             let registered = server.requests(to: "/oauth/register").map(\.json)
-            #expect(registered.count == 2)
+            #expect(registered.count == 3)
             #expect(registered.last?["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
             #expect(registered.last?["redirect_uris"] == nil)
             _ = try await authorization.startDeviceSignIn().credential()
-            #expect(server.requests(to: "/oauth/register").count == 2)
+            #expect(server.requests(to: "/oauth/register").count == 4)
 
-            _ = try await authorization.signIn(browser: approve)
-            #expect(server.requests(to: "/oauth/register").count == 3)
+            // The kept client holds the device grant, not the one a browser confirmation needs.
+            _ = try await authorization.signIn(maxAge: 0, browser: approve)
+            #expect(server.requests(to: "/oauth/register").count == 5)
         }
     }
 
@@ -373,7 +422,7 @@ struct BrowserSignIn {
 @Suite(.timeLimit(.minutes(1)))
 struct DeviceSignInPolling {
     private func deviceServer(
-        expiresIn: Int = 600, _ polls: @escaping @Sendable (Int) -> ScriptedAuthServer.Reply
+        expiresIn: Double = 600, _ polls: @escaping @Sendable (Int) -> ScriptedAuthServer.Reply
     ) -> ScriptedAuthServer {
         let server = ScriptedAuthServer()
         let count = Mutex(0)
@@ -436,6 +485,23 @@ struct DeviceSignInPolling {
             let registered = try #require(server.requests(to: "/oauth/register").first).json
             #expect(registered["redirect_uris"] == nil)
             #expect(registered["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
+        }
+    }
+
+    @Test(arguments: [1e20, -5, 1e300, 100_000])
+    func aDeviceCodeWhoseLifetimeIsNegativeOrAbsurdIsUnreadableRatherThanTrapping(expiresIn: Double) async throws {
+        let server = deviceServer(expiresIn: expiresIn) { _ in tokens("at-1", "rt-1") }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: server.transport())
+            await #expect {
+                try await authorization.startDeviceSignIn()
+            } throws: { error in
+                guard case SignInError.unreadable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read() == nil)
         }
     }
 
@@ -603,9 +669,9 @@ struct TokenRenewal {
 
     /// Keeps a sign-in made against the earlier token endpoint, which the server no longer serves.
     private func signedInAtEarlierEndpoint(
-        _ server: ScriptedAuthServer, _ keychain: Keychain
+        _ server: ScriptedAuthServer, _ keychain: Keychain, transport: SignInTransport? = nil
     ) throws -> (Authorization, Credential) {
-        let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+        let (authorization, _) = try signedIn(server, keychain, transport: transport ?? server.transport())
         var kept = try #require(try authorization.place.read())
         kept.tokenEndpoint = "\(server.origin)/auth/oauth2/token"
         kept.revocationEndpoint = "\(server.origin)/auth/oauth2/revoke"
@@ -804,6 +870,37 @@ struct TokenRenewal {
         }
     }
 
+    @Test func aRenewalHoldsTheLeaseForNoLongerThanTheRequestLimitInAllOverItsRequests() async throws {
+        let server = ScriptedAuthServer()
+        let first = Hold()
+        server.answer { request in
+            request.path == "/oauth/token" ? .held(first, .json(404, [:])) : .silence
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            var transport = server.transport()
+            transport.timeLimit = .seconds(5)
+            transport.requestLimit = .seconds(2)
+            let (authorization, credential) = try signedIn(server, keychain, transport: transport)
+            let renewing = Task { try await renew(credential, refused: "at-1") }
+            try await eventually("the renewal asks the server") { server.requests(to: "/oauth/token").count == 1 }
+            // The token endpoint answers after half the limit, and the metadata read that follows never does.
+            try await Task.sleep(for: .seconds(1))
+            let released = ContinuousClock.now
+            first.release()
+            await #expect {
+                try await renewing.value
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            // The metadata read is cut off at the limit of the whole renewal, a second on, not a limit of its own.
+            #expect(ContinuousClock.now - released < .milliseconds(1600))
+            try await eventually("the lease is let go") {
+                (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
+            }
+        }
+    }
+
     /// The same keychain file as `keychain`, reached as another process reaches it: no lock of this process's
     /// renewals is shared with it.
     private func anotherProcess(_ keychain: Keychain, _ server: ScriptedAuthServer, _ transport: SignInTransport)
@@ -864,6 +961,135 @@ struct TokenRenewal {
         }
     }
 
+    @Test func aRetryThatCannotFinishInTheTimeLeftIsNotSentAndTheSignInIsKeptNotUncertain() async throws {
+        let metadata = Hold()
+        let server = ScriptedAuthServer()
+        let discovery = server.discovery()
+        server.answer { request in
+            switch request.path {
+            case "/.well-known/oauth-authorization-server": .held(metadata, discovery)
+            case "/oauth/token": tokens("at-2", "rt-2")
+            default: .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            var transport = server.transport()
+            transport.timeLimit = .seconds(2)
+            transport.requestLimit = .seconds(3)
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain, transport: transport)
+            let renewing = Task { try await renew(credential, refused: "at-1") }
+            try await eventually("the metadata is asked for") {
+                server.requests(to: "/.well-known/oauth-authorization-server").count == 1
+            }
+            // Less than one request's time is left when the metadata arrives, so the retry cannot finish.
+            try await Task.sleep(for: .milliseconds(1500))
+            metadata.release()
+            await #expect {
+                try await renewing.value
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(server.requests(to: "/oauth/token").isEmpty, "a retry that cannot finish was sent")
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.refreshToken == "rt-1")
+            #expect(!kept.uncertain, "nothing was sent with the refresh token, so it is not spent")
+            try await eventually("the lease is let go") {
+                (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
+            }
+        }
+    }
+
+    @Test func aRetryAnsweredAfterItsCutOffLeavesTheSignInUncertainAndASignOutNotConfirmed() async throws {
+        let answer = Hold()
+        let current = Mutex("rt-1")
+        let ended = Mutex(false)
+        let server = ScriptedAuthServer()
+        let discovery = server.discovery()
+        server.answer { request in
+            switch request.path {
+            case "/.well-known/oauth-authorization-server": return discovery
+            case "/oauth/token":
+                // The server rotates the grant, then its answer comes too late.
+                current.withLock { $0 = "rt-2" }
+                return .held(answer, tokens("at-2", "rt-2"))
+            case "/oauth/revoke":
+                if request.form["token"] == current.withLock({ $0 }) { ended.withLock { $0 = true } }
+                return .json(200, [:])
+            default: return .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            var transport = server.transport()
+            transport.timeLimit = .milliseconds(300)
+            transport.requestLimit = .seconds(1)
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain, transport: transport)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            try await eventually("the lease is let go", within: 30) {
+                (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
+            }
+            answer.release()
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.refreshToken == "rt-1")
+            #expect(kept.uncertain, "the retry was cut off after it was sent")
+
+            #expect(try await authorization.signOut() == .notConfirmed)
+            #expect(server.requests(to: "/oauth/revoke").count == 1)
+            #expect(!ended.withLock { $0 }, "the grant stands, so the outcome must not say it ended")
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test(arguments: [
+        (URLError.Code.networkConnectionLost, true), (.notConnectedToInternet, false), (.secureConnectionFailed, false),
+        (.appTransportSecurityRequiresSecureConnection, false), (.serverCertificateUntrusted, false),
+    ])
+    func aRequestLostAfterItWasSentLeavesTheSignInUncertainAndOneNeverMadeDoesNot(
+        code: URLError.Code, uncertain: Bool
+    ) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .failure(code) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.uncertain == uncertain)
+        }
+    }
+
+    @Test func aLaterRenewalThatTheServerAnswersClearsTheUncertainty() async throws {
+        let server = ScriptedAuthServer()
+        let ended = Mutex(false)
+        marfa(server) { request in
+            switch request.path {
+            case "/oauth/token": return tokens("at-3", "rt-3")
+            case "/oauth/revoke":
+                if request.form["token"] == "rt-3" { ended.withLock { $0 = true } }
+                return .json(200, [:])
+            default: return .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            var kept = try #require(try authorization.place.read())
+            kept.uncertain = true
+            try authorization.place.keep(kept)
+            #expect(try await renew(credential, refused: "at-1") == "at-3")
+            #expect(try authorization.place.read()?.uncertain == false)
+            #expect(try await authorization.signOut() == .endedAtServer)
+            #expect(ended.withLock { $0 })
+        }
+    }
+
     @Test func aRenewalWritesNothingOverASignInThatChangedWhileItAsked() async throws {
         let renewedElsewhere = KeptSignIn(
             clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
@@ -882,7 +1108,7 @@ struct TokenRenewal {
             ),
         ]
         for (change, apply) in changes {
-            for reply in [tokens("at-2", "rt-2"), oauthError("invalid_grant")] {
+            for (reply, issuesTokens) in [(tokens("at-2", "rt-2"), true), (oauthError("invalid_grant"), false)] {
                 let server = ScriptedAuthServer()
                 try await inIsolatedKeychainAsync { keychain, _ async throws in
                     let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
@@ -917,6 +1143,14 @@ struct TokenRenewal {
                     }
                     if change == "lease taken" {
                         #expect(try keychain.label(service: service, account: place.leaseAccount) == "taken")
+                    }
+                    // Only a 200 answer for a sign-in that is gone leaves a grant nothing holds, so only it is revoked.
+                    let revoked = server.requests(to: "/oauth/revoke").map(\.form)
+                    if change == "signed out", issuesTokens {
+                        #expect(
+                            revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-1"]])
+                    } else {
+                        #expect(revoked.isEmpty, "\(change)")
                     }
                 }
             }
@@ -1153,7 +1387,11 @@ struct TokenRenewal {
 
 /// A Marfa server whose registrations answer `client-2`, `client-3` and so on, whose token answers are `at-2`
 /// and `rt-2`, then `at-3` and `rt-3`, and whose revocations `revocation` answers.
+///
+/// With `forgetting`, it is a server replaced at the same address: it knows only the clients registered with it
+/// since, and refuses any other client as the real one does.
 private func replacingServer(
+    forgetting: Bool = false,
     revocation: @escaping @Sendable (ScriptedAuthServer.Request) -> ScriptedAuthServer.Reply = { _ in .json(200, [:]) }
 ) -> ScriptedAuthServer {
     let server = ScriptedAuthServer()
@@ -1161,6 +1399,10 @@ private func replacingServer(
     let discovery = server.discovery()
     let issued = Mutex((clients: 1, tokens: 1))
     server.answer { request in
+        let asking = ["/oauth/token", "/oauth/device-authorization", "/oauth/revoke"].contains(request.path)
+        if forgetting, asking, !serverKnows(request.form["client_id"] ?? "", issued: issued.withLock { $0.clients }) {
+            return oauthError("invalid_client", status: request.path == "/oauth/device-authorization" ? 400 : 401)
+        }
         switch request.path {
         case "/.well-known/oauth-authorization-server": return discovery
         case "/oauth/register", "/oauth/token":
@@ -1182,6 +1424,25 @@ private func replacingServer(
         }
     }
     return server
+}
+
+/// Whether a server replaced at the same address knows `clientId`, once it has registered `issued` clients.
+private func serverKnows(_ clientId: String, issued: Int) -> Bool {
+    guard clientId.hasPrefix("client-"), let number = Int(clientId.dropFirst("client-".count)) else { return false }
+    return number >= 2 && number <= issued
+}
+
+/// Approves a browser sign-in as a replaced server's authorize page does: a client it does not know leaves the
+/// person on the server's own error page, which they close.
+private func approveWhereKnown(_ server: ScriptedAuthServer) -> @MainActor @Sendable (URL, String) async throws -> URL {
+    { url, scheme in
+        let id = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "client_id" }?
+            .value
+        guard serverKnows(id ?? "", issued: 1 + server.requests(to: "/oauth/register").count) else {
+            throw SignInError.canceled
+        }
+        return try await approveAtOnce(url, scheme)
+    }
 }
 
 /// Approves a browser sign-in at once, answering its state.
@@ -1215,11 +1476,11 @@ struct SigningInAgain {
         }
     }
 
-    @Test func revokesOnlyTheReplacedAccessTokenWhenBothShareAClientAndSoAGrant() async throws {
+    @Test func aConfirmationRevokesOnlyTheReplacedAccessTokenSinceBothShareAClientAndSoAGrant() async throws {
         let server = replacingServer()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
-            let credential = try await authorization.signIn(browser: approveAtOnce)
+            let credential = try await authorization.signIn(maxAge: 0, browser: approveAtOnce)
 
             #expect(!credential.replacedGrantStands)
             #expect(server.requests(to: "/oauth/register").isEmpty)
@@ -1239,6 +1500,20 @@ struct SigningInAgain {
             #expect(credential.replacedGrantStands)
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
             #expect(try authorization.credential()?.replacedGrantStands == false)
+            #expect(server.requests(to: "/oauth/revoke").map { $0.form["token"] } == ["rt-1"])
+        }
+    }
+
+    @Test func aReplacedSignInLeftUncertainIsReportedAsStandingThoughTheServerConfirmsItsRevocation() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            var kept = try #require(try authorization.place.read())
+            kept.uncertain = true
+            try authorization.place.keep(kept)
+            let credential = try await authorization.startDeviceSignIn().credential()
+
+            #expect(credential.replacedGrantStands, "the server may hold a rotated grant the revocation did not name")
             #expect(server.requests(to: "/oauth/revoke").map { $0.form["token"] } == ["rt-1"])
         }
     }
@@ -1290,7 +1565,7 @@ struct SigningInAgain {
         }
     }
 
-    @Test func anApprovalThatCannotBeKeptOnTheKeptSignInsClientRevokesOnlyItsAccessToken() async throws {
+    @Test func aConfirmationThatCannotBeKeptOnTheKeptSignInsClientRevokesOnlyItsAccessToken() async throws {
         let server = replacingServer()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             var transport = server.transport()
@@ -1299,7 +1574,7 @@ struct SigningInAgain {
             let held = try await heldElsewhere(authorization.place, transport)
             defer { held.release() }
             await #expect(throws: SignInError.heldElsewhere) {
-                try await authorization.signIn(browser: approveAtOnce)
+                try await authorization.signIn(maxAge: 0, browser: approveAtOnce)
             }
 
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
@@ -1327,7 +1602,7 @@ struct SigningInAgain {
         }
     }
 
-    @Test func anApprovalOnTheKeptClientThatAnUnreadableKeychainCannotKeepRevokesOnlyItsAccessToken() async throws {
+    @Test func aConfirmationOnTheKeptClientThatAnUnreadableKeychainCannotKeepRevokesOnlyItsAccessToken() async throws {
         let server = replacingServer()
         let fault = KeychainFault()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
@@ -1336,7 +1611,7 @@ struct SigningInAgain {
                 server: server.url, client: client, keychain: fault.on(keychain, account: kept.place.account),
                 service: service, transport: server.transport())
             await #expect(throws: Keychain.Failure.self) {
-                try await authorization.signIn { url, scheme in
+                try await authorization.signIn(maxAge: 0) { url, scheme in
                     fault.fail()
                     return try await approveAtOnce(url, scheme)
                 }
@@ -1349,6 +1624,105 @@ struct SigningInAgain {
             #expect(revoked == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
         }
     }
+
+    @Test func aBrowserSignInToAReplacedServerRegistersANewClientAndCompletes() async throws {
+        let server = replacingServer(forgetting: true)
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            // The kept sign-in names a client the server at this address has never heard of.
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let credential = try await authorization.signIn(browser: approveWhereKnown(server))
+
+            #expect(server.requests(to: "/oauth/register").count == 1)
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.clientId == "client-2")
+            #expect(try authorization.credential() == credential)
+            #expect(try #require(server.requests(to: "/oauth/token").first).form["client_id"] == "client-2")
+            // The replaced server holds no grant for the old client, which it says by refusing it.
+            #expect(!credential.replacedGrantStands)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
+            #expect(revoked == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
+        }
+    }
+
+    @Test func aDeviceSignInToAReplacedServerRegistersANewClientAndCompletes() async throws {
+        let server = replacingServer(forgetting: true)
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            // The kept sign-in is a device one, on a client the server forgot.
+            var kept = try #require(try authorization.place.read())
+            kept.grantTypes = [deviceCodeGrant, "refresh_token"]
+            kept.redirect = nil
+            try authorization.place.keep(kept)
+            let credential = try await authorization.startDeviceSignIn().credential()
+
+            #expect(server.requests(to: "/oauth/register").count == 1)
+            #expect(try authorization.place.read()?.clientId == "client-2")
+            #expect(!credential.replacedGrantStands)
+        }
+    }
+
+    @Test func aCancelAfterTheCodeExchangeAndBeforeTheWriteChangesNothingKeptAndEndsTheNewGrant() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let probe = KeychainProbe()
+            let watched = probe.on(keychain, account: server.origin)
+            let transport = server.transport()
+            let (authorization, _) = try signedIn(server, watched, transport: transport)
+            let before = try authorization.place.read()
+            // The write waits for the lease, so the tokens are in hand and the write is still to come.
+            let held = try await heldElsewhere(
+                SignInPlace(keychain: keychain, service: service, account: server.origin), transport)
+            defer { held.release() }
+            let signingIn = Task { try await authorization.signIn(browser: approveAtOnce) }
+            try await eventually("the code is exchanged and the write waits for the lease") {
+                server.requests(to: "/oauth/token").count == 1 && probe.leaseLookups > 0
+            }
+            signingIn.cancel()
+            held.release()
+            await #expect(throws: CancellationError.self) { try await signingIn.value }
+
+            #expect(try authorization.place.read() == before)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
+            #expect(revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]])
+        }
+    }
+
+    @Test func aCancelWhileTheKeychainReadsTheReplacedSignInChangesNothingKeptAndEndsTheNewGrant() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let probe = KeychainProbe()
+            let watched = probe.on(keychain, account: server.origin)
+            let (authorization, _) = try signedIn(server, watched, transport: server.transport())
+            let before = try authorization.place.read()
+            probe.holdNextRead()
+            let signingIn = Task { try await authorization.signIn(browser: approveAtOnce) }
+            try await eventually("the code is exchanged and the keychain read waits") {
+                server.requests(to: "/oauth/token").count == 1 && probe.holding
+            }
+            signingIn.cancel()
+            // A cancel that lands during the read is still seen before the write.
+            try await Task.sleep(for: .milliseconds(100))
+            probe.release()
+            await #expect(throws: CancellationError.self) { try await signingIn.value }
+
+            #expect(try authorization.place.read() == before)
+            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
+            #expect(revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]])
+        }
+    }
+
+    @Test func aCanceledSignInChangesNothingAndEndsNothing() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let before = try authorization.place.read()
+            await #expect(throws: SignInError.canceled) {
+                try await authorization.signIn { _, _ in throw SignInError.canceled }
+            }
+            #expect(try authorization.place.read() == before)
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
+        }
+    }
 }
 
 @Suite(.timeLimit(.minutes(1)))
@@ -1358,7 +1732,7 @@ struct SigningOut {
         marfa(server) { _ in .json(200, [:]) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport(), refresh: nil)
-            #expect(try await authorization.signOut() == false)
+            #expect(try await authorization.signOut() == .notConfirmed)
             let revoked = try #require(server.requests(to: "/oauth/revoke").first).form
             #expect(revoked == ["token": "at-1", "token_type_hint": "access_token", "client_id": "client-1"])
         }
@@ -1369,7 +1743,7 @@ struct SigningOut {
         marfa(server) { _ in .json(200, [:]) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
-            #expect(try await authorization.signOut())
+            #expect(try await authorization.signOut() == .endedAtServer)
             #expect(try authorization.place.read() == nil)
             let revoked = try #require(server.requests(to: "/oauth/revoke").first).form
             #expect(revoked == ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"])
@@ -1396,9 +1770,182 @@ struct SigningOut {
         marfa(server) { _ in .failure(.notConnectedToInternet) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
-            #expect(try await authorization.signOut() == false)
+            #expect(try await authorization.signOut() == .notConfirmed)
             #expect(try authorization.place.read() == nil)
-            #expect(try await authorization.signOut() == false)
+            #expect(try await authorization.signOut() == .nothingKept)
+        }
+    }
+
+    @Test func aSignInTheRenewerDroppedLeavesNothingToEnd() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in
+            request.path == "/oauth/token" ? oauthError("invalid_grant") : .json(200, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect(throws: RenewalError.self) { try await renew(credential, refused: "at-1") }
+            #expect(try authorization.place.read() == nil)
+            #expect(try await authorization.signOut() == .nothingKept)
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
+        }
+    }
+
+    /// Keeps a sign-in whose revocation endpoint is one the server no longer serves.
+    private func signedInAtEarlierEndpoint(
+        _ server: ScriptedAuthServer, _ keychain: Keychain
+    ) throws -> Authorization {
+        let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+        var kept = try #require(try authorization.place.read())
+        kept.revocationEndpoint = "\(server.origin)/auth/oauth2/revoke"
+        try authorization.place.keep(kept)
+        return authorization
+    }
+
+    @Test(arguments: [404, 410])
+    func aRevocationEndpointTheServerNoLongerHasIsReadAgainAndRevokedOnceWhereItIsNow(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in request.path == "/oauth/revoke" ? .json(200, [:]) : .json(status, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try signedInAtEarlierEndpoint(server, keychain)
+            #expect(try await authorization.signOut() == .endedAtServer)
+            let asked = ["/auth/oauth2/revoke", "/.well-known/oauth-authorization-server", "/oauth/revoke"]
+            #expect(server.requests.map(\.path) == asked)
+            let sent = try #require(server.requests(to: "/oauth/revoke").first).form
+            #expect(sent == ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"])
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test func aRevocationEndpointStillGoneWhereTheMetadataNowPointsIsNotConfirmedAfterOneMoreTry() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(404, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try signedInAtEarlierEndpoint(server, keychain)
+            #expect(try await authorization.signOut() == .notConfirmed)
+            #expect(server.requests(to: "/auth/oauth2/revoke").count == 1)
+            #expect(server.requests(to: "/oauth/revoke").count == 1)
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test func aGoneEndpointTheMetadataStillNamesIsNotAskedAgain() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(404, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await authorization.signOut() == .notConfirmed)
+            #expect(server.requests.map(\.path) == ["/oauth/revoke", "/.well-known/oauth-authorization-server"])
+        }
+    }
+
+    @Test(arguments: [
+        ScriptedAuthServer.Reply.json(404, [:]), .json(503, [:]), .failure(.notConnectedToInternet),
+        .json(200, ["issuer": "https://elsewhere.example"]),
+    ])
+    func aGoneEndpointWhoseMetadataCannotBeReadIsNotConfirmed(metadata: ScriptedAuthServer.Reply) async throws {
+        let server = ScriptedAuthServer()
+        server.answer { request in
+            request.path == "/.well-known/oauth-authorization-server" ? metadata : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try signedInAtEarlierEndpoint(server, keychain)
+            #expect(try await authorization.signOut() == .notConfirmed)
+            #expect(server.requests.map(\.path) == ["/auth/oauth2/revoke", "/.well-known/oauth-authorization-server"])
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test func aRefusalThatIsAnOAuthErrorIsNeverTakenForAMissingRevocationEndpoint() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in oauthError("invalid_request", status: 404) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await authorization.signOut() == .notConfirmed)
+            #expect(server.requests.map(\.path) == ["/oauth/revoke"])
+        }
+    }
+
+    @Test(arguments: [400, 401])
+    func aRevocationRefusedForAClientTheServerDoesNotKnowCountsAsEnded(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in oauthError("invalid_client", status: status) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await authorization.signOut() == .endedAtServer)
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test(arguments: [
+        ScriptedAuthServer.Reply.json(503, [:]), .json(500, [:]), .failure(.notConnectedToInternet),
+        oauthError("invalid_request"), .json(401, [:]),
+    ])
+    func aRevocationTheServerDoesNotConfirmIsNotConfirmedAndTheSignInIsGoneHere(
+        answer: ScriptedAuthServer.Reply
+    ) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in answer }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await authorization.signOut() == .notConfirmed)
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test func aSignOutBesideARenewalThatRotatesTheTokenWaitsForItAndEndsTheGrantItRenewed() async throws {
+        let server = ScriptedAuthServer()
+        let answer = Hold()
+        // The server ends a grant only when it is asked to revoke the refresh token it holds now: a rotated
+        // refresh token is ignored and still answered 200, as marfa-server does.
+        let current = Mutex("rt-1")
+        let ended = Mutex(false)
+        marfa(server) { request in
+            switch request.path {
+            case "/oauth/token":
+                current.withLock { $0 = "rt-2" }
+                return .held(answer, tokens("at-2", "rt-2"))
+            case "/oauth/revoke":
+                if request.form["token"] == current.withLock({ $0 }) { ended.withLock { $0 = true } }
+                return .json(200, [:])
+            default: return .json(404, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            let renewing = Task { try await renew(credential, refused: "at-1") }
+            try await eventually("the renewal asks the server") { server.requests(to: "/oauth/token").count == 1 }
+
+            let signingOut = Task { try await authorization.signOut() }
+            // The sign-out waits for the renewal, which holds the lease, so it has revoked nothing yet.
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
+            answer.release()
+
+            #expect(try await renewing.value == "at-2")
+            #expect(try await signingOut.value == .endedAtServer)
+            let revoked = try #require(server.requests(to: "/oauth/revoke").first).form
+            #expect(revoked == ["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-1"])
+            #expect(ended.withLock { $0 }, "the outcome says ended, so the grant really ended")
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test func aSignOutWhileAnotherProcessHoldsTheLeaseDeletesNothingBesideARenewalWaitingForIt() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(200, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            var transport = server.transport()
+            transport.leaseLifetime = .seconds(1)
+            let (authorization, credential) = try signedIn(server, keychain, transport: transport)
+            let held = try await heldElsewhere(authorization.place, transport)
+            defer { held.release() }
+            // A renewal in this process holds the gate, waiting for the lease the other process holds.
+            let renewing = Task { try await renew(credential, refused: "at-1") }
+            try await Task.sleep(for: .milliseconds(200))
+            await #expect(throws: SignInError.heldElsewhere) { try await authorization.signOut() }
+            _ = try? await renewing.value
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
         }
     }
 
@@ -1748,7 +2295,7 @@ struct SignInRequestsRefuseRedirects {
         defer { origins.stop() }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try origins.signedIn(keychain, endpoint: "/oauth/token")
-            #expect(try await authorization.signOut() == false)
+            #expect(try await authorization.signOut() == .notConfirmed)
             #expect(try authorization.place.read() == nil)
         }
         try await origins.expectUntouched()

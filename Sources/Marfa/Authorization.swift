@@ -1,16 +1,19 @@
 import AuthenticationServices
 import Foundation
+import Synchronization
 
 /// Signs an app in to one Marfa server, with the owner's approval, and keeps the sign-in in the keychain.
 ///
-/// The app registers with the server as a native client the first time it signs in, for the grant that
-/// sign-in uses, and the registration is kept with the tokens. It registers again after it signs out or the
-/// sign-in ends, and when it signs in another way than the kept registration allows.
+/// Each sign-in registers the app with the server as a native client for the grant it uses, and keeps the
+/// registration with the tokens. A server never sees a client it did not register, so a sign-in after the server
+/// was reset, restored or replaced works as the first one did. Only a confirmation sign-in, which ``Server``
+/// starts when the server asks the owner to sign in again before an action, reuses the kept registration, since
+/// it confirms the grant that registration holds.
 ///
 /// Signing in again replaces the sign-in kept for the server and then ends the grant it held there, as
-/// ``signOut()`` does, so each sign-in leaves one grant standing. A sign-in that reused the kept registration
-/// shares its grant, so only the replaced access token is revoked. ``Credential/replacedGrantStands`` says when
-/// the server did not confirm the replaced grant ended.
+/// ``signOut()`` does, so each sign-in leaves one grant standing. A confirmation shares the grant of the
+/// sign-in it confirms, so only the replaced access token is revoked. ``Credential/replacedGrantStands`` says
+/// when the server did not confirm the replaced grant ended.
 ///
 /// Sign in with a browser through ``signIn(presentingFrom:prefersEphemeralWebBrowserSession:)`` or
 /// ``signIn(using:)``, or, without a browser, through ``startDeviceSignIn()``. Then open a copy with
@@ -112,9 +115,9 @@ public struct Authorization: Sendable {
     /// ``SignInError/noRedirect`` when the client names no redirect, and
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
     /// keep the approval. When the approval cannot be kept, for that or a keychain error, it asks the server to
-    /// revoke it: by its refresh token, which ends its grant, or by its access token alone when it reused the
-    /// kept registration and the sign-in kept for the server shares, or may share, that grant. The error does
-    /// not say whether the server confirmed it.
+    /// revoke it: by its refresh token, which ends its grant, or by its access token alone when it is a
+    /// confirmation and the sign-in kept for the server shares, or may share, that grant. The error does not say
+    /// whether the server confirmed it.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -136,7 +139,7 @@ public struct Authorization: Sendable {
     ) async throws -> Credential {
         guard let redirect = client.redirect, let scheme = redirect.scheme else { throw SignInError.noRedirect }
         let discovery = try await Discovery.read(place.account, transport)
-        let registered = try await registration(discovery, for: "authorization_code")
+        let registered = try await registration(discovery, for: "authorization_code", reusing: maxAge != nil)
         let clientId = registered.clientId
         let proof = ProofKey()
         let state = randomText()
@@ -189,7 +192,7 @@ public struct Authorization: Sendable {
     /// ``DeviceSignIn/credential()``.
     public func startDeviceSignIn() async throws -> DeviceSignIn {
         let discovery = try await Discovery.read(place.account, transport)
-        let registered = try await registration(discovery, for: deviceCodeGrant)
+        let registered = try await registration(discovery, for: deviceCodeGrant, reusing: false)
         let started = try await send(
             try formRequest(
                 discovery.deviceAuthorizationEndpoint,
@@ -199,7 +202,8 @@ public struct Authorization: Sendable {
         guard let object = started.object, let deviceCode = object["device_code"] as? String,
             let userCode = object["user_code"] as? String,
             let verification = (object["verification_uri"] as? String).flatMap(URL.init(string:)),
-            let expiresIn = (object["expires_in"] as? NSNumber)?.doubleValue
+            let expiresIn = (object["expires_in"] as? NSNumber)?.doubleValue,
+            expiresIn.isFinite, expiresIn >= 0, expiresIn <= DeviceSignIn.longestWait
         else { throw SignInError.unreadable(message: "the device code answer is not one this package reads") }
         let complete = (object["verification_uri_complete"] as? String).flatMap(URL.init(string:))
         for page in [verification, complete].compactMap(\.self) where origin(of: page) != place.account {
@@ -217,12 +221,17 @@ public struct Authorization: Sendable {
     /// Ends the sign-in: deletes its tokens and registration from the keychain, then revokes the refresh
     /// token at the server, which ends the app's grant there.
     ///
-    /// Answers whether the server confirmed that the grant ended. The keychain no longer holds the sign-in
-    /// either way; on `false`, the grant stands at the server until the owner revokes it. Throws
-    /// ``SignInError/heldElsewhere``, changing nothing, when another process sharing the keychain holds the
+    /// The keychain no longer holds the sign-in whatever the answer is. A server whose revocation address moved
+    /// is asked again at the address its metadata names now, and one that holds no grant for the app's client
+    /// counts as having ended it. A renewal of the sign-in under way, in this process or another, is waited for
+    /// first, so the refresh token revoked is the newest one. A sign-in whose last renewal was sent and cut off
+    /// with no answer is revoked too, but the outcome is ``SignOutOutcome/notConfirmed`` whatever the server
+    /// answers, because it may hold a rotated grant that no refresh token kept here names.
+    ///
+    /// Throws ``SignInError/heldElsewhere``, changing nothing, when another process sharing the keychain holds the
     /// sign-in too long.
     @discardableResult
-    public func signOut() async throws -> Bool {
+    public func signOut() async throws -> SignOutOutcome {
         let place = place
         let transport = transport
         let kept = try await background {
@@ -232,40 +241,58 @@ public struct Authorization: Sendable {
                 return kept
             }
         }
-        guard let kept else { return false }
-        return await revoke(kept)
+        guard let kept else { return .nothingKept }
+        // The server answers 200 to a revoked refresh token it has already rotated, so where a renewal may have
+        // been answered with one that was lost, the answer proves nothing about the grant.
+        let confirmed = await revoke(kept)
+        return confirmed && !kept.uncertain ? .endedAtServer : .notConfirmed
     }
 
     /// Revokes the sign-in at the server, and answers whether the server confirmed that its grant ended.
     ///
     /// Revoking the refresh token ends the app's grant, with every token of its client, other sign-ins on the
     /// client included. With `endingGrant` off, or for a sign-in with no refresh token, only the access token
-    /// is revoked, and the grant stands.
+    /// is revoked, and the grant stands. A server that refuses the client as unknown holds no grant for it, so
+    /// that counts as ended either way.
+    ///
+    /// A revocation address answered 404 or 410 with no OAuth error is read again from the server's metadata,
+    /// and asked once at the address it names now, when that differs.
     private func revoke(_ kept: KeptSignIn, endingGrant: Bool = true) async -> Bool {
-        guard let revocation = kept.revocationEndpoint else { return false }
+        guard let stored = kept.revocationEndpoint else { return false }
         let refreshToken = endingGrant ? kept.refreshToken : nil
         let (token, hint) = refreshToken.map { ($0, "refresh_token") } ?? (kept.accessToken, "access_token")
-        do {
-            let answer = try await send(
-                try formRequest(
-                    revocation, [("token", token), ("token_type_hint", hint), ("client_id", kept.clientId)]),
-                transport)
-            return refreshToken != nil && answer.status == 200
-        } catch {
-            return false
+        let transport = transport
+        func ask(_ endpoint: String) async -> Answer? {
+            guard
+                let request = try? formRequest(
+                    endpoint, [("token", token), ("token_type_hint", hint), ("client_id", kept.clientId)])
+            else { return nil }
+            return try? await send(request, transport)
         }
+        guard var answer = await ask(stored) else { return false }
+        if (answer.status == 404 || answer.status == 410) && answer.oauthError == nil {
+            guard let advertised = try? await Discovery.read(place.account, transport),
+                let endpoint = advertised.revocationEndpoint, endpoint != stored,
+                let again = await ask(endpoint)
+            else { return false }
+            answer = again
+        }
+        if answer.oauthError == "invalid_client" { return true }
+        return refreshToken != nil && answer.status == 200
     }
 
     /// The client registered for this server that may use `grant`.
     ///
-    /// The kept one while a sign-in holds it and it was registered for `grant`, so a grant names it, and a
-    /// new one otherwise. A registration nothing has approved can be removed by the server, so one is never
-    /// kept apart from a sign-in. Each registration names only the grant its flow uses, because the server
-    /// tells the owner what kind of app it approved from the grants the app registered.
-    private func registration(_ discovery: Discovery, for grant: String) async throws -> Registered {
+    /// A new one, unless `reusing` and a kept sign-in holds one registered for `grant`: only a confirmation
+    /// reuses a registration, because the server that confirms the sign-in is the one that holds it, and any
+    /// other sign-in cannot know that the server still has the kept client. A registration nothing has approved
+    /// can be removed by the server, so one is never kept apart from a sign-in. Each registration names only the
+    /// grant its flow uses, because the server tells the owner what kind of app it approved from the grants the
+    /// app registered.
+    private func registration(_ discovery: Discovery, for grant: String, reusing: Bool) async throws -> Registered {
         let place = place
         let redirect = grant == "authorization_code" ? client.redirect?.absoluteString : nil
-        if let kept = try await background({ try place.read() }), kept.grantTypes.contains(grant),
+        if reusing, let kept = try await background({ try place.read() }), kept.grantTypes.contains(grant),
             kept.redirect == redirect
         {
             return Registered(
@@ -301,10 +328,13 @@ public struct Authorization: Sendable {
         let clientId: String
         let grantTypes: [String]
         let redirect: String?
-        /// Whether it is the kept sign-in's registration, whose grant another sign-in may hold, rather than one
-        /// registered for this sign-in alone.
+        /// Whether it is the kept sign-in's registration, which a confirmation reuses and whose grant the sign-in
+        /// it replaces may hold, rather than one registered for this sign-in alone.
         let reused: Bool
     }
+
+    /// Whether a new sign-in may still be canceled, or is being written.
+    private enum Admission { case open, canceled, admitted }
 
     fileprivate func keep(_ token: TokenAnswer, registered: Registered, discovery: Discovery) async throws
         -> Credential
@@ -316,13 +346,29 @@ public struct Authorization: Sendable {
             tokenEndpoint: discovery.tokenEndpoint, revocationEndpoint: discovery.revocationEndpoint)
         let place = place
         let transport = transport
+        // The tokens are in hand, and a cancel from here until the write is admitted changes nothing kept. The
+        // write is admitted under the lock the cancellation takes, and made outside it, so a cancel never waits on
+        // the keychain; a cancel after the admission is too late, and the sign-in stands.
+        let admission = Mutex(Admission.open)
         let replaced: KeptSignIn?
         do {
-            replaced = try await background {
-                try place.exclusively(transport) { () throws -> KeptSignIn? in
-                    let replaced = try place.read()
-                    try place.keep(kept)
-                    return replaced
+            replaced = try await withTaskCancellationHandler {
+                try await background {
+                    try place.exclusively(transport) { () throws -> KeptSignIn? in
+                        let replaced = try place.read()
+                        let admitted = admission.withLock { admission in
+                            guard admission == .open else { return false }
+                            admission = .admitted
+                            return true
+                        }
+                        guard admitted else { throw CancellationError() }
+                        try place.keep(kept)
+                        return replaced
+                    }
+                }
+            } onCancel: {
+                admission.withLock { admission in
+                    if admission == .open { admission = .canceled }
                 }
             }
         } catch {
@@ -336,7 +382,9 @@ public struct Authorization: Sendable {
                     shared = true
                 }
             }
-            _ = await revoke(kept, endingGrant: !shared)
+            // A canceled task cannot send, so the revocation runs in a task that is not canceled with it.
+            let authorization = self
+            _ = await Task.detached { await authorization.revoke(kept, endingGrant: !shared) }.value
             throw error
         }
         var replacedGrantStands = false
@@ -344,10 +392,23 @@ public struct Authorization: Sendable {
             // Revoking the refresh token of a sign-in on the same client would end the new sign-in's grant too.
             let shared = replaced.clientId == kept.clientId
             let ended = await revoke(replaced, endingGrant: !shared)
-            replacedGrantStands = !shared && !ended
+            // A replaced sign-in whose refresh request got no answer may have been rotated at the server, which
+            // ignores the revocation of a rotated token and still confirms it.
+            replacedGrantStands = !shared && (!ended || replaced.uncertain)
         }
         return Credential(place: place, kept: kept, transport: transport, replacedGrantStands: replacedGrantStands)
     }
+}
+
+/// What ``Authorization/signOut()`` found.
+public enum SignOutOutcome: Sendable, Hashable {
+    /// The server confirmed that the grant ended.
+    case endedAtServer
+    /// The keychain held no sign-in.
+    case nothingKept
+    /// The sign-in is deleted here, but the server did not confirm that the grant ended, or a renewal that was
+    /// cut off with no answer may have left it holding a grant the revocation did not name.
+    case notConfirmed
 }
 
 /// A device grant waiting for the person to approve it on another device.
@@ -371,6 +432,9 @@ public struct DeviceSignIn: Sendable {
 
     let polling: Polling
 
+    /// The longest a device code may be given to last, in seconds, which keeps every conversion of it in range.
+    static let longestWait: Double = 24 * 60 * 60
+
     /// Asks the server at the interval it gives until the person decides, slowing by 5 seconds each time
     /// the server says `slow_down`, and keeps the sign-in once they approve.
     ///
@@ -383,9 +447,8 @@ public struct DeviceSignIn: Sendable {
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
     /// expires, and ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
     /// too long to keep the approval. When the approval cannot be kept, for that or a keychain error, it asks
-    /// the server to revoke it: by its refresh token, which ends its grant, or by its access token alone when it
-    /// reused the kept registration and the sign-in kept for the server shares, or may share, that grant. The
-    /// error does not say whether the server confirmed it.
+    /// the server to revoke it by its refresh token, which ends its grant. The error does not say whether the
+    /// server confirmed it.
     /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
@@ -394,7 +457,7 @@ public struct DeviceSignIn: Sendable {
         while true {
             let remaining = expiresAt.timeIntervalSince(transport.now())
             if remaining <= 0 { throw SignInError.expired }
-            try await transport.sleep(min(pause, .milliseconds(Int64(remaining * 1000))))
+            try await transport.sleep(min(pause, .milliseconds(Int64(min(remaining, Self.longestWait) * 1000))))
             pause = interval
             let answer: Answer
             do {
@@ -620,20 +683,65 @@ final class WebSession: NSObject, ASWebAuthenticationPresentationContextProvidin
         return session
     }
 
-    /// What the continuation of a sign-in takes from a session's answer.
+    /// The one answer a sign-in's continuation takes.
     ///
-    /// Not isolated to an actor, because the system calls it on a queue of its own, where a main-actor closure
-    /// stops the app.
-    nonisolated static func completion(
-        resuming continuation: CheckedContinuation<URL, any Error>
-    ) -> @Sendable (URL?, (any Error)?) -> Void {
-        { returned, error in
-            if let returned {
-                continuation.resume(returning: returned)
-            } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-                continuation.resume(throwing: SignInError.canceled)
-            } else {
-                continuation.resume(throwing: error ?? SignInError.canceled)
+    /// Whoever gives it first counts: the session's completion handler, a browser that cannot open, or the
+    /// cancellation of the task. Any later one is ignored.
+    ///
+    /// Not isolated to an actor, because the system calls the completion handler on a queue of its own, where a
+    /// main-actor closure stops the app.
+    final class Answer: Sendable {
+        private enum State {
+            case waiting
+            case taken(CheckedContinuation<URL, any Error>)
+            case given(Result<URL, any Error>)
+            case done
+        }
+
+        private let state = Mutex(State.waiting)
+
+        /// Takes the continuation, resuming it at once with an answer given before it existed.
+        func take(_ continuation: CheckedContinuation<URL, any Error>) {
+            let early: Result<URL, any Error>? = state.withLock { state in
+                if case .given(let result) = state {
+                    state = .done
+                    return result
+                }
+                state = .taken(continuation)
+                return nil
+            }
+            if let early { continuation.resume(with: early) }
+        }
+
+        func resume(returning url: URL) { give(.success(url)) }
+        func resume(throwing error: any Error) { give(.failure(error)) }
+
+        private func give(_ result: Result<URL, any Error>) {
+            let taken: CheckedContinuation<URL, any Error>? = state.withLock { state in
+                switch state {
+                case .waiting:
+                    state = .given(result)
+                    return nil
+                case .taken(let continuation):
+                    state = .done
+                    return continuation
+                case .given, .done:
+                    return nil
+                }
+            }
+            taken?.resume(with: result)
+        }
+
+        /// What the system's session calls with its answer.
+        var completion: @Sendable (URL?, (any Error)?) -> Void {
+            { returned, error in
+                if let returned {
+                    self.resume(returning: returned)
+                } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                    self.resume(throwing: SignInError.canceled)
+                } else {
+                    self.resume(throwing: error ?? SignInError.canceled)
+                }
             }
         }
     }
@@ -642,15 +750,20 @@ final class WebSession: NSObject, ASWebAuthenticationPresentationContextProvidin
         _ url: URL, scheme: String, anchor: ASPresentationAnchor, ephemeral: Bool, make: Maker = system
     ) async throws -> URL {
         let context = WebSession(anchor: anchor)
+        let answer = Answer()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-                let started = make(url, scheme, ephemeral, context, completion(resuming: continuation))
+                answer.take(continuation)
+                let started = make(url, scheme, ephemeral, context, answer.completion)
                 context.session = started
                 if !started.start() {
-                    continuation.resume(throwing: SignInError.unavailable(message: "The browser could not open."))
+                    answer.resume(throwing: SignInError.unavailable(message: "The browser could not open."))
                 }
             }
         } onCancel: {
+            // The system does not promise that a canceled session calls its completion handler, so the
+            // cancellation answers for it, and a handler that comes later finds the answer already given.
+            answer.resume(throwing: SignInError.canceled)
             Task { @MainActor in context.session?.cancel() }
         }
     }
