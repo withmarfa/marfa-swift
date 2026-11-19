@@ -7,6 +7,14 @@ import Synchronization
 /// Every renewal of one sign-in, in this process or another that shares the keychain, holds the same
 /// ``RenewalLease`` from before it reads the refresh token until its request has ended, so one refresh token is
 /// sent once: the next to ask finds the token already renewed and returns it without asking the server.
+///
+/// A renewal never starts a refresh request that cannot finish inside what is left of its time: it sends nothing,
+/// keeps the sign-in and is unavailable, so the refresh token is not spent. A refresh request that was sent and
+/// then ended with no answer, because it timed out, was canceled or the connection was lost, may have been
+/// answered by the server with a rotated refresh token that nothing here received. The kept sign-in is then
+/// marked ``KeptSignIn/uncertain``, under the lease, until a later renewal is answered, and
+/// ``Authorization/signOut()`` of an uncertain sign-in does not report the grant as ended, since the server may
+/// hold a grant this sign-in cannot name.
 final class TokenRenewer: CredentialRenewer {
     private let credential: Credential
 
@@ -59,13 +67,14 @@ final class TokenRenewer: CredentialRenewer {
     /// the transport's request limit, which bounds the first request, the metadata read and the retry together.
     /// So an answer that arrives late is still kept and no other renewal sends the same refresh token meanwhile,
     /// and the lease is always let go well within the time a waiter for it gives up after. Only a request that
-    /// never answers can leave the refresh token spent.
+    /// never answers can leave the refresh token spent, which the kept sign-in records as uncertain.
     ///
     /// A stored token endpoint the server no longer has answers 404 or 410 with no OAuth error. The renewal
     /// then reads the server's metadata again and sends the same request once to the endpoint it names, so a
     /// sign-in kept against an earlier address of the token endpoint still renews. Before that retry it checks
     /// again that it holds the lease and that the kept refresh token is the one it captured, and sends nothing
-    /// if not.
+    /// if not. It sends nothing either when less time is left than one request is given, since the request could
+    /// be cut off after the server had answered it.
     private func ask(
         _ request: URLRequest, sent: String, kept: KeptSignIn, lease: RenewalLease, transport: SignInTransport
     ) throws(RenewalError) -> String {
@@ -86,7 +95,13 @@ final class TokenRenewer: CredentialRenewer {
             settled.set(result)
             activity.end()
         }
-        let step: @Sendable (URLRequest, @escaping @Sendable (Result<Answer, RenewalError>) -> Void) -> Void = {
+        // A refresh request that ended with no answer may have spent the refresh token, so it is recorded with
+        // the sign-in before the lease is let go.
+        let fail: @Sendable (Cut) -> Void = { cut in
+            if cut.mayHaveReachedServer { Self.markUncertain(sent: sent, place: place, lease: lease) }
+            finish(.failure(cut.error))
+        }
+        let step: @Sendable (URLRequest, @escaping @Sendable (Result<Answer, Cut>) -> Void) -> Void = {
             request, then in
             Self.send(request, transport: transport, pending: pending, deadline: deadline) {
                 then(Self.received($0, origin: origin))
@@ -105,8 +120,8 @@ final class TokenRenewer: CredentialRenewer {
         }
         step(request) { first in
             let answer: Answer
-            do throws(RenewalError) { answer = try first.get() } catch {
-                finish(.failure(error))
+            do throws(Cut) { answer = try first.get() } catch {
+                fail(error)
                 return
             }
             guard Self.tokenEndpointIsGone(answer) else {
@@ -122,7 +137,7 @@ final class TokenRenewer: CredentialRenewer {
                 let advertised: Discovery
                 let retry: URLRequest
                 do throws(RenewalError) {
-                    advertised = try Self.advertised(try read.get(), origin: origin)
+                    advertised = try Self.advertised(try read.mapError(\.error).get(), origin: origin)
                     retry = try Self.refresh(at: advertised.tokenEndpoint, kept: kept, sent: sent)
                 } catch {
                     finish(.failure(error))
@@ -142,11 +157,17 @@ final class TokenRenewer: CredentialRenewer {
                     finish(Self.settledElsewhere(sent: sent, place: place))
                     return
                 }
+                // A request sent with too little time left could be answered after it is cut off, and its
+                // answer would be lost with the refresh token spent.
+                guard Self.secondsLeft(until: deadline) >= transport.timeLimit.seconds else {
+                    finish(.failure(.Unavailable(message: "the renewal ran out of time before it could ask again")))
+                    return
+                }
                 step(retry) { second in
-                    do throws(RenewalError) {
+                    do throws(Cut) {
                         let answer = try second.get()
                         conclude(answer, advertised)
-                    } catch { finish(.failure(error)) }
+                    } catch { fail(error) }
                 }
             }
         }
@@ -155,6 +176,34 @@ final class TokenRenewer: CredentialRenewer {
         }
         return try result.get()
     }
+
+    /// How long until `deadline`, which is zero once it has passed.
+    private static func secondsLeft(until deadline: DispatchTime) -> TimeInterval {
+        let now = DispatchTime.now().uptimeNanoseconds
+        return deadline.uptimeNanoseconds > now ? Double(deadline.uptimeNanoseconds - now) / 1e9 : 0
+    }
+
+    /// Records that a refresh request sent with `sent` ended with no answer, so the server may have rotated the
+    /// grant.
+    ///
+    /// Written only while the lease is held and the kept refresh token is still `sent`. A keychain that refuses
+    /// the write leaves the sign-in as it was, since nothing more can be recorded.
+    private static func markUncertain(sent: String, place: SignInPlace, lease: RenewalLease) {
+        _ = try? lease.whileHeld {
+            guard var current = try place.read(), current.refreshToken == sent, !current.uncertain else { return }
+            current.uncertain = true
+            try place.keep(current)
+        }
+    }
+
+    /// A request that got no answer, and whether it may have reached the server.
+    private struct Cut: Error {
+        let error: RenewalError
+        let mayHaveReachedServer: Bool
+    }
+
+    /// A request that was never sent, because the process's time had ended.
+    private struct NotSent: Error {}
 
     /// Sends a request and calls `done` with its answer.
     ///
@@ -175,7 +224,7 @@ final class TokenRenewer: CredentialRenewer {
         }
         guard pending.begin(task) else {
             task.cancel()
-            done(.failure(URLError(.cancelled)))
+            done(.failure(NotSent()))
             return
         }
         task.resume()
@@ -194,19 +243,37 @@ final class TokenRenewer: CredentialRenewer {
         }
     }
 
-    /// The answer, or the renewal's failure where the request did not get one.
-    private static func received(_ answered: Result<Answer, any Error>, origin: String) -> Result<
-        Answer, RenewalError
-    > {
+    /// The answer, or the failure of a request that did not get one.
+    private static func received(_ answered: Result<Answer, any Error>, origin: String) -> Result<Answer, Cut> {
         switch answered {
         case .success(let answer): return .success(answer)
+        case .failure(let error) where error is NotSent:
+            return .failure(
+                Cut(
+                    error: .Unavailable(message: "the app is being suspended, so the sign-in was not renewed"),
+                    mayHaveReachedServer: false))
         case .failure(let error as URLError) where error.code == .cancelled:
-            return .failure(.Unavailable(message: "the server did not answer the renewal in time"))
+            return .failure(
+                Cut(
+                    error: .Unavailable(message: "the server did not answer the renewal in time"),
+                    mayHaveReachedServer: true))
         case .failure(let error as URLError):
-            return .failure(.Unavailable(message: "the server could not be reached: \(error.localizedDescription)"))
-        case .failure(let error): return .failure(.Failed(message: "the renewal failed: \(error.localizedDescription)"))
+            return .failure(
+                Cut(
+                    error: .Unavailable(message: "the server could not be reached: \(error.localizedDescription)"),
+                    mayHaveReachedServer: !neverConnected.contains(error.code)))
+        case .failure(let error):
+            return .failure(
+                Cut(
+                    error: .Failed(message: "the renewal failed: \(error.localizedDescription)"),
+                    mayHaveReachedServer: true))
         }
     }
+
+    /// The failures of a connection that was never made, which prove the server never saw the request.
+    private static let neverConnected: Set<URLError.Code> = [
+        .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet,
+    ]
 
     /// Whether the server answered as one that has no such endpoint, as opposed to refusing the renewal.
     private static func tokenEndpointIsGone(_ answer: Answer) -> Bool {
@@ -256,6 +323,7 @@ final class TokenRenewer: CredentialRenewer {
             renewed.accessToken = token.accessToken
             renewed.refreshToken = token.refreshToken ?? current.refreshToken
             renewed.scope = token.scope ?? current.scope
+            renewed.uncertain = false
             if let advertised {
                 renewed.tokenEndpoint = advertised.tokenEndpoint
                 renewed.revocationEndpoint = advertised.revocationEndpoint

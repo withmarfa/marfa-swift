@@ -12,7 +12,8 @@ struct SignInTransport: Sendable {
     ///
     /// A renewal that gives up at `timeLimit` leaves its requests running, still holding the lease, until they
     /// answer or this passes. It must stay well within two `leaseLifetime`s, the time a caller waiting for the
-    /// lease gives up after, so that a sign-out or a sign-in in this process waits for a renewal to finish.
+    /// lease gives up after, so that a sign-out or a sign-in in this process waits for a renewal to finish, and
+    /// it must be at least `timeLimit`, since a retry is sent only when `timeLimit` of it is left.
     var requestLimit: Duration = .seconds(60)
     /// How long a ``RenewalLease`` lasts unless its holder moves it on, after which another holder may take it.
     var leaseLifetime: Duration = .seconds(60)
@@ -97,6 +98,11 @@ struct KeptSignIn: Codable, Sendable, Equatable {
     var scope: String?
     var tokenEndpoint: String
     var revocationEndpoint: String?
+    /// Whether a renewal's request was cut off with no answer.
+    ///
+    /// The server may then have rotated the grant to a refresh token this sign-in does not hold. A renewal that
+    /// is answered clears it.
+    var uncertain = false
 
     enum CodingKeys: String, CodingKey {
         case clientId = "client_id"
@@ -107,6 +113,23 @@ struct KeptSignIn: Codable, Sendable, Equatable {
         case scope
         case tokenEndpoint = "token_endpoint"
         case revocationEndpoint = "revocation_endpoint"
+        case uncertain
+    }
+}
+
+extension KeptSignIn {
+    /// A sign-in kept before `uncertain` existed reads as certain.
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        clientId = try values.decode(String.self, forKey: .clientId)
+        grantTypes = try values.decode([String].self, forKey: .grantTypes)
+        redirect = try values.decodeIfPresent(String.self, forKey: .redirect)
+        accessToken = try values.decode(String.self, forKey: .accessToken)
+        refreshToken = try values.decodeIfPresent(String.self, forKey: .refreshToken)
+        scope = try values.decodeIfPresent(String.self, forKey: .scope)
+        tokenEndpoint = try values.decode(String.self, forKey: .tokenEndpoint)
+        revocationEndpoint = try values.decodeIfPresent(String.self, forKey: .revocationEndpoint)
+        uncertain = try values.decodeIfPresent(Bool.self, forKey: .uncertain) ?? false
     }
 }
 

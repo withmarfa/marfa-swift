@@ -224,7 +224,9 @@ public struct Authorization: Sendable {
     /// The keychain no longer holds the sign-in whatever the answer is. A server whose revocation address moved
     /// is asked again at the address its metadata names now, and one that holds no grant for the app's client
     /// counts as having ended it. A renewal of the sign-in under way, in this process or another, is waited for
-    /// first, so the refresh token revoked is the newest one.
+    /// first, so the refresh token revoked is the newest one. A sign-in whose last renewal was sent and cut off
+    /// with no answer is revoked too, but the outcome is ``SignOutOutcome/notConfirmed`` whatever the server
+    /// answers, because it may hold a rotated grant that no refresh token kept here names.
     ///
     /// Throws ``SignInError/heldElsewhere``, changing nothing, when another process sharing the keychain holds the
     /// sign-in too long.
@@ -240,7 +242,10 @@ public struct Authorization: Sendable {
             }
         }
         guard let kept else { return .nothingKept }
-        return await revoke(kept) ? .endedAtServer : .notConfirmed
+        // The server answers 200 to a revoked refresh token it has already rotated, so where a renewal may have
+        // been answered with one that was lost, the answer proves nothing about the grant.
+        let confirmed = await revoke(kept)
+        return confirmed && !kept.uncertain ? .endedAtServer : .notConfirmed
     }
 
     /// Revokes the sign-in at the server, and answers whether the server confirmed that its grant ended.
@@ -339,16 +344,19 @@ public struct Authorization: Sendable {
         let place = place
         let transport = transport
         // The tokens are in hand, and a cancel from here until the write changes nothing kept. The write itself is
-        // not cancelable, so the cancel is noticed under the lease, just before it.
+        // not cancelable, so the cancel is decided on under the same lock the cancellation takes, with nothing to
+        // wait for between that decision and the write.
         let canceled = Mutex(false)
         let replaced: KeptSignIn?
         do {
             replaced = try await withTaskCancellationHandler {
                 try await background {
                     try place.exclusively(transport) { () throws -> KeptSignIn? in
-                        if canceled.withLock({ $0 }) { throw CancellationError() }
                         let replaced = try place.read()
-                        try place.keep(kept)
+                        try canceled.withLock { canceled in
+                            if canceled { throw CancellationError() }
+                            try place.keep(kept)
+                        }
                         return replaced
                     }
                 }
@@ -388,7 +396,8 @@ public enum SignOutOutcome: Sendable, Hashable {
     case endedAtServer
     /// The keychain held no sign-in.
     case nothingKept
-    /// The sign-in is deleted here, but the server did not confirm that the grant ended.
+    /// The sign-in is deleted here, but the server did not confirm that the grant ended, or a renewal that was
+    /// cut off with no answer may have left it holding a grant the revocation did not name.
     case notConfirmed
 }
 
