@@ -404,8 +404,8 @@ public final class WorkingCopy: Sendable {
     /// still notify the writer's streams. `status().hydration` says which.
     /// A reader keeps reading and tells `.saved` once it reads a changed
     /// SQLite data version. The stream takes its place in that watch just after this
-    /// returns, off the caller's thread, so a reader's stream is first told one `.saved`, once it has its place,
-    /// for any save made before then, and each save after is told once. A stream the core's own fault ended is told
+    /// returns, off the caller's thread, so a reader's stream is told one extra `.saved` once it has its place,
+    /// for any save made before then. A stream the core's own fault ended is told
     /// `.stopped` and then finishes, as one the core refused does: ask for a new
     /// one.
     public func changes() -> AsyncStream<Change> {
