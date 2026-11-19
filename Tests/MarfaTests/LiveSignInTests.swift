@@ -62,12 +62,12 @@ struct LiveSignIn {
         #expect(try await itemsStatus(browser.accessToken, own) == 401)
         #expect(try await itemsStatus(device.accessToken, own) == 200)
 
-        // Another device sign-in reuses the client, so both sign-ins hold one grant, which must stand.
+        // Another device sign-in registers a client of its own too, and ends the grant it replaces.
         let again = try await authorization.startDeviceSignIn()
         try await approve(again.userCode, on: own)
         #expect(try await again.credential().replacedGrantStands == false)
         let second = try #require(try authorization.place.read())
-        #expect(second.clientId == device.clientId)
+        #expect(second.clientId != device.clientId)
         #expect(try await grants(own) == [second.clientId])
         #expect(try await itemsStatus(device.accessToken, own) == 401)
         #expect(try await itemsStatus(second.accessToken, own) == 200)

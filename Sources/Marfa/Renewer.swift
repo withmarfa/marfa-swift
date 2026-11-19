@@ -273,8 +273,12 @@ final class TokenRenewer: CredentialRenewer {
     ) -> Result<String, RenewalError> {
         do {
             let decided = try lease.whileHeld { () throws -> Result<String, RenewalError>? in
-                guard let current = try place.read(), current.refreshToken == sent else { return nil }
-                return write(current)
+                // A sign-out in this process does not wait for the lease, so the read and the write that follows
+                // it are one step under the place's lock.
+                try place.locked {
+                    guard let current = try place.read(), current.refreshToken == sent else { return nil }
+                    return write(current)
+                }
             }
             if let decided = decided ?? nil { return decided }
             return settledElsewhere(sent: sent, place: place)
