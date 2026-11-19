@@ -327,6 +327,8 @@ final class TokenRenewer: CredentialRenewer {
         }
         let origin = place.account
         guard let token = try? TokenAnswer.read(answer) else {
+            // The server answered 200, so it may have rotated the refresh token in a body nothing could read.
+            markUncertain(sent: sent, place: place, lease: lease)
             return Settlement(
                 result: .failure(
                     .Refused(reason: .unreadable, message: "\(origin) answered a renewal this package cannot read")))
@@ -344,6 +346,11 @@ final class TokenRenewer: CredentialRenewer {
             do {
                 try place.keep(renewed)
             } catch {
+                // With no new refresh token the server spent none, so the kept entry still renews.
+                guard token.refreshToken != nil else {
+                    return .failure(
+                        .Unavailable(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
+                }
                 // The server has spent the old refresh token, so the kept one cannot renew again.
                 try? place.drop()
                 return .failure(.Ended(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
@@ -369,7 +376,9 @@ final class TokenRenewer: CredentialRenewer {
         _ answer: Answer, sent: String, place: SignInPlace, lease: RenewalLease, advertised: Discovery?
     ) -> Result<String, RenewalError> {
         let origin = place.account
-        switch (answer.status, answer.code) {
+        switch (answer.status, answer.oauthError) {
+        case (408, _):
+            return .failure(.Unavailable(message: "\(origin) timed out renewing the sign-in (408)"))
         case (_, "invalid_grant"), (_, "invalid_client"):
             return written(sent: sent, place: place, lease: lease) { _ in
                 try? place.drop()
@@ -377,8 +386,6 @@ final class TokenRenewer: CredentialRenewer {
             }
         case (429, _), (500..., _):
             return .failure(.Unavailable(message: "\(origin) could not renew the sign-in now (\(answer.status))"))
-        case (408, _) where answer.oauthError == nil:
-            return .failure(.Unavailable(message: "\(origin) timed out renewing the sign-in (408)"))
         case (404, _), (410, _):
             guard advertised != nil, answer.oauthError == nil else { return refused(answer, origin: origin) }
             return written(sent: sent, place: place, lease: lease) { _ in

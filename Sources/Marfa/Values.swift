@@ -154,9 +154,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case invalid(message: String)
     /// The app's renewer could not renew the sign-in, and the sign-in is kept. ``RenewalRefusalReason`` says why.
     ///
-    /// It is not the app's own mistake, an ended sign-in or an unreachable server, so the copy stops, keeps its
-    /// queue and asks the renewer again on its next attempt. Word it from `reason`; `message` is for logs and can
-    /// name an address.
+    /// Queued writes stay queued, and the renewer is asked again on the next attempt. Use `reason` to choose text
+    /// for people. `message` is diagnostic and can include an address.
     case renewalRefused(reason: RenewalRefusalReason, message: String)
     /// The copy lacks data needed for a local count. ``WorkingCopy/counts(of:_:)`` handles this error by asking
     /// the copy's server.
@@ -249,7 +248,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         if case .renewalRefused = self { true } else { false }
     }
 
-    /// Fit to show a person.
+    /// The error's message.
+    ///
+    /// For a renewal refusal, use `reason` to choose text for people.
     public var message: String {
         switch self {
         case .notFound(_, let message, _), .unauthorized(_, let message, _), .forbidden(_, let message, _),
