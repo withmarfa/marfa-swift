@@ -442,6 +442,7 @@ struct AnAppCallThatFails {
         let calling = Task { try await copy.catchUp() }
         try await eventually("the call is in the core") { core.state.withLock { $0.catchUpScript.count == 1 } }
         copy.lifecycle.keyWillChange()
+        copy.lifecycle.keyReplaced()
         copy.lifecycle.keyChanged()
         app.signal()
         await #expect(throws: (any Error).self) { try await calling.value }
@@ -523,6 +524,7 @@ struct AnAppCallThatFails {
         copy.lifecycle.keyWillChange()
         let calling = Task { try await copy.catchUp() }
         try await eventually("the call is in the core") { core.state.withLock { $0.catchUpScript.count == 1 } }
+        copy.lifecycle.keyReplaced()
         copy.lifecycle.keyChanged()
         app.signal()
         await #expect(throws: (any Error).self) { try await calling.value }
