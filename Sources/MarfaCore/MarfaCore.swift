@@ -1530,6 +1530,18 @@ public protocol CoreProtocol: AnyObject, Sendable {
      */
     func writeRows(itemId: String, table: String, operations: [JsonObject]) throws  -> QueuedWrite
     
+    /**
+     * Requires a server; duplicate IDs count once toward the 20-item limit.
+     */
+    func previewTrash(ids: [String]) throws  -> TrashPreview
+    
+    /**
+     * Never queued: the digest binds the request to the previewed state.
+     * A write to an item it holds throws `Validation` with the code
+     * `item_being_removed` until it returns.
+     */
+    func trashItems(preview: TrashPreview) throws  -> TrashReport
+    
     func changeView(id: String, changes: JsonObject, version: Int64, idempotencyKey: String?) throws  -> ViewRow
     
     func createView(settings: JsonObject, idempotencyKey: String?) throws  -> ViewRow
@@ -1603,10 +1615,8 @@ open class Core: CoreProtocol, @unchecked Sendable {
 
     
     /**
-     * Opens the file at `path`, creating it when absent. `url` and `key`
-     * go together; without them only local reads work. `renewer` renews
-     * `key` when the server refuses it, as an app signed in with OAuth
-     * does with its refresh token; it needs `url` and `key`.
+     * Only the writer creates a missing store. Omit both `url` and `key` for offline use.
+     * With both set, `renewer` can refresh a key the server refuses.
      */
 public static func `open`(path: String, url: String?, key: String?, renewer: CredentialRenewer? = nil)throws  -> Core  {
     return try  FfiConverterTypeCore_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -2888,6 +2898,32 @@ open func writeRows(itemId: String, table: String, operations: [JsonObject])thro
         FfiConverterString.lower(itemId),
         FfiConverterString.lower(table),
         FfiConverterSequenceTypeJsonObject.lower(operations),$0
+    )
+})
+}
+    
+    /**
+     * Requires a server; duplicate IDs count once toward the 20-item limit.
+     */
+open func previewTrash(ids: [String])throws  -> TrashPreview  {
+    return try  FfiConverterTypeTrashPreview_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_preview_trash(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(ids),$0
+    )
+})
+}
+    
+    /**
+     * Never queued: the digest binds the request to the previewed state.
+     * A write to an item it holds throws `Validation` with the code
+     * `item_being_removed` until it returns.
+     */
+open func trashItems(preview: TrashPreview)throws  -> TrashReport  {
+    return try  FfiConverterTypeTrashReport_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_core_trash_items(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeTrashPreview_lower(preview),$0
     )
 })
 }
@@ -11573,6 +11609,298 @@ public func FfiConverterTypeThumbnail_lower(_ value: Thumbnail) -> RustBuffer {
 
 
 /**
+ * What trashing items would take, as the server read it.
+ */
+public struct TrashPreview: Equatable, Hashable {
+    /**
+     * Each named item once, in the order named.
+     */
+    public var items: [TrashPreviewItem]
+    /**
+     * The number of distinct readable items the trash would take.
+     */
+    public var count: UInt64
+    /**
+     * Pass unchanged to `trash_items` to bind it to this preview.
+     */
+    public var digest: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Each named item once, in the order named.
+         */items: [TrashPreviewItem], 
+        /**
+         * The number of distinct readable items the trash would take.
+         */count: UInt64, 
+        /**
+         * Pass unchanged to `trash_items` to bind it to this preview.
+         */digest: String) {
+        self.items = items
+        self.count = count
+        self.digest = digest
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TrashPreview: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTrashPreview: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TrashPreview {
+        return
+            try TrashPreview(
+                items: FfiConverterSequenceTypeTrashPreviewItem.read(from: &buf), 
+                count: FfiConverterUInt64.read(from: &buf), 
+                digest: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TrashPreview, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeTrashPreviewItem.write(value.items, into: &buf)
+        FfiConverterUInt64.write(value.count, into: &buf)
+        FfiConverterString.write(value.digest, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashPreview_lift(_ buf: RustBuffer) throws -> TrashPreview {
+    return try FfiConverterTypeTrashPreview.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashPreview_lower(_ value: TrashPreview) -> RustBuffer {
+    return FfiConverterTypeTrashPreview.lower(value)
+}
+
+
+public struct TrashPreviewItem: Equatable, Hashable {
+    public var id: String
+    public var type: String
+    public var version: Int64
+    /**
+     * What the trash takes with this item, leaves first, at most 100.
+     */
+    public var takes: [TrashTaken]
+    public var count: UInt64
+    /**
+     * `takes` was cut at its limit.
+     */
+    public var truncated: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, type: String, version: Int64, 
+        /**
+         * What the trash takes with this item, leaves first, at most 100.
+         */takes: [TrashTaken], count: UInt64, 
+        /**
+         * `takes` was cut at its limit.
+         */truncated: Bool) {
+        self.id = id
+        self.type = type
+        self.version = version
+        self.takes = takes
+        self.count = count
+        self.truncated = truncated
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TrashPreviewItem: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTrashPreviewItem: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TrashPreviewItem {
+        return
+            try TrashPreviewItem(
+                id: FfiConverterString.read(from: &buf), 
+                type: FfiConverterString.read(from: &buf), 
+                version: FfiConverterInt64.read(from: &buf), 
+                takes: FfiConverterSequenceTypeTrashTaken.read(from: &buf), 
+                count: FfiConverterUInt64.read(from: &buf), 
+                truncated: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TrashPreviewItem, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.type, into: &buf)
+        FfiConverterInt64.write(value.version, into: &buf)
+        FfiConverterSequenceTypeTrashTaken.write(value.takes, into: &buf)
+        FfiConverterUInt64.write(value.count, into: &buf)
+        FfiConverterBool.write(value.truncated, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashPreviewItem_lift(_ buf: RustBuffer) throws -> TrashPreviewItem {
+    return try FfiConverterTypeTrashPreviewItem.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashPreviewItem_lower(_ value: TrashPreviewItem) -> RustBuffer {
+    return FfiConverterTypeTrashPreviewItem.lower(value)
+}
+
+
+/**
+ * A trash the server accepted.
+ */
+public struct TrashReport: Equatable, Hashable {
+    /**
+     * The copy shows the trash: every item it holds that the trash took,
+     * listed or not, is in the bin, or as a later event left it.
+     */
+    public var settled: Bool
+    /**
+     * Why the copy has not caught up yet, where `settled` is false. The
+     * follow or the next catch-up brings it up to date.
+     */
+    public var behind: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The copy shows the trash: every item it holds that the trash took,
+         * listed or not, is in the bin, or as a later event left it.
+         */settled: Bool, 
+        /**
+         * Why the copy has not caught up yet, where `settled` is false. The
+         * follow or the next catch-up brings it up to date.
+         */behind: String?) {
+        self.settled = settled
+        self.behind = behind
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TrashReport: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTrashReport: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TrashReport {
+        return
+            try TrashReport(
+                settled: FfiConverterBool.read(from: &buf), 
+                behind: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TrashReport, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.settled, into: &buf)
+        FfiConverterOptionString.write(value.behind, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashReport_lift(_ buf: RustBuffer) throws -> TrashReport {
+    return try FfiConverterTypeTrashReport.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashReport_lower(_ value: TrashReport) -> RustBuffer {
+    return FfiConverterTypeTrashReport.lower(value)
+}
+
+
+public struct TrashTaken: Equatable, Hashable {
+    public var id: String
+    public var type: String
+    public var version: Int64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: String, type: String, version: Int64) {
+        self.id = id
+        self.type = type
+        self.version = version
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TrashTaken: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTrashTaken: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TrashTaken {
+        return
+            try TrashTaken(
+                id: FfiConverterString.read(from: &buf), 
+                type: FfiConverterString.read(from: &buf), 
+                version: FfiConverterInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TrashTaken, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.id, into: &buf)
+        FfiConverterString.write(value.type, into: &buf)
+        FfiConverterInt64.write(value.version, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashTaken_lift(_ buf: RustBuffer) throws -> TrashTaken {
+    return try FfiConverterTypeTrashTaken.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTrashTaken_lower(_ value: TrashTaken) -> RustBuffer {
+    return FfiConverterTypeTrashTaken.lower(value)
+}
+
+
+/**
  * A field of an item type, or a property of an edge type.
  */
 public struct TypeField: Equatable, Hashable {
@@ -14726,7 +15054,10 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
         /**
          * Writes in its queue the server has not taken; `None` where the
          * queue cannot be read whole.
-         */unsent: UInt64?, message: String
+         */unsent: UInt64?, 
+        /**
+         * True while set-aside recovery blocks removal or replacement.
+         */setAsideStopped: Bool, message: String
     )
     /**
      * A removal of a store was refused, leaving it as it was, because the
@@ -14778,6 +15109,17 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
         /**
          * The answer's status, where it was read; its body was not.
          */server: ServerAnswer?
+    )
+    /**
+     * The server's root names a release older than this build supports.
+     */
+    case ServerTooOld(
+        /**
+         * The release the server's root names.
+         */served: String, 
+        /**
+         * The oldest release this build works with.
+         */oldest: String, message: String
     )
     /**
      * The `Stop` the call was given was raised before it finished.
@@ -14943,6 +15285,7 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             path: try FfiConverterString.read(from: &buf), 
             reason: try FfiConverterString.read(from: &buf), 
             unsent: try FfiConverterOptionUInt64.read(from: &buf), 
+            setAsideStopped: try FfiConverterBool.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
         case 25: return .UnsentDiffers(
@@ -14984,19 +15327,24 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             message: try FfiConverterString.read(from: &buf), 
             server: try FfiConverterOptionTypeServerAnswer.read(from: &buf)
             )
-        case 32: return .Canceled(
+        case 32: return .ServerTooOld(
+            served: try FfiConverterString.read(from: &buf), 
+            oldest: try FfiConverterString.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 33: return .FirstSyncWaiting(
+        case 33: return .Canceled(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 34: return .Invalid(
+        case 34: return .FirstSyncWaiting(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 35: return .NotAnswerable(
+        case 35: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 36: return .Fault(
+        case 36: return .NotAnswerable(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 37: return .Fault(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -15153,11 +15501,12 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .StoreDamaged(path,reason,unsent,message):
+        case let .StoreDamaged(path,reason,unsent,setAsideStopped,message):
             writeInt(&buf, Int32(24))
             FfiConverterString.write(path, into: &buf)
             FfiConverterString.write(reason, into: &buf)
             FfiConverterOptionUInt64.write(unsent, into: &buf)
+            FfiConverterBool.write(setAsideStopped, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
@@ -15214,28 +15563,35 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterOptionTypeServerAnswer.write(server, into: &buf)
             
         
-        case let .Canceled(message):
+        case let .ServerTooOld(served,oldest,message):
             writeInt(&buf, Int32(32))
+            FfiConverterString.write(served, into: &buf)
+            FfiConverterString.write(oldest, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .FirstSyncWaiting(message):
+        case let .Canceled(message):
             writeInt(&buf, Int32(33))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Invalid(message):
+        case let .FirstSyncWaiting(message):
             writeInt(&buf, Int32(34))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .NotAnswerable(message):
+        case let .Invalid(message):
             writeInt(&buf, Int32(35))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Fault(message):
+        case let .NotAnswerable(message):
             writeInt(&buf, Int32(36))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Fault(message):
+            writeInt(&buf, Int32(37))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -18307,6 +18663,56 @@ fileprivate struct FfiConverterSequenceTypeTableChoice: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeTrashPreviewItem: FfiConverterRustBuffer {
+    typealias SwiftType = [TrashPreviewItem]
+
+    public static func write(_ value: [TrashPreviewItem], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTrashPreviewItem.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TrashPreviewItem] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TrashPreviewItem]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTrashPreviewItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeTrashTaken: FfiConverterRustBuffer {
+    typealias SwiftType = [TrashTaken]
+
+    public static func write(_ value: [TrashTaken], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeTrashTaken.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [TrashTaken] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [TrashTaken]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeTrashTaken.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeTypeField: FfiConverterRustBuffer {
     typealias SwiftType = [TypeField]
 
@@ -18668,10 +19074,7 @@ public func removeStore(path: String, confirmation: String)throws   {try rustCal
 }
 }
 /**
- * Removes the store at `path` as `removeStore` does, agreeing to lose every
- * write it holds that the server has not taken, whatever they are and
- * whether or not they can be read, as for a store `open` refuses with
- * `StoreDamaged`. Throws as `removeStore` does but for the writes.
+ * Like `removeStore`, but accepts loss without a list only for an unreadable or empty queue.
  */
 public func removeStoreLosingAll(path: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_func_remove_store_losing_all(
@@ -18765,7 +19168,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_func_remove_store() != 56347) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_func_remove_store_losing_all() != 6871) {
+    if (uniffi_marfa_core_ffi_checksum_func_remove_store_losing_all() != 34447) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_func_set_aside_damaged() != 15762) {
@@ -19059,6 +19462,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_write_rows() != 34686) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_core_preview_trash() != 64443) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_core_trash_items() != 54587) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_core_change_view() != 11627) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -19125,7 +19534,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_credentialrenewer_renew() != 48172) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 18143) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_core_open() != 61363) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_constructor_core_open_reader() != 60011) {
