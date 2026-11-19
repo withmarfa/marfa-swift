@@ -50,6 +50,8 @@ final class CoreHolder: Sendable {
     ///
     /// A core with no Rust behind it takes none, and so makes no call into the glue.
     private let stops: Bool
+    /// Where a call that can wait on the server runs.
+    private let blocking: CoreQueue
 
     /// What a core is opened with: the token to send and, for a sign-in, what renews it.
     struct Opening: Sendable {
@@ -61,12 +63,13 @@ final class CoreHolder: Sendable {
     /// `address` is the server's address; a new server at another one is refused before anything changes.
     init(
         _ core: any CoreProtocol, reopen: (@Sendable (Opening) throws -> any CoreProtocol)? = nil,
-        address: String? = nil, stops: Bool = true
+        address: String? = nil, stops: Bool = true, blocking: CoreQueue = .blocking
     ) {
         state = Mutex(State(core: core, handle: Handle(core.heldHandle())))
         self.reopen = reopen
         self.address = address
         self.stops = stops
+        self.blocking = blocking
     }
 
     /// What the copy held while it was open, and still the last thing it held
@@ -160,7 +163,7 @@ final class CoreHolder: Sendable {
     /// Runs `work` as ``run(_:)`` does, on ``CoreQueue/blocking``, for a call that can wait on the server, so a few
     /// slow transfers never fill the lane that reads and writes use.
     func runBlocking<T: Sendable>(_ work: @escaping @Sendable (any CoreProtocol) throws -> T) async throws -> T {
-        try await queued(on: .blocking) { [self] in try with(work) }
+        try await queued(on: blocking) { [self] in try with(work) }
     }
 
     /// A canceled call on a copy that is closing or closed reports `closed`, which stays true, rather than `canceled`.
@@ -179,7 +182,7 @@ final class CoreHolder: Sendable {
     ) async throws -> T {
         let stop = stops ? MarfaCore.Stop() : nil
         return try await withTaskCancellationHandler {
-            try await queued(on: .blocking) { [self] in try with { core in try work(core, stop) } }
+            try await queued(on: blocking) { [self] in try with { core in try work(core, stop) } }
         } onCancel: {
             stop?.raise()
         }
@@ -194,6 +197,17 @@ final class CoreHolder: Sendable {
         core = nil
         returnLease()
         return try result.get()
+    }
+
+    /// Refuses every call that has not yet begun, at once.
+    ///
+    /// The calls running finish, and the core is dropped when the last of them returns or when `close()` runs.
+    func refuseNewCalls() {
+        let settled = state.withLock { state in
+            state.closing = true
+            return state.takeSettled()
+        }
+        for waiter in settled { waiter.resume() }
     }
 
     /// Refuses new calls and returns once the running ones are done and the

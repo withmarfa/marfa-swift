@@ -511,7 +511,8 @@ struct FakeCopyBehavior {
             return .accepted
         }
         let first = Task { try await copy.queue.drain() }
-        try await eventually("the first drain offered the write") { offered.withLock { $0 } == 1 }
+        try await eventually("the first drain offered the write", within: 60) { offered.withLock { $0 } == 1 }
+        try #require(offered.withLock { $0 } == 1, "the first drain never offered the write")
         let started = Mutex(false)
         let second = Task {
             started.withLock { $0 = true }

@@ -9,7 +9,7 @@ struct CopyOptions {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(
+        await core.change(
             0,
             MarfaCore.Change.watchFailed(
                 reason: .Unauthorized(code: "invalid_key", message: "refused", server: nil),
@@ -18,7 +18,7 @@ struct CopyOptions {
         try await eventually("the credential stopped the watch") { heard.stops.count == 1 }
         _ = try await copy.pin("outside")
         _ = try await copy.unpin("outside")
-        #expect(core.places.count == 1)
+        try await eventually("the place was taken") { core.places.count == 1 }
         await copy.close()
     }
 
@@ -87,12 +87,12 @@ struct CopyOptions {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(
+        await core.change(
             0,
             MarfaCore.Change.serverUnreachable(
                 reason: .RateLimited(code: "rate_limited", message: "slow down", retryAfterSeconds: 7, server: nil),
                 cursor: "3"))
-        core.change(0, MarfaCore.Change.serverReachable(cursor: "3"))
+        await core.change(0, MarfaCore.Change.serverReachable(cursor: "3"))
         try await eventually("both were told") { heard.all.count == 2 }
         #expect(
             heard.all.map(\.origin) == [
@@ -112,7 +112,7 @@ struct CopyOptions {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.serverUnreachable(reason: coreError, cursor: "3"))
+        await core.change(0, MarfaCore.Change.serverUnreachable(reason: coreError, cursor: "3"))
         try await eventually("the server's going was told") { heard.all.count == 1 }
         #expect(heard.all.map(\.origin) == [.serverUnreachable(expected)])
         await copy.close()

@@ -204,7 +204,7 @@ struct LiveQueries {
         let probe = Probe()
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
-        core.change(0, MarfaCore.Change.applied(event: "item.updated", itemId: "n1", edgeId: nil, cursor: "7"))
+        await core.change(0, MarfaCore.Change.applied(event: "item.updated", itemId: "n1", edgeId: nil, cursor: "7"))
         try await eventually("the event was read") { probe.reads == 2 && !query.isLoading }
         try await bounded("close") { await copy.close() }
     }
@@ -412,7 +412,7 @@ struct LiveQueries {
         try await eventually("following") { query.connection == .following }
         let reads = probe.reads
 
-        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
+        await core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         #expect(query.error == nil, "a follow failure is not a read failure")
         #expect(probe.reads == reads, "a follow failure read")
@@ -421,7 +421,7 @@ struct LiveQueries {
         try await eventually("a local write is still read") { probe.reads == reads + 1 && !query.isLoading }
         #expect(query.connection == .offline(.network(message: "dropped")), "a read cleared the follow failure")
 
-        core.change(0, MarfaCore.Change.serverReachable(cursor: "8"))
+        await core.change(0, MarfaCore.Change.serverReachable(cursor: "8"))
         try await eventually("the server reached again shows the follow runs") { query.connection == .following }
         try await bounded("close") { await copy.close() }
     }
@@ -432,7 +432,7 @@ struct LiveQueries {
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
         try await eventually("following") { query.connection == .following }
-        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
+        await core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         _ = try await copy.hydrate(types: ["app.test.entry"], tier: .feed)
         try await eventually("the hydration shows the follow runs") { query.connection == .following }
@@ -445,7 +445,7 @@ struct LiveQueries {
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
         try await eventually("following") { query.connection == .following }
-        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
+        await core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
         let reads = probe.reads
         copy.feed.announce(told(.refreshed(.unfinished)))
@@ -463,7 +463,7 @@ struct LiveQueries {
         try await Self.settled(query)
         try await eventually("following") { query.connection == .following }
 
-        core.fail(0, with: .Store(message: "fault"))
+        await core.fail(0, with: .Store(message: "fault"))
         try await eventually("the stop is shown") { query.connection == .stopped(.store(message: "fault")) }
         let reads = probe.reads
         await query.refresh()
@@ -473,7 +473,7 @@ struct LiveQueries {
         try await eventually("a retry waits") { clock.waiting > 0 }
         clock.advance(by: .seconds(300))
         try await eventually("following again") { query.connection == .following }
-        #expect(core.places.count == 2, "the retry took no new place in the watch")
+        try await eventually("the place was taken") { core.places.count == 2 }
         copy.feed.announce(write(.addTag, item: "n1"))
         try await eventually("a local write is read again") { probe.reads == reads + 2 && !query.isLoading }
         try await bounded("close") { await copy.close() }
@@ -485,7 +485,7 @@ struct LiveQueries {
         let query = LiveQuery(copy, reading: probe.reading("A"))
         try await Self.settled(query)
         try await eventually("following") { query.connection == .following }
-        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
+        await core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "dropped"), cursor: "3"))
         try await eventually("the failure is shown") { query.connection == .offline(.network(message: "dropped")) }
 
         try await bounded("close") { await copy.close() }
@@ -523,6 +523,7 @@ struct LiveQueries {
         weak let released = query
         try await Self.settled(try #require(query))
         #expect(copy.feed.count == 1)
+        try await eventually("the place was taken") { core.places.count == 1 }
         #expect(!core.places[0].stopped)
 
         query = nil

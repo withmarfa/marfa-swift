@@ -135,12 +135,12 @@ struct ALifecycle {
 
         // A follow that ran five minutes since it last failed starts its waits again from the first.
         clock.advance(by: .seconds(300))
-        core.fail(0, with: .Io(message: "disk"))
+        await core.fail(0, with: .Io(message: "disk"))
         try await eventually("offline again") { updates.connection == .offline(.io(message: "disk")) }
         #expect(try await Self.wait(clock, after: 10) == .seconds(5))
         clock.advance(by: .seconds(5))
         try await eventually("following again") { updates.connection == .following }
-        #expect(core.places.count == 2, "the stream the core ended was not taken again")
+        try await eventually("the place was taken") { core.places.count == 2 }
         await copy.close()
     }
 
@@ -163,7 +163,7 @@ struct ALifecycle {
 
         // A drain that left writes undelivered goes again, no sooner than its rate limit asks.
         core.state.withLock { $0.drained = Self.report(undelivered: 1, retryAfterSeconds: 60) }
-        core.change(0, .queueDrained(report: Self.report(undelivered: 1, retryAfterSeconds: 60), cursor: "2"))
+        await core.change(0, .queueDrained(report: Self.report(undelivered: 1, retryAfterSeconds: 60), cursor: "2"))
         #expect(try await Self.wait(clock, after: 1) == .seconds(60))
         clock.advance(by: .seconds(60))
         try await eventually("drained again") { core.state.withLock { $0.drains } == 1 }
@@ -184,7 +184,7 @@ struct ALifecycle {
         let updates = Updates(copy.updates())
         try await eventually("following") { updates.connection == .following }
 
-        old.change(
+        await old.change(
             0,
             .watchFailed(
                 reason: .Unauthorized(code: "unauthorized", message: "no", server: nil),
@@ -226,7 +226,7 @@ struct ALifecycle {
         let updates = Updates(copy.updates())
         try await eventually("following") { updates.connection == .following }
 
-        core.change(
+        await core.change(
             0,
             .watchFailed(
                 reason: .Server(
@@ -239,7 +239,7 @@ struct ALifecycle {
         try await eventually("stopped") { updates.connection == stopped }
         #expect(try await Self.wait(clock, after: 0) == .seconds(300))
 
-        core.change(0, Self.applied("a"))
+        await core.change(0, Self.applied("a"))
         try await eventually("the event's row was named") { updates.namedItems.contains("a") }
         #expect(updates.connection == stopped, "a server event showed a stopped follow as following")
 
@@ -258,7 +258,7 @@ struct ALifecycle {
         try await eventually("following") { updates.connection == .following }
 
         core.state.withLock { $0.changedItems.append("a") }
-        core.change(0, .applied(event: "item.updated", itemId: nil, edgeId: nil, cursor: "2"))
+        await core.change(0, .applied(event: "item.updated", itemId: nil, edgeId: nil, cursor: "2"))
         try await eventually("the moved row was named") { updates.namedItems.contains("a") }
         await copy.close()
     }
@@ -273,7 +273,7 @@ struct ALifecycle {
         var update = await updates.next()
         while update?.connection != .following { update = await updates.next() }
 
-        core.fail(0, with: .Io(message: "disk"))
+        await core.fail(0, with: .Io(message: "disk"))
         while update?.connection != .offline(.io(message: "disk")) { update = await updates.next() }
         try await eventually("the stream was let go") { copy.feed.count == 0 }
 
@@ -305,7 +305,7 @@ struct ALifecycle {
         try await eventually("watching the writer's saves") { updates.connection == .local && core.places.count == 1 }
 
         core.state.withLock { $0.watchRefused = .Io(message: "disk") }
-        core.fail(0, with: .Io(message: "disk"))
+        await core.fail(0, with: .Io(message: "disk"))
         try await eventually("stopped") { updates.connection == .stopped(.io(message: "disk")) }
         #expect(try await Self.wait(clock, after: 0) == .seconds(5))
         clock.advance(by: .seconds(5))
@@ -325,6 +325,23 @@ struct ALifecycle {
         await copy.close()
     }
 
+    @Test func aReaderIsAskedToReadEverythingAfterAKeyChange() async throws {
+        let core = FakeCore.reader()
+        let next = FakeCore.reader()
+        let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
+        let updates = Updates(copy.updates())
+        try await eventually("watching the writer's saves") { updates.connection == .local && core.places.count == 1 }
+        let before = updates.all.count
+
+        try await bounded("use") { try await copy.use(.stub("new-key")) }
+
+        // A save made while the places were let go went unseen.
+        try await eventually("asked to read everything") {
+            updates.all[before...].contains { $0.reread == .everything }
+        }
+        await copy.close()
+    }
+
     @Test func aRefillThatFailsForNowShowsTheCopyOfflineUntilItSucceeds() async throws {
         let core = FakeCore.writer()
         let clock = ManualClock()
@@ -339,7 +356,7 @@ struct ALifecycle {
             $0.hydrateFails = .Network(message: "offline")
             $0.hydrateFailsFirst = 1
         }
-        core.change(0, .watchFailed(reason: ARefill.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: ARefill.agedOut, cursor: "3"))
         try await eventually("offline") { updates.connection == .offline(.network(message: "offline")) }
         #expect(updates.all.contains { $0.connection == .connecting })
         try await ARefill.letWaitsPass(on: clock, until: updates.connection == .following)
@@ -353,7 +370,7 @@ struct ALifecycle {
             let copy = Self.copy(core, ManualClock())
             let updates = Updates(copy.updates())
             try await eventually("following") { updates.connection == .following }
-            core.fail(0, with: .Io(message: "disk"))
+            await core.fail(0, with: .Io(message: "disk"))
             try await eventually("the stream was let go") { copy.feed.count == 0 }
 
             await withTaskGroup(of: Void.self) { group in
@@ -434,7 +451,7 @@ struct ALifecycle {
 
         updates.cancel()
         try await eventually("the follow was let go") { copy.feed.count == 0 && clock.waiting == 0 }
-        #expect(core.places[0].stopped)
+        try await eventually("the place was stopped") { core.places.first?.stopped == true }
         clock.advance(by: .seconds(300))
         #expect(Self.catchUps(core) == 1)
 
@@ -454,7 +471,7 @@ struct ALifecycle {
         #expect(update?.reread == .everything)
         while update?.connection != .following { update = await updates.next() }
 
-        for n in 0..<10_000 { core.change(0, Self.applied("i\(n % 50)", n)) }
+        for n in 0..<10_000 { await core.change(0, Self.applied("i\(n % 50)", n)) }
         let burst = try #require(await updates.next())
         guard case .parts(let parts) = burst.reread else {
             Issue.record("the burst asked to read everything: \(burst.reread)")
@@ -463,7 +480,7 @@ struct ALifecycle {
         #expect(Set(parts.rows.items) == Set((0..<50).map { "i\($0)" }))
         #expect(parts.rows.items.count == 50)
 
-        core.change(0, Self.applied("j", 10_000))
+        await core.change(0, Self.applied("j", 10_000))
         let next = try #require(await updates.next())
         #expect(next.reread == .parts(Reread.Parts(rows: ChangedRows(items: ["j"]))))
         await copy.close()
@@ -476,7 +493,7 @@ struct ALifecycle {
         var update = await updates.next()
         while update?.connection != .following { update = await updates.next() }
 
-        for n in 0..<10_000 { core.change(0, Self.applied("i\(n)", n)) }
+        for n in 0..<10_000 { await core.change(0, Self.applied("i\(n)", n)) }
         #expect(await updates.next()?.reread == .everything)
         await copy.close()
     }

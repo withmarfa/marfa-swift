@@ -44,7 +44,7 @@ struct AnAppCallThatFails {
         #expect(try await ALifecycle.wait(clock, after: 0) == .seconds(300))
 
         // A server event does not show the copy following: only a catch-up that succeeds does.
-        core.change(0, ALifecycle.applied("a"))
+        await core.change(0, ALifecycle.applied("a"))
         try await eventually("the event's row was named") { updates.namedItems.contains("a") }
         #expect(updates.connection == .stopped(fault.error))
 
@@ -157,7 +157,7 @@ struct AnAppCallThatFails {
         let core = FakeCore.writer()
         let (copy, updates) = try await followingCopy(core, ManualClock())
         let refusal = Marfa.MarfaError.unauthorized(code: "unauthorized", message: "no", server: nil)
-        core.change(
+        await core.change(
             0,
             .watchFailed(
                 reason: .Unauthorized(code: "unauthorized", message: "no", server: nil),
@@ -183,7 +183,7 @@ struct AnAppCallThatFails {
 
         core.state.withLock { $0.catchUpFails = ALifecycle.offline }
         await #expect(throws: (any Error).self) { try await copy.catchUp() }
-        core.change(0, ALifecycle.applied("a"))
+        await core.change(0, ALifecycle.applied("a"))
         try await eventually("the event's row was named") { updates.namedItems.contains("a") }
         #expect(updates.connection == .stopped(stopped))
         #expect(copy.lifecycle.connection == .stopped(stopped))
@@ -227,7 +227,7 @@ struct AnAppCallThatFails {
         #expect(try await Self.retryWait(clock, 0) == .seconds(5))
 
         // A server event does not show the copy following: only a hydration or a catch-up that succeeds does.
-        core.change(0, ALifecycle.applied("a"))
+        await core.change(0, ALifecycle.applied("a"))
         try await eventually("the event's row was named") { updates.namedItems.contains("a") }
         #expect(updates.connection == .offline(network))
 
@@ -316,7 +316,7 @@ struct AnAppCallThatFails {
         core.state.withLock { $0.hydrateFails = ALifecycle.offline }
         await #expect(throws: (any Error).self) { try await copy.hydrate(types: ["app.test.entry"], tier: .all) }
         try await eventually("offline") { updates.connection == .offline(.network(message: "offline")) }
-        core.change(0, ALifecycle.applied("a"))
+        await core.change(0, ALifecycle.applied("a"))
         try await eventually("the event's row was named") { updates.namedItems.contains("a") }
         #expect(Self.isOffline(updates.connection))
 
@@ -442,6 +442,7 @@ struct AnAppCallThatFails {
         let calling = Task { try await copy.catchUp() }
         try await eventually("the call is in the core") { core.state.withLock { $0.catchUpScript.count == 1 } }
         copy.lifecycle.keyWillChange()
+        copy.lifecycle.keyReplaced()
         copy.lifecycle.keyChanged()
         app.signal()
         await #expect(throws: (any Error).self) { try await calling.value }
@@ -475,7 +476,7 @@ struct AnAppCallThatFails {
         try await eventually("the retry ran") { ALifecycle.catchUps(core) == before + 1 }
         #expect(try await ALifecycle.wait(clock, after: 1) == .seconds(300), "the retry was not asked for again")
 
-        core.change(0, ALifecycle.applied("a"))
+        await core.change(0, ALifecycle.applied("a"))
         try await eventually("the event's row was named") { updates.namedItems.contains("a") }
         #expect(copy.lifecycle.connection == .stopped(stopped))
         #expect(updates.connection == .stopped(stopped))
@@ -523,6 +524,7 @@ struct AnAppCallThatFails {
         copy.lifecycle.keyWillChange()
         let calling = Task { try await copy.catchUp() }
         try await eventually("the call is in the core") { core.state.withLock { $0.catchUpScript.count == 1 } }
+        copy.lifecycle.keyReplaced()
         copy.lifecycle.keyChanged()
         app.signal()
         await #expect(throws: (any Error).self) { try await calling.value }

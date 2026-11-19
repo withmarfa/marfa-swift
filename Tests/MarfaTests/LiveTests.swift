@@ -655,7 +655,8 @@ extension LiveWorkingCopies {
                 try await Task.sleep(for: .milliseconds(700))
             }
             try await Task.sleep(for: .seconds(1))
-            let saves = heard.saves
+            // The first save told is the one a stream is given as it takes its place in the watch.
+            let saves = Array(heard.saves.dropFirst())
             #expect(saves.count == 3, "\(heard.all)")
             for (madeAt, told) in zip(made, saves) {
                 #expect(
