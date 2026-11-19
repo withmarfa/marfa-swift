@@ -24,7 +24,7 @@ struct Changes {
         core.state.withLock { $0.hydration = .expired }
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.watchFailed(reason: coreError, cursor: "3"))
+        await core.change(0, MarfaCore.Change.watchFailed(reason: coreError, cursor: "3"))
         try await eventually("the stream receives the typed failure") { heard.all == [stopped(expected)] }
         try await bounded("close") { await copy.close() }
     }
@@ -105,9 +105,9 @@ struct Changes {
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
-        #expect(core.places.count == 2)
-        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7"))
-        core.change(1, MarfaCore.Change.applied(event: "item.created", itemId: "n2", edgeId: nil, cursor: "8"))
+        try await eventually("the place was taken") { core.places.count == 2 }
+        await core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7"))
+        await core.change(1, MarfaCore.Change.applied(event: "item.created", itemId: "n2", edgeId: nil, cursor: "8"))
         try await eventually("each stream was told what its own place heard") {
             first.all.map(\.itemId) == ["n1"] && second.all.map(\.itemId) == ["n2"]
         }
@@ -118,7 +118,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.applied(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42"))
+        await core.change(0, MarfaCore.Change.applied(event: "edge.created", itemId: "a", edgeId: "e1", cursor: "42"))
         let told = Marfa.Change(origin: .server(event: "edge.created", cursor: "42"), itemId: "a", edgeId: "e1")
         try await eventually("the change was told") { heard.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -128,8 +128,8 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.catalogChanged(cursor: "9"))
-        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10"))
+        await core.change(0, MarfaCore.Change.catalogChanged(cursor: "9"))
+        await core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "10"))
         let item = Marfa.Change(origin: .server(event: "item.created", cursor: "10"), itemId: "n1", edgeId: nil)
         try await eventually("both changes were told") { heard.all.count == 2 }
         #expect(heard.all == [refreshed(.catalog), item])
@@ -141,10 +141,11 @@ struct Changes {
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
+        try await eventually("both places were taken") { core.places.count == 2 }
         first.stop()
         try await eventually("the first place was stopped") { core.places[0].stopped }
         #expect(!core.places[1].stopped)
-        core.change(1, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7"))
+        await core.change(1, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "7"))
         try await eventually("the second stream was told") { second.all.count == 1 }
         second.stop()
         try await eventually("the second place was stopped") { core.places[1].stopped }
@@ -160,11 +161,12 @@ struct Changes {
         let heard = Heard(stream)
         try await bounded("suspend") { try await feed.suspend() }
         feed.resume(readsOnly: false)
-        try #require(core.places.count == 2)
+        try await eventually("the place was taken") { core.places.count == 2 }
 
-        core.endAgain(0, with: .Network(message: "late"))
-        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
-        core.change(1, MarfaCore.Change.applied(event: "item.created", itemId: "current", edgeId: nil, cursor: "2"))
+        await core.endAgain(0, with: .Network(message: "late"))
+        await core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
+        await core.change(
+            1, MarfaCore.Change.applied(event: "item.created", itemId: "current", edgeId: nil, cursor: "2"))
         try await eventually("the current place's change was told") { !heard.all.isEmpty }
         #expect(heard.all.map(\.itemId) == ["current"])
         #expect(heard.stops.isEmpty)
@@ -182,21 +184,22 @@ struct Changes {
         _ = try #require(feed.add(otherContinuation))
         let heard = Heard(told)
         withExtendedLifetime(other) {}
-        core.change(
+        await core.change(
             0, MarfaCore.Change.serverUnreachable(reason: .Network(message: "gone"), cursor: "3"))
         try await eventually("the first stream was told the server went") { heard.all.count == 1 }
 
         try await bounded("suspend") { try await feed.suspend() }
         feed.resume(readsOnly: false)
-        try #require(core.places.count == 4)
+        try await eventually("the place was taken") { core.places.count == 4 }
         // The feed resumes its streams in no set order.
         let given = core.places.indices.dropFirst(2).filter { core.places[$0].toldUnreachable }
         #expect(given.count == 1, "only the stream told the server was gone should be given a place told so")
         let place = try #require(given.first)
-        core.change(place, MarfaCore.Change.serverReachable(cursor: "3"))
+        await core.change(place, MarfaCore.Change.serverReachable(cursor: "3"))
         try await eventually("the stream was told the server is back") { heard.all.count == 2 }
         try await bounded("suspend") { try await feed.suspend() }
         feed.resume(readsOnly: false)
+        try await eventually("both streams took a place again") { core.places.count == 6 }
         let again = core.places.dropFirst(4).filter(\.toldUnreachable).count
         #expect(again == 0, "a stream told the server was back was given a place told it was gone")
         try await bounded("close") { await feed.close() }
@@ -209,7 +212,7 @@ struct Changes {
         _ = try #require(feed.add(continuation))
         let heard = Heard(stream)
         try await bounded("suspend") { try await feed.suspend() }
-        core.endAgain(0, with: .Network(message: "as it stopped"))
+        await core.endAgain(0, with: .Network(message: "as it stopped"))
         feed.resume(readsOnly: false)
         try await Task.sleep(for: .milliseconds(100))
         #expect(heard.stops.isEmpty, "a place already left told its error")
@@ -223,12 +226,12 @@ struct Changes {
         let copy = WorkingCopy(holder: CoreHolder(core, reopen: { _ in next }), hasServer: true)
         var heard = copy.changes().makeAsyncIterator()
         let fault = MarfaCore.MarfaError.Invalid(message: "the watch stopped on a fault in the core")
-        core.fail(0, with: fault)
+        await core.fail(0, with: fault)
         #expect(await heard.next() == stopped(.invalid(message: "the watch stopped on a fault in the core")))
         #expect(await heard.next() == nil, "the stream stayed open after the fault")
         #expect(copy.feed.count == 0)
 
-        core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
+        await core.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "late", edgeId: nil, cursor: "1"))
         copy.feed.announce(write(.addTag, item: "n1"))
         _ = try await bounded("the catch-up") { try await copy.catchUp() }
         try await bounded("use") { try await copy.use(.stub("new-key")) }
@@ -245,9 +248,12 @@ struct Changes {
             core.state.withLock { $0.caughtUp.applied = 2 }
             _ = try await bounded("the catch-up") { try await copy.catchUp() }
             try await eventually("the hydration and the catch-up that applied events were told") {
-                heard.all == [refreshed(.hydrated), refreshed(.caughtUp)]
+                // A reader's stream is also told the save it is given as it takes its place.
+                heard.all.filter { $0.origin != .saved(dataVersion: 0) } == [
+                    refreshed(.hydrated), refreshed(.caughtUp),
+                ]
             }
-            #expect(core.places.count == 1)
+            try await eventually("the place was taken") { core.places.count == 1 }
             let stopped = core.places.map(\.stopped)
             #expect(stopped == [false], "a place was stopped for a recovery")
             try await bounded("close") { await copy.close() }
@@ -277,7 +283,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.applied(event: "item.updated", itemId: nil, edgeId: nil, cursor: "5"))
+        await core.change(0, MarfaCore.Change.applied(event: "item.updated", itemId: nil, edgeId: nil, cursor: "5"))
         let told = Marfa.Change(origin: .server(event: "item.updated", cursor: "5"), itemId: nil, edgeId: nil)
         try await eventually("the change was told") { heard.all == [told] }
         try await bounded("close") { await copy.close() }
@@ -358,7 +364,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "gone"), cursor: "3"))
+        await core.change(0, MarfaCore.Change.watchFailed(reason: .Network(message: "gone"), cursor: "3"))
         _ = try await copy.queue.drain()
         let refusal = MarfaCore.Refusal(
             reason: "validation_error", code: "validation_error", message: "m",
@@ -402,7 +408,7 @@ struct Changes {
         let report = MarfaCore.DrainReport(
             answered: 1, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [verdict],
             stopped: nil, unclaimedSources: [], retryAfterSeconds: nil)
-        core.change(0, MarfaCore.Change.queueDrained(report: report, cursor: "3"))
+        await core.change(0, MarfaCore.Change.queueDrained(report: report, cursor: "3"))
         let told = Marfa.DrainReport(report)
         try await eventually("the drain was told") { heard.all.count == 3 }
         #expect(
@@ -415,7 +421,7 @@ struct Changes {
         let idle = MarfaCore.DrainReport(
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
             unclaimedSources: [], retryAfterSeconds: nil)
-        core.change(0, MarfaCore.Change.queueDrained(report: idle, cursor: "3"))
+        await core.change(0, MarfaCore.Change.queueDrained(report: idle, cursor: "3"))
         try await eventually("the idle drain was told") { heard.all.count == 4 }
         #expect(heard.all[3] == Marfa.Change(origin: .queueDrained(Marfa.DrainReport(idle)), itemId: nil, edgeId: nil))
         try await bounded("close") { await copy.close() }
@@ -425,7 +431,7 @@ struct Changes {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(
+        await core.change(
             0,
             MarfaCore.Change.queueNotDrained(
                 error: .RateLimited(code: "rate_limited", message: "slow", retryAfterSeconds: 4, server: nil),
@@ -484,7 +490,7 @@ struct Changes {
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let first = Heard(copy.changes())
         let second = Heard(copy.changes())
-        #expect(core.places.count == 2)
+        try await eventually("the place was taken") { core.places.count == 2 }
         try await bounded("close") { await copy.close() }
         let ended = core.places.map(\.ended)
         #expect(ended == [true, true], "close returned while a place in the watch still held the store")
@@ -500,7 +506,7 @@ struct Changes {
             let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
             held = copy.feed
             let heard = Heard(copy.changes())
-            #expect(core.places.count == 1)
+            try await eventually("the place was taken") { core.places.count == 1 }
             try await bounded("close") { await copy.close() }
             withExtendedLifetime(heard) {}
         }()
@@ -535,8 +541,8 @@ struct Changes {
         gate.signal()
         let heard = try await bounded("changes()") { await listening.value }
         try await eventually("the place was taken") { core.places.count == 1 }
-        core.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
-        try await eventually("the save was told") { heard.saves.count == 1 }
+        await core.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
+        try await eventually("the save was told") { heard.told(saveOf: 1) }
         try await bounded("close") { await copy.close() }
     }
 
@@ -633,7 +639,7 @@ struct ARefill {
         let core = Self.stale()
         let copy = Self.copy(core)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill was told") { heard.all == [refreshed(.hydrated)] }
         let options = try #require(core.state.withLock { $0.hydrationOptions })
         #expect(options.types == ["core.note"] && options.tier == .library && options.edgeTypes == ["core.link"])
@@ -652,7 +658,7 @@ struct ARefill {
         let clock = ManualClock()
         let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         let waits = [100, 200, 400, 400].map(Duration.milliseconds)
         for (made, wait) in waits.enumerated() {
             try await eventually("the refill waits before attempt \(made + 2)") { clock.waiting == 1 }
@@ -679,7 +685,7 @@ struct ARefill {
         let clock = ManualClock()
         let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill waits") { clock.waiting == 1 }
         #expect(clock.requested == [.seconds(600)])
         clock.advance(by: .seconds(599))
@@ -694,17 +700,17 @@ struct ARefill {
         let clock = ManualClock()
         let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first refill was told") { heard.all.count == 1 }
         #expect(clock.requested.isEmpty)
         core.state.withLock { $0.hydration = .stale }
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the second refill waits") { clock.waiting == 1 }
         #expect(heard.all.count == 1)
         clock.advance(by: .milliseconds(100))
         try await eventually("the second refill was told") { heard.all.count == 2 }
         core.state.withLock { $0.hydration = .stale }
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the third refill waits") { clock.waiting == 1 }
         #expect(heard.all.count == 2)
         clock.advance(by: .milliseconds(200))
@@ -719,13 +725,13 @@ struct ARefill {
         let clock = ManualClock()
         let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first refill was told") { heard.all.count == 1 }
         // The refill tells the streams before it notes when the fill ended.
         try await eventually("the first refill ended") { !copy.feed.isRefilling }
         clock.advance(by: Self.pace.settle)
         core.state.withLock { $0.hydration = .stale }
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the second refill was told") { heard.all.count == 2 }
         #expect(clock.requested.isEmpty)
         await copy.close()
@@ -776,7 +782,7 @@ struct ARefill {
         }
         let copy = Self.copy(core)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the stop reached the app") { heard.stops == [stopped(told)] }
         try await Task.sleep(for: .milliseconds(500))
         #expect(heard.stops == [stopped(told)])
@@ -793,7 +799,7 @@ struct ARefill {
         let refused = MarfaCore.MarfaError.CopyExpired(
             reason: "catchup_too_old", message: "refill the copy",
             server: nil)
-        core.change(0, .watchFailed(reason: refused, cursor: "3"))
+        await core.change(0, .watchFailed(reason: refused, cursor: "3"))
         try await eventually("the stop reached the app") {
             heard.stops == [stopped(.copyExpired(reason: "catchup_too_old", message: "refill the copy", server: nil))]
         }
@@ -812,7 +818,7 @@ struct ARefill {
         let copy = Self.copy(
             core, pace: .init(first: .seconds(1), most: .seconds(1), settle: .seconds(5)), clock: clock)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the first attempt failed") { heard.all == [refreshed(.unfinished)] }
         try await eventually("the refill waits") { clock.waiting == 1 }
         try await copy.feed.suspend()
@@ -828,7 +834,7 @@ struct ARefill {
         let gate = Self.gate(core)
         let copy = Self.copy(core)
         _ = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill is running") { Self.gated(core) }
         let app = Task { try await copy.catchUp() }
         try await Task.sleep(for: .milliseconds(100))
@@ -862,7 +868,7 @@ struct ARefill {
         let gate = Self.gate(core)
         let copy = Self.copy(core)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill is running") { Self.gated(core) }
         let app = Task { try await copy.hydrate(types: ["*"], tier: .all) }
         try await Task.sleep(for: .milliseconds(100))
@@ -881,7 +887,7 @@ struct ARefill {
         let gate = Self.gate(core)
         let copy = Self.copy(core)
         _ = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill is running") { Self.gated(core) }
         let app = Task { try await copy.hydrate(types: ["core.note"], tier: .library, edgeTypes: ["core.link"]) }
         try await Task.sleep(for: .milliseconds(100))
@@ -899,7 +905,7 @@ struct ARefill {
         let heard = Heard(copy.changes())
         let app = Task { try await copy.hydrate(types: ["*"], tier: .all) }
         try await eventually("the app's hydration is running") { Self.gated(core) }
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await Task.sleep(for: .milliseconds(100))
         gate.signal()
         _ = try await bounded("the app's hydration") { try await app.value }
@@ -916,7 +922,7 @@ struct ARefill {
         core.state.withLock { $0.hydration = .inProgress }
         let copy = Self.copy(core)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await Task.sleep(for: .milliseconds(300))
         #expect(heard.all.isEmpty)
         #expect(core.state.withLock { $0.hydrations.isEmpty })
@@ -927,7 +933,7 @@ struct ARefill {
         let core = Self.stale()
         let copy = Self.copy(core)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill filled the copy") { heard.all.last == refreshed(.hydrated) }
         #expect(core.state.withLock { $0.hydrationsInPlaceOnly } == [true])
         _ = try await copy.hydrate(types: ["core.note"], tier: .library)
@@ -943,9 +949,9 @@ struct ARefill {
         }
         let copy = Self.copy(core, pace: .init(first: .seconds(60), most: .seconds(60), settle: .seconds(30)))
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the stop reached the app") { heard.stops.count == 1 }
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the second refill was made at once", within: 15) {
             heard.all.last == refreshed(.hydrated)
         }
@@ -962,11 +968,11 @@ struct ARefill {
         let clock = ManualClock()
         let copy = Self.copy(core, clock: clock)
         let heard = Heard(copy.changes())
-        core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
+        await core.change(0, .watchFailed(reason: Self.agedOut, cursor: "3"))
         try await eventually("the refill is running") { Self.gated(core) }
         let later = MarfaCore.MarfaError.CopyExpired(
             reason: "the event log no longer holds the cursor 5 (oldest retained id 12)", message: "later", server: nil)
-        core.change(0, .watchFailed(reason: later, cursor: "5"))
+        await core.change(0, .watchFailed(reason: later, cursor: "5"))
         core.state.withLock { $0.hydration = .expired }
         gate.signal()
         try await Self.letWaitsPass(on: clock, until: !heard.stops.isEmpty)

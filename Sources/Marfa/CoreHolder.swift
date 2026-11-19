@@ -196,6 +196,17 @@ final class CoreHolder: Sendable {
         return try result.get()
     }
 
+    /// Refuses every call that has not yet begun, at once.
+    ///
+    /// The calls running finish, and the core is dropped when the last of them returns or when `close()` runs.
+    func refuseNewCalls() {
+        let settled = state.withLock { state in
+            state.closing = true
+            return state.takeSettled()
+        }
+        for waiter in settled { waiter.resume() }
+    }
+
     /// Refuses new calls and returns once the running ones are done and the
     /// core is dropped, so it can take as long as the slowest running call.
     ///

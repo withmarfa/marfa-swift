@@ -113,6 +113,11 @@ final class Heard: Sendable {
         timed.filter { if case .saved = $0.change.origin { true } else { false } }
     }
 
+    /// Whether the stream was told the writer saved to data version `version`.
+    func told(saveOf version: Int64) -> Bool {
+        saves.contains { $0.change.origin == .saved(dataVersion: version) }
+    }
+
     var stops: [Marfa.Change] {
         all.filter { if case .stopped = $0.origin { true } else { false } }
     }
@@ -145,6 +150,8 @@ final class FakeCore: Core, @unchecked Sendable {
             answered: 0, held: 0, undelivered: 0, unsent: 0, unmade: 0, unavailable: nil, verdicts: [], stopped: nil,
             unclaimedSources: [], retryAfterSeconds: nil)
         var dataVersion: Int64 = 0
+        /// What every drain fails with, instead of answering `drained`.
+        var drainFails: MarfaCore.MarfaError?
         var gate: DispatchSemaphore?
         var gated = false
         var watchGate: DispatchSemaphore?
@@ -280,17 +287,28 @@ final class FakeCore: Core, @unchecked Sendable {
         }
     }
 
+    /// Waits for the place at `index`, which the feed takes off the thread that asked for it.
+    func waitForPlace(_ index: Int) async {
+        let deadline = Date.now.addingTimeInterval(20)
+        while places.count <= index, Date.now < deadline, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+    }
+
     /// The core ends the listener on a fault of its own.
-    func fail(_ index: Int, with error: MarfaCore.MarfaError) {
+    func fail(_ index: Int, with error: MarfaCore.MarfaError) async {
+        await waitForPlace(index)
         end(index, with: error)
     }
 
     /// No real core ends a listener twice; the feed must ignore it.
-    func endAgain(_ index: Int, with error: MarfaCore.MarfaError?) {
+    func endAgain(_ index: Int, with error: MarfaCore.MarfaError?) async {
+        await waitForPlace(index)
         state.withLock { $0.places[index].listener }.ended(error: error)
     }
 
-    func change(_ index: Int, _ change: MarfaCore.Change) {
+    func change(_ index: Int, _ change: MarfaCore.Change) async {
+        await waitForPlace(index)
         let listener = state.withLock { state in
             if case .applied(_, let itemId?, _, _) = change { state.changedItems.append(itemId) }
             return state.places[index].listener
@@ -510,8 +528,9 @@ final class FakeCore: Core, @unchecked Sendable {
     }
 
     override func drain(stop: MarfaCore.Stop?) throws -> MarfaCore.DrainReport {
-        state.withLock { state in
+        try state.withLock { state in
             state.drains += 1
+            if let failure = state.drainFails { throw failure }
             return state.drained
         }
     }

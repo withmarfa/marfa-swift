@@ -90,7 +90,7 @@ struct TableHolds {
         let core = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(core), hasServer: true)
         let heard = Heard(copy.changes())
-        core.change(0, MarfaCore.Change.tableFilled(itemId: "item", table: "steps", cursor: "4"))
+        await core.change(0, MarfaCore.Change.tableFilled(itemId: "item", table: "steps", cursor: "4"))
         let told = Marfa.Change(origin: .refreshed(.tables), itemId: "item", edgeId: nil)
         try await eventually("the filled table is told") { heard.all == [told] }
         try await bounded("close") { await copy.close() }

@@ -279,13 +279,13 @@ struct ChangingTheKey {
                 }),
             hasServer: true)
         let heard = Heard(copy.changes())
-        #expect(old.places.count == 1)
+        try await eventually("the place was taken") { old.places.count == 1 }
 
         try await bounded("use") { try await copy.use(.stub("new-key")) }
 
         #expect(keys.withLock { $0 } == ["new-key"])
-        #expect(new.places.count == 1)
-        new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2"))
+        try await eventually("the place was taken") { new.places.count == 1 }
+        await new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "2"))
         try await eventually("the stream heard the new core") { heard.all.count == 1 }
         #expect(heard.stops.isEmpty, "the stream was told the watch stopped")
         try await bounded("close") { await copy.close() }
@@ -297,7 +297,7 @@ struct ChangingTheKey {
         let new = FakeCore.writer()
         let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: true)
         let heard = Heard(copy.changes())
-        old.change(
+        await old.change(
             0,
             MarfaCore.Change.watchFailed(
                 reason: .Unauthorized(code: "unauthorized", message: "no", server: nil),
@@ -306,8 +306,8 @@ struct ChangingTheKey {
         #expect(new.places.isEmpty)
 
         try await bounded("use") { try await copy.use(.stub("new-key")) }
-        #expect(new.places.count == 1)
-        new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "4"))
+        try await eventually("the place was taken") { new.places.count == 1 }
+        await new.change(0, MarfaCore.Change.applied(event: "item.created", itemId: "n1", edgeId: nil, cursor: "4"))
         try await eventually("the stream heard the new core") { heard.all.count == 2 }
         #expect(heard.stops.count == 1)
         try await bounded("close") { await copy.close() }
@@ -318,12 +318,12 @@ struct ChangingTheKey {
         let new = FakeCore.reader()
         let copy = WorkingCopy(holder: CoreHolder(old, reopen: { _ in new }), hasServer: true)
         let heard = Heard(copy.changes())
-        old.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
-        try await eventually("the old core's save was told") { heard.saves.count == 1 }
+        await old.change(0, MarfaCore.Change.saved(dataVersion: 1, cursor: ""))
+        try await eventually("the old core's save was told") { heard.told(saveOf: 1) }
 
         try await bounded("use") { try await copy.use(.stub("new-key")) }
-        new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
-        try await eventually("the new core's save was told") { heard.saves.count == 2 }
+        await new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
+        try await eventually("the new core's save was told") { heard.told(saveOf: 2) }
         try await bounded("close") { await copy.close() }
     }
 
@@ -397,8 +397,8 @@ struct ChangingTheKey {
         try await bounded("use") { try await changing.value }
 
         try await eventually("the stream was told to read again") { heard.saves.count == 1 }
-        #expect(new.places.count == 1)
-        new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
+        try await eventually("the place was taken") { new.places.count == 1 }
+        await new.change(0, MarfaCore.Change.saved(dataVersion: 2, cursor: ""))
         try await eventually("the next save was told") { heard.saves.count == 2 }
         try await bounded("close") { await copy.close() }
     }

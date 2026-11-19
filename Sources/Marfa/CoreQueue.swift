@@ -98,6 +98,11 @@ final class CoreQueue: Sendable {
         }
     }
 
+    /// Runs `work` on the queue, at the priority of the caller, with no one waiting for it.
+    func perform(_ work: @escaping @Sendable () -> Void) {
+        _ = submit(Task.currentPriority, work, abandon: {})
+    }
+
     private func enqueue<T: Sendable>(
         _ ticket: Ticket, _ priority: TaskPriority, _ work: @escaping @Sendable () throws -> T
     ) async throws -> T {

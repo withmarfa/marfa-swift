@@ -36,6 +36,30 @@ final class Feed: Sendable {
         case announced(Change)
     }
 
+    /// What a stream is told, with the number of key changes the feed had begun when it was told.
+    struct Told: Sendable {
+        let change: Change
+        let suspensions: Int
+    }
+
+    /// Where one stream's changes go.
+    struct Sink: Sendable {
+        fileprivate let yield: @Sendable (Change, Int) -> Void
+        fileprivate let finish: @Sendable () -> Void
+
+        /// A stream that hears each change as it is told.
+        init(_ continuation: AsyncStream<Change>.Continuation) {
+            yield = { change, _ in continuation.yield(change) }
+            finish = { continuation.finish() }
+        }
+
+        /// A stream that also learns whether a key change began since each change was told.
+        init(_ continuation: AsyncStream<Told>.Continuation) {
+            yield = { change, suspensions in continuation.yield(Told(change: change, suspensions: suspensions)) }
+            finish = { continuation.finish() }
+        }
+    }
+
     /// The time a refill and the copy's lifecycle read and wait by, so a test can drive them.
     struct RefillClock: Sendable {
         private let reading: @Sendable () -> Duration
@@ -77,7 +101,7 @@ final class Feed: Sendable {
     }
 
     private struct Stream {
-        let continuation: AsyncStream<Change>.Continuation
+        let sink: Sink
         /// The stream's place in the core's watch. `nil` before it has one,
         /// while the core is replaced, and after the watch ends it.
         var subscription: MarfaCore.Subscription?
@@ -104,7 +128,13 @@ final class Feed: Sendable {
         var open: Set<Int> = []
         var waitingForEnd: [CheckedContinuation<Void, Never>] = []
         /// Told once the lock is let go; `nil` ends the stream.
-        var told: [(AsyncStream<Change>.Continuation, Change?)] = []
+        var told: [(Sink, Change?, Int)] = []
+        /// Places being taken in the core's watch, which can wait on the store.
+        var placing = 0
+        /// Places claimed and not yet taken, in the order claimed.
+        var placements: [Placement] = []
+        var placingNow = false
+        var waitingForPlaces: [CheckedContinuation<Void, Never>] = []
         var refill = Refill()
         /// A hydration or catch-up runs; the core runs one at a time and refuses the next `invalid`.
         var filling = false
@@ -113,6 +143,17 @@ final class Feed: Sendable {
         var lastFill: Fill?
         /// Told each ``Event``.
         var observer: (@Sendable (Event) -> Void)?
+
+        mutating func tell(_ sink: Sink, _ change: Change?) {
+            told.append((sink, change, suspensions))
+        }
+    }
+
+    private struct Placement {
+        let token: UUID
+        let registration: Int
+        let unreachable: Bool
+        let tellsSave: Bool
     }
 
     private struct Fill {
@@ -146,18 +187,21 @@ final class Feed: Sendable {
     /// Runs `body` under the lock, then tells what it queued to stream
     /// continuations, outside the lock.
     private func locked<T: Sendable>(_ body: (inout State) throws -> T) rethrows -> T {
-        let (result, told) = try state.withLock { state -> (T, [(AsyncStream<Change>.Continuation, Change?)]) in
+        let (result, told) = try state.withLock { state -> (T, [(Sink, Change?, Int)]) in
             let result = try body(&state)
             return (result, state.told.drain())
         }
         // Finishing a stream runs its termination handler, which takes the lock.
-        for (continuation, change) in told {
-            if let change { continuation.yield(change) } else { continuation.finish() }
+        for (sink, change, suspensions) in told {
+            if let change { sink.yield(change, suspensions) } else { sink.finish() }
         }
         return result
     }
 
     var count: Int { locked { $0.streams.count } }
+
+    /// How many key changes the feed has begun, which a result told before one can be told apart from by.
+    var suspensionCount: Int { locked { $0.suspensions } }
 
     /// Whether the feed was closed, which it is before any of its streams finish.
     var isClosed: Bool { locked { $0.closed } }
@@ -165,25 +209,46 @@ final class Feed: Sendable {
     /// Whether a refill is running, which it is until after it has noted when its fill ended.
     var isRefilling: Bool { locked { $0.refill.running } }
 
-    /// Holds a stream and gives it a place in the core's watch.
+    /// Holds a stream and gives it a place in the core's watch, which is taken off the caller's thread: the core
+    /// reads a reader's baseline there, which waits for any call running on the store.
     ///
-    /// A stream added with `announced` false is told only what the core tells.
-    func add(_ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID(), announced: Bool = true)
-        -> UUID?
-    {
+    /// A stream added with `announced` false is told only what the core tells. A reader's stream added with
+    /// `tellsSave` is told one `.saved` once it has its place, since a save made before the core read its baseline
+    /// went unseen. A stream whose reader first waits for ``untilPlaced()`` needs none.
+    func add(
+        _ continuation: AsyncStream<Change>.Continuation, as token: UUID = UUID(), announced: Bool = true,
+        tellsSave: Bool = true
+    ) -> UUID? {
+        add(Sink(continuation), as: token, announced: announced, tellsSave: tellsSave)
+    }
+
+    func add(_ sink: Sink, as token: UUID = UUID(), announced: Bool = true, tellsSave: Bool = true) -> UUID? {
         let (added, joins) = locked { state -> (Bool, Bool) in
             guard !state.closed else { return (false, false) }
             let suspended = state.suspends > 0
-            state.streams[token] = Stream(
-                continuation: continuation, addedWhileSuspended: suspended, announced: announced)
+            state.streams[token] = Stream(sink: sink, addedWhileSuspended: suspended, announced: announced)
             return (true, !suspended)
         }
         guard added else {
-            continuation.finish()
+            sink.finish()
             return nil
         }
-        if joins { join(token) }
+        if joins { join(token, tellsSave: tellsSave) }
         return token
+    }
+
+    /// Returns once no stream is taking its place in the core's watch.
+    ///
+    /// A reader reads the store after this, so a save made since its baseline was read is one it is told.
+    func untilPlaced() async {
+        await withCheckedContinuation { continuation in
+            let done = locked { state -> Bool in
+                guard state.placing > 0 else { return true }
+                state.waitingForPlaces.append(continuation)
+                return false
+            }
+            if done { continuation.resume() }
+        }
     }
 
     func observe(_ observer: @escaping @Sendable (Event) -> Void) {
@@ -203,11 +268,11 @@ final class Feed: Sendable {
     }
 
     func announce(_ change: Change) {
-        let (continuations, observer) = locked { state in
-            (state.streams.values.filter(\.announced).map(\.continuation), state.observer)
+        let (sinks, observer, suspensions) = locked { state in
+            (state.streams.values.filter(\.announced).map(\.sink), state.observer, state.suspensions)
         }
         observer?(.announced(change))
-        for continuation in continuations { continuation.yield(change) }
+        for sink in sinks { sink.yield(change, suspensions) }
     }
 
     /// Ends every stream, takes each out of the watch, and returns once the core
@@ -224,7 +289,7 @@ final class Feed: Sendable {
         }
         for waiter in waiters { waiter.resume(throwing: MarfaError.closed(message: CoreHolder.closedMessage)) }
         // Finishing a stream runs its termination handler, which takes the lock.
-        for stream in streams { stream.continuation.finish() }
+        for stream in streams { stream.sink.finish() }
         for stream in streams { stream.subscription?.stop() }
         await untilLetGo()
     }
@@ -256,7 +321,8 @@ final class Feed: Sendable {
     /// last told of the server.
     ///
     /// A reader's stream added meanwhile could take no baseline, and a save
-    /// since may have gone unseen, so each is told one `.saved` to read again.
+    /// since may have gone unseen, so each is told one `.saved` to read again,
+    /// once the places are taken.
     func resume(readsOnly: Bool) {
         let ended = locked { state -> Bool in
             state.suspends -= 1
@@ -273,47 +339,88 @@ final class Feed: Sendable {
             for token in late { state.streams[token]?.addedWhileSuspended = false }
             return (Array(state.streams.keys), late)
         }
-        for token in joining { join(token) }
-        guard readsOnly, !late.isEmpty, let now = try? holder.with({ try $0.dataVersion() }) else { return }
-        let saved = Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil)
-        locked { state in
-            for token in late {
-                if let stream = state.streams[token] { state.told.append((stream.continuation, saved)) }
+        for token in joining { join(token, tellsSave: false) }
+        guard readsOnly, !late.isEmpty else { return }
+        Task {
+            await untilPlaced()
+            guard let now = try? await holder.run({ try $0.dataVersion() }) else { return }
+            let saved = Change(origin: .saved(dataVersion: now), itemId: nil, edgeId: nil)
+            locked { state in
+                for token in late {
+                    if let stream = state.streams[token] { state.tell(stream.sink, saved) }
+                }
             }
         }
     }
 
-    /// Takes a place in the core's watch for one stream, with no lock held across the
-    /// call that reads a reader's baseline, which can wait on the store.
-    private func join(_ token: UUID) {
+    /// Claims a place in the core's watch for one stream, and takes it on the queue for calls that wait, so no thread that
+    /// asks for it waits on the store, and no lock is held across the call that reads a reader's baseline.
+    ///
+    /// The claim is made before this returns, so closing or replacing the core waits for the place. Places are
+    /// taken one at a time, in the order they were claimed.
+    private func join(_ token: UUID, tellsSave: Bool) {
         guard watched else { return }
-        let claim = locked { state -> (registration: Int, unreachable: Bool)? in
+        let claimed = locked { state -> Bool in
             guard !state.closed, state.suspends == 0, var stream = state.streams[token],
                 stream.registration == nil
-            else { return nil }
+            else { return false }
             state.registrations += 1
             stream.registration = state.registrations
             state.streams[token] = stream
             state.open.insert(state.registrations)
-            return (state.registrations, stream.unreachable)
+            state.placing += 1
+            state.placements.append(
+                Placement(
+                    token: token, registration: state.registrations, unreachable: stream.unreachable,
+                    tellsSave: tellsSave))
+            return true
         }
-        guard let claim else { return }
+        if claimed { placeNext() }
+    }
+
+    private func placeNext() {
+        let next = locked { state -> Placement? in
+            guard !state.placingNow, !state.placements.isEmpty else { return nil }
+            state.placingNow = true
+            return state.placements.removeFirst()
+        }
+        guard let next else { return }
+        CoreQueue.blocking.perform { [self] in
+            place(next)
+            locked { $0.placingNow = false }
+            placeNext()
+        }
+    }
+
+    private func place(_ claim: Placement) {
+        let token = claim.token
         let listener = Listener(feed: self, token: token, registration: claim.registration)
+        let readsToo = claim.tellsSave && holder.handle == .reader
         let joined = Result {
-            try holder.with { try $0.watch(toldUnreachable: claim.unreachable, listener: listener) }
+            try holder.with { core in
+                let subscription = try core.watch(toldUnreachable: claim.unreachable, listener: listener)
+                let version: Int64? = readsToo ? (try? core.dataVersion()) : nil
+                return (subscription, version)
+            }
         }
         switch joined {
-        case .success(let subscription):
+        case .success(let (subscription, version)):
             // A stream let go, or a core replaced or closed, while the call ran has
             // no use for the place; it ends on its own.
-            let unwanted = locked { state -> Bool in
-                if state.closed || state.suspends > 0 || state.streams[token]?.registration != claim.registration {
-                    return true
+            let (unwanted, placed) = locked { state -> (Bool, [CheckedContinuation<Void, Never>]) in
+                var unwanted = true
+                if !state.closed, state.suspends == 0, state.streams[token]?.registration == claim.registration {
+                    unwanted = false
+                    state.streams[token]?.subscription = subscription
+                    if let version, let stream = state.streams[token] {
+                        state.tell(
+                            stream.sink, Change(origin: .saved(dataVersion: version), itemId: nil, edgeId: nil))
+                    }
                 }
-                state.streams[token]?.subscription = subscription
-                return false
+                return (unwanted, stopPlacing(&state))
             }
             if unwanted { subscription.stop() }
+            for waiter in placed { waiter.resume() }
         case .failure(let error):
             // A key change refuses the call without ending the stream: it stays held, and is joined by
             // `resume(readsOnly:)` or `rejoin(readsOnly:)`, or here when the change ended before this ran.
@@ -332,11 +439,17 @@ final class Feed: Sendable {
                         end(&state, token, with: error as? MarfaError ?? .store(message: "\(error)"))
                     }
                 }
-                return (release(&state, claim.registration), again)
+                return (release(&state, claim.registration) + stopPlacing(&state), again)
             }
             for waiter in waiters { waiter.resume() }
-            if again { join(token) }
+            if again { join(token, tellsSave: claim.tellsSave) }
         }
+    }
+
+    /// One place is taken, or refused: wakes `untilPlaced()` where it was the last.
+    private func stopPlacing(_ state: inout State) -> [CheckedContinuation<Void, Never>] {
+        state.placing -= 1
+        return state.placing == 0 ? state.waitingForPlaces.drain() : []
     }
 
     /// What the core's thread tells a stream: dropped unless it comes from the
@@ -364,7 +477,7 @@ final class Feed: Sendable {
             default: break
             }
             state.streams[token] = stream
-            for told in Self.translated(change) { state.told.append((stream.continuation, told)) }
+            for told in Self.translated(change) { state.tell(stream.sink, told) }
             return false
         }
         guard refills else { return }
@@ -559,7 +672,7 @@ final class Feed: Sendable {
             locked { state in
                 for token in next.owed.union(state.refill.waiting) {
                     if let stream = state.streams[token] {
-                        state.told.append((stream.continuation, Self.stopped(failure)))
+                        state.tell(stream.sink, Self.stopped(failure))
                     }
                 }
                 state.refill = Refill(filledAt: state.refill.filledAt)
@@ -629,8 +742,8 @@ final class Feed: Sendable {
     /// app needs to tell it from a watch failure, which a recovery restarts.
     private func end(_ state: inout State, _ token: UUID, with error: MarfaError) {
         guard let stream = state.streams.removeValue(forKey: token) else { return }
-        state.told.append((stream.continuation, Self.stopped(error)))
-        state.told.append((stream.continuation, nil))
+        state.tell(stream.sink, Self.stopped(error))
+        state.tell(stream.sink, nil)
     }
 
     private func release(_ state: inout State, _ registration: Int) -> [CheckedContinuation<Void, Never>] {

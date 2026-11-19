@@ -305,6 +305,8 @@ final class Lifecycle: Sendable {
     #if DEBUG
     /// Runs after a consumer starts a run and before the run's first step, so a test can hold that moment.
     let started = Mutex<(@Sendable () -> Void)?>(nil)
+    /// Runs when a drain's result reaches the lifecycle, before it is applied, so a test can hold that moment.
+    let reporting = Mutex<(@Sendable () -> Void)?>(nil)
     #endif
 
     init(holder: CoreHolder, feed: Feed, hasServer: Bool, pace: Pace, clock: Feed.RefillClock) {
@@ -466,6 +468,8 @@ final class Lifecycle: Sendable {
         case .closed(let update), .scripted(let update): return .update(update)
         case .read(let marks, let held, let state): (pending, cursor, claimed) = (marks, held, state)
         }
+        // A reader's baseline is read as its place in the watch is taken, so a read before that could miss a save.
+        if reads { await feed.untilPlaced() }
 
         var reread = Reread.parts(
             Reread.Parts(queue: pending.queue, views: pending.views, catalog: pending.catalog))
@@ -595,14 +599,16 @@ final class Lifecycle: Sendable {
     /// says whether the core gave the stream a place, or will once a key change ends.
     @discardableResult
     private func takeStream(_ run: Int, _ claim: UUID) -> Bool {
-        let (stream, continuation) = AsyncStream<Change>.makeStream()
+        let (stream, continuation) = AsyncStream<Feed.Told>.makeStream()
         // Noted before the feed lets the stream go, so a pull that begins once the feed has let it go sees it ended.
         continuation.onTermination = { [feed, weak self] _ in
             self?.letGo(claim)
             feed.remove(claim)
         }
         let task = Task { [weak self] in
-            for await change in stream { self?.heard(change, run: run, claim: claim) }
+            for await told in stream {
+                self?.heard(told.change, run: run, claim: claim, suspensions: told.suspensions)
+            }
             self?.streamEnded(claim)
         }
         let taken = locked { state -> Bool in
@@ -615,7 +621,7 @@ final class Lifecycle: Sendable {
             continuation.finish()
             return false
         }
-        return feed.add(continuation, as: claim, announced: false) != nil && feed.holds(claim)
+        return feed.add(.init(continuation), as: claim, announced: false, tellsSave: false) != nil && feed.holds(claim)
     }
 
     /// The first step of a run: a copy that holds a completed hydration is caught up, which says whether the
@@ -804,6 +810,9 @@ final class Lifecycle: Sendable {
         state.retry = Task { [weak self, clock] in
             do { try await clock.sleep(for: wait) } catch { return }
             guard let self, let claim = self.claimRetake(epoch), self.takeStream(run, claim) else { return }
+            await self.feed.untilPlaced()
+            // The core refused the place, or ended it, which the stream's own stop tells.
+            guard self.feed.holds(claim) else { return }
             self.locked { state in
                 guard state.active, state.run == run, state.streamClaim == claim else { return }
                 state.followingSince = clock.now
@@ -840,7 +849,12 @@ final class Lifecycle: Sendable {
     }
 
     /// What the core told the lifecycle's stream of `run` under `claim`, or, with neither, what the copy announced.
-    private func heard(_ change: Change, run: Int? = nil, claim: UUID? = nil) {
+    ///
+    /// `suspensions` is ``Feed/suspensionCount`` when the core told it. A change told before a key change that has
+    /// since begun still names rows and the queue to read again, but says nothing of the key that replaced the one it
+    /// was told under, so what it says of the connection is dropped.
+    private func heard(_ change: Change, run: Int? = nil, claim: UUID? = nil, suspensions: Int? = nil) {
+        let stale = suspensions.map { $0 != feed.suspensionCount } ?? false
         var pulled = false
         var failure: MarfaError?
         var drain: Result<DrainReport, MarfaError>?
@@ -862,12 +876,12 @@ final class Lifecycle: Sendable {
                     $0.rows = true
                     if synced { $0.synced = true }
                 }
-                reached(&state)
+                if !stale { reached(&state) }
             case .serverReachable:
-                reached(&state)
+                if !stale { reached(&state) }
             case .serverUnreachable(let error):
                 switch state.connection {
-                case .following, .connecting, .offline: set(&state, .offline(error))
+                case .following, .connecting, .offline: if !stale { set(&state, .offline(error)) }
                 default: break
                 }
             case .queueDrained(let report):
@@ -875,14 +889,14 @@ final class Lifecycle: Sendable {
                     $0.rows = true
                     $0.queue = true
                 }
-                drain = .success(report)
+                if !stale { drain = .success(report) }
             case .queueNotDrained(let error):
                 mark(&state) { $0.queue = true }
-                drain = .failure(error)
+                if !stale { drain = .failure(error) }
             case .saved:
                 mark(&state) { $0.everything = true }
             case .stopped(let error):
-                failure = error
+                if !stale { failure = error }
             case .refreshed(let refresh):
                 switch refresh {
                 case .hydrated:
@@ -963,9 +977,18 @@ final class Lifecycle: Sendable {
     ///
     /// Writes it left undelivered are drained again while the copy follows; a copy that is offline drains them
     /// when its server is back.
-    func drained(_ report: DrainReport) {
+    ///
+    /// A drain that began under an earlier key, or in an earlier run (`keyEpoch` is read when an app's drain began,
+    /// `epoch` when a retry was scheduled), says nothing of the copy the key opened: its refusal changes nothing, and
+    /// the writes it left are the new key's to send.
+    func drained(_ report: DrainReport, epoch: Int? = nil, keyEpoch: Int? = nil) {
+        #if DEBUG
+        reporting.withLock { $0 }?()
+        #endif
         locked { state in
-            guard state.active, !state.closed, !state.keyChanging, state.connection != .local else { return }
+            guard state.active, !state.closed, !state.keyChanging, state.connection != .local,
+                epoch == nil || epoch == state.epoch, keyEpoch == nil || keyEpoch == state.keyEpoch
+            else { return }
             if let stopped = report.stopped {
                 cancelDrain(&state)
                 cancelRetry(&state)
@@ -982,10 +1005,16 @@ final class Lifecycle: Sendable {
         }
     }
 
-    func drainFailed(_ error: any Error) {
+    /// A drain failed with `error`; `epoch` and `keyEpoch` are as ``drained(_:epoch:keyEpoch:)`` has them.
+    func drainFailed(_ error: any Error, epoch: Int? = nil, keyEpoch: Int? = nil) {
         guard let error = error as? MarfaError else { return }
+        #if DEBUG
+        reporting.withLock { $0 }?()
+        #endif
         locked { state in
-            guard state.active, !state.closed, !state.keyChanging, state.connection != .local else { return }
+            guard state.active, !state.closed, !state.keyChanging, state.connection != .local,
+                epoch == nil || epoch == state.epoch, keyEpoch == nil || keyEpoch == state.keyEpoch
+            else { return }
             if error.isKeyRefusal {
                 cancelDrain(&state)
                 cancelRetry(&state)
@@ -1019,9 +1048,9 @@ final class Lifecycle: Sendable {
             }
             guard runs else { return }
             do {
-                self.drained(try await drainQueue(holder, feed))
+                self.drained(try await drainQueue(holder, feed), epoch: epoch)
             } catch {
-                self.drainFailed(error)
+                self.drainFailed(error, epoch: epoch)
             }
         }
     }

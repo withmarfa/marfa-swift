@@ -9,9 +9,8 @@ import Synchronization
 /// only a held `changes()` stream drains on its own, once when its server is
 /// back and once after a drain left a write undelivered, and a held `updates()`
 /// sequence also catches up and drains again to keep its follow going. Every call that can
-/// wait on the store or the network runs off the caller's thread, except a
-/// reader's `changes()`, which reads the store before it returns and so can
-/// wait behind the copy's other reads.
+/// wait on the store or the network runs off the caller's thread, and so does the place in the watch
+/// that `changes()` and `updates()` take, which waits behind the copy's other calls on a reader.
 public final class WorkingCopy: Sendable {
     let holder: CoreHolder
     let feed: Feed
@@ -404,7 +403,9 @@ public final class WorkingCopy: Sendable {
     /// server nothing, until one completes. Local writes and declarations
     /// still notify the writer's streams. `status().hydration` says which.
     /// A reader keeps reading and tells `.saved` once it reads a changed
-    /// SQLite data version. A stream the core's own fault ended is told
+    /// SQLite data version. The stream takes its place in that watch just after this
+    /// returns, off the caller's thread, so a reader's stream is first told one `.saved`, once it has its place,
+    /// for any save made before then, and each save after is told once. A stream the core's own fault ended is told
     /// `.stopped` and then finishes, as one the core refused does: ask for a new
     /// one.
     public func changes() -> AsyncStream<Change> {
@@ -451,7 +452,8 @@ public final class WorkingCopy: Sendable {
     ///   it is tried again by itself, never sooner than a rate limit asks.
     /// - A reader is `.local` while it watches the writer's saves. When the core ends that watch on a fault, the
     ///   reader is `.stopped` and takes the watch again after the same waits as `.offline`, then asks to read
-    ///   everything.
+    ///   everything. A reader's first update arrives once it has its place in the watch, which can wait behind
+    ///   the copy's other calls, so a save made after the sequence is asked for is never missed.
     /// - A key or sign-in the server refused is `.keyRefused`, and nothing is tried until ``use(_:)``, which catches up at
     ///   once with the new sign-in.
     /// - A copy that must be hydrated first is `.needsHydration`, and the app hydrates it; nothing else is tried until
@@ -460,6 +462,8 @@ public final class WorkingCopy: Sendable {
     ///   again; a server event does not show it following in the meantime.
     /// - A drain, the app's or the follow's, that left writes undelivered while the copy follows is made again after
     ///   the same waits, honoring the report's `retryAfterSeconds`. The app still drains after its own writes.
+    ///   A drain that ended under a key since replaced, or a result the old key's follow told after the change,
+    ///   says nothing of the new key and changes nothing.
     ///
     /// While a hydration runs, each update carries its `fill`, read every half second, and asks to read everything
     /// as rows arrive. Releasing every sequence stops the follow and every retry. ``close()`` ends each sequence
@@ -475,10 +479,12 @@ public final class WorkingCopy: Sendable {
     /// Calls already running finish first, so this takes as long as the
     /// slowest of them. Every call made after it begins, on the copy or any of
     /// its parts (`items`, `queue` and the rest), throws `MarfaError.closed`,
+    /// from the moment it is called, even while the streams are still ending,
     /// and a call racing `close()` either completes or throws it. Closing a
     /// closed copy does nothing, and a second `close()` made while the first is
     /// running returns only once the store is released.
     public func close() async {
+        holder.refuseNewCalls()
         lifecycle.close()
         await feed.close()
         await holder.close()
@@ -1144,12 +1150,13 @@ public struct Queue: Sendable {
     /// sequence also drains again, while the copy follows, after a drain
     /// left a write undelivered. Otherwise nothing drains on its own.
     public func drain() async throws -> DrainReport {
+        let key = lifecycle.keyEpoch
         do {
             let report = try await drainQueue(holder, feed)
-            lifecycle.drained(report)
+            lifecycle.drained(report, keyEpoch: key)
             return report
         } catch {
-            lifecycle.drainFailed(error)
+            lifecycle.drainFailed(error, keyEpoch: key)
             throw error
         }
     }
