@@ -36,6 +36,37 @@ struct SignInTransport: Sendable {
         ContractHeader.apply(to: &request, path: request.url?.path ?? "")
         return request
     }
+
+    /// Sends `request` and answers whatever the server answers first, a redirect included, never following it.
+    ///
+    /// Every request a sign-in or a renewal sends goes through this or ``dataTask(for:completion:)``, so no
+    /// session the transport holds can send one on to another address.
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        try await session.data(for: prepared(request), delegate: RefusedRedirects.shared)
+    }
+
+    /// A task for `request` that answers a redirect as it is, never following it.
+    ///
+    /// The caller resumes it.
+    func dataTask(
+        for request: URLRequest, completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void
+    ) -> URLSessionDataTask {
+        let task = session.dataTask(with: prepared(request), completionHandler: completion)
+        task.delegate = RefusedRedirects.shared
+        return task
+    }
+}
+
+/// Answers every redirect with no new request, which ends the task with the redirect's own response.
+private final class RefusedRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    static let shared = RefusedRedirects()
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
 }
 
 /// The device code grant's type, as RFC 8628 names it.
@@ -242,7 +273,7 @@ func formRequest(_ url: String, _ fields: [(String, String)]) throws(SignInError
 
 func send(_ request: URLRequest, _ transport: SignInTransport) async throws(SignInError) -> Answer {
     do {
-        let (body, response) = try await transport.session.data(for: transport.prepared(request))
+        let (body, response) = try await transport.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw SignInError.unreadable(message: "the server's answer is not HTTP")
         }

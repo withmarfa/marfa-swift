@@ -148,7 +148,7 @@ final class TokenRenewer: CredentialRenewer {
         _ request: URLRequest, transport: SignInTransport, pending: Pending,
         done: @escaping @Sendable (Result<Answer, any Error>) -> Void
     ) {
-        let task = transport.session.dataTask(with: transport.prepared(request)) { body, response, error in
+        let task = transport.dataTask(for: request) { body, response, error in
             if let error {
                 done(.failure(error))
             } else if let http = response as? HTTPURLResponse {

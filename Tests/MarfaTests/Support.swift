@@ -643,6 +643,7 @@ struct LocalServer: Sendable {
         contract: Int,
         headers: String = "x-marfa-reach: \(LocalServer.reach)\r\ncache-control: no-store\r\n",
         holdsResponse: Bool = false,
+        redirects: [String: URL] = [:],
         answer: @escaping @Sendable (_ method: String, _ path: String) -> Answer = emptyPage
     ) async throws -> LocalServer {
         let parameters = NWParameters.tcp
@@ -681,9 +682,10 @@ struct LocalServer: Sendable {
                     let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
                     if holdsResponse { return }
                     let (status, type, body) = answer(method, path)
+                    let redirect = redirects[path].map { "location: \($0.absoluteString)\r\n" } ?? ""
                     let response = Data(
                         ("HTTP/1.1 \(status) Answered\r\ncontent-type: \(type)\r\nx-marfa-contract: \(contract)\r\n"
-                            + (method == "GET" ? headers : "")
+                            + redirect + (method == "GET" ? headers : "")
                             + "content-length: \(body.utf8.count)\r\nconnection: close\r\n\r\n\(body)").utf8)
                     connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
                 }
