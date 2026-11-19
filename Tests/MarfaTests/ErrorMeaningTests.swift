@@ -77,6 +77,9 @@ import Testing
         (.itemBeingRemoved(id: nil, message: "m"), .none),
         (.canceled(message: "m"), .none),
         (.firstSyncWaiting(message: "m"), .hydration),
+        (.renewalRefused(reason: .refused, message: "m"), .none),
+        (.renewalRefused(reason: .redirected, message: "m"), .none),
+        (.renewalRefused(reason: .unreadable, message: "m"), .none),
         (.invalid(message: "m"), .none),
         (.fault(message: "m"), .none),
         (.keyChanging(message: "m"), .transient),
@@ -119,6 +122,14 @@ import Testing
                     details: nil, server: nil)
             }
         }
+    }
+
+    @Test(arguments: Marfa.RenewalFailure.allCases)
+    func aRefusedRenewalHasItsOwnFixedTextThatCarriesNothingTheErrorHolds(reason: Marfa.RenewalFailure) {
+        let error = Marfa.MarfaError.renewalRefused(reason: reason, message: "https://secret.example said no")
+        #expect(error.fixedText.code == "renewal_refused")
+        #expect(!error.fixedText.sentence.contains("secret"))
+        #expect(error.code() == "renewal_refused")
     }
 
     @Test func aFaultInTheCoreArrivesAsItsOwnCase() {

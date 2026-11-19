@@ -150,6 +150,12 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// A folder's first sync waits for the person to confirm it, so the call that would write or send for it
     /// was refused.
     case firstSyncWaiting(message: String)
+    /// The app's sign-in could not be renewed for `reason`, and it still stands.
+    ///
+    /// It is neither the app's own arguments nor a failure to reach the server. Queued writes stay queued, and
+    /// the next refusal of the access token tries the renewal again. `message` is for logs: an app words
+    /// `reason`.
+    case renewalRefused(reason: RenewalFailure, message: String)
     /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
     /// The copy lacks data needed for a local count. ``WorkingCopy/counts(of:_:)`` handles this error by asking
@@ -256,7 +262,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message, _), .serverTooOld(_, _, let message),
             .trashPlanChanged(let message, _), .itemBeingRemoved(_, let message),
-            .canceled(let message), .firstSyncWaiting(let message),
+            .canceled(let message), .firstSyncWaiting(let message), .renewalRefused(_, let message),
             .invalid(let message), .notAnswerable(let message), .fault(let message), .keyChanging(let message),
             .versionConflict(let message, _),
             .instanceChanged(let message, _), .closed(let message), .noConnection(let message),
@@ -281,8 +287,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             server
         case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
             .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
-            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .notAnswerable, .fault,
-            .keyChanging, .serverTooOld, .itemBeingRemoved,
+            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .renewalRefused, .invalid,
+            .notAnswerable, .fault, .keyChanging, .serverTooOld, .itemBeingRemoved,
             .closed, .noConnection:
             nil
         }
@@ -360,6 +366,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
                 details: id.map { JSONValue.object(["id": .string($0)]).core }, server: nil)
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
+        case .renewalRefused(let reason, let message):
+            core = .RenewalRefused(reason: reason.core, message: message)
         case .invalid(let message): core = .Invalid(message: message)
         case .notAnswerable(let message): core = .NotAnswerable(message: message)
         case .fault(let message): core = .Fault(message: message)
@@ -458,9 +466,38 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .serverTooOld(served: served, oldest: oldest, message: message)
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
+        case .RenewalRefused(let reason, let message):
+            self = .renewalRefused(reason: RenewalFailure(reason), message: message)
         case .Invalid(let message): self = .invalid(message: message)
         case .NotAnswerable(let message): self = .notAnswerable(message: message)
         case .Fault(let message): self = .fault(message: message)
+        }
+    }
+}
+
+/// Why a renewal of the app's sign-in failed without ending it, as a set an app can word.
+public enum RenewalFailure: Sendable, Hashable, CaseIterable {
+    /// The server refused the renewal and the sign-in still stands, as a token endpoint's `invalid_request`,
+    /// `invalid_scope` or `unauthorized_client` says, or as a client error with no OAuth error does.
+    case refused
+    /// The server answered a redirect, which a renewal never follows.
+    case redirected
+    /// The server's answer could not be read, or the server gave no sign-in metadata to renew with.
+    case unreadable
+
+    package init(_ core: MarfaCore.RenewalFailure) {
+        switch core {
+        case .Refused: self = .refused
+        case .Redirected: self = .redirected
+        case .Unreadable: self = .unreadable
+        }
+    }
+
+    package var core: MarfaCore.RenewalFailure {
+        switch self {
+        case .refused: .Refused
+        case .redirected: .Redirected
+        case .unreadable: .Unreadable
         }
     }
 }

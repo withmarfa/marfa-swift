@@ -733,7 +733,7 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(let reason, _) = error, reason == .Refused else { return false }
                 return true
             }
             #expect(server.requests(to: "/.well-known/oauth-authorization-server").isEmpty)
@@ -751,12 +751,89 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(let reason, _) = error, reason == .Refused else { return false }
                 return true
             }
             let kept = try #require(try authorization.place.read())
             #expect(kept.refreshToken == "rt-1")
             #expect(kept.tokenEndpoint == "\(server.origin)/auth/oauth2/token")
+        }
+    }
+
+    private func renewalRefusal(
+        _ server: ScriptedAuthServer, keychain: Keychain, earlierEndpoint: Bool = false
+    ) async throws -> (reason: Marfa.RenewalFailure, message: String, kept: String?) {
+        let (authorization, credential) =
+            earlierEndpoint
+            ? try signedInAtEarlierEndpoint(server, keychain)
+            : try signedIn(server, keychain, transport: server.transport())
+        let made = try Server(url: server.url, credential: credential)
+        do {
+            _ = try await made.renewedToken(refused: "at-1")
+            Issue.record("the renewal answered a token")
+        } catch {
+            guard case .renewalRefused(let reason, let message) = error else {
+                Issue.record("expected renewalRefused, got \(error)")
+                throw error
+            }
+            return (reason, message, try authorization.place.read()?.refreshToken)
+        }
+        throw SignInError.notSignedIn
+    }
+
+    @Test(arguments: ["invalid_request", "invalid_scope", "unauthorized_client"])
+    func aRefusalThatDoesNotEndTheSignInReachesTheAppAsRenewalRefused(code: String) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in oauthError(code) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let refusal = try await renewalRefusal(server, keychain: keychain)
+            #expect(refusal.reason == .refused)
+            #expect(refusal.kept == "rt-1")
+        }
+    }
+
+    @Test func aClientErrorWithNoOAuthErrorAndNoMetadataToReadReachesTheAppAsRefused() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(403, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let refusal = try await renewalRefusal(server, keychain: keychain)
+            #expect(refusal.reason == .refused)
+            #expect(refusal.kept == "rt-1")
+        }
+    }
+
+    @Test func aRenewalAnswerThePackageCannotReadReachesTheAppAsUnreadable() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(200, ["unexpected": "shape"]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let refusal = try await renewalRefusal(server, keychain: keychain)
+            #expect(refusal.reason == .unreadable)
+            #expect(refusal.kept == "rt-1")
+        }
+    }
+
+    @Test func aMetadataAnswerThePackageCannotReadReachesTheAppAsUnreadable() async throws {
+        let server = ScriptedAuthServer()
+        server.answer { request in
+            request.path == "/.well-known/oauth-authorization-server"
+                ? .json(200, ["unexpected": "shape"]) : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let refusal = try await renewalRefusal(server, keychain: keychain, earlierEndpoint: true)
+            #expect(refusal.reason == .unreadable)
+            #expect(refusal.kept == "rt-1")
+        }
+    }
+
+    @Test func aMetadataClientErrorReachesTheAppAsRefused() async throws {
+        let server = ScriptedAuthServer()
+        server.answer { request in
+            .json(request.path == "/.well-known/oauth-authorization-server" ? 403 : 404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let refusal = try await renewalRefusal(server, keychain: keychain, earlierEndpoint: true)
+            #expect(refusal.reason == .refused)
+            #expect(refusal.kept == "rt-1")
         }
     }
 
@@ -838,7 +915,7 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(let reason, _) = error, reason == .Refused else { return false }
                 return true
             }
             // A proxy's 403 or 404 on the metadata does not show that the grant ended.
@@ -2201,7 +2278,7 @@ struct SignInRequestsRefuseRedirects {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(let reason, _) = error, reason == .Redirected else { return false }
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
@@ -2220,7 +2297,7 @@ struct SignInRequestsRefuseRedirects {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(let reason, _) = error, reason == .Redirected else { return false }
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")

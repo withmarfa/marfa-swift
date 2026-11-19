@@ -34,7 +34,7 @@ final class TokenRenewer: CredentialRenewer {
         } catch is RenewalLease.Held {
             throw RenewalError.Unavailable(message: "another process is renewing the sign-in to \(origin)")
         } catch {
-            throw RenewalError.Failed(message: "the keychain could not be read: \(error)")
+            throw RenewalError.Unavailable(message: "the keychain could not be read: \(error)")
         }
         let kept: KeptSignIn
         let sent: String
@@ -150,7 +150,7 @@ final class TokenRenewer: CredentialRenewer {
                 do {
                     admitted = try lease.whileHeld { try place.read()?.refreshToken == sent } ?? false
                 } catch {
-                    finish(.failure(.Failed(message: "the keychain could not be read: \(error)")))
+                    finish(.failure(.Unavailable(message: "the keychain could not be read: \(error)")))
                     return
                 }
                 guard admitted else {
@@ -292,10 +292,16 @@ final class TokenRenewer: CredentialRenewer {
         if answer.status == 429 || answer.status >= 500 {
             throw .Unavailable(message: "\(origin) could not give its sign-in metadata now (\(answer.status))")
         }
+        let said = "\(origin) gave no sign-in metadata to renew with"
+        switch answer.status {
+        case 200: break
+        case 300..<400: throw .Refused(reason: .Redirected, message: "\(said): the server answered \(answer.status)")
+        default: throw .Refused(reason: .Refused, message: "\(said): \(answer.message)")
+        }
         do {
             return try Discovery.parse(answer, from: origin)
         } catch {
-            throw .Failed(message: "\(origin) gave no sign-in metadata to renew with: \(error)")
+            throw .Refused(reason: .Unreadable, message: "\(said): \(error)")
         }
     }
 
@@ -320,7 +326,8 @@ final class TokenRenewer: CredentialRenewer {
         let origin = place.account
         guard let token = try? TokenAnswer.read(answer) else {
             return Settlement(
-                result: .failure(.Failed(message: "\(origin) answered a renewal this package cannot read")))
+                result: .failure(
+                    .Refused(reason: .Unreadable, message: "\(origin) answered a renewal this package cannot read")))
         }
         let result = written(sent: sent, place: place, lease: lease) { current in
             var renewed = current
@@ -374,8 +381,13 @@ final class TokenRenewer: CredentialRenewer {
                 return .failure(
                     .Ended(message: "\(origin) has no token endpoint to renew the sign-in at: \(answer.message)"))
             }
+        case (300..<400, _):
+            return .failure(
+                .Refused(
+                    reason: .Redirected, message: "\(origin) refused to renew the sign-in: \(answer.message)"))
         default:
-            return .failure(.Failed(message: "\(origin) refused to renew the sign-in: \(answer.message)"))
+            return .failure(
+                .Refused(reason: .Refused, message: "\(origin) refused to renew the sign-in: \(answer.message)"))
         }
     }
 
@@ -409,7 +421,7 @@ final class TokenRenewer: CredentialRenewer {
             if let decided = decided ?? nil { return decided }
             return settledElsewhere(sent: sent, place: place)
         } catch {
-            return .failure(.Failed(message: "the keychain could not be read: \(error)"))
+            return .failure(.Unavailable(message: "the keychain could not be read: \(error)"))
         }
     }
 
@@ -427,7 +439,7 @@ final class TokenRenewer: CredentialRenewer {
             }
             return .success(current.accessToken)
         } catch {
-            return .failure(.Failed(message: "the keychain could not be read: \(error)"))
+            return .failure(.Unavailable(message: "the keychain could not be read: \(error)"))
         }
     }
 
@@ -435,7 +447,7 @@ final class TokenRenewer: CredentialRenewer {
         do {
             return try place.read()
         } catch {
-            throw .Failed(message: "the keychain could not be read: \(error)")
+            throw .Unavailable(message: "the keychain could not be read: \(error)")
         }
     }
 }

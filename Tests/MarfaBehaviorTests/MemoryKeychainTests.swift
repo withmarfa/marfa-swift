@@ -156,6 +156,24 @@ import Testing
         #expect(try Server(url: endpoint.url, credential: credential).key == "at-1")
     }
 
+    @Test func aKeychainThatRefusesReadsDuringARenewalIsUnavailableAndKeepsTheSignIn() async throws {
+        let endpoint = try await ConnectionCounter()
+        let memory = MemoryKeychain()
+        let credential = try memory.signIn(to: endpoint.url, accessToken: "at-1", refreshToken: "rt-1")
+        let server = try Server(url: endpoint.url, credential: credential)
+        memory.failReads(with: errSecInteractionNotAllowed)
+        do {
+            _ = try await server.renewedToken(refused: "at-1")
+            Issue.record("a renewal read a keychain that refuses reads")
+        } catch {
+            if case .network = error {} else { Issue.record("expected network, got \(error)") }
+            #expect(error.isTransient)
+        }
+        #expect(endpoint.connections == 0)
+        memory.succeed()
+        #expect(try Server(url: endpoint.url, credential: credential).key == "at-1")
+    }
+
     @Test func aRefusedAccessTokenAlreadyRenewedAnswersTheKeptOne() async throws {
         let memory = MemoryKeychain()
         let credential = try memory.signIn(to: home, accessToken: "at-2", refreshToken: "rt-1")

@@ -260,6 +260,9 @@ struct Errors {
         ),
         (.Canceled(message: "m"), .canceled(message: "m")),
         (.FirstSyncWaiting(message: "m"), .firstSyncWaiting(message: "m")),
+        (.RenewalRefused(reason: .Refused, message: "m"), .renewalRefused(reason: .refused, message: "m")),
+        (.RenewalRefused(reason: .Redirected, message: "m"), .renewalRefused(reason: .redirected, message: "m")),
+        (.RenewalRefused(reason: .Unreadable, message: "m"), .renewalRefused(reason: .unreadable, message: "m")),
         (.Invalid(message: "m"), .invalid(message: "m")),
         (.StoreBusy(message: "m"), .storeBusy(message: "m")),
         (

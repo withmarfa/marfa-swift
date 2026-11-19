@@ -32,11 +32,12 @@ public enum CopyConnection: Sendable, Hashable {
     case offline(MarfaError)
     /// The follow, or the app's own ``WorkingCopy/catchUp()`` or ``WorkingCopy/hydrate(types:tier:edgeTypes:inPlaceOnly:)``,
     /// stopped with an error that asking again may not clear, such as a refusal from the server, a fault in the
-    /// store, `noCatalog` or `wrongServer`. The copy tries again every five minutes, in case the server changed, and
-    /// follows again only once a catch-up or a hydration succeeds, the app's or the retry's. An error the app's own
-    /// arguments caused (`invalid`, `unknownType`, `validation`), a call canceled, a call made during a key
-    /// change, a call that began under a key since replaced, and a failure that may mend itself, such as the
-    /// network, of an app's call or of the retry itself, do not change it.
+    /// store, a renewal of the sign-in the server refused (`renewalRefused`), `noCatalog` or `wrongServer`. The copy
+    /// tries again every five minutes, in case the server changed, and follows again only once a catch-up or a
+    /// hydration succeeds, the app's or the retry's. An error the app's own arguments caused (`invalid`,
+    /// `unknownType`, `validation`), a call canceled, a call made during a key change, a call that began under a
+    /// key since replaced, and a failure that may mend itself, such as the network, of an app's call or of the
+    /// retry itself, do not change it.
     ///
     /// For a reader, the core ended its watch of the writer's saves on a fault. The reader takes it again by itself,
     /// further apart each time, and is `.local` once it has.
