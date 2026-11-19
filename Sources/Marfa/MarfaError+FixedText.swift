@@ -124,6 +124,8 @@ extension MarfaError {
             FixedErrorText(type: "first_sync_waiting", sentence: "a folder's first sync waits for confirmation")
         case .invalid:
             FixedErrorText(type: "invalid", sentence: "a value was not accepted")
+        case .renewalRefused:
+            FixedErrorText(type: "renewal_refused", sentence: "the sign-in could not be renewed and is kept")
         case .notAnswerable:
             FixedErrorText(type: "not_answerable", sentence: "the working copy does not hold what a count needs")
         case .fault:

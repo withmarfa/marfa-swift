@@ -2809,14 +2809,14 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/Health/backups/reason`.
                 public var reason: Components.Schemas.Health.BackupsPayload.ReasonPayload?
-                /// Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when one is in use.
+                /// Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when the settings name one.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Health/backups/destination`.
                 @frozen public enum DestinationPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case folder = "folder"
                     case bucket = "bucket"
                 }
-                /// Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when one is in use.
+                /// Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when the settings name one.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Health/backups/destination`.
                 public var destination: Components.Schemas.Health.BackupsPayload.DestinationPayload?
@@ -2861,7 +2861,7 @@ extension Components {
                 /// - Parameters:
                 ///   - status: `ok`: on schedule, with the last backup whole. `incomplete`: files it names have no recorded copy. `failing`: a run failed or lost files, a store refuses copies, or a part is damaged, so overall `status` is at least `degraded`. `off`: none scheduled.
                 ///   - reason: Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
-                ///   - destination: Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when one is in use.
+                ///   - destination: Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when the settings name one.
                 ///   - lastBackup: The name of the last backup Marfa put. Present only for a caller that holds `instance.read`.
                 ///   - lastBackupAt: When Marfa took the last backup it put. Present only for a caller that holds `instance.read`.
                 ///   - failures: How many backup runs in a row have failed or lost files. Present only for a caller that holds `instance.read`.
@@ -16340,27 +16340,27 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/sign_in_address`.
             public var signInAddress: Swift.String?
-            /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder.
+            /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/backup_path`.
             public var backupPath: Swift.String?
-            /// The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store.
+            /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes. Absent: no object store.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_bucket`.
             public var objectStoreBucket: Swift.String?
-            /// The region of the object store. Absent: `us-east-1`.
+            /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_region`.
             public var objectStoreRegion: Swift.String?
-            /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it.
+            /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes. Absent: the store's provider chooses it.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_endpoint`.
             public var objectStoreEndpoint: Swift.String?
-            /// `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`.
+            /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_path_style`.
             public var objectStorePathStyle: Swift.Bool?
-            /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`.
+            /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_prefix`.
             public var objectStorePrefix: Swift.String?
@@ -16527,12 +16527,12 @@ extension Components {
             ///   - inboundPendingRetentionDays: Days Marfa keeps inbound webhook deliveries no connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
             ///   - addresses: The addresses people reach this instance at, each an origin with no path. The sign-in address is always one of them.
             ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address.
-            ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Absent: no backup folder.
-            ///   - objectStoreBucket: The bucket of an S3-compatible object store that keeps a second copy of each file and the backups. Absent: no object store.
-            ///   - objectStoreRegion: The region of the object store. Absent: `us-east-1`.
-            ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Absent: the store's provider chooses it.
-            ///   - objectStorePathStyle: `true` if the object store at `object_store_endpoint` is addressed by path rather than by host. Absent: `true`.
-            ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Absent: `marfa`.
+            ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
+            ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes. Absent: no object store.
+            ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
+            ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes. Absent: the store's provider chooses it.
+            ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
+            ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
             ///   - objectStoreAccessKeyId: The access key ID for the object store.
             ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
             ///   - secretsSet: The key of each secret setting stored with a value Marfa can read, present only while one is. Marfa never returns a secret's value.
@@ -18150,15 +18150,25 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/NarrowedAppGrant/scopes`.
             public var scopes: [Swift.String]
+            /// How many keys the app made, or those keys made, Marfa revoked because they reached beyond the resulting scope set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/NarrowedAppGrant/revoked_keys`.
+            public var revokedKeys: Swift.Int
             /// Creates a new `NarrowedAppGrant`.
             ///
             /// - Parameters:
             ///   - scopes: The resulting scope set.
-            public init(scopes: [Swift.String]) {
+            ///   - revokedKeys: How many keys the app made, or those keys made, Marfa revoked because they reached beyond the resulting scope set.
+            public init(
+                scopes: [Swift.String],
+                revokedKeys: Swift.Int
+            ) {
                 self.scopes = scopes
+                self.revokedKeys = revokedKeys
             }
             public enum CodingKeys: String, CodingKey {
                 case scopes
+                case revokedKeys = "revoked_keys"
             }
         }
         /// An error response.
@@ -23916,8 +23926,8 @@ extension Components {
         public typealias MarfaInline681004346c78d5f3 = [Swift.String]
         /// - Remark: Generated from `#/components/schemas/MarfaInline099cb398ed5d68c2`.
         public typealias MarfaInline099cb398ed5d68c2 = Swift.String
-        /// - Remark: Generated from `#/components/schemas/MarfaInlined856c03b0c724c83`.
-        public typealias MarfaInlined856c03b0c724c83 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline7d7d6f95a5c460e0`.
+        public typealias MarfaInline7d7d6f95a5c460e0 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlinef9757109fae32f55`.
         public typealias MarfaInlinef9757109fae32f55 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlinef9d1ebbef8c9bb54`.
@@ -24171,8 +24181,8 @@ extension Components {
         public typealias MarfaNullableMarfaInline681004346c78d5f3 = MarfaNullable<Components.Schemas.MarfaInline681004346c78d5f3>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline099cb398ed5d68c2`.
         public typealias MarfaNullableMarfaInline099cb398ed5d68c2 = MarfaNullable<Components.Schemas.MarfaInline099cb398ed5d68c2>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlined856c03b0c724c83`.
-        public typealias MarfaNullableMarfaInlined856c03b0c724c83 = MarfaNullable<Components.Schemas.MarfaInlined856c03b0c724c83>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline7d7d6f95a5c460e0`.
+        public typealias MarfaNullableMarfaInline7d7d6f95a5c460e0 = MarfaNullable<Components.Schemas.MarfaInline7d7d6f95a5c460e0>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef9757109fae32f55`.
         public typealias MarfaNullableMarfaInlinef9757109fae32f55 = MarfaNullable<Components.Schemas.MarfaInlinef9757109fae32f55>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef9d1ebbef8c9bb54`.

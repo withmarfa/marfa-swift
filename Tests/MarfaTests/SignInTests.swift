@@ -733,7 +733,7 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
                 return true
             }
             #expect(server.requests(to: "/.well-known/oauth-authorization-server").isEmpty)
@@ -751,12 +751,136 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
                 return true
             }
             let kept = try #require(try authorization.place.read())
             #expect(kept.refreshToken == "rt-1")
             #expect(kept.tokenEndpoint == "\(server.origin)/auth/oauth2/token")
+        }
+    }
+
+    @Test(arguments: [401, 403, 400])
+    func anAnswerFromTheAdvertisedEndpointThatIsNoOAuthErrorOrMissingEndpointKeepsTheSignIn(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in request.path == "/oauth/token" ? .json(status, [:]) : .json(404, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
+                return true
+            }
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.refreshToken == "rt-1")
+            #expect(kept.tokenEndpoint == "\(server.origin)/auth/oauth2/token")
+        }
+    }
+
+    @Test func aTimeoutFromTheAdvertisedEndpointIsUnavailableAndKeepsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in request.path == "/oauth/token" ? .json(408, [:]) : .json(404, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test(arguments: [404, 410])
+    func aMissingAdvertisedEndpointEndsTheSignIn(status: Int) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(status, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Ended = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read() == nil)
+        }
+    }
+
+    @Test(arguments: ["invalid_request", "invalid_scope", "unauthorized_client"])
+    func aRefusalWithAnOAuthErrorThatEndsNothingIsRefusedAndKeepsTheSignIn(code: String) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in oauthError(code) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.refused, let message) = error else { return false }
+                return !message.contains("rt-1")
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func aTokenAnswerThatCannotBeReadIsUnreadableAndKeepsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in .json(200, ["unexpected": true]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.unreadable, _) = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test func metadataThatCannotBeReadIsUnreadable() async throws {
+        let server = ScriptedAuthServer()
+        server.answer { request in
+            request.path == "/.well-known/oauth-authorization-server" ? .json(200, ["issuer": 1]) : .json(404, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain)
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Refused(.unreadable, _) = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        }
+    }
+
+    @Test(arguments: [
+        (ScriptedAuthServer.Reply.json(400, ["error": "invalid_request"]), RenewalRefusalReason.refused),
+        (.json(200, ["unexpected": true]), .unreadable),
+    ])
+    func aFailedRenewalReachesAnAppAsItsOwnErrorWithItsReason(
+        answer: ScriptedAuthServer.Reply, reason: RenewalRefusalReason
+    ) async throws {
+        let server = ScriptedAuthServer()
+        marfa(server) { _ in answer }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (_, credential) = try signedIn(server, keychain, transport: server.transport())
+            let app = try Server(url: server.url, credential: credential)
+            do {
+                _ = try await app.renewedToken(refused: "at-1")
+                Issue.record("a failed renewal answered a token")
+            } catch let error as Marfa.MarfaError {
+                guard case .renewalRefused(let said, _) = error else {
+                    Issue.record("expected renewalRefused, got \(error)")
+                    return
+                }
+                #expect(said == reason)
+            } catch {
+                Issue.record("expected a MarfaError, got \(error)")
+            }
         }
     }
 
@@ -838,7 +962,7 @@ struct TokenRenewal {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.refused, _) = error else { return false }
                 return true
             }
             // A proxy's 403 or 404 on the metadata does not show that the grant ended.
@@ -1167,6 +1291,31 @@ struct TokenRenewal {
             server: server.url, client: client, keychain: fault.on(keychain, account: place.leaseAccount),
             service: service, transport: transport)
         return (place, try #require(try faulty.credential()))
+    }
+
+    @Test func aKeychainThatCannotBeReadDuringARenewalIsUnavailableAndKeepsTheSignIn() async throws {
+        let server = ScriptedAuthServer()
+        let fault = KeychainFault()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let place = authorization.place
+            let faulty = try Authorization(
+                server: server.url, client: client, keychain: fault.on(keychain, account: place.account),
+                service: service, transport: server.transport())
+            let credential = try #require(try faulty.credential())
+            marfa(server) { _ in tokens("at-2", "rt-2") }
+            fault.fail()
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Unavailable = error else { return false }
+                return true
+            }
+            #expect(fault.failed > 0)
+            fault.stop()
+            #expect(server.requests(to: "/oauth/token").isEmpty)
+            #expect(try place.read()?.refreshToken == "rt-1")
+        }
     }
 
     @Test func aKeychainErrorWhileTheLeaseIsMovedOnKeepsTheRenewedSignIn() async throws {
@@ -2201,7 +2350,7 @@ struct SignInRequestsRefuseRedirects {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.redirected, _) = error else { return false }
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")
@@ -2220,7 +2369,7 @@ struct SignInRequestsRefuseRedirects {
             await #expect {
                 try await renew(credential, refused: "at-1")
             } throws: { error in
-                guard case RenewalError.Failed = error else { return false }
+                guard case RenewalError.Refused(.redirected, _) = error else { return false }
                 return true
             }
             #expect(try authorization.place.read()?.refreshToken == "rt-1")

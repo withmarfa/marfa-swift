@@ -1033,7 +1033,7 @@ final class Lifecycle: Sendable {
                 cancelDrain(&state)
                 cancelRetry(&state)
                 set(&state, .keyRefused(error))
-            } else if error.isTransient {
+            } else if error.isTransient || error.isRenewalRefused {
                 scheduleDrain(&state, retryAfter: Self.retryAfter(error))
             }
         }

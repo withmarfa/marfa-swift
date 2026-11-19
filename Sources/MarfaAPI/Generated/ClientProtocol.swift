@@ -392,7 +392,7 @@ public protocol ClientProtocol: Sendable {
     func listAppGrants(_ input: Operations.ListAppGrants.Input) async throws -> Operations.ListAppGrants.Output
     /// Narrow an app grant
     ///
-    /// Narrows an app's standing access. Requires `grants.manage`. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    /// Narrows an app's standing access. Requires `grants.manage`. Tokens, refresh chains and keys the app made that reach beyond the new access end, with pending codes; the rest keep working. The app may need to reconnect.
     ///
     /// - Remark: HTTP `PATCH /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/patch(narrowAppGrant)`.
@@ -504,7 +504,7 @@ public protocol ClientProtocol: Sendable {
     func getConfig(_ input: Operations.GetConfig.Input) async throws -> Operations.GetConfig.Output
     /// Update the configuration
     ///
-    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    /// Updates the named settings and returns the configuration. Unnamed settings stay, except the store secret when its bucket or endpoint changes; `null` removes a setting. Send all `enforcement` levers you want on; requires `config.manage`.
     ///
     /// - Remark: HTTP `PATCH /config`.
     /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
@@ -595,7 +595,7 @@ public protocol ClientProtocol: Sendable {
     func exportArchive(_ input: Operations.ExportArchive.Input) async throws -> Operations.ExportArchive.Output
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage` and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -623,7 +623,7 @@ public protocol ClientProtocol: Sendable {
     func adoptBackupFolder(_ input: Operations.AdoptBackupFolder.Input) async throws -> Operations.AdoptBackupFolder.Output
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage` and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -1408,7 +1408,7 @@ extension ClientProtocol {
     }
     /// Narrow an app grant
     ///
-    /// Narrows an app's standing access. Requires `grants.manage`. Overbroad tokens, their refresh chains and pending codes end; covered chains keep working. The app may need to reconnect. Minted keys keep working.
+    /// Narrows an app's standing access. Requires `grants.manage`. Tokens, refresh chains and keys the app made that reach beyond the new access end, with pending codes; the rest keep working. The app may need to reconnect.
     ///
     /// - Remark: HTTP `PATCH /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/patch(narrowAppGrant)`.
@@ -1616,7 +1616,7 @@ extension ClientProtocol {
     }
     /// Update the configuration
     ///
-    /// Changes only the settings the body names and returns the whole configuration. A setting you leave out stays as it is, and `null` removes one so its default applies. `enforcement` is one setting: send every lever you want on. Requires `config.manage`.
+    /// Updates the named settings and returns the configuration. Unnamed settings stay, except the store secret when its bucket or endpoint changes; `null` removes a setting. Send all `enforcement` levers you want on; requires `config.manage`.
     ///
     /// - Remark: HTTP `PATCH /config`.
     /// - Remark: Generated from `#/paths//config/patch(updateConfig)`.
@@ -1769,7 +1769,7 @@ extension ClientProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage` and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -1811,7 +1811,7 @@ extension ClientProtocol {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage` and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
