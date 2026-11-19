@@ -1045,7 +1045,10 @@ struct TokenRenewal {
         }
     }
 
-    @Test(arguments: [(URLError.Code.networkConnectionLost, true), (.notConnectedToInternet, false)])
+    @Test(arguments: [
+        (URLError.Code.networkConnectionLost, true), (.notConnectedToInternet, false), (.secureConnectionFailed, false),
+        (.appTransportSecurityRequiresSecureConnection, false), (.serverCertificateUntrusted, false),
+    ])
     func aRequestLostAfterItWasSentLeavesTheSignInUncertainAndOneNeverMadeDoesNot(
         code: URLError.Code, uncertain: Bool
     ) async throws {
@@ -1497,6 +1500,20 @@ struct SigningInAgain {
             #expect(credential.replacedGrantStands)
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
             #expect(try authorization.credential()?.replacedGrantStands == false)
+            #expect(server.requests(to: "/oauth/revoke").map { $0.form["token"] } == ["rt-1"])
+        }
+    }
+
+    @Test func aReplacedSignInLeftUncertainIsReportedAsStandingThoughTheServerConfirmsItsRevocation() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            var kept = try #require(try authorization.place.read())
+            kept.uncertain = true
+            try authorization.place.keep(kept)
+            let credential = try await authorization.startDeviceSignIn().credential()
+
+            #expect(credential.replacedGrantStands, "the server may hold a rotated grant the revocation did not name")
             #expect(server.requests(to: "/oauth/revoke").map { $0.form["token"] } == ["rt-1"])
         }
     }

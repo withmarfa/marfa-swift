@@ -333,6 +333,9 @@ public struct Authorization: Sendable {
         let reused: Bool
     }
 
+    /// Whether a new sign-in may still be canceled, or is being written.
+    private enum Admission { case open, canceled, admitted }
+
     fileprivate func keep(_ token: TokenAnswer, registered: Registered, discovery: Discovery) async throws
         -> Credential
     {
@@ -343,25 +346,30 @@ public struct Authorization: Sendable {
             tokenEndpoint: discovery.tokenEndpoint, revocationEndpoint: discovery.revocationEndpoint)
         let place = place
         let transport = transport
-        // The tokens are in hand, and a cancel from here until the write changes nothing kept. The write itself is
-        // not cancelable, so the cancel is decided on under the same lock the cancellation takes, with nothing to
-        // wait for between that decision and the write.
-        let canceled = Mutex(false)
+        // The tokens are in hand, and a cancel from here until the write is admitted changes nothing kept. The
+        // write is admitted under the lock the cancellation takes, and made outside it, so a cancel never waits on
+        // the keychain; a cancel after the admission is too late, and the sign-in stands.
+        let admission = Mutex(Admission.open)
         let replaced: KeptSignIn?
         do {
             replaced = try await withTaskCancellationHandler {
                 try await background {
                     try place.exclusively(transport) { () throws -> KeptSignIn? in
                         let replaced = try place.read()
-                        try canceled.withLock { canceled in
-                            if canceled { throw CancellationError() }
-                            try place.keep(kept)
+                        let admitted = admission.withLock { admission in
+                            guard admission == .open else { return false }
+                            admission = .admitted
+                            return true
                         }
+                        guard admitted else { throw CancellationError() }
+                        try place.keep(kept)
                         return replaced
                     }
                 }
             } onCancel: {
-                canceled.withLock { $0 = true }
+                admission.withLock { admission in
+                    if admission == .open { admission = .canceled }
+                }
             }
         } catch {
             // The person approved a grant the app cannot use; ending it keeps it from standing at the server,
@@ -384,7 +392,9 @@ public struct Authorization: Sendable {
             // Revoking the refresh token of a sign-in on the same client would end the new sign-in's grant too.
             let shared = replaced.clientId == kept.clientId
             let ended = await revoke(replaced, endingGrant: !shared)
-            replacedGrantStands = !shared && !ended
+            // A replaced sign-in whose refresh request got no answer may have been rotated at the server, which
+            // ignores the revocation of a rotated token and still confirms it.
+            replacedGrantStands = !shared && (!ended || replaced.uncertain)
         }
         return Credential(place: place, kept: kept, transport: transport, replacedGrantStands: replacedGrantStands)
     }

@@ -222,12 +222,11 @@ final class TokenRenewer: CredentialRenewer {
                 done(.failure(URLError(.badServerResponse)))
             }
         }
-        guard pending.begin(task) else {
+        guard pending.start(task) else {
             task.cancel()
             done(.failure(NotSent()))
             return
         }
-        task.resume()
         DispatchQueue.global().asyncAfter(deadline: deadline) { task.cancel() }
     }
 
@@ -270,9 +269,14 @@ final class TokenRenewer: CredentialRenewer {
         }
     }
 
-    /// The failures of a connection that was never made, which prove the server never saw the request.
+    /// The failures of a connection that was never made, or never secured, which prove the server never saw the
+    /// request: the request is sent only once the connection and its TLS session are up.
     private static let neverConnected: Set<URLError.Code> = [
         .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet,
+        .appTransportSecurityRequiresSecureConnection, .secureConnectionFailed, .serverCertificateUntrusted,
+        .serverCertificateHasBadDate, .serverCertificateNotYetValid, .serverCertificateHasUnknownRoot,
+        .clientCertificateRejected, .clientCertificateRequired, .internationalRoamingOff, .dataNotAllowed,
+        .unsupportedURL, .badURL,
     ]
 
     /// Whether the server answered as one that has no such endpoint, as opposed to refusing the renewal.
@@ -445,11 +449,15 @@ private final class Pending: Sendable {
 
     private let state = Mutex(State())
 
-    /// Takes `task` as the request in flight, or answers `false` when the process's time has ended.
-    func begin(_ task: URLSessionDataTask) -> Bool {
+    /// Takes `task` as the request in flight and resumes it, or answers `false` when the process's time has ended.
+    ///
+    /// The task is resumed under the same lock `expire()` takes, so a task the expiry cancels was either never
+    /// resumed, and is reported as not sent, or already on its way.
+    func start(_ task: URLSessionDataTask) -> Bool {
         state.withLock { state in
             guard !state.expired else { return false }
             state.task = task
+            task.resume()
             return true
         }
     }
