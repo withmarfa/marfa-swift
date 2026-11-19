@@ -43,13 +43,7 @@ final class TokenRenewer: CredentialRenewer {
                 try? place.drop()
                 throw RenewalError.Ended(message: "the sign-in to \(origin) holds no refresh token")
             }
-            do {
-                request = try formRequest(
-                    read.tokenEndpoint,
-                    [("grant_type", "refresh_token"), ("refresh_token", refreshToken), ("client_id", read.clientId)])
-            } catch {
-                throw RenewalError.Failed(message: error.description)
-            }
+            request = try Self.refresh(at: read.tokenEndpoint, kept: read, sent: refreshToken)
             kept = read
             sent = refreshToken
         } catch {
@@ -61,44 +55,161 @@ final class TokenRenewer: CredentialRenewer {
 
     /// Sends the renewal and waits for what it settles, for up to the transport's time limit.
     ///
-    /// The request runs on after the wait gives up, holding the lease, until it answers or reaches the
+    /// The requests run on after the wait gives up, holding the lease, until they answer or each reaches the
     /// request limit, so an answer that arrives late is still kept and no other renewal sends the same refresh
     /// token meanwhile. Only a request that never answers can leave the refresh token spent.
+    ///
+    /// A stored token endpoint the server no longer has answers 404 or 410 with no OAuth error. The renewal
+    /// then reads the server's metadata again and sends the same request once to the endpoint it names, so a
+    /// sign-in kept against an earlier address of the token endpoint still renews. Before that retry it checks
+    /// again that it holds the lease and that the kept refresh token is the one it captured, and sends nothing
+    /// if not.
     private func ask(
         _ request: URLRequest, sent: String, kept: KeptSignIn, lease: RenewalLease, transport: SignInTransport
     ) throws(RenewalError) -> String {
         let place = credential.place
+        let origin = place.account
         let settled = Settled()
-        let pending = Mutex<URLSessionDataTask?>(nil)
+        let pending = Pending()
         guard
             let activity = BackgroundActivity.begin(
-                "Renewing the sign-in", onExpiry: { pending.withLock { $0?.cancel() } })
+                "Renewing the sign-in", onExpiry: { pending.expire() })
         else {
             lease.release()
             throw .Unavailable(message: "the app is being suspended, so the sign-in was not renewed")
         }
-        let task = transport.session.dataTask(with: transport.prepared(request)) { body, response, error in
-            let answered: Result<Answer, any Error>
-            if let error {
-                answered = .failure(error)
-            } else if let http = response as? HTTPURLResponse {
-                answered = .success(
-                    Answer(status: http.statusCode, body: body ?? Data(), headers: http.allHeaderFields))
-            } else {
-                answered = .failure(URLError(.badServerResponse))
-            }
-            let result = Self.settle(answered, sent: sent, kept: kept, place: place, lease: lease)
+        let finish: @Sendable (Result<String, RenewalError>) -> Void = { result in
             lease.release()
             settled.set(result)
             activity.end()
         }
-        pending.withLock { $0 = task }
-        task.resume()
-        DispatchQueue.global().asyncAfter(deadline: .now() + transport.requestLimit.seconds) { task.cancel() }
+        let step: @Sendable (URLRequest, @escaping @Sendable (Result<Answer, RenewalError>) -> Void) -> Void = {
+            request, then in
+            Self.send(request, transport: transport, pending: pending) { then(Self.received($0, origin: origin)) }
+        }
+        step(request) { first in
+            let answer: Answer
+            do throws(RenewalError) { answer = try first.get() } catch {
+                finish(.failure(error))
+                return
+            }
+            guard Self.tokenEndpointIsGone(answer) else {
+                finish(Self.settle(answer, sent: sent, place: place, lease: lease, advertised: nil))
+                return
+            }
+            guard let discoveryRequest = URL(string: "\(origin)/.well-known/oauth-authorization-server")
+            else {
+                finish(.failure(.Failed(message: "\(origin) is not an address a sign-in can use")))
+                return
+            }
+            step(URLRequest(url: discoveryRequest)) { read in
+                let advertised: Discovery
+                let retry: URLRequest
+                do throws(RenewalError) {
+                    advertised = try Self.advertised(try read.get(), origin: origin)
+                    retry = try Self.refresh(at: advertised.tokenEndpoint, kept: kept, sent: sent)
+                } catch {
+                    finish(.failure(error))
+                    return
+                }
+                // Reading the metadata took time with the lease held, but nothing stops the lease lapsing in that
+                // time, so the retry is admitted only while this renewal still holds it and the kept refresh
+                // token is still the one it captured. Otherwise another holder has renewed or ended the sign-in.
+                let admitted: Bool
+                do {
+                    admitted = try lease.whileHeld { try place.read()?.refreshToken == sent } ?? false
+                } catch {
+                    finish(.failure(.Failed(message: "the keychain could not be read: \(error)")))
+                    return
+                }
+                guard admitted else {
+                    finish(Self.settledElsewhere(sent: sent, place: place))
+                    return
+                }
+                step(retry) { second in
+                    do throws(RenewalError) {
+                        let answer = try second.get()
+                        finish(Self.settle(answer, sent: sent, place: place, lease: lease, advertised: advertised))
+                    } catch { finish(.failure(error)) }
+                }
+            }
+        }
         guard let result = settled.wait(transport.timeLimit) else {
             throw .Unavailable(message: "the server did not answer the renewal in time")
         }
         return try result.get()
+    }
+
+    /// Sends a request and calls `done` with its answer.
+    ///
+    /// The request is cancelled at the request limit or when the system ends the process's time, and one begun
+    /// after that ends at once.
+    private static func send(
+        _ request: URLRequest, transport: SignInTransport, pending: Pending,
+        done: @escaping @Sendable (Result<Answer, any Error>) -> Void
+    ) {
+        let task = transport.session.dataTask(with: transport.prepared(request)) { body, response, error in
+            if let error {
+                done(.failure(error))
+            } else if let http = response as? HTTPURLResponse {
+                done(.success(Answer(status: http.statusCode, body: body ?? Data(), headers: http.allHeaderFields)))
+            } else {
+                done(.failure(URLError(.badServerResponse)))
+            }
+        }
+        guard pending.begin(task) else {
+            task.cancel()
+            done(.failure(URLError(.cancelled)))
+            return
+        }
+        task.resume()
+        DispatchQueue.global().asyncAfter(deadline: .now() + transport.requestLimit.seconds) { task.cancel() }
+    }
+
+    /// The request that renews `kept` with the refresh token `sent`, at `endpoint`.
+    private static func refresh(at endpoint: String, kept: KeptSignIn, sent: String) throws(RenewalError)
+        -> URLRequest
+    {
+        do {
+            return try formRequest(
+                endpoint, [("grant_type", "refresh_token"), ("refresh_token", sent), ("client_id", kept.clientId)])
+        } catch {
+            throw .Failed(message: error.description)
+        }
+    }
+
+    /// The answer, or the renewal's failure where the request did not get one.
+    private static func received(_ answered: Result<Answer, any Error>, origin: String) -> Result<
+        Answer, RenewalError
+    > {
+        switch answered {
+        case .success(let answer): return .success(answer)
+        case .failure(let error as URLError) where error.code == .cancelled:
+            return .failure(.Unavailable(message: "the server did not answer the renewal in time"))
+        case .failure(let error as URLError):
+            return .failure(.Unavailable(message: "the server could not be reached: \(error.localizedDescription)"))
+        case .failure(let error): return .failure(.Failed(message: "the renewal failed: \(error.localizedDescription)"))
+        }
+    }
+
+    /// Whether the server answered as one that has no such endpoint, as opposed to refusing the renewal.
+    private static func tokenEndpointIsGone(_ answer: Answer) -> Bool {
+        (answer.status == 404 || answer.status == 410) && answer.oauthError == nil
+    }
+
+    /// The metadata the server advertises now, read from its answer.
+    ///
+    /// A client error on the metadata read itself, such as a proxy's 403 or 404, does not prove the grant ended,
+    /// so it fails the renewal and keeps the sign-in.
+    private static func advertised(_ answer: Answer, origin: String) throws(RenewalError) -> Discovery {
+        if answer.status == 429 || answer.status >= 500 {
+            throw .Unavailable(message: "\(origin) could not give its sign-in metadata now (\(answer.status))")
+        }
+        do {
+            return try Discovery.parse(answer, from: origin)
+        } catch {
+            throw .Failed(message: "\(origin) gave no sign-in metadata to renew with: \(error)")
+        }
     }
 
     /// What a renewal's answer comes to, and the keychain written to match.
@@ -107,20 +218,14 @@ final class TokenRenewer: CredentialRenewer {
     /// refresh token is still the one it sent. Otherwise, where another holder has written since, the token the
     /// keychain holds now is the answer, and where the keychain still holds the sent refresh token, the renewal
     /// is unavailable rather than answering the token the server refused.
+    ///
+    /// `advertised` is the metadata a renewal retried with, which its success keeps beside the new tokens. A
+    /// retry that is refused with a client error that is no OAuth error ends the sign-in: the server has no
+    /// token endpoint to renew it at.
     private static func settle(
-        _ answered: Result<Answer, any Error>, sent: String, kept: KeptSignIn, place: SignInPlace,
-        lease: RenewalLease
+        _ answer: Answer, sent: String, place: SignInPlace, lease: RenewalLease, advertised: Discovery?
     ) -> Result<String, RenewalError> {
         let origin = place.account
-        let answer: Answer
-        switch answered {
-        case .success(let received): answer = received
-        case .failure(let error as URLError) where error.code == .cancelled:
-            return .failure(.Unavailable(message: "the server did not answer the renewal in time"))
-        case .failure(let error as URLError):
-            return .failure(.Unavailable(message: "the server could not be reached: \(error.localizedDescription)"))
-        case .failure(let error): return .failure(.Failed(message: "the renewal failed: \(error.localizedDescription)"))
-        }
         switch (answer.status, answer.code) {
         case (200, _):
             guard let token = try? TokenAnswer.read(answer) else {
@@ -131,6 +236,10 @@ final class TokenRenewer: CredentialRenewer {
                 renewed.accessToken = token.accessToken
                 renewed.refreshToken = token.refreshToken ?? current.refreshToken
                 renewed.scope = token.scope ?? current.scope
+                if let advertised {
+                    renewed.tokenEndpoint = advertised.tokenEndpoint
+                    renewed.revocationEndpoint = advertised.revocationEndpoint
+                }
                 do {
                     try place.keep(renewed)
                 } catch {
@@ -147,6 +256,12 @@ final class TokenRenewer: CredentialRenewer {
             }
         case (429, _), (500..., _):
             return .failure(.Unavailable(message: "\(origin) could not renew the sign-in now (\(answer.status))"))
+        case (400..<500, _) where advertised != nil && answer.oauthError == nil:
+            return written(sent: sent, place: place, lease: lease) { _ in
+                try? place.drop()
+                return .failure(
+                    .Ended(message: "\(origin) has no token endpoint to renew the sign-in at: \(answer.message)"))
+            }
         default:
             return .failure(.Failed(message: "\(origin) refused to renew the sign-in: \(answer.message)"))
         }
@@ -162,6 +277,16 @@ final class TokenRenewer: CredentialRenewer {
                 return write(current)
             }
             if let decided = decided ?? nil { return decided }
+            return settledElsewhere(sent: sent, place: place)
+        } catch {
+            return .failure(.Failed(message: "the keychain could not be read: \(error)"))
+        }
+    }
+
+    /// What a renewal answers when it no longer holds the lease or the kept refresh token is no longer the one
+    /// it sent: the token another holder wrote, and nothing sent.
+    private static func settledElsewhere(sent: String, place: SignInPlace) -> Result<String, RenewalError> {
+        do {
             guard let current = try place.read() else {
                 return .failure(.Ended(message: "the app is no longer signed in to \(place.account)"))
             }
@@ -182,6 +307,33 @@ final class TokenRenewer: CredentialRenewer {
         } catch {
             throw .Failed(message: "the keychain could not be read: \(error)")
         }
+    }
+}
+
+/// The request a renewal has in flight, so the system's expiry can cancel it and stop the next from starting.
+private final class Pending: Sendable {
+    private struct State {
+        var task: URLSessionDataTask?
+        var expired = false
+    }
+
+    private let state = Mutex(State())
+
+    /// Takes `task` as the request in flight, or answers `false` when the process's time has ended.
+    func begin(_ task: URLSessionDataTask) -> Bool {
+        state.withLock { state in
+            guard !state.expired else { return false }
+            state.task = task
+            return true
+        }
+    }
+
+    func expire() {
+        let task = state.withLock { state in
+            state.expired = true
+            return state.task
+        }
+        task?.cancel()
     }
 }
 

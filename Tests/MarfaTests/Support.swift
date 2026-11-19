@@ -657,7 +657,8 @@ struct LocalServer: Sendable {
                 connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, _, _ in
                     let received = received + (data ?? Data())
                     let text = String(decoding: received, as: UTF8.self)
-                    // Until the head ends, and then until the body has come, unless the peer closed.
+                    // Until the head ends, and then until the body has come, unless the peer closed. Lines end in
+                    // "\r\n", which Swift reads as one Character, so the head is split on that, not on "\r".
                     if data != nil {
                         guard let end = text.range(of: "\r\n\r\n") else {
                             read(received)
@@ -666,7 +667,7 @@ struct LocalServer: Sendable {
                         let length =
                             text[..<end.lowerBound].lowercased().components(separatedBy: "content-length:")
                             .dropFirst().first.flatMap {
-                                Int($0.prefix { $0 != "\r" }.trimmingCharacters(in: .whitespaces))
+                                Int($0.components(separatedBy: "\r\n")[0].trimmingCharacters(in: .whitespaces))
                             }
                             ?? 0
                         if received.count < text[..<end.upperBound].utf8.count + length {
@@ -675,7 +676,7 @@ struct LocalServer: Sendable {
                         }
                     }
                     log.heads.withLock { $0.append(text) }
-                    let line = text.prefix { $0 != "\r" }.split(separator: " ")
+                    let line = text.components(separatedBy: "\r\n")[0].split(separator: " ")
                     let method = line.first.map(String.init) ?? ""
                     let path = line.dropFirst().first.map { String($0.split(separator: "?").first ?? "") } ?? ""
                     if holdsResponse { return }
