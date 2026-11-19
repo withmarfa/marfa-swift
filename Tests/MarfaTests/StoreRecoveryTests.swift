@@ -17,8 +17,20 @@ struct StoreRecovery {
         return (store, id)
     }
 
+    /// Moves everything in the store's log into the file and empties the log.
+    ///
+    /// Once a core in this process has met a damaged store, every core keeps its log when it closes, and SQLite
+    /// would read the pages a test overwrites from that log, so the damage would not show.
+    private static func checkpoint(_ store: URL) throws {
+        var database: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        try #require(sqlite3_exec(database, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil) == SQLITE_OK)
+    }
+
     /// Writes over the first page, so SQLite no longer reads the file as a database.
     private static func damage(_ store: URL) throws {
+        try checkpoint(store)
         let handle = try FileHandle(forWritingTo: store)
         defer { try? handle.close() }
         try handle.write(contentsOf: Data(repeating: 0x5A, count: 4096))
@@ -26,6 +38,7 @@ struct StoreRecovery {
 
     /// Overwrites the page that holds one table's rows, so SQLite still reads the file but not that table.
     private static func damage(_ store: URL, table: String) throws {
+        try checkpoint(store)
         var database: OpaquePointer?
         try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
         defer { sqlite3_close(database) }
