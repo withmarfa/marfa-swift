@@ -1,5 +1,6 @@
 import AuthenticationServices
 import Foundation
+import Synchronization
 
 /// Signs an app in to one Marfa server, with the owner's approval, and keeps the sign-in in the keychain.
 ///
@@ -201,7 +202,8 @@ public struct Authorization: Sendable {
         guard let object = started.object, let deviceCode = object["device_code"] as? String,
             let userCode = object["user_code"] as? String,
             let verification = (object["verification_uri"] as? String).flatMap(URL.init(string:)),
-            let expiresIn = (object["expires_in"] as? NSNumber)?.doubleValue
+            let expiresIn = (object["expires_in"] as? NSNumber)?.doubleValue,
+            expiresIn.isFinite, expiresIn >= 0, expiresIn <= DeviceSignIn.longestWait
         else { throw SignInError.unreadable(message: "the device code answer is not one this package reads") }
         let complete = (object["verification_uri_complete"] as? String).flatMap(URL.init(string:))
         for page in [verification, complete].compactMap(\.self) where origin(of: page) != place.account {
@@ -221,8 +223,8 @@ public struct Authorization: Sendable {
     ///
     /// The keychain no longer holds the sign-in whatever the answer is. A server whose revocation address moved
     /// is asked again at the address its metadata names now, and one that holds no grant for the app's client
-    /// counts as having ended it. A renewal of the sign-in under way in this process is not waited for: it
-    /// finds the sign-in gone and writes nothing.
+    /// counts as having ended it. A renewal of the sign-in under way, in this process or another, is waited for
+    /// first, so the refresh token revoked is the newest one.
     ///
     /// Throws ``SignInError/heldElsewhere``, changing nothing, when another process sharing the keychain holds the
     /// sign-in too long.
@@ -230,7 +232,13 @@ public struct Authorization: Sendable {
     public func signOut() async throws -> SignOutOutcome {
         let place = place
         let transport = transport
-        let kept = try await background { try place.takeAway(transport) }
+        let kept = try await background {
+            try place.exclusively(transport) { () throws -> KeptSignIn? in
+                let kept = try place.read()
+                try place.drop()
+                return kept
+            }
+        }
         guard let kept else { return .nothingKept }
         return await revoke(kept) ? .endedAtServer : .notConfirmed
     }
@@ -330,14 +338,22 @@ public struct Authorization: Sendable {
             tokenEndpoint: discovery.tokenEndpoint, revocationEndpoint: discovery.revocationEndpoint)
         let place = place
         let transport = transport
+        // The tokens are in hand, and a cancel from here until the write changes nothing kept. The write itself is
+        // not cancelable, so the cancel is noticed under the lease, just before it.
+        let canceled = Mutex(false)
         let replaced: KeptSignIn?
         do {
-            replaced = try await background {
-                try place.exclusively(transport) { () throws -> KeptSignIn? in
-                    let replaced = try place.read()
-                    try place.keep(kept)
-                    return replaced
+            replaced = try await withTaskCancellationHandler {
+                try await background {
+                    try place.exclusively(transport) { () throws -> KeptSignIn? in
+                        if canceled.withLock({ $0 }) { throw CancellationError() }
+                        let replaced = try place.read()
+                        try place.keep(kept)
+                        return replaced
+                    }
                 }
+            } onCancel: {
+                canceled.withLock { $0 = true }
             }
         } catch {
             // The person approved a grant the app cannot use; ending it keeps it from standing at the server,
@@ -350,7 +366,9 @@ public struct Authorization: Sendable {
                     shared = true
                 }
             }
-            _ = await revoke(kept, endingGrant: !shared)
+            // A canceled task cannot send, so the revocation runs in a task that is not canceled with it.
+            let authorization = self
+            _ = await Task.detached { await authorization.revoke(kept, endingGrant: !shared) }.value
             throw error
         }
         var replacedGrantStands = false
@@ -395,6 +413,9 @@ public struct DeviceSignIn: Sendable {
 
     let polling: Polling
 
+    /// The longest a device code may be given to last, in seconds, which keeps every conversion of it in range.
+    static let longestWait: Double = 24 * 60 * 60
+
     /// Asks the server at the interval it gives until the person decides, slowing by 5 seconds each time
     /// the server says `slow_down`, and keeps the sign-in once they approve.
     ///
@@ -417,7 +438,7 @@ public struct DeviceSignIn: Sendable {
         while true {
             let remaining = expiresAt.timeIntervalSince(transport.now())
             if remaining <= 0 { throw SignInError.expired }
-            try await transport.sleep(min(pause, .milliseconds(Int64(remaining * 1000))))
+            try await transport.sleep(min(pause, .milliseconds(Int64(min(remaining, Self.longestWait) * 1000))))
             pause = interval
             let answer: Answer
             do {
@@ -643,20 +664,65 @@ final class WebSession: NSObject, ASWebAuthenticationPresentationContextProvidin
         return session
     }
 
-    /// What the continuation of a sign-in takes from a session's answer.
+    /// The one answer a sign-in's continuation takes.
     ///
-    /// Not isolated to an actor, because the system calls it on a queue of its own, where a main-actor closure
-    /// stops the app.
-    nonisolated static func completion(
-        resuming continuation: CheckedContinuation<URL, any Error>
-    ) -> @Sendable (URL?, (any Error)?) -> Void {
-        { returned, error in
-            if let returned {
-                continuation.resume(returning: returned)
-            } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
-                continuation.resume(throwing: SignInError.canceled)
-            } else {
-                continuation.resume(throwing: error ?? SignInError.canceled)
+    /// Whoever gives it first counts: the session's completion handler, a browser that cannot open, or the
+    /// cancellation of the task. Any later one is ignored.
+    ///
+    /// Not isolated to an actor, because the system calls the completion handler on a queue of its own, where a
+    /// main-actor closure stops the app.
+    final class Answer: Sendable {
+        private enum State {
+            case waiting
+            case taken(CheckedContinuation<URL, any Error>)
+            case given(Result<URL, any Error>)
+            case done
+        }
+
+        private let state = Mutex(State.waiting)
+
+        /// Takes the continuation, resuming it at once with an answer given before it existed.
+        func take(_ continuation: CheckedContinuation<URL, any Error>) {
+            let early: Result<URL, any Error>? = state.withLock { state in
+                if case .given(let result) = state {
+                    state = .done
+                    return result
+                }
+                state = .taken(continuation)
+                return nil
+            }
+            if let early { continuation.resume(with: early) }
+        }
+
+        func resume(returning url: URL) { give(.success(url)) }
+        func resume(throwing error: any Error) { give(.failure(error)) }
+
+        private func give(_ result: Result<URL, any Error>) {
+            let taken: CheckedContinuation<URL, any Error>? = state.withLock { state in
+                switch state {
+                case .waiting:
+                    state = .given(result)
+                    return nil
+                case .taken(let continuation):
+                    state = .done
+                    return continuation
+                case .given, .done:
+                    return nil
+                }
+            }
+            taken?.resume(with: result)
+        }
+
+        /// What the system's session calls with its answer.
+        var completion: @Sendable (URL?, (any Error)?) -> Void {
+            { returned, error in
+                if let returned {
+                    self.resume(returning: returned)
+                } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                    self.resume(throwing: SignInError.canceled)
+                } else {
+                    self.resume(throwing: error ?? SignInError.canceled)
+                }
             }
         }
     }
@@ -665,15 +731,20 @@ final class WebSession: NSObject, ASWebAuthenticationPresentationContextProvidin
         _ url: URL, scheme: String, anchor: ASPresentationAnchor, ephemeral: Bool, make: Maker = system
     ) async throws -> URL {
         let context = WebSession(anchor: anchor)
+        let answer = Answer()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, any Error>) in
-                let started = make(url, scheme, ephemeral, context, completion(resuming: continuation))
+                answer.take(continuation)
+                let started = make(url, scheme, ephemeral, context, answer.completion)
                 context.session = started
                 if !started.start() {
-                    continuation.resume(throwing: SignInError.unavailable(message: "The browser could not open."))
+                    answer.resume(throwing: SignInError.unavailable(message: "The browser could not open."))
                 }
             }
         } onCancel: {
+            // The system does not promise that a canceled session calls its completion handler, so the
+            // cancellation answers for it, and a handler that comes later finds the answer already given.
+            answer.resume(throwing: SignInError.canceled)
             Task { @MainActor in context.session?.cancel() }
         }
     }

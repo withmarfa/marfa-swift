@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Synchronization
 
 /// What the HTTP calls of a sign-in and a renewal run on.
 ///
@@ -9,11 +8,12 @@ struct SignInTransport: Sendable {
     var session: URLSession
     /// The longest a token request may take before a renewal gives up and reports the server unavailable.
     var timeLimit: Duration = .seconds(30)
-    /// The longest a token request may run in all.
+    /// The longest a renewal may hold the lease in all, its token request, metadata read and retry together.
     ///
-    /// A renewal that gives up at `timeLimit` leaves its request running, still holding the lease, until it
-    /// answers or this passes.
-    var requestLimit: Duration = .seconds(90)
+    /// A renewal that gives up at `timeLimit` leaves its requests running, still holding the lease, until they
+    /// answer or this passes. It must stay well within two `leaseLifetime`s, the time a caller waiting for the
+    /// lease gives up after, so that a sign-out or a sign-in in this process waits for a renewal to finish.
+    var requestLimit: Duration = .seconds(60)
     /// How long a ``RenewalLease`` lasts unless its holder moves it on, after which another holder may take it.
     var leaseLifetime: Duration = .seconds(60)
     var leasePoll: Duration = .milliseconds(100)
@@ -146,44 +146,8 @@ struct SignInPlace: Sendable, Hashable {
             throw SignInError.heldElsewhere
         }
         defer { lease.release() }
-        return try locked(work)
+        return try work()
     }
-
-    /// Deletes the sign-in and answers what it held, for a sign-out.
-    ///
-    /// A renewal in this process that waits on its server holds the lease for as long as the server takes, and
-    /// the sign-out does not wait for it: it deletes the sign-in under ``locked(_:)``, which that renewal's write
-    /// takes too, so the renewal finds nothing kept and writes nothing. Otherwise it takes the lease, waiting for
-    /// a holder in another process, and throws ``SignInError/heldElsewhere`` when that holder stays too long.
-    ///
-    /// Blocks the calling thread; never call it on the main thread.
-    func takeAway(_ transport: SignInTransport) throws -> KeptSignIn? {
-        let lease: RenewalLease?
-        do {
-            lease = try RenewalLease.takeUnlessHeldHere(self, transport)
-        } catch is RenewalLease.Held {
-            throw SignInError.heldElsewhere
-        }
-        defer { lease?.release() }
-        return try locked {
-            let kept = try read()
-            try drop()
-            return kept
-        }
-    }
-
-    /// Runs `work`, one at a time in this process for the place, so a read of the kept sign-in and the write that
-    /// follows it are one step against another write in this process, whether or not it holds the lease.
-    func locked<T>(_ work: () throws -> T) rethrows -> T {
-        try Self.locks.withLock { locks in
-            if let lock = locks[self] { return lock }
-            let lock = NSLock()
-            locks[self] = lock
-            return lock
-        }.withLock(work)
-    }
-
-    private static let locks = Mutex<[SignInPlace: NSLock]>([:])
 }
 
 extension Duration {

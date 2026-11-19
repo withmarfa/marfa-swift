@@ -55,9 +55,11 @@ final class TokenRenewer: CredentialRenewer {
 
     /// Sends the renewal and waits for what it settles, for up to the transport's time limit.
     ///
-    /// The requests run on after the wait gives up, holding the lease, until they answer or each reaches the
-    /// request limit, so an answer that arrives late is still kept and no other renewal sends the same refresh
-    /// token meanwhile. Only a request that never answers can leave the refresh token spent.
+    /// The requests run on after the wait gives up, holding the lease, until they answer or the renewal reaches
+    /// the transport's request limit, which bounds the first request, the metadata read and the retry together.
+    /// So an answer that arrives late is still kept and no other renewal sends the same refresh token meanwhile,
+    /// and the lease is always let go well within the time a waiter for it gives up after. Only a request that
+    /// never answers can leave the refresh token spent.
     ///
     /// A stored token endpoint the server no longer has answers 404 or 410 with no OAuth error. The renewal
     /// then reads the server's metadata again and sends the same request once to the endpoint it names, so a
@@ -71,6 +73,7 @@ final class TokenRenewer: CredentialRenewer {
         let origin = place.account
         let settled = Settled()
         let pending = Pending()
+        let deadline = DispatchTime.now() + transport.requestLimit.seconds
         guard
             let activity = BackgroundActivity.begin(
                 "Renewing the sign-in", onExpiry: { pending.expire() })
@@ -85,7 +88,20 @@ final class TokenRenewer: CredentialRenewer {
         }
         let step: @Sendable (URLRequest, @escaping @Sendable (Result<Answer, RenewalError>) -> Void) -> Void = {
             request, then in
-            Self.send(request, transport: transport, pending: pending) { then(Self.received($0, origin: origin)) }
+            Self.send(request, transport: transport, pending: pending, deadline: deadline) {
+                then(Self.received($0, origin: origin))
+            }
+        }
+        // A 200 answer the sign-in cannot take, because it was dropped meanwhile, would leave a grant nothing
+        // holds, so it is revoked before the lease is let go.
+        let conclude: @Sendable (Answer, Discovery?) -> Void = { answer, advertised in
+            let settlement = Self.settle(
+                answer, sent: sent, kept: kept, place: place, lease: lease, advertised: advertised)
+            guard let orphan = settlement.orphan, let request = orphan.request else {
+                finish(settlement.result)
+                return
+            }
+            step(request) { _ in finish(settlement.result) }
         }
         step(request) { first in
             let answer: Answer
@@ -94,7 +110,7 @@ final class TokenRenewer: CredentialRenewer {
                 return
             }
             guard Self.tokenEndpointIsGone(answer) else {
-                finish(Self.settle(answer, sent: sent, place: place, lease: lease, advertised: nil))
+                conclude(answer, nil)
                 return
             }
             guard let discoveryRequest = URL(string: "\(origin)/.well-known/oauth-authorization-server")
@@ -129,7 +145,7 @@ final class TokenRenewer: CredentialRenewer {
                 step(retry) { second in
                     do throws(RenewalError) {
                         let answer = try second.get()
-                        finish(Self.settle(answer, sent: sent, place: place, lease: lease, advertised: advertised))
+                        conclude(answer, advertised)
                     } catch { finish(.failure(error)) }
                 }
             }
@@ -142,10 +158,10 @@ final class TokenRenewer: CredentialRenewer {
 
     /// Sends a request and calls `done` with its answer.
     ///
-    /// The request is cancelled at the request limit or when the system ends the process's time, and one begun
-    /// after that ends at once.
+    /// The request is cancelled at `deadline`, the end of the renewal's time, or when the system ends the
+    /// process's time, and one begun after either ends at once.
     private static func send(
-        _ request: URLRequest, transport: SignInTransport, pending: Pending,
+        _ request: URLRequest, transport: SignInTransport, pending: Pending, deadline: DispatchTime,
         done: @escaping @Sendable (Result<Answer, any Error>) -> Void
     ) {
         let task = transport.dataTask(for: request) { body, response, error in
@@ -163,7 +179,7 @@ final class TokenRenewer: CredentialRenewer {
             return
         }
         task.resume()
-        DispatchQueue.global().asyncAfter(deadline: .now() + transport.requestLimit.seconds) { task.cancel() }
+        DispatchQueue.global().asyncAfter(deadline: deadline) { task.cancel() }
     }
 
     /// The request that renews `kept` with the refresh token `sent`, at `endpoint`.
@@ -223,32 +239,56 @@ final class TokenRenewer: CredentialRenewer {
     /// retry that is refused with a client error that is no OAuth error ends the sign-in: the server has no
     /// token endpoint to renew it at.
     private static func settle(
+        _ answer: Answer, sent: String, kept: KeptSignIn, place: SignInPlace, lease: RenewalLease,
+        advertised: Discovery?
+    ) -> Settlement {
+        guard answer.status == 200 else {
+            return Settlement(
+                result: settleRefused(answer, sent: sent, place: place, lease: lease, advertised: advertised))
+        }
+        let origin = place.account
+        guard let token = try? TokenAnswer.read(answer) else {
+            return Settlement(
+                result: .failure(.Failed(message: "\(origin) answered a renewal this package cannot read")))
+        }
+        let result = written(sent: sent, place: place, lease: lease) { current in
+            var renewed = current
+            renewed.accessToken = token.accessToken
+            renewed.refreshToken = token.refreshToken ?? current.refreshToken
+            renewed.scope = token.scope ?? current.scope
+            if let advertised {
+                renewed.tokenEndpoint = advertised.tokenEndpoint
+                renewed.revocationEndpoint = advertised.revocationEndpoint
+            }
+            do {
+                try place.keep(renewed)
+            } catch {
+                // The server has spent the old refresh token, so the kept one cannot renew again.
+                try? place.drop()
+                return .failure(.Ended(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
+            }
+            return .success(renewed.accessToken)
+        }
+        // Where the sign-in is gone, nothing holds the grant this answer gave, so it is ended at the server. Where
+        // another holder wrote a sign-in, it may share the grant, and nothing is revoked.
+        guard case .failure = result, signInIsGone(place),
+            let endpoint = advertised?.revocationEndpoint ?? kept.revocationEndpoint
+        else { return Settlement(result: result) }
+        return Settlement(
+            result: result,
+            orphan: Orphan(endpoint: endpoint, token: token.refreshToken ?? sent, clientId: kept.clientId))
+    }
+
+    /// Whether the keychain answers that it holds no sign-in; an error proves nothing.
+    private static func signInIsGone(_ place: SignInPlace) -> Bool {
+        do { return try place.read() == nil } catch { return false }
+    }
+
+    private static func settleRefused(
         _ answer: Answer, sent: String, place: SignInPlace, lease: RenewalLease, advertised: Discovery?
     ) -> Result<String, RenewalError> {
         let origin = place.account
         switch (answer.status, answer.code) {
-        case (200, _):
-            guard let token = try? TokenAnswer.read(answer) else {
-                return .failure(.Failed(message: "\(origin) answered a renewal this package cannot read"))
-            }
-            return written(sent: sent, place: place, lease: lease) { current in
-                var renewed = current
-                renewed.accessToken = token.accessToken
-                renewed.refreshToken = token.refreshToken ?? current.refreshToken
-                renewed.scope = token.scope ?? current.scope
-                if let advertised {
-                    renewed.tokenEndpoint = advertised.tokenEndpoint
-                    renewed.revocationEndpoint = advertised.revocationEndpoint
-                }
-                do {
-                    try place.keep(renewed)
-                } catch {
-                    // The server has spent the old refresh token, so the kept one cannot renew again.
-                    try? place.drop()
-                    return .failure(.Ended(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
-                }
-                return .success(renewed.accessToken)
-            }
         case (_, "invalid_grant"), (_, "invalid_client"):
             return written(sent: sent, place: place, lease: lease) { _ in
                 try? place.drop()
@@ -267,18 +307,32 @@ final class TokenRenewer: CredentialRenewer {
         }
     }
 
+    /// What a renewal came to, and the grant it received that the sign-in could not take, if any.
+    private struct Settlement {
+        let result: Result<String, RenewalError>
+        var orphan: Orphan?
+    }
+
+    /// A refresh token the server issued that the keychain does not hold.
+    private struct Orphan {
+        let endpoint: String
+        let token: String
+        let clientId: String
+
+        var request: URLRequest? {
+            try? formRequest(
+                endpoint, [("token", token), ("token_type_hint", "refresh_token"), ("client_id", clientId)])
+        }
+    }
+
     private static func written(
         sent: String, place: SignInPlace, lease: RenewalLease,
         _ write: (KeptSignIn) -> Result<String, RenewalError>
     ) -> Result<String, RenewalError> {
         do {
             let decided = try lease.whileHeld { () throws -> Result<String, RenewalError>? in
-                // A sign-out in this process does not wait for the lease, so the read and the write that follows
-                // it are one step under the place's lock.
-                try place.locked {
-                    guard let current = try place.read(), current.refreshToken == sent else { return nil }
-                    return write(current)
-                }
+                guard let current = try place.read(), current.refreshToken == sent else { return nil }
+                return write(current)
             }
             if let decided = decided ?? nil { return decided }
             return settledElsewhere(sent: sent, place: place)

@@ -56,28 +56,11 @@ final class RenewalLease: Sendable {
     ///
     /// Blocks the calling thread while it waits; never call it on the main thread.
     static func take(_ place: SignInPlace, _ transport: SignInTransport) throws -> RenewalLease {
+        let lifetime = transport.leaseLifetime
         // How long this caller waits is its own matter, not the lease's, so it is measured on Dispatch's clock.
-        let giveUp = DispatchTime.now() + (transport.leaseLifetime * 2).seconds
+        let giveUp = DispatchTime.now() + (lifetime * 2).seconds
         let gate = gate(for: place)
         guard gate.wait(timeout: giveUp) == .success else { throw Held() }
-        return try lease(holding: gate, place, transport, giveUp: giveUp)
-    }
-
-    /// Takes the place's lease as ``take(_:_:)`` does, or answers `nil` at once where another holder in this
-    /// process has it.
-    ///
-    /// For a caller that cannot wait for that holder's request. A holder in another process is still waited for.
-    static func takeUnlessHeldHere(_ place: SignInPlace, _ transport: SignInTransport) throws -> RenewalLease? {
-        let giveUp = DispatchTime.now() + (transport.leaseLifetime * 2).seconds
-        let gate = gate(for: place)
-        guard gate.wait(timeout: .now()) == .success else { return nil }
-        return try lease(holding: gate, place, transport, giveUp: giveUp)
-    }
-
-    private static func lease(
-        holding gate: DispatchSemaphore, _ place: SignInPlace, _ transport: SignInTransport, giveUp: DispatchTime
-    ) throws -> RenewalLease {
-        let lifetime = transport.leaseLifetime
         do {
             while true {
                 let mine = label(lapsingAt: transport.leaseClock() + nanoseconds(lifetime))

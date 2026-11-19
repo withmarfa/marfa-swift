@@ -13,6 +13,10 @@ private final class QueueSession: BrowserSession {
         case returned(URL)
         case failed(String)
         case canceled
+        /// Never answers, even once canceled, as a session the documentation does not promise to answer.
+        case silentWhenCanceled
+        /// Answers its cancellation only after the task has already been told it was canceled.
+        case answersCancellationLate
         case refusesToStart
     }
 
@@ -27,13 +31,24 @@ private final class QueueSession: BrowserSession {
 
     func start() -> Bool {
         if case .refusesToStart = answer { return false }
-        if case .canceled = answer { return true }
+        switch answer {
+        case .canceled, .silentWhenCanceled, .answersCancellationLate: return true
+        default: break
+        }
         reply(answer)
         return true
     }
 
     func cancel() {
-        reply(.canceled)
+        switch answer {
+        case .silentWhenCanceled: break
+        case .answersCancellationLate:
+            let completion = completion
+            queue.asyncAfter(deadline: .now() + .milliseconds(300)) {
+                completion(nil, ASWebAuthenticationSessionError(.canceledLogin))
+            }
+        default: reply(.canceled)
+        }
     }
 
     private func reply(_ answer: Answer) {
@@ -43,7 +58,7 @@ private final class QueueSession: BrowserSession {
             case .returned(let url): completion(url, nil)
             case .failed(let message): completion(nil, URLError(.badServerResponse, userInfo: ["why": message]))
             case .canceled: completion(nil, ASWebAuthenticationSessionError(.canceledLogin))
-            case .refusesToStart: break
+            case .refusesToStart, .silentWhenCanceled, .answersCancellationLate: break
             }
         }
     }
@@ -113,6 +128,23 @@ struct WebSessionTests {
             guard case SignInError.canceled = error else { return false }
             return true
         }
+    }
+
+    @Test(arguments: [QueueSession.Answer.silentWhenCanceled, .answersCancellationLate])
+    fileprivate func cancellingTheTaskEndsTheSignInWhetherOrNotTheSessionAnswersItsCancellation(
+        answer: QueueSession.Answer
+    ) async throws {
+        let task = Task { @MainActor in try await present(answer, anchor()) }
+        try await Task.sleep(for: .milliseconds(200))
+        task.cancel()
+        await #expect {
+            try await task.value
+        } throws: { error in
+            guard case SignInError.canceled = error else { return false }
+            return true
+        }
+        // A completion handler that comes after the answer is given finds it taken, and does not resume again.
+        try await Task.sleep(for: .milliseconds(500))
     }
 
     @Test func theSessionIsGivenThePresentationAnchorOfTheCall() async throws {
