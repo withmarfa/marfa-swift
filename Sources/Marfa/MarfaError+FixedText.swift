@@ -15,7 +15,7 @@ public struct FixedErrorText: Sendable, Hashable {
     /// The server's refusal code where the error carries one and it has the shape of a code, otherwise `type`.
     ///
     /// A code is lowercase letters and underscores only, at most 48 characters, so an id, a hash, a path or a
-    /// sentence that arrived in its place is never sent.
+    /// sentence that arrived in its place never reaches it.
     public let code: String
 
     init(type: StaticString, sentence: StaticString, serverCode: String? = nil) {
