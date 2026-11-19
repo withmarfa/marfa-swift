@@ -49,8 +49,8 @@ import Testing
         (.decoding(message: "m"), .none),
         (.store(message: "m"), .none),
         (.storeBusy(message: "m"), .transient),
-        (.storeDamaged(path: "p", reason: "r", unsent: 1, message: "m"), .none),
-        (.storeDamaged(path: "", reason: "r", unsent: nil, message: "m"), .none),
+        (.storeDamaged(path: "p", reason: "r", unsent: 1, setAsideStopped: false, message: "m"), .none),
+        (.storeDamaged(path: "", reason: "r", unsent: nil, setAsideStopped: true, message: "m"), .none),
         (.storageFull(message: "m"), .transient),
         (.signedOut(origin: "https://marfa.example", message: "m"), .keyRefusal),
         (.noKeychain(message: "m"), .none),
@@ -71,6 +71,10 @@ import Testing
         (.bytesAbsent(hash: "h", reason: "r", message: "m"), .none),
         (.noRoom(hash: "h", size: 5, free: 3, message: "m"), .none),
         (.contractMismatch(served: "3", expected: 2, status: 200, writeSent: false, message: "m", server: nil), .none),
+        (.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: "m"), .none),
+        (.trashPlanChanged(message: "m", server: nil), .none),
+        (.itemBeingRemoved(id: "a", message: "m"), .none),
+        (.itemBeingRemoved(id: nil, message: "m"), .none),
         (.canceled(message: "m"), .none),
         (.firstSyncWaiting(message: "m"), .hydration),
         (.invalid(message: "m"), .none),
@@ -150,6 +154,13 @@ import Testing
         #expect(Marfa.MarfaError.instanceChanged(message: "m", server: nil).fixedText.code == "instance_changed")
         #expect(Marfa.MarfaError.keyChanging(message: "m").code() == "key_changing")
         #expect(Marfa.MarfaError.keyChanging(message: "m").fixedText.code == "key_changing")
+        #expect(
+            Marfa.MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: "m").code() == "server_too_old")
+        #expect(
+            Marfa.MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: "m").fixedText.code
+                == "server_too_old")
+        #expect(Marfa.MarfaError.trashPlanChanged(message: "m", server: nil).fixedText.code == "trash_plan_changed")
+        #expect(Marfa.MarfaError.itemBeingRemoved(id: "a", message: "m").fixedText.code == "item_being_removed")
         for (error, _) in Self.meanings {
             #expect(error.fixedText.type == error.code(), "\(error)")
             #expect(error.message == "m")

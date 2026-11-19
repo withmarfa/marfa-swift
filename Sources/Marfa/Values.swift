@@ -69,7 +69,12 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// `unsent` counts the writes the server has not taken, `nil` where the queue cannot be read whole.
     /// ``WorkingCopy/setAsideDamaged(store:)`` keeps the store and carries the writes it can read, and
     /// ``WorkingCopy/unsentWrites(in:)`` lists them so the person can see what a removal would lose.
-    case storeDamaged(path: String, reason: String, unsent: UInt64?, message: String)
+    ///
+    /// `setAsideStopped` is `true` while a file stands where a set-aside carries the store, so the app offers no
+    /// removal or replacement: ``WorkingCopy/removeLosingAll(store:)``, ``WorkingCopy/remove(store:confirming:)`` and
+    /// replacing the store refuse until ``WorkingCopy/setAsideDamaged(store:)`` is called again and finishes it. It is
+    /// `false` for any other damage. Test it, never the text of `reason`.
+    case storeDamaged(path: String, reason: String, unsent: UInt64?, setAsideStopped: Bool, message: String)
     /// The device has no room left to write the store.
     case storageFull(message: String)
     /// The keychain no longer holds a sign-in for `origin`, or the server ended it; sign in again.
@@ -125,6 +130,21 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// `status` is nil when the failure carries no HTTP status.
     case contractMismatch(
         served: String?, expected: UInt64, status: UInt16?, writeSent: Bool, message: String, server: ServerAnswer?)
+    /// The server's release is older than the oldest this build works with, so nothing was asked of it beyond
+    /// its root. `served` is the release the server's root names and `oldest` the oldest release this build works
+    /// with, both such as `0.0.77`.
+    ///
+    /// Asking again cannot clear it: the server must be updated, or the app must use a build made for it. Show the
+    /// person ``message``, which names both releases, or say that the server needs updating.
+    case serverTooOld(served: String, oldest: String, message: String)
+    /// A several-item trash named a preview that no longer matches what the trash would take (409
+    /// `trash_plan_changed`): an item or something it takes changed since ``Items/previewTrash(ids:)``. Nothing was
+    /// trashed. Preview again, show the person the new preview, and trash that.
+    case trashPlanChanged(message: String, server: ServerAnswer?)
+    /// A write was refused, queueing and sending nothing, because a several-item trash or a purge of the item is
+    /// out (`validation` with the code `item_being_removed`). `id` names the item, or is `nil` where a trash
+    /// whose preview cut what it takes holds every item. Ask again once the call that holds the item returns.
+    case itemBeingRemoved(id: String?, message: String)
     /// The caller canceled the call before it finished.
     case canceled(message: String)
     /// A folder's first sync waits for the person to confirm it, so the call that would write or send for it
@@ -226,7 +246,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .validation(_, let message, _, _), .unknownType(let message, _), .rateLimited(_, let message, _, _),
             .server(_, _, let message, _, _), .io(let message), .network(let message), .unnamed(_, let message, _),
             .decoding(let message),
-            .store(let message), .storeBusy(let message), .storeDamaged(_, _, _, let message),
+            .store(let message), .storeBusy(let message), .storeDamaged(_, _, _, _, let message),
             .storageFull(let message), .signedOut(_, let message),
             .noKeychain(let message), .redirected(_, _, _, let message, _),
             .noServer(let message), .noCursor(let message), .hydrationIncomplete(let message), .noCatalog(let message),
@@ -234,7 +254,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .copyExpired(_, let message, _),
             .streamIncomplete(_, let message, _), .wrongServer(_, _, let message), .bytesAbsent(_, _, let message),
             .noRoom(_, _, _, let message),
-            .contractMismatch(_, _, _, _, let message, _), .canceled(let message), .firstSyncWaiting(let message),
+            .contractMismatch(_, _, _, _, let message, _), .serverTooOld(_, _, let message),
+            .trashPlanChanged(let message, _), .itemBeingRemoved(_, let message),
+            .canceled(let message), .firstSyncWaiting(let message),
             .invalid(let message), .notAnswerable(let message), .fault(let message), .keyChanging(let message),
             .versionConflict(let message, _),
             .instanceChanged(let message, _), .closed(let message), .noConnection(let message),
@@ -255,12 +277,12 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .copyExpired(_, _, let server), .streamIncomplete(_, _, let server),
             .contractMismatch(_, _, _, _, _, let server), .versionConflict(_, let server),
             .instanceChanged(_, let server), .confirmationRequired(_, _, let server),
-            .appSignInRequired(_, let server):
+            .appSignInRequired(_, let server), .trashPlanChanged(_, let server):
             server
         case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
             .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
             .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .notAnswerable, .fault,
-            .keyChanging,
+            .keyChanging, .serverTooOld, .itemBeingRemoved,
             .closed, .noConnection:
             nil
         }
@@ -294,8 +316,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .decoding(let message): core = .Decoding(message: message)
         case .store(let message): core = .Store(message: message)
         case .storeBusy(let message): core = .StoreBusy(message: message)
-        case .storeDamaged(let path, let reason, let unsent, let message):
-            core = .StoreDamaged(path: path, reason: reason, unsent: unsent, message: message)
+        case .storeDamaged(let path, let reason, let unsent, let setAsideStopped, let message):
+            core = .StoreDamaged(
+                path: path, reason: reason, unsent: unsent, setAsideStopped: setAsideStopped, message: message)
         case .storageFull(let message): core = .StorageFull(message: message)
         case .signedOut(let origin, let message): core = .SignedOut(origin: origin, message: message)
         case .noKeychain(let message): core = .NoKeychain(message: message)
@@ -325,6 +348,16 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             core = .ContractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message,
                 server: server?.core)
+        case .serverTooOld(let served, let oldest, let message):
+            core = .ServerTooOld(served: served, oldest: oldest, message: message)
+        case .trashPlanChanged(let message, let server):
+            core = .Server(
+                status: 409, code: "trash_plan_changed", message: message, details: server?.details?.core,
+                server: server?.core)
+        case .itemBeingRemoved(let id, let message):
+            core = .Validation(
+                code: "item_being_removed", message: message,
+                details: id.map { JSONValue.object(["id": .string($0)]).core }, server: nil)
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
         case .invalid(let message): core = .Invalid(message: message)
@@ -357,6 +390,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .unauthorized(code: code, message: message, server: server.map(ServerAnswer.init))
         case .Forbidden(let code, let message, let server):
             self = .forbidden(code: code, message: message, server: server.map(ServerAnswer.init))
+        case .Validation("item_being_removed", let message, let details, _):
+            self = .itemBeingRemoved(id: details.map(JSONValue.init)?.object?["id"]?.string, message: message)
         case .Validation(let code, let message, let details, let server):
             self = .validation(
                 code: code, message: message, details: details.map(JSONValue.init),
@@ -369,6 +404,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
                 server: server.map(ServerAnswer.init))
         case .Server(409, "version_conflict", let message, _, let server):
             self = .versionConflict(message: message, server: server.map(ServerAnswer.init))
+        case .Server(409, "trash_plan_changed", let message, _, let server):
+            self = .trashPlanChanged(message: message, server: server.map(ServerAnswer.init))
         case .Server(409, "instance_changed", let message, _, let server):
             self = .instanceChanged(message: message, server: server.map(ServerAnswer.init))
         case .Server(let status, let code, let message, let details, let server):
@@ -382,8 +419,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
         case .Decoding(let message): self = .decoding(message: message)
         case .Store(let message): self = .store(message: message)
         case .StoreBusy(let message): self = .storeBusy(message: message)
-        case .StoreDamaged(let path, let reason, let unsent, let message):
-            self = .storeDamaged(path: path, reason: reason, unsent: unsent, message: message)
+        case .StoreDamaged(let path, let reason, let unsent, let setAsideStopped, let message):
+            self = .storeDamaged(
+                path: path, reason: reason, unsent: unsent, setAsideStopped: setAsideStopped, message: message)
         case .StorageFull(let message): self = .storageFull(message: message)
         case .SignedOut(let origin, let message): self = .signedOut(origin: origin, message: message)
         case .NoKeychain(let message): self = .noKeychain(message: message)
@@ -416,6 +454,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .contractMismatch(
                 served: served, expected: expected, status: status, writeSent: writeSent, message: message,
                 server: server.map(ServerAnswer.init))
+        case .ServerTooOld(let served, let oldest, let message):
+            self = .serverTooOld(served: served, oldest: oldest, message: message)
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
         case .Invalid(let message): self = .invalid(message: message)

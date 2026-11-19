@@ -224,7 +224,8 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
             .readingHandle, .unsentDiffers,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,
             .firstSyncWaiting, .invalid, .notAnswerable, .fault, .keyChanging, .versionConflict, .instanceChanged,
-            .closed, .noConnection, .confirmationRequired, .appSignInRequired:
+            .closed, .noConnection, .confirmationRequired, .appSignInRequired, .serverTooOld, .trashPlanChanged,
+            .itemBeingRemoved:
             true
         }
     return [verdictRead, originRead, errorRead].filter { $0 }.count

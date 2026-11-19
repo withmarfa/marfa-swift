@@ -263,8 +263,41 @@ struct Errors {
         (.Invalid(message: "m"), .invalid(message: "m")),
         (.StoreBusy(message: "m"), .storeBusy(message: "m")),
         (
-            .StoreDamaged(path: "p", reason: "malformed", unsent: 3, message: "m"),
-            .storeDamaged(path: "p", reason: "malformed", unsent: 3, message: "m")
+            .StoreDamaged(path: "p", reason: "malformed", unsent: 3, setAsideStopped: false, message: "m"),
+            .storeDamaged(path: "p", reason: "malformed", unsent: 3, setAsideStopped: false, message: "m")
+        ),
+        (
+            .StoreDamaged(path: "p", reason: "malformed", unsent: nil, setAsideStopped: true, message: "m"),
+            .storeDamaged(path: "p", reason: "malformed", unsent: nil, setAsideStopped: true, message: "m")
+        ),
+        (
+            .UnsentDiffers(path: "p", unsent: 4, message: "m"),
+            .unsentDiffers(path: "p", unsent: 4, message: "m")
+        ),
+        (
+            .ServerTooOld(served: "0.0.77", oldest: "0.0.78", message: "m"),
+            .serverTooOld(served: "0.0.77", oldest: "0.0.78", message: "m")
+        ),
+        (
+            .Server(
+                status: 409, code: "trash_plan_changed", message: "m",
+                details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])),
+                server: ServerAnswer(
+                    status: 409, code: "trash_plan_changed",
+                    details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])))),
+            .trashPlanChanged(
+                message: "m",
+                server: Marfa.ServerAnswer(status: 409, code: "trash_plan_changed", details: .object(["digest": "d"])))
+        ),
+        (
+            .Validation(
+                code: "item_being_removed", message: "m",
+                details: .object(JsonObject(members: [JsonMember(key: "id", value: .string("a"))])), server: nil),
+            .itemBeingRemoved(id: "a", message: "m")
+        ),
+        (
+            .Validation(code: "item_being_removed", message: "m", details: nil, server: nil),
+            .itemBeingRemoved(id: nil, message: "m")
         ),
         (
             .Server(

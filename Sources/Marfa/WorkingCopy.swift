@@ -614,6 +614,8 @@ public struct Change: Sendable, Hashable {
         case unpinned
         /// An item, named by `itemId`, was purged and left the copy.
         case purged
+        /// Items were moved to the bin by ``Items/trash(_:)``; read the copy's rows again.
+        case trashed
         /// A folder's settings, named by `itemId`, were created, changed or
         /// revoked; the copy holds the answer where its slice or a pin takes it,
         /// and otherwise at its next catch-up.
