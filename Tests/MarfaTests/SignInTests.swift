@@ -1568,8 +1568,9 @@ private struct Origins {
     let second: LocalServer
     let transport = SignInTransport(session: URLSession(configuration: .ephemeral))
 
+    /// `body` is what the redirect carries, which the package never reads for an error code.
     static func start(
-        status: Int, redirected: Set<String>,
+        status: Int, redirected: Set<String>, body: String = "{}",
         rest: @escaping @Sendable (_ path: String, _ origin: String) -> LocalServer.Answer = { _, _ in
             (404, "application/json", "{}")
         }
@@ -1585,7 +1586,7 @@ private struct Origins {
                     URL(string: "\(second.url.absoluteString)/landing").map { (path, $0) }
                 })
         ) { _, path in
-            if redirected.contains(path) { return (status, "application/json", "{}") }
+            if redirected.contains(path) { return (status, "application/json", body) }
             return rest(path, origin.withLock { $0 })
         }
         origin.withLock { $0 = first.url.absoluteString }
@@ -1643,9 +1644,10 @@ private struct Origins {
 
 @Suite(.timeLimit(.minutes(1)))
 struct SignInRequestsRefuseRedirects {
-    @Test(arguments: [307, 302])
-    func aRenewalAnsweredByARedirectFailsAndKeepsTheSignIn(status: Int) async throws {
-        let origins = try await Origins.start(status: status, redirected: ["/oauth/token"], rest: Origins.marfa())
+    @Test(arguments: [307, 302], ["{}", #"{"error":"invalid_grant"}"#, #"{"error":"invalid_client"}"#])
+    func aRenewalAnsweredByARedirectFailsAndKeepsTheSignIn(status: Int, body: String) async throws {
+        let origins = try await Origins.start(
+            status: status, redirected: ["/oauth/token"], body: body, rest: Origins.marfa())
         defer { origins.stop() }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, credential) = try origins.signedIn(keychain, endpoint: "/oauth/token")
@@ -1707,11 +1709,11 @@ struct SignInRequestsRefuseRedirects {
         try await origins.expectUntouched()
     }
 
-    @Test(arguments: [307, 302])
-    func aDevicePollAnsweredByARedirectIsRefused(status: Int) async throws {
+    @Test(arguments: [307, 302], ["{}", #"{"error":"authorization_pending"}"#, #"{"error":"slow_down"}"#])
+    func aDevicePollAnsweredByARedirectIsRefused(status: Int, body: String) async throws {
         let origin = Mutex("")
         let origins = try await Origins.start(
-            status: status, redirected: ["/oauth/token"],
+            status: status, redirected: ["/oauth/token"], body: body,
             rest: Origins.marfa { path in
                 guard path == "/oauth/device-authorization" else { return (404, "application/json", "{}") }
                 let body = """
@@ -1734,6 +1736,8 @@ struct SignInRequestsRefuseRedirects {
                 try await started.credential()
             }
             #expect(try authorization.place.read() == nil)
+            // Refused at the first poll, not polled again as a pending or slowed grant.
+            #expect(origins.first.log.all.filter { $0.hasPrefix("POST /oauth/token ") }.count == 1)
         }
         try await origins.expectUntouched()
     }

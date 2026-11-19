@@ -228,17 +228,23 @@ struct Answer: Sendable {
 
     var object: [String: Any]? { (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] }
 
+    /// The body of an error answer, 4xx or 5xx.
+    ///
+    /// A redirect's body is never read for a code, so whatever it holds,
+    /// a redirect is refused as `http_<status>` and never taken for a pending, slowed or ended grant.
+    private var refusalObject: [String: Any]? { status >= 400 ? object : nil }
+
     /// RFC 6749's `error` string, which only an OAuth endpoint's own refusal carries.
-    var oauthError: String? { object?["error"] as? String }
+    var oauthError: String? { refusalObject?["error"] as? String }
 
     /// The OAuth error code, or the code of Marfa's error envelope.
     var code: String? {
         if let oauthError { return oauthError }
-        return (object?["error"] as? [String: Any])?["code"] as? String
+        return (refusalObject?["error"] as? [String: Any])?["code"] as? String
     }
 
     var message: String {
-        guard let object else { return "the server answered \(status)" }
+        guard let object = refusalObject else { return "the server answered \(status)" }
         if let text = object["error_description"] as? String { return text }
         if let text = (object["error"] as? [String: Any])?["message"] as? String { return text }
         return "the server answered \(status)"
