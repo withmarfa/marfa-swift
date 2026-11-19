@@ -33,6 +33,13 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
     func emptyTrash(_ input: Operations.EmptyTrash.Input) async throws -> Operations.EmptyTrash.Output
+    /// Apply a bulk action
+    ///
+    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
+    ///
+    /// - Remark: HTTP `POST /items/bulk-actions`.
+    /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
+    func applyBulkAction(_ input: Operations.ApplyBulkAction.Input) async throws -> Operations.ApplyBulkAction.Output
     /// Get a bulk-action job
     ///
     /// Returns a bulk-action job's status and counts, and its `result` once it has finished. Only the credential that queued the job, or the holder of `instance.read`, can read it.
@@ -668,6 +675,21 @@ extension ClientProtocol {
         try await emptyTrash(Operations.EmptyTrash.Input(
             query: query,
             headers: headers
+        ))
+    }
+    /// Apply a bulk action
+    ///
+    /// Applies one action to every item that matches a filter: change state, purge, update tags, tier, properties or own time. It matches only items you can write. With `dry_run: true` it returns the matched IDs; otherwise it queues a bulk-action job.
+    ///
+    /// - Remark: HTTP `POST /items/bulk-actions`.
+    /// - Remark: Generated from `#/paths//items/bulk-actions/post(applyBulkAction)`.
+    public func applyBulkAction(
+        headers: Operations.ApplyBulkAction.Input.Headers = .init(),
+        body: Operations.ApplyBulkAction.Input.Body
+    ) async throws -> Operations.ApplyBulkAction.Output {
+        try await applyBulkAction(Operations.ApplyBulkAction.Input(
+            headers: headers,
+            body: body
         ))
     }
     /// Get a bulk-action job
