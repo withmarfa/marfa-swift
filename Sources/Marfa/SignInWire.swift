@@ -36,6 +36,36 @@ struct SignInTransport: Sendable {
         ContractHeader.apply(to: &request, path: request.url?.path ?? "")
         return request
     }
+
+    /// Sends `request` and answers whatever the server answers first, a redirect included, never following it.
+    ///
+    /// Every request a sign-in or a renewal sends goes through this or ``dataTask(for:completion:)``, so no
+    /// session the transport holds can send one on to another address.
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        try await session.data(for: prepared(request), delegate: RefusedRedirects.shared)
+    }
+
+    /// A task for `request` that answers a redirect as it is, never following it.
+    ///
+    /// The caller resumes it.
+    func dataTask(
+        for request: URLRequest, completion: @escaping @Sendable (Data?, URLResponse?, (any Error)?) -> Void
+    ) -> URLSessionDataTask {
+        let task = session.dataTask(with: prepared(request), completionHandler: completion)
+        task.delegate = RefusedRedirects.shared
+        return task
+    }
+}
+
+private final class RefusedRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    static let shared = RefusedRedirects()
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
 }
 
 /// The device code grant's type, as RFC 8628 names it.
@@ -198,17 +228,23 @@ struct Answer: Sendable {
 
     var object: [String: Any]? { (try? JSONSerialization.jsonObject(with: body)) as? [String: Any] }
 
+    /// The body of an error answer, 4xx or 5xx.
+    ///
+    /// A redirect's body is never read for a code, so whatever it holds,
+    /// a redirect is refused as `http_<status>` and never taken for a pending, slowed or ended grant.
+    private var refusalObject: [String: Any]? { status >= 400 ? object : nil }
+
     /// RFC 6749's `error` string, which only an OAuth endpoint's own refusal carries.
-    var oauthError: String? { object?["error"] as? String }
+    var oauthError: String? { refusalObject?["error"] as? String }
 
     /// The OAuth error code, or the code of Marfa's error envelope.
     var code: String? {
         if let oauthError { return oauthError }
-        return (object?["error"] as? [String: Any])?["code"] as? String
+        return (refusalObject?["error"] as? [String: Any])?["code"] as? String
     }
 
     var message: String {
-        guard let object else { return "the server answered \(status)" }
+        guard let object = refusalObject else { return "the server answered \(status)" }
         if let text = object["error_description"] as? String { return text }
         if let text = (object["error"] as? [String: Any])?["message"] as? String { return text }
         return "the server answered \(status)"
@@ -242,7 +278,7 @@ func formRequest(_ url: String, _ fields: [(String, String)]) throws(SignInError
 
 func send(_ request: URLRequest, _ transport: SignInTransport) async throws(SignInError) -> Answer {
     do {
-        let (body, response) = try await transport.session.data(for: transport.prepared(request))
+        let (body, response) = try await transport.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw SignInError.unreadable(message: "the server's answer is not HTTP")
         }

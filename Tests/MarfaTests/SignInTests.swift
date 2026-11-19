@@ -1560,3 +1560,197 @@ struct SignInContractHeader {
         #expect(renewal.headers["X-Marfa-Contract"] == contract)
     }
 }
+
+/// Two loopback servers on a plain session: `first` is the server a sign-in is addressed to, and answers
+/// `status` with a `Location` on `second` for each path in `redirected`. `second` answers 200 to anything.
+private struct Origins {
+    let first: LocalServer
+    let second: LocalServer
+    let transport = SignInTransport(session: URLSession(configuration: .ephemeral))
+
+    /// `body` is what the redirect carries, which the package never reads for an error code.
+    static func start(
+        status: Int, redirected: Set<String>, body: String = "{}",
+        rest: @escaping @Sendable (_ path: String, _ origin: String) -> LocalServer.Answer = { _, _ in
+            (404, "application/json", "{}")
+        }
+    ) async throws -> Origins {
+        let second = try await LocalServer.start(contract: marfaContractVersion) { _, _ in
+            (200, "application/json", "{}")
+        }
+        let origin = Mutex("")
+        let first = try await LocalServer.start(
+            contract: marfaContractVersion,
+            redirects: Dictionary(
+                uniqueKeysWithValues: redirected.compactMap { path in
+                    URL(string: "\(second.url.absoluteString)/landing").map { (path, $0) }
+                })
+        ) { _, path in
+            if redirected.contains(path) { return (status, "application/json", body) }
+            return rest(path, origin.withLock { $0 })
+        }
+        origin.withLock { $0 = first.url.absoluteString }
+        return Origins(first: first, second: second)
+    }
+
+    func stop() {
+        first.stop()
+        second.stop()
+    }
+
+    static func metadata(_ origin: String) -> LocalServer.Answer {
+        let body = """
+            {"issuer":"\(origin)","authorization_endpoint":"\(origin)/oauth/authorize",\
+            "token_endpoint":"\(origin)/oauth/token","device_authorization_endpoint":"\(origin)/oauth/device-authorization",\
+            "registration_endpoint":"\(origin)/oauth/register","revocation_endpoint":"\(origin)/oauth/revoke"}
+            """
+        return (200, "application/json", body)
+    }
+
+    static func marfa(
+        _ rest: @escaping @Sendable (_ path: String) -> LocalServer.Answer = { _ in (404, "application/json", "{}") }
+    ) -> @Sendable (_ path: String, _ origin: String) -> LocalServer.Answer {
+        { path, origin in
+            switch path {
+            case "/.well-known/oauth-authorization-server": metadata(origin)
+            case "/oauth/register": (201, "application/json", #"{"client_id":"client-1"}"#)
+            default: rest(path)
+            }
+        }
+    }
+
+    /// Nothing reached `second`, and `second` is reachable the same way: a request sent straight to it arrives.
+    func expectUntouched() async throws {
+        #expect(second.log.all.isEmpty)
+        let request = try formRequest("\(second.url.absoluteString)/oauth/token", [("grant_type", "refresh_token")])
+        let answer = try await send(request, transport)
+        #expect(answer.status == 200)
+        #expect(second.log.all.count == 1)
+        #expect(second.log.all.first?.hasPrefix("POST /oauth/token") == true)
+    }
+
+    func signedIn(_ keychain: Keychain, endpoint: String) throws -> (Authorization, Credential) {
+        let authorization = try Authorization(
+            server: first.url, client: client, keychain: keychain, service: service, transport: transport)
+        try authorization.place.keep(
+            KeptSignIn(
+                clientId: "client-1", grantTypes: ["authorization_code", "refresh_token"],
+                redirect: client.redirect?.absoluteString, accessToken: "at-1", refreshToken: "rt-1",
+                scope: "core.note:read offline_access", tokenEndpoint: "\(first.url.absoluteString)\(endpoint)",
+                revocationEndpoint: "\(first.url.absoluteString)/oauth/revoke"))
+        return (authorization, try #require(try authorization.credential()))
+    }
+}
+
+@Suite(.timeLimit(.minutes(1)))
+struct SignInRequestsRefuseRedirects {
+    @Test(arguments: [307, 302], ["{}", #"{"error":"invalid_grant"}"#, #"{"error":"invalid_client"}"#])
+    func aRenewalAnsweredByARedirectFailsAndKeepsTheSignIn(status: Int, body: String) async throws {
+        let origins = try await Origins.start(
+            status: status, redirected: ["/oauth/token"], body: body, rest: Origins.marfa())
+        defer { origins.stop() }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try origins.signedIn(keychain, endpoint: "/oauth/token")
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Failed = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            // A redirect is not a token endpoint that has gone, so the metadata is not read and nothing is retried.
+            #expect(origins.first.log.all.count == 1)
+        }
+        try await origins.expectUntouched()
+    }
+
+    @Test(arguments: [307, 302])
+    func aRenewalWhoseMetadataReadIsAnsweredByARedirectFailsAndKeepsTheSignIn(status: Int) async throws {
+        let origins = try await Origins.start(status: status, redirected: ["/.well-known/oauth-authorization-server"])
+        defer { origins.stop() }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try origins.signedIn(keychain, endpoint: "/auth/oauth2/token")
+            await #expect {
+                try await renew(credential, refused: "at-1")
+            } throws: { error in
+                guard case RenewalError.Failed = error else { return false }
+                return true
+            }
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            #expect(origins.first.log.all.count == 2)
+        }
+        try await origins.expectUntouched()
+    }
+
+    @Test(arguments: [307, 302])
+    func aMetadataReadAnsweredByARedirectIsRefused(status: Int) async throws {
+        let origins = try await Origins.start(status: status, redirected: ["/.well-known/oauth-authorization-server"])
+        defer { origins.stop() }
+        await #expect(throws: SignInError.refused(code: "http_\(status)", message: "the server answered \(status)")) {
+            try await Discovery.read(origins.first.url.absoluteString, origins.transport)
+        }
+        try await origins.expectUntouched()
+    }
+
+    @Test(arguments: [307, 302])
+    func aDeviceSignInStepAnsweredByARedirectIsRefused(status: Int) async throws {
+        let origins = try await Origins.start(
+            status: status, redirected: ["/oauth/device-authorization"], rest: Origins.marfa())
+        defer { origins.stop() }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: origins.first.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: origins.transport)
+            await #expect(throws: SignInError.refused(code: "http_\(status)", message: "the server answered \(status)"))
+            {
+                try await authorization.startDeviceSignIn()
+            }
+        }
+        try await origins.expectUntouched()
+    }
+
+    @Test(arguments: [307, 302], ["{}", #"{"error":"authorization_pending"}"#, #"{"error":"slow_down"}"#])
+    func aDevicePollAnsweredByARedirectIsRefused(status: Int, body: String) async throws {
+        let origin = Mutex("")
+        let origins = try await Origins.start(
+            status: status, redirected: ["/oauth/token"], body: body,
+            rest: Origins.marfa { path in
+                guard path == "/oauth/device-authorization" else { return (404, "application/json", "{}") }
+                let body = """
+                    {"device_code":"device-1","user_code":"ABCD-EFGH",\
+                    "verification_uri":"\(origin.withLock { $0 })/auth/device","expires_in":600,"interval":5}
+                    """
+                return (200, "application/json", body)
+            })
+        defer { origins.stop() }
+        origin.withLock { $0 = origins.first.url.absoluteString }
+        var transport = origins.transport
+        transport.sleep = { _ in }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: origins.first.url, client: Authorization.Client(name: "Device", scopes: ["core.note:read"]),
+                keychain: keychain, service: service, transport: transport)
+            let started = try await authorization.startDeviceSignIn()
+            await #expect(throws: SignInError.refused(code: "http_\(status)", message: "the server answered \(status)"))
+            {
+                try await started.credential()
+            }
+            #expect(try authorization.place.read() == nil)
+            // Refused at the first poll, not polled again as a pending or slowed grant.
+            #expect(origins.first.log.all.filter { $0.hasPrefix("POST /oauth/token ") }.count == 1)
+        }
+        try await origins.expectUntouched()
+    }
+
+    @Test(arguments: [307, 302])
+    func aRevocationAnsweredByARedirectIsNotFollowed(status: Int) async throws {
+        let origins = try await Origins.start(status: status, redirected: ["/oauth/revoke"])
+        defer { origins.stop() }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try origins.signedIn(keychain, endpoint: "/oauth/token")
+            #expect(try await authorization.signOut() == false)
+            #expect(try authorization.place.read() == nil)
+        }
+        try await origins.expectUntouched()
+    }
+}
