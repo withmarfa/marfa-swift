@@ -1597,7 +1597,6 @@ private struct Origins {
         second.stop()
     }
 
-    /// The server's discovery metadata, every endpoint on `origin`.
     static func metadata(_ origin: String) -> LocalServer.Answer {
         let body = """
             {"issuer":"\(origin)","authorization_endpoint":"\(origin)/oauth/authorize",\
@@ -1607,7 +1606,6 @@ private struct Origins {
         return (200, "application/json", body)
     }
 
-    /// Answers discovery and registration as Marfa does, and `rest` for every other path.
     static func marfa(
         _ rest: @escaping @Sendable (_ path: String) -> LocalServer.Answer = { _ in (404, "application/json", "{}") }
     ) -> @Sendable (_ path: String, _ origin: String) -> LocalServer.Answer {
@@ -1630,7 +1628,6 @@ private struct Origins {
         #expect(second.log.all.first?.hasPrefix("POST /oauth/token") == true)
     }
 
-    /// The sign-in kept for `first`, with its token endpoint at `endpoint`.
     func signedIn(_ keychain: Keychain, endpoint: String) throws -> (Authorization, Credential) {
         let authorization = try Authorization(
             server: first.url, client: client, keychain: keychain, service: service, transport: transport)

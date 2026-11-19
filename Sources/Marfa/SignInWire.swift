@@ -57,7 +57,6 @@ struct SignInTransport: Sendable {
     }
 }
 
-/// Answers every redirect with no new request, which ends the task with the redirect's own response.
 private final class RefusedRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     static let shared = RefusedRedirects()
 
