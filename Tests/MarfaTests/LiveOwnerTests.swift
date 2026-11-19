@@ -33,9 +33,32 @@ struct LiveOwner {
 
     @Test func aKeyIsToldWhichPermissionItLacks() async throws {
         let own = try await OwnServer.boot()
-        let refused = await #expect(throws: MarfaError.self) { try await Client(own.server).listBackups() }
-        #expect(refused?.code() == "forbidden", "\(String(describing: refused))")
+        do {
+            let narrow = try await Self.keyWithoutInstancePermissions(own)
+            let refused = await #expect(throws: MarfaError.self) { try await Client(narrow).listBackups() }
+            #expect(refused?.code() == "forbidden", "\(String(describing: refused))")
+        } catch {
+            try await own.end()
+            throw error
+        }
         try await own.end()
+    }
+
+    /// A key that may read notes and holds no instance permission, minted with the server's own key, which
+    /// holds every one.
+    private static func keyWithoutInstancePermissions(_ own: OwnServer) async throws -> Server {
+        var request = URLRequest(url: own.url.appending(path: "keys"))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(own.key)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "label": "Swift narrow key", "source": "swift-narrow", "type_permissions": ["core.note": "read"],
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = try #require((response as? HTTPURLResponse)?.statusCode)
+        try #require((200..<300).contains(status), "POST keys answered \(status)")
+        let minted = try JSONDecoder().decode([String: JSONValue].self, from: data)
+        return try Server(url: own.url, key: try #require(minted["key"]?.string))
     }
 
     @Test(

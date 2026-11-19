@@ -246,8 +246,11 @@ struct ChangingTheKey {
         _ = try await copy.catchUp()
 
         let after = Array(server.log.all.dropFirst(before))
-        #expect(!after.isEmpty)
-        #expect(after.allSatisfy { $0.contains("new-key") && !$0.contains("old-key") }, "\(after)")
+        #expect(after.allSatisfy { !$0.contains("old-key") }, "\(after)")
+        // The catch-up reads the server's root with no key first, to learn its release.
+        let keyed = after.filter { $0.lowercased().contains("\r\nauthorization:") }
+        #expect(!keyed.isEmpty, "\(after)")
+        #expect(keyed.allSatisfy { $0.contains("new-key") }, "\(after)")
         await copy.close()
     }
 

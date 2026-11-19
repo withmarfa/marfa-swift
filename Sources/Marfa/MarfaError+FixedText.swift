@@ -107,6 +107,16 @@ extension MarfaError {
         case .contractMismatch:
             FixedErrorText(
                 type: "contract_mismatch", sentence: "the server speaks a different contract than this build")
+        case .serverTooOld:
+            FixedErrorText(type: "server_too_old", sentence: "the server's release is older than this build works with")
+        case .trashPlanChanged:
+            FixedErrorText(
+                type: "server", sentence: "the items changed since the trash was previewed",
+                serverCode: "trash_plan_changed")
+        case .itemBeingRemoved:
+            FixedErrorText(
+                type: "validation", sentence: "the item is being removed by a trash or a purge",
+                serverCode: "item_being_removed")
         case .canceled:
             FixedErrorText(type: "canceled", sentence: "the operation was stopped before it finished")
         case .firstSyncWaiting:

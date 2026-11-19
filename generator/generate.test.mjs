@@ -398,6 +398,8 @@ test("the client keeps what an app's credential calls on the server and a workin
       "/items": { post: operation("createItem", ["Items"]) },
       "/items/{id}/versions": { get: operation("listItemVersions", ["Items"]) },
       "/items/new": { get: operation("aNewItemsOperation", ["Items"]) },
+      "/items/trash": { post: operation("trashItems", ["Items"]) },
+      "/items/trash-preview": { post: operation("previewItemTrash", ["Items"]) },
       "/items/bulk-actions": { post: operation("applyBulkAction", ["Bulk actions"]) },
       "/items/bulk-actions/jobs/{id}": { get: operation("getBulkActionJob", ["Bulk actions"]) },
       "/items/bulk-actions/jobs/{id}/cancel": { post: operation("cancelBulkActionJob", ["Bulk actions"]) },
@@ -436,7 +438,7 @@ test("the client keeps what an app's credential calls on the server and a workin
     },
   };
   assert.deepEqual(clientOperations(input), [
-    "aNewServerOperation", "cancelBulkActionJob", "createInboundEndpoint", "deleteConnector", "deleteConnectorState",
+    "aNewServerOperation", "applyBulkAction", "cancelBulkActionJob", "createInboundEndpoint", "deleteConnector", "deleteConnectorState",
     "getBulkActionJob", "getConfig", "getConnector", "listBlobStores", "listConnectors", "listInboundEndpoints",
     "registerType", "replaceConfig", "updateConfig",
   ]);
@@ -458,10 +460,10 @@ test("the committed client makes what the rule keeps from the pinned document", 
     "deleteConnector", "listConnectorRuns", "deleteConnectorState", "listInboundEndpoints", "createInboundEndpoint",
     "retireInboundEndpoint",
   ];
-  for (const kept of ["registerType", "moveType", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", ...owner])
+  for (const kept of ["registerType", "moveType", "applyBulkAction", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", ...owner])
     assert.ok(client.has(kept), kept);
   for (const left of [
-    "createItem", "applyBulkAction", "registerConnector", "sendConnectorHeartbeat", "reportConnectorRun",
+    "createItem", "trashItems", "previewItemTrash", "registerConnector", "sendConnectorHeartbeat", "reportConnectorRun",
     "takeConnectorHold", "replaceConnectorState", "listInboundDeliveries", "createOwner", "getInstance", "listItemVersions",
     "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
     "countItemLinks",

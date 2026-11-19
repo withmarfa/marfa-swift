@@ -93,6 +93,23 @@ extension InMemoryCore {
         try unsupported("pin")
     }
 
+    /// Refuses as a real copy with no server does: a count of IDs outside 1 to 20, then `noServer`.
+    ///
+    /// A preview needs the server's reading, so the fake never answers one.
+    func previewTrash(ids: [String]) throws -> TrashPreview {
+        let distinct = Set(ids).count
+        guard (1...20).contains(distinct) else {
+            throw MarfaCore.MarfaError.Validation(
+                code: "validation_error", message: "ids: name from 1 to 20 distinct items, not \(distinct)",
+                details: nil, server: nil)
+        }
+        throw Refuse.noServer
+    }
+
+    func trashItems(preview: TrashPreview) throws -> TrashReport {
+        throw FakeCopyError.unsupported(call: "items.trash")
+    }
+
     func purgeItem(id: String, version: Int64?) throws {
         throw FakeCopyError.unsupported(call: "items.purge")
     }

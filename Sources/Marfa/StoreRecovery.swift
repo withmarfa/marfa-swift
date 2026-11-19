@@ -90,14 +90,14 @@ public struct SetAside: Sendable, Hashable {
 /// A store the working copy refuses to open: what it holds, and how to give it up or keep what can be kept.
 ///
 /// ``WorkingCopy/open(store:server:fileBudget:ifRefused:)`` refuses a store SQLite cannot read with
-/// ``MarfaError/storeDamaged(path:reason:unsent:message:)`` and one another build made with
+/// ``MarfaError/storeDamaged(path:reason:unsent:setAsideStopped:message:)`` and one another build made with
 /// ``MarfaError/wrongSchema(path:reason:unsent:message:)``. Each carries the count of writes the server has not
 /// taken. ``unsentWrites(in:)`` lists them, so a person sees what a removal loses before agreeing to it. Close every
 /// copy of the store in this process first, for each call here.
 extension WorkingCopy {
     /// Reads every page of the store at `store` and checks each index against its rows, changing nothing.
     ///
-    /// Throws ``MarfaError/storeDamaged(path:reason:unsent:message:)``, naming the store and counting its unsent
+    /// Throws ``MarfaError/storeDamaged(path:reason:unsent:setAsideStopped:message:)``, naming the store and counting its unsent
     /// writes, where SQLite cannot read it, ``MarfaError/wrongSchema(path:reason:unsent:message:)`` where another
     /// build made it, and ``MarfaError/readingHandle(message:)`` while another process writes it. A damaged store
     /// met part way through a call is refused with an empty path; this names it. It reads the whole file, so it
@@ -133,12 +133,16 @@ extension WorkingCopy {
         return try await background { SetAside(try MarfaCore.setAsideDamaged(path: path)) }
     }
 
-    /// Removes the store at `store` as ``remove(store:confirming:)`` does, agreeing to lose every write it holds that the
-    /// server has not taken, whatever they are and whether or not they can be read.
+    /// Removes the store at `store` without a list of confirmed writes only when its queue is unreadable or empty.
     ///
-    /// It is for a store `open` refuses with ``MarfaError/storeDamaged(path:reason:unsent:message:)``, whose
-    /// queue cannot always be read. Show the person ``unsentWrites(in:)`` first. Throws as `remove` does, except
-    /// for the writes.
+    /// It is for a store `open` refuses with ``MarfaError/storeDamaged(path:reason:unsent:setAsideStopped:message:)``, whose
+    /// queue cannot always be read. It reads the queue under the store's writer lock and removes the store only
+    /// where the whole list of unsent writes cannot be read, even where some rows read, or is empty. Where the whole
+    /// list reads and holds any write, it leaves the store as it is and throws
+    /// ``MarfaError/unsentDiffers(path:unsent:message:)`` with `unsent` the number of writes it would have lost, so
+    /// the app can say how many. Then show the person ``unsentWrites(in:)`` and, if they agree to lose those writes,
+    /// call ``remove(store:confirming:)`` with it. Throws `storeDamaged` with `setAsideStopped` true while a
+    /// set-aside is unfinished, and otherwise as `remove` does.
     public static func removeLosingAll(store: URL) async throws {
         let path = store.path
         try await background { try removeStoreLosingAll(path: path) }

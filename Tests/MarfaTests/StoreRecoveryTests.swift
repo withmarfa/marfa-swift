@@ -17,8 +17,20 @@ struct StoreRecovery {
         return (store, id)
     }
 
+    /// Moves everything in the store's log into the file and empties the log.
+    ///
+    /// Once a core in this process has met a damaged store, every core keeps its log when it closes, and SQLite
+    /// would read the pages a test overwrites from that log, so the damage would not show.
+    private static func checkpoint(_ store: URL) throws {
+        var database: OpaquePointer?
+        try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READWRITE, nil) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        try #require(sqlite3_exec(database, "PRAGMA wal_checkpoint(TRUNCATE)", nil, nil, nil) == SQLITE_OK)
+    }
+
     /// Writes over the first page, so SQLite no longer reads the file as a database.
     private static func damage(_ store: URL) throws {
+        try checkpoint(store)
         let handle = try FileHandle(forWritingTo: store)
         defer { try? handle.close() }
         try handle.write(contentsOf: Data(repeating: 0x5A, count: 4096))
@@ -26,6 +38,7 @@ struct StoreRecovery {
 
     /// Overwrites the page that holds one table's rows, so SQLite still reads the file but not that table.
     private static func damage(_ store: URL, table: String) throws {
+        try checkpoint(store)
         var database: OpaquePointer?
         try #require(sqlite3_open_v2(store.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
         defer { sqlite3_close(database) }
@@ -61,7 +74,7 @@ struct StoreRecovery {
         let reopened = try await WorkingCopy.open(store: store)
         #expect(try await reopened.queue.all().isEmpty == false)
         await reopened.close()
-        try await WorkingCopy.removeLosingAll(store: store)
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
         try? FileManager.default.removeItem(atPath: result.setAside)
     }
 
@@ -72,8 +85,48 @@ struct StoreRecovery {
         #expect(unsent.writes.count == 2)
         #expect(unsent.writes.allSatisfy { $0.itemId == id })
         #expect(unsent.writes.map(\.kind).sorted() == ["add_tag", "create_item"])
-        try await WorkingCopy.removeLosingAll(store: store)
+        try await WorkingCopy.remove(store: store, confirming: unsent)
         #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func removingLosingAllRefusesAStoreWhoseUnsentWritesReadAndCountsThem() async throws {
+        let (store, _) = try await Self.storeWithUnsentWrites()
+        await #expect {
+            try await WorkingCopy.removeLosingAll(store: store)
+        } throws: { error in
+            guard case Marfa.MarfaError.unsentDiffers(let path, let unsent, _) = error else { return false }
+            return path.hasSuffix(store.lastPathComponent) && unsent == 2
+        }
+        #expect(FileManager.default.fileExists(atPath: store.path), "the refused removal left the store")
+
+        let unsent = try await WorkingCopy.unsentWrites(in: store)
+        #expect(unsent.writes.count == 2)
+        try await WorkingCopy.remove(store: store, confirming: unsent)
+        #expect(!FileManager.default.fileExists(atPath: store.path))
+    }
+
+    @Test func aDamagedStoreSaysWhetherASetAsideStopped() async throws {
+        let (store, _) = try await Self.storeWithUnsentWrites()
+        try Self.damage(store)
+        func stopped() async throws -> Bool {
+            do {
+                try await WorkingCopy.check(store: store)
+            } catch Marfa.MarfaError.storeDamaged(_, _, _, let setAsideStopped, _) {
+                return setAsideStopped
+            }
+            Issue.record("the damaged store passed the check")
+            return false
+        }
+        #expect(try await stopped() == false)
+        let carrying = URL(fileURLWithPath: store.path + ".carrying")
+        try Data().write(to: carrying)
+        defer { try? FileManager.default.removeItem(at: carrying) }
+        #expect(try await stopped() == true)
+        // The flag is the app's cue to offer no removal.
+        await #expect(throws: Marfa.MarfaError.self) { try await WorkingCopy.removeLosingAll(store: store) }
+        #expect(FileManager.default.fileExists(atPath: store.path))
+        try FileManager.default.removeItem(at: carrying)
+        try await WorkingCopy.removeLosingAll(store: store)
     }
 
     @Test func aDamagedStoreFailsTheCheckAndTheOpenNamingTheStore() async throws {
@@ -86,7 +139,7 @@ struct StoreRecovery {
             await #expect {
                 try await call()
             } throws: { error in
-                guard case Marfa.MarfaError.storeDamaged(let path, _, _, _) = error else { return false }
+                guard case Marfa.MarfaError.storeDamaged(let path, _, _, _, _) = error else { return false }
                 return path.hasSuffix(store.lastPathComponent)
             }
         }
@@ -102,7 +155,7 @@ struct StoreRecovery {
             if case Marfa.MarfaError.invalid = error { return true }
             return false
         }
-        try await WorkingCopy.removeLosingAll(store: store)
+        try await WorkingCopy.remove(store: store, confirming: try await WorkingCopy.unsentWrites(in: store))
     }
 
     @Test func aStoreWhoseFirstPageIsGoneIsKeptAsideAndAFreshOneTakesItsPlace() async throws {
