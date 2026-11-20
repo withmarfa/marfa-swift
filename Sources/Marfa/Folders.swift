@@ -743,6 +743,8 @@ public struct ConfirmedFolder: Sendable, Hashable {
     public let added: UInt64
     /// Files not let go, because the other folders couldn't all be read.
     public let unsure: [UnsureFile]
+    /// Paused files the volume could not take away safely, which stay paused.
+    public let refused: [UnsureFile]
 
     init(_ core: MarfaCore.ConfirmedFolder) {
         deleted = core.deleted
@@ -750,6 +752,7 @@ public struct ConfirmedFolder: Sendable, Hashable {
         removed = core.removed
         added = core.added
         unsure = core.unsure.map(UnsureFile.init)
+        refused = core.refused.map(UnsureFile.init)
     }
 }
 

@@ -115,6 +115,9 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
     /// The write was carried from a store set aside where a record that decides how it is sent could not be read,
     /// and is sent only once released.
     case recordUnread
+    /// The device queued the write to put back what it held that a server restored to an earlier point no longer holds,
+    /// and it is sent only once released, since the owner may have restored the server to undo that work.
+    case serverRestored
 
     init(_ core: MarfaCore.BlockedReason) {
         switch core {
@@ -125,6 +128,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .failingAlone: self = .failingAlone
         case .instanceChanged: self = .instanceChanged
         case .recordUnread: self = .recordUnread
+        case .serverRestored: self = .serverRestored
         }
     }
 
@@ -137,6 +141,7 @@ public enum BlockedReason: Sendable, Hashable, CaseIterable {
         case .failingAlone: .failingAlone
         case .instanceChanged: .instanceChanged
         case .recordUnread: .recordUnread
+        case .serverRestored: .serverRestored
         }
     }
 }

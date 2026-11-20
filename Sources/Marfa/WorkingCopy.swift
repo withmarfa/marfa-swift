@@ -1171,7 +1171,7 @@ public struct Queue: Sendable {
     /// row back to what the server holds.
     ///
     /// Only a dead write, or one blocked `ancestorUnavailable`, `conflictUnresolved`,
-    /// `failingAlone`, `instanceChanged` or `recordUnread`, is taken; any other answers an empty list. Writes waiting on it
+    /// `failingAlone`, `instanceChanged`, `recordUnread` or `serverRestored`, is taken; any other answers an empty list. Writes waiting on it
     /// are refused unsent. It reads the row from the server first, so it needs
     /// the server, and answers an empty list when the copy moved during the read;
     /// ask again. It answers the id of every write it took out of the queue, which holds more than `id` where
