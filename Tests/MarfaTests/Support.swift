@@ -856,7 +856,7 @@ final class OwnServer: Sendable {
     let state: URL
     let url: URL
     let key: String
-    let owner: (email: String, password: String)?
+    let owner: (username: String, password: String)?
     var server: Server { try! Server(url: url, key: key) }
     private var env: URL { state.appending(path: "env") }
 
@@ -864,8 +864,8 @@ final class OwnServer: Sendable {
         self.state = state
         url = try #require(exports["MARFA_TEST_URL"].flatMap(URL.init(string:)))
         key = try #require(exports["MARFA_TEST_KEY"])
-        owner = exports["MARFA_TEST_OWNER_EMAIL"].flatMap { email in
-            exports["MARFA_TEST_OWNER_PASSWORD"].map { (email, $0) }
+        owner = exports["MARFA_TEST_OWNER_USERNAME"].flatMap { username in
+            exports["MARFA_TEST_OWNER_PASSWORD"].map { (username, $0) }
         }
     }
 

@@ -82,7 +82,7 @@ struct LiveOwner {
         let authorization = try authorization(own, keychain, every: true)
         let credential = try await authorization.signIn(browser: LiveSignIn.browserApproval(on: own))
         #expect(Set(every.map(\.rawValue)).isSubset(of: Set(credential.scopes)))
-        #expect(credential.scopes.contains("profile.email:write"))
+        #expect(credential.scopes.contains("profile.username:write"))
         let api = Client(try Server(url: own.url, credential: credential))
         _ = try await api.getConfig()
         _ = try await api.listSettings()
@@ -107,7 +107,7 @@ struct LiveOwner {
             client: Authorization.Client(
                 name: "marfa-swift owner live tests",
                 redirect: URL(string: "com.withmarfa.marfa-swift.tests:/signed-in"),
-                scopes: every ? ["core.note:read", "profile.email:write"] : ["core.note:read"],
+                scopes: every ? ["core.note:read", "profile.username:write"] : ["core.note:read"],
                 permissions: every ? Self.every : [.configManage]),
             keychain: keychain, service: service)
     }
