@@ -7090,6 +7090,11 @@ public struct FolderPull: Equatable, Hashable {
      */
     public var unwritten: UInt64
     /**
+     * Files left because a program holds them open for writing, which a later
+     * pull writes or removes once it closes them.
+     */
+    public var busy: UInt64
+    /**
      * Items whose bytes could not be fetched.
      */
     public var absent: UInt64
@@ -7126,6 +7131,10 @@ public struct FolderPull: Equatable, Hashable {
          * Files the folder did not write, and would not write over.
          */unwritten: UInt64, 
         /**
+         * Files left because a program holds them open for writing, which a later
+         * pull writes or removes once it closes them.
+         */busy: UInt64, 
+        /**
          * Items whose bytes could not be fetched.
          */absent: UInt64, 
         /**
@@ -7149,6 +7158,7 @@ public struct FolderPull: Equatable, Hashable {
         self.purged = purged
         self.kept = kept
         self.unwritten = unwritten
+        self.busy = busy
         self.absent = absent
         self.unplaced = unplaced
         self.unmatched = unmatched
@@ -7181,6 +7191,7 @@ public struct FfiConverterTypeFolderPull: FfiConverterRustBuffer {
                 purged: FfiConverterUInt64.read(from: &buf), 
                 kept: FfiConverterUInt64.read(from: &buf), 
                 unwritten: FfiConverterUInt64.read(from: &buf), 
+                busy: FfiConverterUInt64.read(from: &buf), 
                 absent: FfiConverterUInt64.read(from: &buf), 
                 unplaced: FfiConverterUInt64.read(from: &buf), 
                 unmatched: FfiConverterUInt64.read(from: &buf), 
@@ -7199,6 +7210,7 @@ public struct FfiConverterTypeFolderPull: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.purged, into: &buf)
         FfiConverterUInt64.write(value.kept, into: &buf)
         FfiConverterUInt64.write(value.unwritten, into: &buf)
+        FfiConverterUInt64.write(value.busy, into: &buf)
         FfiConverterUInt64.write(value.absent, into: &buf)
         FfiConverterUInt64.write(value.unplaced, into: &buf)
         FfiConverterUInt64.write(value.unmatched, into: &buf)
