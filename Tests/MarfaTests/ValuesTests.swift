@@ -284,10 +284,20 @@ struct Errors {
                 details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])),
                 server: ServerAnswer(
                     status: 409, code: "trash_plan_changed",
-                    details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])))),
+                    details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])),
+                    requestId: nil)),
             .trashPlanChanged(
                 message: "m",
-                server: Marfa.ServerAnswer(status: 409, code: "trash_plan_changed", details: .object(["digest": "d"])))
+                server: Marfa.ServerAnswer(
+                    status: 409, code: "trash_plan_changed", details: .object(["digest": "d"]), requestId: nil))
+        ),
+        (
+            .Server(
+                status: 500, code: "internal", message: "m", details: nil,
+                server: ServerAnswer(status: 500, code: "internal", details: nil, requestId: "req-1")),
+            .server(
+                status: 500, code: "internal", message: "m", details: nil,
+                server: Marfa.ServerAnswer(status: 500, code: "internal", details: nil, requestId: "req-1"))
         ),
         (
             .Validation(
@@ -305,10 +315,12 @@ struct Errors {
                 details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])),
                 server: ServerAnswer(
                     status: 413, code: "payload_too_large",
-                    details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])))),
+                    details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])),
+                    requestId: nil)),
             .server(
                 status: 413, code: "payload_too_large", message: "m", details: .object(["limit": "9"]),
-                server: Marfa.ServerAnswer(status: 413, code: "payload_too_large", details: .object(["limit": "9"])))
+                server: Marfa.ServerAnswer(
+                    status: 413, code: "payload_too_large", details: .object(["limit": "9"]), requestId: nil))
         ),
     ]
 

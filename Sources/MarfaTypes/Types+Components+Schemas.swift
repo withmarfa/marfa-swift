@@ -406,14 +406,14 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/ProfilePermissions`.
         public struct ProfilePermissions: Codable, Hashable, Sendable {
-            /// Access to every profile field, except that `write` changes only the name and the avatar. Changing the email address takes `email` at `write`.
+            /// Access to every profile field, except that `write` doesn't change the username. Changing the username takes `username` at `write`.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/*`.
             @frozen public enum _ast_Payload: String, Codable, Hashable, Sendable, CaseIterable {
                 case read = "read"
                 case write = "write"
             }
-            /// Access to every profile field, except that `write` changes only the name and the avatar. Changing the email address takes `email` at `write`.
+            /// Access to every profile field, except that `write` doesn't change the username. Changing the username takes `username` at `write`.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/*`.
             public var _ast_: Components.Schemas.ProfilePermissions._ast_Payload?
@@ -428,14 +428,25 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/name`.
             public var name: Components.Schemas.ProfilePermissions.NamePayload?
-            /// Access to the owner's email address, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            /// Access to the owner's username, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/username`.
+            @frozen public enum UsernamePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case read = "read"
+                case write = "write"
+            }
+            /// Access to the owner's username, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ProfilePermissions/username`.
+            public var username: Components.Schemas.ProfilePermissions.UsernamePayload?
+            /// Access to the owner's email address, which plays no part in signing in.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
             @frozen public enum EmailPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case read = "read"
                 case write = "write"
             }
-            /// Access to the owner's email address, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            /// Access to the owner's email address, which plays no part in signing in.
             ///
             /// - Remark: Generated from `#/components/schemas/ProfilePermissions/email`.
             public var email: Components.Schemas.ProfilePermissions.EmailPayload?
@@ -453,24 +464,28 @@ extension Components {
             /// Creates a new `ProfilePermissions`.
             ///
             /// - Parameters:
-            ///   - _ast_: Access to every profile field, except that `write` changes only the name and the avatar. Changing the email address takes `email` at `write`.
+            ///   - _ast_: Access to every profile field, except that `write` doesn't change the username. Changing the username takes `username` at `write`.
             ///   - name: Access to the owner's name.
-            ///   - email: Access to the owner's email address, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            ///   - username: Access to the owner's username, which password sign-in matches. Only this entry at `write` lets a credential change it.
+            ///   - email: Access to the owner's email address, which plays no part in signing in.
             ///   - avatar: Access to the owner's profile avatar.
             public init(
                 _ast_: Components.Schemas.ProfilePermissions._ast_Payload? = nil,
                 name: Components.Schemas.ProfilePermissions.NamePayload? = nil,
+                username: Components.Schemas.ProfilePermissions.UsernamePayload? = nil,
                 email: Components.Schemas.ProfilePermissions.EmailPayload? = nil,
                 avatar: Components.Schemas.ProfilePermissions.AvatarPayload? = nil
             ) {
                 self._ast_ = _ast_
                 self.name = name
+                self.username = username
                 self.email = email
                 self.avatar = avatar
             }
             public enum CodingKeys: String, CodingKey {
                 case _ast_ = "*"
                 case name
+                case username
                 case email
                 case avatar
             }
@@ -484,6 +499,10 @@ extension Components {
                     Components.Schemas.ProfilePermissions.NamePayload.self,
                     forKey: .name
                 )
+                self.username = try container.decodeIfPresent(
+                    Components.Schemas.ProfilePermissions.UsernamePayload.self,
+                    forKey: .username
+                )
                 self.email = try container.decodeIfPresent(
                     Components.Schemas.ProfilePermissions.EmailPayload.self,
                     forKey: .email
@@ -495,6 +514,7 @@ extension Components {
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "*",
                     "name",
+                    "username",
                     "email",
                     "avatar"
                 ])
@@ -2506,6 +2526,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Health/status`.
             public var status: Components.Schemas.Health.StatusPayload
+            /// `true` if the instance has an owner, `false` if it is waiting to be claimed with its setup code, and `null` if Marfa couldn't read its database to tell.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Health/claimed`.
+            public var claimed: Swift.Bool?
             /// Each component checked: reading and writing the database, free disk space and the blob store.
             ///
             /// - Remark: Generated from `#/components/schemas/Health/components`.
@@ -2797,7 +2821,7 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/Health/backups/status`.
                 public var status: Components.Schemas.Health.BackupsPayload.StatusPayload
-                /// Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
+                /// Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0. `destination_unusable` wins if both apply.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Health/backups/reason`.
                 @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -2805,7 +2829,7 @@ extension Components {
                     case turnedOff = "turned_off"
                     case destinationUnusable = "destination_unusable"
                 }
-                /// Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
+                /// Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0. `destination_unusable` wins if both apply.
                 ///
                 /// - Remark: Generated from `#/components/schemas/Health/backups/reason`.
                 public var reason: Components.Schemas.Health.BackupsPayload.ReasonPayload?
@@ -2860,7 +2884,7 @@ extension Components {
                 ///
                 /// - Parameters:
                 ///   - status: `ok`: on schedule, with the last backup whole. `incomplete`: files it names have no recorded copy. `failing`: a run failed or lost files, a store refuses copies, or a part is damaged, so overall `status` is at least `degraded`. `off`: none scheduled.
-                ///   - reason: Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0, also given beside `failing`.
+                ///   - reason: Why backups are `off` or `failing`: `no_backup_destination` when no destination is set, `destination_unusable` when the one set can't be used, or `turned_off` when `backup_interval_seconds` is 0. `destination_unusable` wins if both apply.
                 ///   - destination: Where Marfa puts backups: `folder` for the backup folder `backup_path` names, `bucket` for the object store `object_store_bucket` names. Present only for a caller that holds `instance.read`, and only when the settings name one.
                 ///   - lastBackup: The name of the last backup Marfa put. Present only for a caller that holds `instance.read`.
                 ///   - lastBackupAt: When Marfa took the last backup it put. Present only for a caller that holds `instance.read`.
@@ -3054,6 +3078,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - status: `ok`: serving normally. `degraded`: serving, but something is slow, low or unknown. `down`: something refused.
+            ///   - claimed: `true` if the instance has an owner, `false` if it is waiting to be claimed with its setup code, and `null` if Marfa couldn't read its database to tell.
             ///   - components: Each component checked: reading and writing the database, free disk space and the blob store.
             ///   - placement: Where the server runs. Present only when it is configured.
             ///   - version: The build the instance runs, when it is known.
@@ -3061,6 +3086,7 @@ extension Components {
             ///   - housekeeping: What needs attention in the background work. Present only for a caller that holds `instance.read`.
             public init(
                 status: Components.Schemas.Health.StatusPayload,
+                claimed: Swift.Bool? = nil,
                 components: Components.Schemas.Health.ComponentsPayload,
                 placement: Components.Schemas.Health.PlacementPayload? = nil,
                 version: Swift.String? = nil,
@@ -3068,6 +3094,7 @@ extension Components {
                 housekeeping: Components.Schemas.Health.HousekeepingPayload? = nil
             ) {
                 self.status = status
+                self.claimed = claimed
                 self.components = components
                 self.placement = placement
                 self.version = version
@@ -3076,6 +3103,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case status
+                case claimed
                 case components
                 case placement
                 case version
@@ -5076,7 +5104,7 @@ extension Components {
                 case error
             }
         }
-        /// A failed exact version precondition: the error and the item now.
+        /// A failed precondition on the item: the error and the item now.
         ///
         /// - Remark: Generated from `#/components/schemas/ItemStaleVersion`.
         public struct ItemStaleVersion: Codable, Hashable, Sendable {
@@ -5222,10 +5250,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/name`.
             public var name: Swift.String?
-            /// The owner's sign-in email address. Present with `profile.email:read`.
+            /// The owner's username, which password sign-in matches. Present with `profile.username:read`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Profile/username`.
+            public var username: Swift.String?
+            /// The owner's email address, or `null` when none is set. Present with `profile.email:read`.
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/email`.
-            public var email: Swift.String?
+            public var email: Components.Schemas.MarfaNullableMarfaInline010b1dec865519f0?
             /// The address of the owner's avatar, or `null` when there is none. Present with `profile.avatar:read`. Fetch it with `GET /profile/avatar`.
             ///
             /// - Remark: Generated from `#/components/schemas/Profile/avatar`.
@@ -5234,19 +5266,23 @@ extension Components {
             ///
             /// - Parameters:
             ///   - name: The owner's name. Present with `profile.name:read`.
-            ///   - email: The owner's sign-in email address. Present with `profile.email:read`.
+            ///   - username: The owner's username, which password sign-in matches. Present with `profile.username:read`.
+            ///   - email: The owner's email address, or `null` when none is set. Present with `profile.email:read`.
             ///   - avatar: The address of the owner's avatar, or `null` when there is none. Present with `profile.avatar:read`. Fetch it with `GET /profile/avatar`.
             public init(
                 name: Swift.String? = nil,
-                email: Swift.String? = nil,
+                username: Swift.String? = nil,
+                email: Components.Schemas.MarfaNullableMarfaInline010b1dec865519f0? = nil,
                 avatar: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil
             ) {
                 self.name = name
+                self.username = username
                 self.email = email
                 self.avatar = avatar
             }
             public enum CodingKeys: String, CodingKey {
                 case name
+                case username
                 case email
                 case avatar
             }
@@ -5256,8 +5292,12 @@ extension Components {
                     Swift.String.self,
                     forKey: .name
                 )
-                self.email = try container.decodeIfPresent(
+                self.username = try container.decodeIfPresent(
                     Swift.String.self,
+                    forKey: .username
+                )
+                self.email = try container.decodeIfPresent(
+                    Components.Schemas.MarfaNullableMarfaInline010b1dec865519f0.self,
                     forKey: .email
                 )
                 self.avatar = try container.decodeIfPresent(
@@ -5266,6 +5306,7 @@ extension Components {
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "name",
+                    "username",
                     "email",
                     "avatar"
                 ])
@@ -11803,7 +11844,7 @@ extension Components {
                 case truncated
             }
         }
-        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key and changes one without widening it; `items.purge` lists and empties the trash and purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`, which holds the stored settings; secret settings are never read back; `audit.read` reads the audit log; `grants.manage` lists, narrows and revokes other apps' access; `instance.read` reads health, what needs attention, metrics, housekeeping, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, cancels bulk jobs, updates the server and confirms the clock; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; `blobs.manage` manages every blob; `backups.manage` lists, takes and adopts backups and restores a backup or an archive; and `sign_ins.manage` lists, renames and ends sign-ins, manages the owner's passkeys and changes the owner's password.
+        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key, changes one without widening it, and grants any source a key may claim; `items.purge` lists and empties the trash and purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`, which holds the stored settings; secret settings are never read back; `audit.read` reads the audit log; `grants.manage` lists, narrows and revokes other apps' access; `instance.read` reads health, what needs attention, metrics, housekeeping, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, cancels bulk jobs, updates the server and confirms the clock; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; `blobs.manage` manages every blob; `backups.manage` lists, takes and adopts backups and restores a backup or an archive; and `sign_ins.manage` lists, renames and ends sign-ins, manages the owner's passkeys and changes the owner's password.
         ///
         /// - Remark: Generated from `#/components/schemas/Permission`.
         @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {
@@ -12262,6 +12303,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/detached_at`.
             public var detachedAt: Swift.String?
+            /// Why the attached object store cannot be used while the address rules refuse the requests to it because `allow_private_addresses` is `false`, the same text as `backups.store_error` in `GET /health`, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobStore/error`.
+            public var error: Swift.String?
             /// Creates a new `BlobStore`.
             ///
             /// - Parameters:
@@ -12270,18 +12315,21 @@ extension Components {
             ///   - locator: Where the store is: its directory for a `disk` store, `s3://<bucket>/<prefix>` for an `s3` store.
             ///   - attachedAt: When the instance first attached the store, in UTC.
             ///   - detachedAt: When the instance's configuration stopped naming the store, in UTC, or `null` while it names it.
+            ///   - error: Why the attached object store cannot be used while the address rules refuse the requests to it because `allow_private_addresses` is `false`, the same text as `backups.store_error` in `GET /health`, or `null`.
             public init(
                 id: Swift.String,
                 kind: Components.Schemas.BlobStore.KindPayload,
                 locator: Swift.String,
                 attachedAt: Swift.String,
-                detachedAt: Swift.String? = nil
+                detachedAt: Swift.String? = nil,
+                error: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
                 self.locator = locator
                 self.attachedAt = attachedAt
                 self.detachedAt = detachedAt
+                self.error = error
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -12289,6 +12337,7 @@ extension Components {
                 case locator
                 case attachedAt = "attached_at"
                 case detachedAt = "detached_at"
+                case error
             }
         }
         /// An error response.
@@ -14239,7 +14288,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/AttentionConcern`.
         public struct AttentionConcern: Codable, Hashable, Sendable {
-            /// health: degraded or down; job: last run failed; connector: failed, has problems, or quiet a day; folder: sync problems; key: expiring; backup: none kept, off or failing; setting: a secret to set again; clock: ahead or behind; unavailable: no answer.
+            /// health: degraded or down; job: last run failed; connector: failed, problems or quiet; folder: sync problems; key: expiring; backup: none, off or failing; setting: secret to set again; clock: ahead or behind; fault: met lately; unavailable: no answer.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -14251,13 +14300,14 @@ extension Components {
                 case backup = "backup"
                 case setting = "setting"
                 case clock = "clock"
+                case fault = "fault"
                 case unavailable = "unavailable"
             }
-            /// health: degraded or down; job: last run failed; connector: failed, has problems, or quiet a day; folder: sync problems; key: expiring; backup: none kept, off or failing; setting: a secret to set again; clock: ahead or behind; unavailable: no answer.
+            /// health: degraded or down; job: last run failed; connector: failed, problems or quiet; folder: sync problems; key: expiring; backup: none, off or failing; setting: secret to set again; clock: ahead or behind; fault: met lately; unavailable: no answer.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
             public var kind: Components.Schemas.AttentionConcern.KindPayload
-            /// The component, job, connector, folder, or key ID, the check that couldn't answer, a backup concern such as `no_backup_destination`, `run` or `store`, a secret setting's key, or a clock concern `clock_ahead` or `clock_behind`.
+            /// The component, job, connector, folder or key ID, the check that couldn't answer, a backup concern such as `store`, a secret setting's key, `clock_ahead` or `clock_behind`, or a fault's kind and place, such as `database:POST /items/{id}`, or `other`.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/reference`.
             public var reference: Swift.String
@@ -14272,8 +14322,8 @@ extension Components {
             /// Creates a new `AttentionConcern`.
             ///
             /// - Parameters:
-            ///   - kind: health: degraded or down; job: last run failed; connector: failed, has problems, or quiet a day; folder: sync problems; key: expiring; backup: none kept, off or failing; setting: a secret to set again; clock: ahead or behind; unavailable: no answer.
-            ///   - reference: The component, job, connector, folder, or key ID, the check that couldn't answer, a backup concern such as `no_backup_destination`, `run` or `store`, a secret setting's key, or a clock concern `clock_ahead` or `clock_behind`.
+            ///   - kind: health: degraded or down; job: last run failed; connector: failed, problems or quiet; folder: sync problems; key: expiring; backup: none, off or failing; setting: secret to set again; clock: ahead or behind; fault: met lately; unavailable: no answer.
+            ///   - reference: The component, job, connector, folder or key ID, the check that couldn't answer, a backup concern such as `store`, a secret setting's key, `clock_ahead` or `clock_behind`, or a fault's kind and place, such as `database:POST /items/{id}`, or `other`.
             ///   - title: A short name for the concern.
             ///   - description: What needs attention or remains unknown.
             public init(
@@ -14416,7 +14466,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FolderQuery/filter`.
             public var filter: Swift.String?
-            /// An item ID. The folder holds that item and everything under it by `parent-of`, at any depth.
+            /// An item ID, or the path of one of the folder's own files, relative to its root, with `/`. The folder holds that item and everything beneath it by `parent-of`. A device replaces a path with its file's item ID once it has sent the file.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderQuery/beneath`.
             public var beneath: Swift.String?
@@ -14427,7 +14477,7 @@ extension Components {
             ///   - tier: The tiers the folder holds: `library`, `feed`, or `all` for both. Absent means `library`.
             ///   - state: The states the folder holds. Absent means both.
             ///   - filter: A filter expression, as on `GET /items`, that narrows what the folder holds.
-            ///   - beneath: An item ID. The folder holds that item and everything under it by `parent-of`, at any depth.
+            ///   - beneath: An item ID, or the path of one of the folder's own files, relative to its root, with `/`. The folder holds that item and everything beneath it by `parent-of`. A device replaces a path with its file's item ID once it has sent the file.
             public init(
                 types: [Swift.String]? = nil,
                 tier: Components.Schemas.FolderQuery.TierPayload? = nil,
@@ -15513,7 +15563,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/permissions`.
             public var permissions: [Components.Schemas.Permission]
-            /// The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
+            /// The app origin client ID, inherited by every descendant key but an owner's key (`owner_key`). Absent when no app is in the key's origin, and on an owner's key.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/oauth_client_id`.
             public var oauthClientId: Swift.String?
@@ -15617,7 +15667,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/metadata_permissions`.
             public var metadataPermissions: Components.Schemas.KeyResponse.MetadataPermissionsPayload
-            /// Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
+            /// Stored profile levels by field. Only the `username` entry permits writing the username; a wildcard reads it.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/profile_permissions`.
             public var profilePermissions: Components.Schemas.StoredProfilePermissions
@@ -15646,13 +15696,13 @@ extension Components {
             ///   - source: The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
-            ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
+            ///   - oauthClientId: The app origin client ID, inherited by every descendant key but an owner's key (`owner_key`). Absent when no app is in the key's origin, and on an owner's key.
             ///   - defaultTier: The tier an item this key creates goes to when the write names none.
             ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
             ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
             ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
-            ///   - profilePermissions: Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
+            ///   - profilePermissions: Stored profile levels by field. Only the `username` entry permits writing the username; a wildcard reads it.
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
             ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
@@ -15775,7 +15825,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/permissions`.
             public var permissions: [Components.Schemas.Permission]
-            /// The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
+            /// The app origin client ID, inherited by every descendant key but an owner's key (`owner_key`). Absent when no app is in the key's origin, and on an owner's key.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/oauth_client_id`.
             public var oauthClientId: Swift.String?
@@ -15879,7 +15929,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/metadata_permissions`.
             public var metadataPermissions: Components.Schemas.ApiKey.MetadataPermissionsPayload
-            /// Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
+            /// Stored profile levels by field. Only the `username` entry permits writing the username; a wildcard reads it.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/profile_permissions`.
             public var profilePermissions: Components.Schemas.StoredProfilePermissions
@@ -15907,13 +15957,13 @@ extension Components {
             ///   - source: The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired has it as its own, and it can't change.
             ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. Empty if the key claims none.
             ///   - permissions: The permissions the key holds, such as `audit.read`. Empty if it holds none.
-            ///   - oauthClientId: The app origin client ID, inherited by every descendant key. Absent when no app is in the key's origin.
+            ///   - oauthClientId: The app origin client ID, inherited by every descendant key but an owner's key (`owner_key`). Absent when no app is in the key's origin, and on an owner's key.
             ///   - defaultTier: The tier an item this key creates goes to when the write names none.
             ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
             ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
             ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
             ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
-            ///   - profilePermissions: Stored profile levels by field. Only name and avatar permit writes; email is read-only, including under a wildcard.
+            ///   - profilePermissions: Stored profile levels by field. Only the `username` entry permits writing the username; a wildcard reads it.
             ///   - enforcementOverride: The key's own enforcement levers. Absent if the key sets none, so it follows the instance's.
             ///   - createdAt: When the key was created, in UTC.
             ///   - expiresAt: When the key stops working, in UTC, or `null` if it doesn't expire.
@@ -16255,10 +16305,26 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_ocr_enabled`.
             public var enrichmentOcrEnabled: Swift.Bool?
-            /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
+            /// `true` if exception reports are sent. Enabling requires both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/error_reporting_enabled`.
             public var errorReportingEnabled: Swift.Bool?
+            /// `true` if Marfa sends telemetry about itself: traces, log records and metrics to the OTLP endpoints, and exception reports to `posthog_host`. `false` sends none of them and keeps every telemetry setting. Absent: `true`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/telemetry_enabled`.
+            public var telemetryEnabled: Swift.Bool?
+            /// The share of traces Marfa exports, from 0 to 1. A trace that holds an error is exported whatever this says. Absent: `0.05`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/otel_sample_ratio`.
+            public var otelSampleRatio: Swift.Double?
+            /// The service name on everything Marfa exports, in place of a `service.name` in `otel_resource_attributes`. Absent: `marfa-server`. An archive doesn't carry it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/otel_service_name`.
+            public var otelServiceName: Swift.String?
+            /// Attributes Marfa adds to everything it exports, as comma-separated `key=value` pairs with percent-encoded values. One named here replaces Marfa's own of the same name, such as `service.version`. An archive doesn't carry it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/otel_resource_attributes`.
+            public var otelResourceAttributes: Swift.String?
             /// `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/heartbeat_enabled`.
@@ -16340,27 +16406,27 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/sign_in_address`.
             public var signInAddress: Swift.String?
-            /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
+            /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last fifteen minutes. Absent: no backup folder.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/backup_path`.
             public var backupPath: Swift.String?
-            /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes. Absent: no object store.
+            /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last fifteen minutes. Absent: no object store.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_bucket`.
             public var objectStoreBucket: Swift.String?
-            /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
+            /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1` or `auto`. Changing it needs a sign-in from the last fifteen minutes. Absent: `us-east-1`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_region`.
             public var objectStoreRegion: Swift.String?
-            /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes. Absent: the store's provider chooses it.
+            /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last fifteen minutes. Absent: the store's provider chooses it.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_endpoint`.
             public var objectStoreEndpoint: Swift.String?
-            /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
+            /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last fifteen minutes. Absent: `true`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_path_style`.
             public var objectStorePathStyle: Swift.Bool?
-            /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
+            /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last fifteen minutes. Absent: `marfa`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_prefix`.
             public var objectStorePrefix: Swift.String?
@@ -16368,7 +16434,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_access_key_id`.
             public var objectStoreAccessKeyId: Swift.String?
-            /// `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+            /// `true` if Marfa may send webhooks, the heartbeat, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last fifteen minutes. Absent: `false`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/allow_private_addresses`.
             public var allowPrivateAddresses: Swift.Bool?
@@ -16515,7 +16581,11 @@ extension Components {
             ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement.
             ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
             ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
-            ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
+            ///   - errorReportingEnabled: `true` if exception reports are sent. Enabling requires both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
+            ///   - telemetryEnabled: `true` if Marfa sends telemetry about itself: traces, log records and metrics to the OTLP endpoints, and exception reports to `posthog_host`. `false` sends none of them and keeps every telemetry setting. Absent: `true`.
+            ///   - otelSampleRatio: The share of traces Marfa exports, from 0 to 1. A trace that holds an error is exported whatever this says. Absent: `0.05`.
+            ///   - otelServiceName: The service name on everything Marfa exports, in place of a `service.name` in `otel_resource_attributes`. Absent: `marfa-server`. An archive doesn't carry it.
+            ///   - otelResourceAttributes: Attributes Marfa adds to everything it exports, as comma-separated `key=value` pairs with percent-encoded values. One named here replaces Marfa's own of the same name, such as `service.version`. An archive doesn't carry it.
             ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
             ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
             ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
@@ -16527,14 +16597,14 @@ extension Components {
             ///   - inboundPendingRetentionDays: Days Marfa keeps inbound webhook deliveries no connector has marked handled. `0` keeps them with no age limit. Absent: the server's default applies.
             ///   - addresses: The addresses people reach this instance at, each an origin with no path. The sign-in address is always one of them.
             ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address.
-            ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
-            ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes. Absent: no object store.
-            ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
-            ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes. Absent: the store's provider chooses it.
-            ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
-            ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
+            ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last fifteen minutes. Absent: no backup folder.
+            ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last fifteen minutes. Absent: no object store.
+            ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1` or `auto`. Changing it needs a sign-in from the last fifteen minutes. Absent: `us-east-1`.
+            ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last fifteen minutes. Absent: the store's provider chooses it.
+            ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last fifteen minutes. Absent: `true`.
+            ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last fifteen minutes. Absent: `marfa`.
             ///   - objectStoreAccessKeyId: The access key ID for the object store.
-            ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+            ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last fifteen minutes. Absent: `false`.
             ///   - secretsSet: The key of each secret setting stored with a value Marfa can read, present only while one is. Marfa never returns a secret's value.
             ///   - signInMoved: What the move did and what the owner does next. Present only in the answer to the write that moved the sign-in address.
             ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link.
@@ -16578,6 +16648,10 @@ extension Components {
                 enrichmentEnabled: Swift.Bool? = nil,
                 enrichmentOcrEnabled: Swift.Bool? = nil,
                 errorReportingEnabled: Swift.Bool? = nil,
+                telemetryEnabled: Swift.Bool? = nil,
+                otelSampleRatio: Swift.Double? = nil,
+                otelServiceName: Swift.String? = nil,
+                otelResourceAttributes: Swift.String? = nil,
                 heartbeatEnabled: Swift.Bool? = nil,
                 name: Swift.String? = nil,
                 enforcement: Components.Schemas.InstanceConfig.EnforcementPayload? = nil,
@@ -16640,6 +16714,10 @@ extension Components {
                 self.enrichmentEnabled = enrichmentEnabled
                 self.enrichmentOcrEnabled = enrichmentOcrEnabled
                 self.errorReportingEnabled = errorReportingEnabled
+                self.telemetryEnabled = telemetryEnabled
+                self.otelSampleRatio = otelSampleRatio
+                self.otelServiceName = otelServiceName
+                self.otelResourceAttributes = otelResourceAttributes
                 self.heartbeatEnabled = heartbeatEnabled
                 self.name = name
                 self.enforcement = enforcement
@@ -16703,6 +16781,10 @@ extension Components {
                 case enrichmentEnabled = "enrichment_enabled"
                 case enrichmentOcrEnabled = "enrichment_ocr_enabled"
                 case errorReportingEnabled = "error_reporting_enabled"
+                case telemetryEnabled = "telemetry_enabled"
+                case otelSampleRatio = "otel_sample_ratio"
+                case otelServiceName = "otel_service_name"
+                case otelResourceAttributes = "otel_resource_attributes"
                 case heartbeatEnabled = "heartbeat_enabled"
                 case name
                 case enforcement
@@ -17016,10 +17098,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/id`.
             public var id: Swift.String
-            /// Email address used to sign in.
+            /// The username the owner signs in with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Owner/username`.
+            public var username: Swift.String
+            /// The owner's email address, or `null` when none is set. It plays no part in signing in.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/email`.
-            public var email: Swift.String
+            public var email: Swift.String?
             /// Display name of the owner.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
@@ -17036,18 +17122,21 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: Unique identifier for the owner.
-            ///   - email: Email address used to sign in.
+            ///   - username: The username the owner signs in with.
+            ///   - email: The owner's email address, or `null` when none is set. It plays no part in signing in.
             ///   - name: Display name of the owner.
             ///   - avatar: The address of the owner's avatar on this instance, or `null` when none is set. Fetch it with `GET /profile/avatar`.
             ///   - createdAt: When the owner was created, in UTC.
             public init(
                 id: Swift.String,
-                email: Swift.String,
+                username: Swift.String,
+                email: Swift.String? = nil,
                 name: Swift.String,
                 avatar: Swift.String? = nil,
                 createdAt: Swift.String
             ) {
                 self.id = id
+                self.username = username
                 self.email = email
                 self.name = name
                 self.avatar = avatar
@@ -17055,6 +17144,7 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case id
+                case username
                 case email
                 case name
                 case avatar
@@ -17216,7 +17306,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/user_agent`.
             public var userAgent: Swift.String?
-            /// For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, any other key, and a key whose app has ended.
+            /// For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, an owner's key (`owner_key`), any other key, and a key whose app has ended.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/minted_by`.
             public var mintedBy: Swift.String?
@@ -17231,7 +17321,7 @@ extension Components {
             ///   - expiresAt: When the sign-in ends unless used again, in UTC. For an app, the inactivity boundary. `null` for disabled app inactivity retirement or a key without an expiry.
             ///   - clientIp: The IP address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
             ///   - userAgent: The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
-            ///   - mintedBy: For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, any other key, and a key whose app has ended.
+            ///   - mintedBy: For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, an owner's key (`owner_key`), any other key, and a key whose app has ended.
             public init(
                 id: Swift.String,
                 kind: Components.Schemas.SignIn.KindPayload,
@@ -22827,7 +22917,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/NotRestored`.
         public struct NotRestored: Codable, Hashable, Sendable {
-            /// What the archive doesn't hold. `enforcement` appears only when the instance that wrote the archive couldn't read its enforcement settings.
+            /// What the archive doesn't hold. `enforcement` appears only when the archive's instance couldn't read its enforcement settings, and `telemetry` only when `secrets_to_set` names a telemetry setting.
             ///
             /// - Remark: Generated from `#/components/schemas/NotRestored/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -22841,8 +22931,9 @@ extension Components {
                 case name = "name"
                 case logs = "logs"
                 case enforcement = "enforcement"
+                case telemetry = "telemetry"
             }
-            /// What the archive doesn't hold. `enforcement` appears only when the instance that wrote the archive couldn't read its enforcement settings.
+            /// What the archive doesn't hold. `enforcement` appears only when the archive's instance couldn't read its enforcement settings, and `telemetry` only when `secrets_to_set` names a telemetry setting.
             ///
             /// - Remark: Generated from `#/components/schemas/NotRestored/kind`.
             public var kind: Components.Schemas.NotRestored.KindPayload
@@ -22853,7 +22944,7 @@ extension Components {
             /// Creates a new `NotRestored`.
             ///
             /// - Parameters:
-            ///   - kind: What the archive doesn't hold. `enforcement` appears only when the instance that wrote the archive couldn't read its enforcement settings.
+            ///   - kind: What the archive doesn't hold. `enforcement` appears only when the archive's instance couldn't read its enforcement settings, and `telemetry` only when `secrets_to_set` names a telemetry setting.
             ///   - message: A sentence saying that this kind is not restored and what to do about it.
             public init(
                 kind: Components.Schemas.NotRestored.KindPayload,
@@ -23032,7 +23123,7 @@ extension Components {
                 ])
             }
         }
-        /// A new entry in what needs the owner's attention, sent once when a check first finds it. You receive it only with `instance.read`, and only on a stream that names no `type` and isn't a copy stream.
+        /// A new entry in what needs the owner's attention, sent once when a check first finds it or Marfa first meets a fault. You receive it only with `instance.read`, and only on a stream that names no `type` and isn't a copy stream.
         ///
         /// - Remark: Generated from `#/components/schemas/AttentionEventFrame`.
         public struct AttentionEventFrame: Codable, Hashable, Sendable {
@@ -23081,7 +23172,9 @@ extension Components {
                 case folder = "folder"
                 case key = "key"
                 case backup = "backup"
+                case setting = "setting"
                 case clock = "clock"
+                case fault = "fault"
                 case unavailable = "unavailable"
             }
             /// The entry's `kind`, as `GET /attention` lists it.
@@ -23144,7 +23237,42 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value1`.
             public var value1: Components.Schemas.AttentionEventFrame
             /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value2`.
-            public var value2: Components.Schemas.WebhookDeliveryAttempt
+            public struct Value2Payload: Codable, Hashable, Sendable {
+                /// The event's ID in the log, the same as its `id:` on `GET /events`. Absent from a delivery of a fault sent while the database fails, which no log holds, no delivery list shows and nothing can redeliver.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value2/event_id`.
+                public var eventId: Swift.String?
+                /// The ID of the delivery, the same on every attempt. Use it to recognize a repeat.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value2/delivery_id`.
+                public var deliveryId: Swift.String
+                /// When Marfa sent this attempt, in UTC.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value2/delivered_at`.
+                public var deliveredAt: Swift.String
+                /// Creates a new `Value2Payload`.
+                ///
+                /// - Parameters:
+                ///   - eventId: The event's ID in the log, the same as its `id:` on `GET /events`. Absent from a delivery of a fault sent while the database fails, which no log holds, no delivery list shows and nothing can redeliver.
+                ///   - deliveryId: The ID of the delivery, the same on every attempt. Use it to recognize a repeat.
+                ///   - deliveredAt: When Marfa sent this attempt, in UTC.
+                public init(
+                    eventId: Swift.String? = nil,
+                    deliveryId: Swift.String,
+                    deliveredAt: Swift.String
+                ) {
+                    self.eventId = eventId
+                    self.deliveryId = deliveryId
+                    self.deliveredAt = deliveredAt
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case eventId = "event_id"
+                    case deliveryId = "delivery_id"
+                    case deliveredAt = "delivered_at"
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/WebhookAttentionEvent/value2`.
+            public var value2: Components.Schemas.WebhookAttentionEvent.Value2Payload
             /// Creates a new `WebhookAttentionEvent`.
             ///
             /// - Parameters:
@@ -23152,7 +23280,7 @@ extension Components {
             ///   - value2:
             public init(
                 value1: Components.Schemas.AttentionEventFrame,
-                value2: Components.Schemas.WebhookDeliveryAttempt
+                value2: Components.Schemas.WebhookAttentionEvent.Value2Payload
             ) {
                 self.value1 = value1
                 self.value2 = value2
@@ -23268,7 +23396,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/UpdateLast`.
         public struct UpdateLast: Codable, Hashable, Sendable {
-            /// How the update ended. `succeeded`: the new release stayed up. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: the new release did not stay up and Marfa put the old one back.
+            /// How the update ended. `succeeded`: the new release stayed up with both its programs in place. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: Marfa put the old release back.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateLast/outcome`.
             @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -23276,7 +23404,7 @@ extension Components {
                 case failed = "failed"
                 case rolledBack = "rolled_back"
             }
-            /// How the update ended. `succeeded`: the new release stayed up. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: the new release did not stay up and Marfa put the old one back.
+            /// How the update ended. `succeeded`: the new release stayed up with both its programs in place. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: Marfa put the old release back.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateLast/outcome`.
             public var outcome: Components.Schemas.UpdateLast.OutcomePayload
@@ -23295,7 +23423,7 @@ extension Components {
             /// Creates a new `UpdateLast`.
             ///
             /// - Parameters:
-            ///   - outcome: How the update ended. `succeeded`: the new release stayed up. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: the new release did not stay up and Marfa put the old one back.
+            ///   - outcome: How the update ended. `succeeded`: the new release stayed up with both its programs in place. `failed`: Marfa did not change the running release, or could not put the old one back. `rolled_back`: Marfa put the old release back.
             ///   - release: The release the update moved to.
             ///   - finishedAt: When the update ended, in UTC.
             ///   - reason: Why the update did not succeed, in words for a person, or `null` when it did.
@@ -23861,6 +23989,8 @@ extension Components {
         public typealias MarfaInline00404e686415370f = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline52ba84a4bbf396ba`.
         public typealias MarfaInline52ba84a4bbf396ba = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline81a5f2b70bdd834c`.
+        public typealias MarfaInline81a5f2b70bdd834c = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaInline0606c3c8f2e5ac06 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline700693241c848bce`.
@@ -23934,6 +24064,10 @@ extension Components {
         public typealias MarfaInlinef9d1ebbef8c9bb54 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline66f34441032fb10a`.
         public typealias MarfaInline66f34441032fb10a = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInlinee25d6df2beaecaec`.
+        public typealias MarfaInlinee25d6df2beaecaec = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline9ec61191bcefa4cb`.
+        public typealias MarfaInline9ec61191bcefa4cb = Swift.Double
         /// - Remark: Generated from `#/components/schemas/MarfaInline85c0b849645b528d`.
         public typealias MarfaInline85c0b849645b528d = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInlineb7a5eebe6656cb32`.
@@ -24019,6 +24153,8 @@ extension Components {
         public typealias MarfaInline4f410cd74c87d8dd = Foundation.Date
         /// - Remark: Generated from `#/components/schemas/MarfaInline0d3ac1e9e006c011`.
         public typealias MarfaInline0d3ac1e9e006c011 = Swift.Int
+        /// - Remark: Generated from `#/components/schemas/MarfaInline010b1dec865519f0`.
+        public typealias MarfaInline010b1dec865519f0 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137`.
         public struct MarfaInlinef5e21acab2df7137: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1`.
@@ -24169,6 +24305,8 @@ extension Components {
         public typealias MarfaNullableMarfaInline52ba84a4bbf396ba = MarfaNullable<Components.Schemas.MarfaInline52ba84a4bbf396ba>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
         public typealias MarfaNullableEnforcementOverride = MarfaNullable<Components.Schemas.EnforcementOverride>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline81a5f2b70bdd834c`.
+        public typealias MarfaNullableMarfaInline81a5f2b70bdd834c = MarfaNullable<Components.Schemas.MarfaInline81a5f2b70bdd834c>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0606c3c8f2e5ac06`.
         public typealias MarfaNullableMarfaInline0606c3c8f2e5ac06 = MarfaNullable<Components.Schemas.MarfaInline0606c3c8f2e5ac06>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline700693241c848bce`.
@@ -24189,6 +24327,10 @@ extension Components {
         public typealias MarfaNullableMarfaInlinef9d1ebbef8c9bb54 = MarfaNullable<Components.Schemas.MarfaInlinef9d1ebbef8c9bb54>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline66f34441032fb10a`.
         public typealias MarfaNullableMarfaInline66f34441032fb10a = MarfaNullable<Components.Schemas.MarfaInline66f34441032fb10a>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinee25d6df2beaecaec`.
+        public typealias MarfaNullableMarfaInlinee25d6df2beaecaec = MarfaNullable<Components.Schemas.MarfaInlinee25d6df2beaecaec>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline9ec61191bcefa4cb`.
+        public typealias MarfaNullableMarfaInline9ec61191bcefa4cb = MarfaNullable<Components.Schemas.MarfaInline9ec61191bcefa4cb>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline85c0b849645b528d`.
         public typealias MarfaNullableMarfaInline85c0b849645b528d = MarfaNullable<Components.Schemas.MarfaInline85c0b849645b528d>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineb7a5eebe6656cb32`.
@@ -24217,6 +24359,8 @@ extension Components {
         public typealias MarfaNullableMarfaInline4f410cd74c87d8dd = MarfaNullable<Components.Schemas.MarfaInline4f410cd74c87d8dd>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0d3ac1e9e006c011`.
         public typealias MarfaNullableMarfaInline0d3ac1e9e006c011 = MarfaNullable<Components.Schemas.MarfaInline0d3ac1e9e006c011>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline010b1dec865519f0`.
+        public typealias MarfaNullableMarfaInline010b1dec865519f0 = MarfaNullable<Components.Schemas.MarfaInline010b1dec865519f0>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableTypeDefinition`.
         public typealias MarfaNullableTypeDefinition = MarfaNullable<Components.Schemas.TypeDefinition>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableHousekeepingOutcome`.

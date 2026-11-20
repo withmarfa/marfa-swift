@@ -206,7 +206,9 @@ struct LiveSignIn {
         signIn.httpMethod = "POST"
         signIn.setValue("application/json", forHTTPHeaderField: "Content-Type")
         signIn.setValue(origin, forHTTPHeaderField: "Origin")
-        signIn.httpBody = try JSONSerialization.data(withJSONObject: ["email": owner.email, "password": owner.password])
+        signIn.httpBody = try JSONSerialization.data(withJSONObject: [
+            "username": owner.username, "password": owner.password,
+        ])
         let (_, signedIn) = try await session.data(for: signIn)
         let response = try #require(signedIn as? HTTPURLResponse)
         try #require(response.statusCode == 200, "the owner could not sign in: \(response.statusCode)")

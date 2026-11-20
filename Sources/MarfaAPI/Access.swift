@@ -67,7 +67,8 @@ func refusal(_ answer: (HTTPResponse, HTTPBody?), origin: String, write: Bool) a
         contract: response.headerFields.first { $0.name.canonicalName == "x-marfa-contract" }?.value,
         declaredCode: response.headerFields[xErrorCode],
         location: response.headerFields[.location], retryAfter: response.headerFields[.retryAfter],
-        challenge: response.headerFields[.wwwAuthenticate], origin: origin, write: write
+        challenge: response.headerFields[.wwwAuthenticate], requestId: response.headerFields[requestIdHeader],
+        origin: origin, write: write
     ) { await read(body) }
 }
 
@@ -87,6 +88,7 @@ private func read(_ body: HTTPBody?) async -> String {
 
 private let contractHeader = headerName(ContractHeader.name)
 private let xErrorCode = headerName("X-Error-Code")
+private let requestIdHeader = headerName("X-Request-ID")
 
 /// A header name written in this file, which is always a valid one.
 private func headerName(_ name: String) -> HTTPField.Name {

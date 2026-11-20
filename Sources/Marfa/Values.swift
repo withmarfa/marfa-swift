@@ -508,24 +508,29 @@ public enum RenewalRefusalReason: Sendable, Hashable, CaseIterable {
     }
 }
 
-/// What a server answered to a request: its status, its refusal code and its `error.details`.
+/// What a server answered to a request: its status, its refusal code, its `error.details` and its `X-Request-ID`.
 public struct ServerAnswer: Sendable, Hashable {
     public var status: UInt16
     public var code: String?
     public var details: JSONValue?
+    /// The server's `X-Request-ID`, which a report of a problem can quote. `nil` where the server sent none.
+    public var requestId: String?
 
-    public init(status: UInt16, code: String?, details: JSONValue?) {
+    public init(status: UInt16, code: String?, details: JSONValue?, requestId: String?) {
         self.status = status
         self.code = code
         self.details = details
+        self.requestId = requestId
     }
 
     init(_ core: MarfaCore.ServerAnswer) {
-        self.init(status: core.status, code: core.code, details: core.details.map(JSONValue.init))
+        self.init(
+            status: core.status, code: core.code, details: core.details.map(JSONValue.init),
+            requestId: core.requestId)
     }
 
     var core: MarfaCore.ServerAnswer {
-        MarfaCore.ServerAnswer(status: status, code: code, details: details?.core)
+        MarfaCore.ServerAnswer(status: status, code: code, details: details?.core, requestId: requestId)
     }
 }
 

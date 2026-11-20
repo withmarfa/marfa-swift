@@ -153,14 +153,14 @@ public protocol APIProtocol: Sendable {
     func settleTombstones(_ input: Operations.SettleTombstones.Input) async throws -> Operations.SettleTombstones.Output
     /// List the trash
     ///
-    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can write. Requires `items.purge`.
     ///
     /// - Remark: HTTP `GET /trash`.
     /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
     func listTrash(_ input: Operations.ListTrash.Input) async throws -> Operations.ListTrash.Output
     /// Empty the trash
     ///
-    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
+    /// Empties one page of the trash: deletes up to 200 items of the types you can write permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
     ///
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
@@ -195,7 +195,7 @@ public protocol APIProtocol: Sendable {
     func addItemTags(_ input: Operations.AddItemTags.Input) async throws -> Operations.AddItemTags.Output
     /// Replace an item's tags
     ///
-    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags.
+    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags. Send `read_tags` to replace them only if the item still has the tags you read.
     ///
     /// - Remark: HTTP `PUT /items/{id}/tags`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)`.
@@ -888,14 +888,14 @@ public protocol APIProtocol: Sendable {
     func createOwner(_ input: Operations.CreateOwner.Input) async throws -> Operations.CreateOwner.Output
     /// Get the owner's profile
     ///
-    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
+    /// Returns the owner's profile fields that your credential can read: `name`, `username`, `email` and `avatar`, each with its own read permission. A field you can't read is left out, so a credential that can read none gets an empty object.
     ///
     /// - Remark: HTTP `GET /profile`.
     /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
     func getProfile(_ input: Operations.GetProfile.Input) async throws -> Operations.GetProfile.Output
     /// Update the owner's profile
     ///
-    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
+    /// Updates the owner's username, email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the username needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -951,14 +951,14 @@ public protocol APIProtocol: Sendable {
     func listOwnerPasskeys(_ input: Operations.ListOwnerPasskeys.Input) async throws -> Operations.ListOwnerPasskeys.Output
     /// Rename a passkey
     ///
-    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
     func renameOwnerPasskey(_ input: Operations.RenameOwnerPasskey.Input) async throws -> Operations.RenameOwnerPasskey.Output
     /// Delete a passkey
     ///
-    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
@@ -1091,7 +1091,7 @@ public protocol APIProtocol: Sendable {
     func exportArchive(_ input: Operations.ExportArchive.Input) async throws -> Operations.ExportArchive.Output
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -1119,7 +1119,7 @@ public protocol APIProtocol: Sendable {
     func adoptBackupFolder(_ input: Operations.AdoptBackupFolder.Input) async throws -> Operations.AdoptBackupFolder.Output
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -1448,7 +1448,7 @@ extension APIProtocol {
     }
     /// List the trash
     ///
-    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can write. Requires `items.purge`.
     ///
     /// - Remark: HTTP `GET /trash`.
     /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
@@ -1463,7 +1463,7 @@ extension APIProtocol {
     }
     /// Empty the trash
     ///
-    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
+    /// Empties one page of the trash: deletes up to 200 items of the types you can write permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
     ///
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
@@ -1542,7 +1542,7 @@ extension APIProtocol {
     }
     /// Replace an item's tags
     ///
-    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags.
+    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags. Send `read_tags` to replace them only if the item still has the tags you read.
     ///
     /// - Remark: HTTP `PUT /items/{id}/tags`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)`.
@@ -3035,7 +3035,7 @@ extension APIProtocol {
     }
     /// Get the owner's profile
     ///
-    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
+    /// Returns the owner's profile fields that your credential can read: `name`, `username`, `email` and `avatar`, each with its own read permission. A field you can't read is left out, so a credential that can read none gets an empty object.
     ///
     /// - Remark: HTTP `GET /profile`.
     /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
@@ -3044,7 +3044,7 @@ extension APIProtocol {
     }
     /// Update the owner's profile
     ///
-    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
+    /// Updates the owner's username, email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the username needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -3150,7 +3150,7 @@ extension APIProtocol {
     }
     /// Rename a passkey
     ///
-    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
@@ -3167,7 +3167,7 @@ extension APIProtocol {
     }
     /// Delete a passkey
     ///
-    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
@@ -3380,7 +3380,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -3422,7 +3422,7 @@ extension APIProtocol {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.

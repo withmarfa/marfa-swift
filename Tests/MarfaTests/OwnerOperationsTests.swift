@@ -360,7 +360,7 @@ struct OwnerOperationsTests {
         #expect(client.scopes == ["core.note:read", "backups.manage", "config.manage"])
         let named = Set(InstancePermission.allCases.map(\.rawValue))
         #expect(named == Set(Components.Schemas.Permission.allCases.map(\.rawValue)))
-        #expect(named.count == 14 && !named.contains("profile.email:write"))
+        #expect(named.count == 14 && !named.contains("profile.username:write"))
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer()
             let credential = try #require(try signedIn(scripted, keychain, nil).credential)

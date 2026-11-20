@@ -33,16 +33,16 @@ private final class RefusesRedirects: NSObject, URLSessionTaskDelegate, Sendable
 ///
 /// `body` is read only for an answer that is not a success. `declaredCode` is the `X-Error-Code` header, which names
 /// a server's own refusal of the contract without the body being read. `challenge` is the `WWW-Authenticate` header,
-/// which names how recently the owner must have signed in.
+/// which names how recently the owner must have signed in. `requestId` is the `X-Request-ID` header.
 package func refusal(
     status: UInt16, contract served: String?, declaredCode: String? = nil, location: String?, retryAfter: String?,
-    challenge: String? = nil, origin: String, write: Bool, body: () async -> String
+    challenge: String? = nil, requestId: String?, origin: String, write: Bool, body: () async -> String
 ) async -> MarfaError? {
     if (300..<400).contains(status) {
         return .redirected(
             origin: origin, status: status, location: location,
             message: "\(origin) answered \(status) redirecting the request, which is never followed",
-            server: ServerAnswer(status: status, code: nil, details: nil))
+            server: ServerAnswer(status: status, code: nil, details: nil, requestId: requestId))
     }
     let expected = UInt64(marfaContractVersion)
     let success = (200..<300).contains(status)
@@ -55,7 +55,7 @@ package func refusal(
             status: status,
             message: "\(origin) answered \(status) naming no contract, taken as from something in front of the "
                 + "server" + (text.isEmpty ? "" : ": \(text.prefix(200))"),
-            server: ServerAnswer(status: status, code: nil, details: nil))
+            server: ServerAnswer(status: status, code: nil, details: nil, requestId: requestId))
     default:
         let named = served.map { "contract \($0)" } ?? "no contract"
         let declined = status == 412 && declaredCode == "contract_mismatch"
@@ -63,14 +63,15 @@ package func refusal(
             served: served, expected: expected, status: status, writeSent: write && !declined,
             message: "\(origin) answered \(status) naming \(named), and this build speaks contract \(expected)"
                 + (declined ? ". The server refused this request before it acted" : ""),
-            server: ServerAnswer(status: status, code: declined ? declaredCode : nil, details: nil))
+            server: ServerAnswer(
+                status: status, code: declined ? declaredCode : nil, details: nil, requestId: requestId))
     }
     let text = await body()
     let refused = RefusalBody(text)
     let code = refused?.code ?? "unknown"
     let message = refused?.message ?? String(text.prefix(200))
     let shown = message.isEmpty ? "\(origin) answered \(status)" : message
-    let answer = ServerAnswer(status: status, code: refused?.code, details: refused?.details)
+    let answer = ServerAnswer(status: status, code: refused?.code, details: refused?.details, requestId: requestId)
     switch status {
     case 400 where code == "unknown_type": return .unknownType(message: shown, server: answer)
     case 412 where code == "contract_mismatch":
@@ -257,7 +258,8 @@ extension Server {
             declaredCode: response.value(forHTTPHeaderField: "X-Error-Code"),
             location: response.value(forHTTPHeaderField: "Location"),
             retryAfter: response.value(forHTTPHeaderField: "Retry-After"),
-            challenge: response.value(forHTTPHeaderField: "WWW-Authenticate"), origin: origin, write: write
+            challenge: response.value(forHTTPHeaderField: "WWW-Authenticate"),
+            requestId: response.value(forHTTPHeaderField: "X-Request-ID"), origin: origin, write: write
         ) { String(decoding: data.prefix(64 * 1024), as: UTF8.self) }
     }
 

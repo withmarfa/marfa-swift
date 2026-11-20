@@ -38,7 +38,7 @@ public struct Authorization: Sendable {
         /// added, so the server issues a refresh token.
         ///
         /// ``init(name:redirect:scopes:permissions:)`` adds the instance permissions it names. A profile scope such
-        /// as `profile.email:write`, which lets the app change the owner's email address, is a scope like any other,
+        /// as `profile.username:write`, which lets the app change the owner's username, is a scope like any other,
         /// so it belongs here.
         public var scopes: [String]
 

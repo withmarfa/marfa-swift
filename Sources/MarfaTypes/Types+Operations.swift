@@ -24372,11 +24372,11 @@ public enum Operations {
         public struct Input: Sendable, Hashable {
             /// - Remark: Generated from `#/paths/occurrences/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Window start, ISO 8601. No zone means UTC; a date is its UTC midnight. An event overlaps if it starts before `to` and ends after this. Its end is `ends_at`, else start plus `duration`. A whole-day event fills whole days in its `timezone`, else UTC.
+                /// A date-time needs seconds and a zone or offset; a date is UTC midnight. An event overlaps if it starts before `to` and ends after this. Its end is `ends_at`, else start plus `duration`. A whole-day event fills whole days of its `timezone` or UTC.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/from`.
                 public var from: Swift.String
-                /// Window end, ISO 8601, read as `from` is. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
+                /// Window end, read as `from` is. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
                 ///
                 /// - Remark: Generated from `#/paths/occurrences/GET/query/to`.
                 public var to: Swift.String
@@ -24387,8 +24387,8 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - from: Window start, ISO 8601. No zone means UTC; a date is its UTC midnight. An event overlaps if it starts before `to` and ends after this. Its end is `ends_at`, else start plus `duration`. A whole-day event fills whole days in its `timezone`, else UTC.
-                ///   - to: Window end, ISO 8601, read as `from` is. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
+                ///   - from: A date-time needs seconds and a zone or offset; a date is UTC midnight. An event overlaps if it starts before `to` and ends after this. Its end is `ends_at`, else start plus `duration`. A whole-day event fills whole days of its `timezone` or UTC.
+                ///   - to: Window end, read as `from` is. The window can span at most 400 days. An event with no length is in the window if it starts at or after `from` and before this time.
                 ///   - _type: Only return events of this type, or of the event types a wildcard matches. Names one type.
                 public init(
                     from: Swift.String,
@@ -26506,7 +26506,7 @@ public enum Operations {
     }
     /// List the trash
     ///
-    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can write. Requires `items.purge`.
     ///
     /// - Remark: HTTP `GET /trash`.
     /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
@@ -27409,7 +27409,7 @@ public enum Operations {
     }
     /// Empty the trash
     ///
-    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
+    /// Empties one page of the trash: deletes up to 200 items of the types you can write permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
     ///
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
@@ -34385,7 +34385,7 @@ public enum Operations {
     }
     /// Replace an item's tags
     ///
-    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags.
+    /// Replaces the item's tags with the ones you send and returns them. An empty list clears all tags. Send `read_tags` to replace them only if the item still has the tags you read.
     ///
     /// - Remark: HTTP `PUT /items/{id}/tags`.
     /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)`.
@@ -34443,15 +34443,25 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/requestBody/json/tags`.
                     public var tags: [Swift.String]?
+                    /// The tags you read. If the item now has a different set of tags, no tag changes; order and repeats don't count. Leave it out to replace the tags as the item stands.
+                    ///
+                    /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/requestBody/json/read_tags`.
+                    public var readTags: [Swift.String]?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - tags: The tags the item will have: at most 100, each up to 128 characters. An empty list clears them.
-                    public init(tags: [Swift.String]? = nil) {
+                    ///   - readTags: The tags you read. If the item now has a different set of tags, no tag changes; order and repeats don't count. Leave it out to replace the tags as the item stands.
+                    public init(
+                        tags: [Swift.String]? = nil,
+                        readTags: [Swift.String]? = nil
+                    ) {
                         self.tags = tags
+                        self.readTags = readTags
                     }
                     public enum CodingKeys: String, CodingKey {
                         case tags
+                        case readTags = "read_tags"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -34459,8 +34469,13 @@ public enum Operations {
                             [Swift.String].self,
                             forKey: .tags
                         )
+                        self.readTags = try container.decodeIfPresent(
+                            [Swift.String].self,
+                            forKey: .readTags
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
-                            "tags"
+                            "tags",
+                            "read_tags"
                         ])
                     }
                 }
@@ -34653,7 +34668,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: `tags` is not a list of valid tags or has more than 100, or the body has a field this endpoint doesn't take.
+            /// - `validation_error`: `tags` is not a list of valid tags or has more than 100, `read_tags` is not a list of strings, or the body has a field this endpoint doesn't take.
             /// - `invalid_id`: the ID is not a valid item ID.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)/responses/400`.
@@ -35089,20 +35104,25 @@ public enum Operations {
                     /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/responses/409/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
                         /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/responses/409/content/json/value1`.
-                        public var value1: Components.Schemas.InstanceChangedRefusal?
+                        public var value1: Components.Schemas.ItemStaleVersion?
                         /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.IdempotencyKeyInFlightRefusal?
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.IdempotencyKeyInFlightRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
+                        ///   - value3:
                         public init(
-                            value1: Components.Schemas.InstanceChangedRefusal? = nil,
-                            value2: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
+                            value1: Components.Schemas.ItemStaleVersion? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil,
+                            value3: Components.Schemas.IdempotencyKeyInFlightRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
+                            self.value3 = value3
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -35116,10 +35136,16 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
-                                    self.value2
+                                    self.value2,
+                                    self.value3
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -35129,6 +35155,7 @@ public enum Operations {
                         public func encode(to encoder: any Swift.Encoder) throws {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/items/{id}/tags/PUT/responses/409/content/application\/json`.
@@ -35161,7 +35188,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            /// - `version_conflict`: `read_tags` differs from the item's tags. `current` is the item now; no tag changed.
+            /// - `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/tags/put(replaceItemTags)/responses/409`.
             ///
@@ -134855,7 +134883,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/source`.
                     public var source: Swift.String
-                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the local command can grant any.
+                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant your own `source` and your claims, or with `keys.manage` any source; the local command can grant any.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -134963,7 +134991,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/metadata_permissions`.
                     public var metadataPermissions: Operations.CreateKey.Input.Body.JsonPayload.MetadataPermissionsPayload?
-                    /// Profile access by `name`, `email`, `avatar`, or `*`. `write` permits name and avatar changes and implies read; email accepts only `read`. `*` reads every field and writes only name and avatar.
+                    /// Profile access by `name`, `username`, `email`, `avatar`, or `*`. `write` implies read. `write` on a field changes it, and only `username` at `write` changes the username. `*` reads every field and at `write` changes every field but the username.
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/profile_permissions`.
                     public var profilePermissions: Components.Schemas.ProfilePermissions?
@@ -134975,21 +135003,26 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/expires_at`.
                     public var expiresAt: Swift.String?
+                    /// `true` if the key is the owner's, not the app's you act for: it carries no `oauth_client_id`, and disconnecting or narrowing that app leaves it working. From an app, or a key an app made, it needs `keys.manage`.
+                    ///
+                    /// - Remark: Generated from `#/paths/keys/POST/requestBody/json/owner_key`.
+                    public var ownerKey: Swift.Bool?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - label: A name for the key, to tell it apart from your other keys.
                     ///   - source: The key's own source, stamped on the items it writes unless a write names a source it claims. No other key that hasn't been revoked or expired may have it as its own, and it can't change later.
-                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the local command can grant any.
+                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant your own `source` and your claims, or with `keys.manage` any source; the local command can grant any.
                     ///   - permissions: The permissions to give the key, such as `audit.read`.
                     ///   - defaultTier: The tier an item this key creates goes to when the write names none. Leave it out for `library`.
                     ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
                     ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
                     ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
                     ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
-                    ///   - profilePermissions: Profile access by `name`, `email`, `avatar`, or `*`. `write` permits name and avatar changes and implies read; email accepts only `read`. `*` reads every field and writes only name and avatar.
+                    ///   - profilePermissions: Profile access by `name`, `username`, `email`, `avatar`, or `*`. `write` implies read. `write` on a field changes it, and only `username` at `write` changes the username. `*` reads every field and at `write` changes every field but the username.
                     ///   - enforcementOverride: Enforcement levers for this key alone. Leave it out for none, so the key follows the instance's.
                     ///   - expiresAt: When the key stops working, as an ISO 8601 date and time in the future. Leave it out for a key that never expires, or, if your own key expires, for one that expires when yours does. It can't be later than your own key's `expires_at`.
+                    ///   - ownerKey: `true` if the key is the owner's, not the app's you act for: it carries no `oauth_client_id`, and disconnecting or narrowing that app leaves it working. From an app, or a key an app made, it needs `keys.manage`.
                     public init(
                         label: Swift.String,
                         source: Swift.String,
@@ -135002,7 +135035,8 @@ public enum Operations {
                         metadataPermissions: Operations.CreateKey.Input.Body.JsonPayload.MetadataPermissionsPayload? = nil,
                         profilePermissions: Components.Schemas.ProfilePermissions? = nil,
                         enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
-                        expiresAt: Swift.String? = nil
+                        expiresAt: Swift.String? = nil,
+                        ownerKey: Swift.Bool? = nil
                     ) {
                         self.label = label
                         self.source = source
@@ -135016,6 +135050,7 @@ public enum Operations {
                         self.profilePermissions = profilePermissions
                         self.enforcementOverride = enforcementOverride
                         self.expiresAt = expiresAt
+                        self.ownerKey = ownerKey
                     }
                     public enum CodingKeys: String, CodingKey {
                         case label
@@ -135030,6 +135065,7 @@ public enum Operations {
                         case profilePermissions = "profile_permissions"
                         case enforcementOverride = "enforcement_override"
                         case expiresAt = "expires_at"
+                        case ownerKey = "owner_key"
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -135081,6 +135117,10 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .expiresAt
                         )
+                        self.ownerKey = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .ownerKey
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "label",
                             "source",
@@ -135093,7 +135133,8 @@ public enum Operations {
                             "metadata_permissions",
                             "profile_permissions",
                             "enforcement_override",
-                            "expires_at"
+                            "expires_at",
+                            "owner_key"
                         ])
                     }
                 }
@@ -135262,7 +135303,7 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `label` or `source` is missing, or a lever in `enforcement_override` lacks `types` or `sources`.
-            /// - `validation_error`: a field is invalid, such as a permission level that doesn't exist, more than 1,000 `sources`, or an `expires_at` that isn't a time or isn't in the future, or `source` or a claimed source starts with `oauth:`.
+            /// - `validation_error`: a field is invalid, such as an unknown permission level, more than 1,000 `sources`, an `expires_at` that isn't a future time, an `owner_key` that isn't `true` or `false`, or a `source` or claim starting `oauth:` or `restored:`.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/400`.
             ///
@@ -135438,7 +135479,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you lack `keys.mint` and aren't the local command; the body names a permission, map entry or source you don't hold, a `source` another key claims that you can't grant, an own `source` a connector holds without `keys.manage`, an `expires_at` past your key's, or `enforcement_override` without `config.manage`. `details.required_scope` and `details.source` name what you lack.
+            /// - `forbidden`: you lack `keys.mint` and aren't the local command; the body names a permission or map entry you don't hold, a claim, or another key's claim as `source`, that you can't grant, an own `source` a connector holds without `keys.manage`, an `expires_at` past your key's, `owner_key` from an app without `keys.manage`, or `enforcement_override` without `config.manage`. `details` names it.
             ///
             /// - Remark: Generated from `#/paths//keys/post(createKey)/responses/403`.
             ///
@@ -137283,7 +137324,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/default_tier`.
                     public var defaultTier: Components.Schemas.Tier?
-                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the local command can grant any.
+                    /// Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant your own `source` and your claims, or with `keys.manage` any source; the local command can grant any.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/sources`.
                     public var sources: [Swift.String]?
@@ -137383,7 +137424,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/metadata_permissions`.
                     public var metadataPermissions: Operations.UpdateKey.Input.Body.JsonPayload.MetadataPermissionsPayload?
-                    /// Profile access by `name`, `email`, `avatar`, or `*`. `write` permits name and avatar changes and implies read; email accepts only `read`. `*` reads every field and writes only name and avatar.
+                    /// Profile access by `name`, `username`, `email`, `avatar`, or `*`. `write` implies read. `write` on a field changes it, and only `username` at `write` changes the username. `*` reads every field and at `write` changes every field but the username.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/profile_permissions`.
                     public var profilePermissions: Components.Schemas.ProfilePermissions?
@@ -137395,7 +137436,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/enforcement_override`.
                     public var enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride?
-                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made, through `keys.manage` or with `narrow_only`.
+                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than the key's current one for a key an app made, with `narrow_only`, or without `keys.mint`. It also can't be later than your own key's `expires_at`, unless you hold `keys.manage` and it isn't later than the key's current one.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/expires_at`.
                     public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
@@ -137412,15 +137453,15 @@ public enum Operations {
                     /// - Parameters:
                     ///   - label: A name for the key, to tell it apart from your other keys.
                     ///   - defaultTier: The tier an item this key creates goes to when the write names none.
-                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant only your own `source` and the sources you claim; the local command can grant any.
+                    ///   - sources: Sources the key may also write under, besides its own `source`. Several keys may claim one source, so their writes share natural keys. You can grant your own `source` and your claims, or with `keys.manage` any source; the local command can grant any.
                     ///   - typePermissions: Item types the key may `read` or `write`, by type ID or a wildcard such as `core.*` or `*`. `none` denies a type a wildcard covers.
                     ///   - extensionPermissions: Extension namespaces the key may `read` or `write`, by namespace or `*`.
                     ///   - edgePermissions: Edge types the key may `read` or `write`, by edge type, a namespace wildcard such as `user.*`, or `*`.
                     ///   - metadataPermissions: Registrations the key may make: `types` to register types and `edge_types` to register edge types, at `write`. `*` covers both.
-                    ///   - profilePermissions: Profile access by `name`, `email`, `avatar`, or `*`. `write` permits name and avatar changes and implies read; email accepts only `read`. `*` reads every field and writes only name and avatar.
+                    ///   - profilePermissions: Profile access by `name`, `username`, `email`, `avatar`, or `*`. `write` implies read. `write` on a field changes it, and only `username` at `write` changes the username. `*` reads every field and at `write` changes every field but the username.
                     ///   - permissions: The permissions the key holds, such as `audit.read`.
                     ///   - enforcementOverride: Replaces the key's enforcement levers whole. `null` clears them.
-                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than your own key's `expires_at`, or the key's current one for a key an app made, through `keys.manage` or with `narrow_only`.
+                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than the key's current one for a key an app made, with `narrow_only`, or without `keys.mint`. It also can't be later than your own key's `expires_at`, unless you hold `keys.manage` and it isn't later than the key's current one.
                     ///   - source: Can't change. To give a key another source, create a new key and revoke this one.
                     ///   - narrowOnly: `true` to refuse the update if it would give the key more: a permission, map entry or claimed source it doesn't hold, a later `expires_at` or none, or an `enforcement_override` other than its own. Defaults to `false`.
                     public init(
@@ -137882,7 +137923,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `keys.mint` and aren't the local command; the body gives the key more than you hold or an `expires_at` later than yours; it widens or lengthens an app's key, or any key through `keys.manage` or with `narrow_only`, which also refuses a changed `enforcement_override`; or it names `enforcement_override` without `config.manage`. `details` names what's missing.
+            /// - `forbidden`: you hold neither `keys.mint` nor `keys.manage`, or only `keys.manage` and it widens or lengthens the key; it gives more than you hold or an `expires_at` later than yours, unless `keys.manage` narrows it; it widens or lengthens an app's key, or any key with `narrow_only`, which also refuses a changed `enforcement_override`; or it names `enforcement_override` without `config.manage`.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/403`.
             ///
@@ -143217,14 +143258,14 @@ public enum Operations {
             public var path: Operations.RevokeAppGrant.Input.Path
             /// - Remark: Generated from `#/paths/grants/{id}/DELETE/query`.
             public struct Query: Sendable, Hashable {
-                /// Also revoke every key the app minted, and every key those keys minted. Omitting it, or `false`, leaves them working.
+                /// Also revoke every key the app minted, and every key those keys minted, but an owner's key (`owner_key`). Omitting it, or `false`, leaves them working.
                 ///
                 /// - Remark: Generated from `#/paths/grants/{id}/DELETE/query/revoke_keys`.
                 public var revokeKeys: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - revokeKeys: Also revoke every key the app minted, and every key those keys minted. Omitting it, or `false`, leaves them working.
+                ///   - revokeKeys: Also revoke every key the app minted, and every key those keys minted, but an owner's key (`owner_key`). Omitting it, or `false`, leaves them working.
                 public init(revokeKeys: Swift.Bool? = nil) {
                     self.revokeKeys = revokeKeys
                 }
@@ -144608,7 +144649,6 @@ public enum Operations {
             /// An RFC 6749 error, when Marfa can't send the browser back to the app:
             /// - `invalid_request`: `client_id` is missing, or a parameter is repeated.
             /// - `invalid_client` or `invalid_client_metadata`: the client ID metadata document is unreadable or invalid.
-            /// - `invalid_scope`: a scope writes the owner's email.
             /// - `invalid_target`: a resource isn't served here.
             ///
             /// `X-Marfa-Reach` gets `validation_error`.
@@ -148138,18 +148178,22 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/owner/POST/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// Email address the owner uses to sign in.
+                    /// The username the owner signs in with: 1 to 64 letters a to z, numbers, dots, dashes and underscores. Marfa stores it in lowercase, with spaces at each end trimmed.
                     ///
-                    /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/email`.
-                    public var email: Swift.String
+                    /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/username`.
+                    public var username: Swift.String
                     /// Password for the new owner.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/password`.
                     public var password: Swift.String
-                    /// Display name. Defaults to the part before @ in the email address when omitted or blank.
+                    /// Display name. Defaults to the username when omitted or blank.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/name`.
                     public var name: Swift.String?
+                    /// The owner's email address. It plays no part in signing in. Marfa stores it in lowercase, with spaces at each end trimmed.
+                    ///
+                    /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/email`.
+                    public var email: Swift.String?
                     /// Machine-issued setup code. Omit when using a setup-only browser session.
                     ///
                     /// - Remark: Generated from `#/paths/owner/POST/requestBody/json/code`.
@@ -148157,32 +148201,36 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - email: Email address the owner uses to sign in.
+                    ///   - username: The username the owner signs in with: 1 to 64 letters a to z, numbers, dots, dashes and underscores. Marfa stores it in lowercase, with spaces at each end trimmed.
                     ///   - password: Password for the new owner.
-                    ///   - name: Display name. Defaults to the part before @ in the email address when omitted or blank.
+                    ///   - name: Display name. Defaults to the username when omitted or blank.
+                    ///   - email: The owner's email address. It plays no part in signing in. Marfa stores it in lowercase, with spaces at each end trimmed.
                     ///   - code: Machine-issued setup code. Omit when using a setup-only browser session.
                     public init(
-                        email: Swift.String,
+                        username: Swift.String,
                         password: Swift.String,
                         name: Swift.String? = nil,
+                        email: Swift.String? = nil,
                         code: Swift.String? = nil
                     ) {
-                        self.email = email
+                        self.username = username
                         self.password = password
                         self.name = name
+                        self.email = email
                         self.code = code
                     }
                     public enum CodingKeys: String, CodingKey {
-                        case email
+                        case username
                         case password
                         case name
+                        case email
                         case code
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
-                        self.email = try container.decode(
+                        self.username = try container.decode(
                             Swift.String.self,
-                            forKey: .email
+                            forKey: .username
                         )
                         self.password = try container.decode(
                             Swift.String.self,
@@ -148192,14 +148240,19 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .name
                         )
+                        self.email = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .email
+                        )
                         self.code = try container.decodeIfPresent(
                             Swift.String.self,
                             forKey: .code
                         )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
-                            "email",
+                            "username",
                             "password",
                             "name",
+                            "email",
                             "code"
                         ])
                     }
@@ -149180,7 +149233,7 @@ public enum Operations {
     }
     /// Get the owner's profile
     ///
-    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
+    /// Returns the owner's profile fields that your credential can read: `name`, `username`, `email` and `avatar`, each with its own read permission. A field you can't read is left out, so a credential that can read none gets an empty object.
     ///
     /// - Remark: HTTP `GET /profile`.
     /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
@@ -150040,7 +150093,7 @@ public enum Operations {
     }
     /// Update the owner's profile
     ///
-    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
+    /// Updates the owner's username, email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the username needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -150072,10 +150125,14 @@ public enum Operations {
             @frozen public enum Body: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/profile/PATCH/requestBody/json`.
                 public struct JsonPayload: Codable, Hashable, Sendable {
-                    /// The email address the owner signs in with. Marfa stores it in lowercase, with spaces at each end trimmed.
+                    /// The username the owner signs in with: 1 to 64 letters a to z, numbers, dots, dashes and underscores. Marfa stores it in lowercase, with spaces at each end trimmed. Signing in with the old username stops at once.
+                    ///
+                    /// - Remark: Generated from `#/paths/profile/PATCH/requestBody/json/username`.
+                    public var username: Swift.String?
+                    /// The owner's email address, which plays no part in signing in. Marfa stores it in lowercase, with spaces at each end trimmed. Set it to `null` to remove it.
                     ///
                     /// - Remark: Generated from `#/paths/profile/PATCH/requestBody/json/email`.
-                    public var email: Swift.String?
+                    public var email: Components.Schemas.MarfaNullableMarfaInline81a5f2b70bdd834c?
                     /// Display name, without control or bidirectional formatting characters. Spaces at each end are trimmed.
                     ///
                     /// - Remark: Generated from `#/paths/profile/PATCH/requestBody/json/name`.
@@ -150087,27 +150144,35 @@ public enum Operations {
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
-                    ///   - email: The email address the owner signs in with. Marfa stores it in lowercase, with spaces at each end trimmed.
+                    ///   - username: The username the owner signs in with: 1 to 64 letters a to z, numbers, dots, dashes and underscores. Marfa stores it in lowercase, with spaces at each end trimmed. Signing in with the old username stops at once.
+                    ///   - email: The owner's email address, which plays no part in signing in. Marfa stores it in lowercase, with spaces at each end trimmed. Set it to `null` to remove it.
                     ///   - name: Display name, without control or bidirectional formatting characters. Spaces at each end are trimmed.
                     ///   - avatar: Set `avatar` to `null` to remove the owner's avatar, or omit it to leave it unchanged. To set an avatar, send its bytes to `PUT /profile/avatar`.
                     public init(
-                        email: Swift.String? = nil,
+                        username: Swift.String? = nil,
+                        email: Components.Schemas.MarfaNullableMarfaInline81a5f2b70bdd834c? = nil,
                         name: Swift.String? = nil,
                         avatar: Components.Schemas.MarfaNull? = nil
                     ) {
+                        self.username = username
                         self.email = email
                         self.name = name
                         self.avatar = avatar
                     }
                     public enum CodingKeys: String, CodingKey {
+                        case username
                         case email
                         case name
                         case avatar
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
-                        self.email = try container.decodeIfPresent(
+                        self.username = try container.decodeIfPresent(
                             Swift.String.self,
+                            forKey: .username
+                        )
+                        self.email = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline81a5f2b70bdd834c.self,
                             forKey: .email
                         )
                         self.name = try container.decodeIfPresent(
@@ -150119,6 +150184,7 @@ public enum Operations {
                             forKey: .avatar
                         )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "username",
                             "email",
                             "name",
                             "avatar"
@@ -155801,14 +155867,14 @@ public enum Operations {
             public var path: Operations.EndSignIn.Input.Path
             /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/query`.
             public struct Query: Sendable, Hashable {
-                /// For an app, also revoke every key it minted, as its `minted_by` entries show. Only an app takes it.
+                /// For an app, also revoke every key it minted but an owner's key (`owner_key`), as its `minted_by` entries show. Only an app takes it.
                 ///
                 /// - Remark: Generated from `#/paths/owner/sign-ins/{id}/DELETE/query/revoke_keys`.
                 public var revokeKeys: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - revokeKeys: For an app, also revoke every key it minted, as its `minted_by` entries show. Only an app takes it.
+                ///   - revokeKeys: For an app, also revoke every key it minted but an owner's key (`owner_key`), as its `minted_by` entries show. Only an app takes it.
                 public init(revokeKeys: Swift.Bool? = nil) {
                     self.revokeKeys = revokeKeys
                 }
@@ -158907,7 +158973,7 @@ public enum Operations {
     }
     /// Rename a passkey
     ///
-    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
@@ -159322,7 +159388,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: the credential lacks `sign_ins.manage`, and `details.required_scope` names it, or the owner's browser session signed in more than five minutes ago, and `details.needs` is `recent_sign_in`.
+            /// - `forbidden`: the credential lacks `sign_ins.manage`, and `details.required_scope` names it, or the owner's browser session signed in more than fifteen minutes ago, and `details.needs` is `recent_sign_in`.
             ///
             /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)/responses/403`.
             ///
@@ -160184,7 +160250,7 @@ public enum Operations {
     }
     /// Delete a passkey
     ///
-    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
@@ -160563,7 +160629,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: the credential lacks `sign_ins.manage`, and `details.required_scope` names it, or the owner's browser session signed in more than five minutes ago, and `details.needs` is `recent_sign_in`.
+            /// - `forbidden`: the credential lacks `sign_ins.manage`, and `details.required_scope` names it, or the owner's browser session signed in more than fifteen minutes ago, and `details.needs` is `recent_sign_in`.
             ///
             /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)/responses/403`.
             ///
@@ -164295,7 +164361,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/enrichment_ocr_enabled`.
                     public var enrichmentOcrEnabled: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
-                    /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies. `null` removes it, so the server's default applies.
+                    /// `true` if exception reports are sent. Enabling requires both `posthog_host` and `posthog_project_token`. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/error_reporting_enabled`.
                     public var errorReportingEnabled: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
@@ -164355,27 +164421,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/skip_sign_in_address_check`.
                     public var skipSignInAddressCheck: Swift.Bool?
-                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder. `null` removes it, so the server's default applies.
+                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last fifteen minutes. Absent: no backup folder. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/backup_path`.
                     public var backupPath: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
-                    /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store. `null` removes it, so the server's default applies.
+                    /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_bucket`.
                     public var objectStoreBucket: Components.Schemas.MarfaNullableMarfaInline099cb398ed5d68c2?
-                    /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`. `null` removes it, so the server's default applies.
+                    /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1` or `auto`. Changing it needs a sign-in from the last fifteen minutes. Absent: `us-east-1`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_region`.
                     public var objectStoreRegion: Components.Schemas.MarfaNullableMarfaInline7d7d6f95a5c460e0?
-                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
+                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_endpoint`.
                     public var objectStoreEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
-                    /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`. `null` removes it, so the server's default applies.
+                    /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last fifteen minutes. Absent: `true`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_path_style`.
                     public var objectStorePathStyle: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
-                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
+                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last fifteen minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_prefix`.
                     public var objectStorePrefix: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
@@ -164383,7 +164449,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_access_key_id`.
                     public var objectStoreAccessKeyId: Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54?
-                    /// `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
+                    /// `true` if Marfa may send webhooks, the heartbeat, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last fifteen minutes. Absent: `false`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/allow_private_addresses`.
                     public var allowPrivateAddresses: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
@@ -164395,10 +164461,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/heartbeat_url`.
                     public var heartbeatUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
-                    /// The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. `null` or an empty string removes it.
-                    ///
-                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/error_webhook_url`.
-                    public var errorWebhookUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
                     /// The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. `null` or an empty string removes it.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/posthog_host`.
@@ -164407,6 +164469,54 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/posthog_project_token`.
                     public var posthogProjectToken: Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54?
+                    /// `true` if Marfa sends telemetry about itself: traces, log records and metrics to the OTLP endpoints, and exception reports to `posthog_host`. `false` sends none of them and keeps every telemetry setting. Absent: `true`. `null` removes it, so the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/telemetry_enabled`.
+                    public var telemetryEnabled: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
+                    /// The base URL of the OTLP receiver Marfa exports traces to, under `v1/traces`, log records to, under `v1/logs`, and metrics to, under `v1/metrics`, keeping its query. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_endpoint`.
+                    public var otelExporterOtlpEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+                    /// The URL Marfa posts traces to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_traces_endpoint`.
+                    public var otelExporterOtlpTracesEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+                    /// The URL Marfa posts log records to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_logs_endpoint`.
+                    public var otelExporterOtlpLogsEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+                    /// The URL Marfa posts metrics to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_metrics_endpoint`.
+                    public var otelExporterOtlpMetricsEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+                    /// The headers Marfa sends with every OTLP export, as comma-separated `key=value` pairs with percent-encoded values and no whitespace around them. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_headers`.
+                    public var otelExporterOtlpHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec?
+                    /// The headers Marfa sends with trace exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_traces_headers`.
+                    public var otelExporterOtlpTracesHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec?
+                    /// The headers Marfa sends with log exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_logs_headers`.
+                    public var otelExporterOtlpLogsHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec?
+                    /// The headers Marfa sends with metric exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_exporter_otlp_metrics_headers`.
+                    public var otelExporterOtlpMetricsHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec?
+                    /// The share of traces Marfa exports, from 0 to 1. A trace that holds an error is exported whatever this says. Absent: `0.05`. `null` removes it, so the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_sample_ratio`.
+                    public var otelSampleRatio: Components.Schemas.MarfaNullableMarfaInline9ec61191bcefa4cb?
+                    /// The service name on everything Marfa exports, in place of a `service.name` in `otel_resource_attributes`. Absent: `marfa-server`. An archive doesn't carry it. `null` removes it, so the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_service_name`.
+                    public var otelServiceName: Components.Schemas.MarfaNullableMarfaInline099cb398ed5d68c2?
+                    /// Attributes Marfa adds to everything it exports, as comma-separated `key=value` pairs with percent-encoded values. One named here replaces Marfa's own of the same name, such as `service.version`. An archive doesn't carry it. `null` removes it, so the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/otel_resource_attributes`.
+                    public var otelResourceAttributes: Components.Schemas.MarfaNullableMarfaInline66f34441032fb10a?
                     /// The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/secrets_set`.
@@ -164545,7 +164655,7 @@ public enum Operations {
                     ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement. `null` removes it, so the server's default applies.
                     ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies. `null` removes it, so the server's default applies.
-                    ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies. `null` removes it, so the server's default applies.
+                    ///   - errorReportingEnabled: `true` if exception reports are sent. Enabling requires both `posthog_host` and `posthog_project_token`. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///   - instanceId: This instance's ID, accepted so you can send back what `GET /config` returned. It sets nothing.
                     ///   - name: The instance's display name. `null` removes it, so the server's default applies.
@@ -164560,19 +164670,30 @@ public enum Operations {
                     ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address. `null` removes it, so the server's default applies.
                     ///   - confirmSignInAddressChange: `true` to confirm a change that moves the sign-in address of a claimed instance. It sets nothing.
                     ///   - skipSignInAddressCheck: `true` moves the sign-in address without first checking that it answers as this instance, for a host that answers only after the move. Only the private local command can send it.
-                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder. `null` removes it, so the server's default applies.
-                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store. `null` removes it, so the server's default applies.
-                    ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`. `null` removes it, so the server's default applies.
-                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
-                    ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`. `null` removes it, so the server's default applies.
-                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
+                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last fifteen minutes. Absent: no backup folder. `null` removes it, so the server's default applies.
+                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store. `null` removes it, so the server's default applies.
+                    ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1` or `auto`. Changing it needs a sign-in from the last fifteen minutes. Absent: `us-east-1`. `null` removes it, so the server's default applies.
+                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it. `null` removes it, so the server's default applies.
+                    ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last fifteen minutes. Absent: `true`. `null` removes it, so the server's default applies.
+                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last fifteen minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
                     ///   - objectStoreAccessKeyId: The access key ID for the object store. `null` removes it, so the server's default applies.
-                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
+                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last fifteen minutes. Absent: `false`. `null` removes it, so the server's default applies.
                     ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. `null` or an empty string removes it, and so does a change to `object_store_bucket` or `object_store_endpoint` that doesn't set it.
                     ///   - heartbeatUrl: The `http` or `https` URL Marfa requests on a schedule, so that something else can notice when the requests stop. Marfa never returns it. `null` or an empty string removes it.
-                    ///   - errorWebhookUrl: The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. `null` or an empty string removes it.
                     ///   - posthogHost: The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. `null` or an empty string removes it.
                     ///   - posthogProjectToken: The PostHog project token Marfa sends its fault reports with, with no whitespace around it. It needs `posthog_host` set too. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - telemetryEnabled: `true` if Marfa sends telemetry about itself: traces, log records and metrics to the OTLP endpoints, and exception reports to `posthog_host`. `false` sends none of them and keeps every telemetry setting. Absent: `true`. `null` removes it, so the server's default applies.
+                    ///   - otelExporterOtlpEndpoint: The base URL of the OTLP receiver Marfa exports traces to, under `v1/traces`, log records to, under `v1/logs`, and metrics to, under `v1/metrics`, keeping its query. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpTracesEndpoint: The URL Marfa posts traces to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpLogsEndpoint: The URL Marfa posts log records to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpMetricsEndpoint: The URL Marfa posts metrics to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpHeaders: The headers Marfa sends with every OTLP export, as comma-separated `key=value` pairs with percent-encoded values and no whitespace around them. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpTracesHeaders: The headers Marfa sends with trace exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpLogsHeaders: The headers Marfa sends with log exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelExporterOtlpMetricsHeaders: The headers Marfa sends with metric exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - otelSampleRatio: The share of traces Marfa exports, from 0 to 1. A trace that holds an error is exported whatever this says. Absent: `0.05`. `null` removes it, so the server's default applies.
+                    ///   - otelServiceName: The service name on everything Marfa exports, in place of a `service.name` in `otel_resource_attributes`. Absent: `marfa-server`. An archive doesn't carry it. `null` removes it, so the server's default applies.
+                    ///   - otelResourceAttributes: Attributes Marfa adds to everything it exports, as comma-separated `key=value` pairs with percent-encoded values. One named here replaces Marfa's own of the same name, such as `service.version`. An archive doesn't carry it. `null` removes it, so the server's default applies.
                     ///   - secretsSet: The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link. `null` removes it, so the server's default applies.
                     ///   - maxBulkRequestBytes: The largest body the bulk operations accept, in bytes, and the largest row a restore reads. The most you can set is 33554432, half the 67108864 bytes a restore reads on one archive line. `null` removes it, so the server's default applies.
@@ -164638,9 +164759,20 @@ public enum Operations {
                         allowPrivateAddresses: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754? = nil,
                         objectStoreSecretAccessKey: Components.Schemas.MarfaNullableMarfaInline66f34441032fb10a? = nil,
                         heartbeatUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
-                        errorWebhookUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
                         posthogHost: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
                         posthogProjectToken: Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54? = nil,
+                        telemetryEnabled: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754? = nil,
+                        otelExporterOtlpEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
+                        otelExporterOtlpTracesEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
+                        otelExporterOtlpLogsEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
+                        otelExporterOtlpMetricsEndpoint: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
+                        otelExporterOtlpHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec? = nil,
+                        otelExporterOtlpTracesHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec? = nil,
+                        otelExporterOtlpLogsHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec? = nil,
+                        otelExporterOtlpMetricsHeaders: Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec? = nil,
+                        otelSampleRatio: Components.Schemas.MarfaNullableMarfaInline9ec61191bcefa4cb? = nil,
+                        otelServiceName: Components.Schemas.MarfaNullableMarfaInline099cb398ed5d68c2? = nil,
+                        otelResourceAttributes: Components.Schemas.MarfaNullableMarfaInline66f34441032fb10a? = nil,
                         secretsSet: [Swift.String]? = nil,
                         maxRequestBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d? = nil,
                         maxBulkRequestBytes: Components.Schemas.MarfaNullableMarfaInlineb7a5eebe6656cb32? = nil,
@@ -164706,9 +164838,20 @@ public enum Operations {
                         self.allowPrivateAddresses = allowPrivateAddresses
                         self.objectStoreSecretAccessKey = objectStoreSecretAccessKey
                         self.heartbeatUrl = heartbeatUrl
-                        self.errorWebhookUrl = errorWebhookUrl
                         self.posthogHost = posthogHost
                         self.posthogProjectToken = posthogProjectToken
+                        self.telemetryEnabled = telemetryEnabled
+                        self.otelExporterOtlpEndpoint = otelExporterOtlpEndpoint
+                        self.otelExporterOtlpTracesEndpoint = otelExporterOtlpTracesEndpoint
+                        self.otelExporterOtlpLogsEndpoint = otelExporterOtlpLogsEndpoint
+                        self.otelExporterOtlpMetricsEndpoint = otelExporterOtlpMetricsEndpoint
+                        self.otelExporterOtlpHeaders = otelExporterOtlpHeaders
+                        self.otelExporterOtlpTracesHeaders = otelExporterOtlpTracesHeaders
+                        self.otelExporterOtlpLogsHeaders = otelExporterOtlpLogsHeaders
+                        self.otelExporterOtlpMetricsHeaders = otelExporterOtlpMetricsHeaders
+                        self.otelSampleRatio = otelSampleRatio
+                        self.otelServiceName = otelServiceName
+                        self.otelResourceAttributes = otelResourceAttributes
                         self.secretsSet = secretsSet
                         self.maxRequestBytes = maxRequestBytes
                         self.maxBulkRequestBytes = maxBulkRequestBytes
@@ -164775,9 +164918,20 @@ public enum Operations {
                         case allowPrivateAddresses = "allow_private_addresses"
                         case objectStoreSecretAccessKey = "object_store_secret_access_key"
                         case heartbeatUrl = "heartbeat_url"
-                        case errorWebhookUrl = "error_webhook_url"
                         case posthogHost = "posthog_host"
                         case posthogProjectToken = "posthog_project_token"
+                        case telemetryEnabled = "telemetry_enabled"
+                        case otelExporterOtlpEndpoint = "otel_exporter_otlp_endpoint"
+                        case otelExporterOtlpTracesEndpoint = "otel_exporter_otlp_traces_endpoint"
+                        case otelExporterOtlpLogsEndpoint = "otel_exporter_otlp_logs_endpoint"
+                        case otelExporterOtlpMetricsEndpoint = "otel_exporter_otlp_metrics_endpoint"
+                        case otelExporterOtlpHeaders = "otel_exporter_otlp_headers"
+                        case otelExporterOtlpTracesHeaders = "otel_exporter_otlp_traces_headers"
+                        case otelExporterOtlpLogsHeaders = "otel_exporter_otlp_logs_headers"
+                        case otelExporterOtlpMetricsHeaders = "otel_exporter_otlp_metrics_headers"
+                        case otelSampleRatio = "otel_sample_ratio"
+                        case otelServiceName = "otel_service_name"
+                        case otelResourceAttributes = "otel_resource_attributes"
                         case secretsSet = "secrets_set"
                         case maxRequestBytes = "max_request_bytes"
                         case maxBulkRequestBytes = "max_bulk_request_bytes"
@@ -164941,10 +165095,6 @@ public enum Operations {
                             Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
                             forKey: .heartbeatUrl
                         )
-                        self.errorWebhookUrl = try container.decodeIfPresent(
-                            Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
-                            forKey: .errorWebhookUrl
-                        )
                         self.posthogHost = try container.decodeIfPresent(
                             Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
                             forKey: .posthogHost
@@ -164952,6 +165102,54 @@ public enum Operations {
                         self.posthogProjectToken = try container.decodeIfPresent(
                             Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54.self,
                             forKey: .posthogProjectToken
+                        )
+                        self.telemetryEnabled = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754.self,
+                            forKey: .telemetryEnabled
+                        )
+                        self.otelExporterOtlpEndpoint = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
+                            forKey: .otelExporterOtlpEndpoint
+                        )
+                        self.otelExporterOtlpTracesEndpoint = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
+                            forKey: .otelExporterOtlpTracesEndpoint
+                        )
+                        self.otelExporterOtlpLogsEndpoint = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
+                            forKey: .otelExporterOtlpLogsEndpoint
+                        )
+                        self.otelExporterOtlpMetricsEndpoint = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
+                            forKey: .otelExporterOtlpMetricsEndpoint
+                        )
+                        self.otelExporterOtlpHeaders = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec.self,
+                            forKey: .otelExporterOtlpHeaders
+                        )
+                        self.otelExporterOtlpTracesHeaders = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec.self,
+                            forKey: .otelExporterOtlpTracesHeaders
+                        )
+                        self.otelExporterOtlpLogsHeaders = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec.self,
+                            forKey: .otelExporterOtlpLogsHeaders
+                        )
+                        self.otelExporterOtlpMetricsHeaders = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinee25d6df2beaecaec.self,
+                            forKey: .otelExporterOtlpMetricsHeaders
+                        )
+                        self.otelSampleRatio = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline9ec61191bcefa4cb.self,
+                            forKey: .otelSampleRatio
+                        )
+                        self.otelServiceName = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline099cb398ed5d68c2.self,
+                            forKey: .otelServiceName
+                        )
+                        self.otelResourceAttributes = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline66f34441032fb10a.self,
+                            forKey: .otelResourceAttributes
                         )
                         self.secretsSet = try container.decodeIfPresent(
                             [Swift.String].self,
@@ -165114,9 +165312,20 @@ public enum Operations {
                             "allow_private_addresses",
                             "object_store_secret_access_key",
                             "heartbeat_url",
-                            "error_webhook_url",
                             "posthog_host",
                             "posthog_project_token",
+                            "telemetry_enabled",
+                            "otel_exporter_otlp_endpoint",
+                            "otel_exporter_otlp_traces_endpoint",
+                            "otel_exporter_otlp_logs_endpoint",
+                            "otel_exporter_otlp_metrics_endpoint",
+                            "otel_exporter_otlp_headers",
+                            "otel_exporter_otlp_traces_headers",
+                            "otel_exporter_otlp_logs_headers",
+                            "otel_exporter_otlp_metrics_headers",
+                            "otel_sample_ratio",
+                            "otel_service_name",
+                            "otel_resource_attributes",
                             "secrets_set",
                             "max_request_bytes",
                             "max_bulk_request_bytes",
@@ -165355,7 +165564,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/responses/401/headers/WWW-Authenticate`.
                     public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
@@ -165365,7 +165574,7 @@ public enum Operations {
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -165413,7 +165622,7 @@ public enum Operations {
                 }
             }
             /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
-            /// - `insufficient_user_authentication`: your app's owner signed in more than five minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
+            /// - `insufficient_user_authentication`: your app's owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//config/patch(updateConfig)/responses/401`.
             ///
@@ -166343,7 +166552,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/enrichment_ocr_enabled`.
                     public var enrichmentOcrEnabled: Swift.Bool?
-                    /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
+                    /// `true` if exception reports are sent. Enabling requires both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/error_reporting_enabled`.
                     public var errorReportingEnabled: Swift.Bool?
@@ -166456,27 +166665,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/skip_sign_in_address_check`.
                     public var skipSignInAddressCheck: Swift.Bool?
-                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
+                    /// The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last fifteen minutes. Absent: no backup folder.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/backup_path`.
                     public var backupPath: Swift.String?
-                    /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store.
+                    /// The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_bucket`.
                     public var objectStoreBucket: Swift.String?
-                    /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
+                    /// The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1` or `auto`. Changing it needs a sign-in from the last fifteen minutes. Absent: `us-east-1`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_region`.
                     public var objectStoreRegion: Swift.String?
-                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it.
+                    /// The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_endpoint`.
                     public var objectStoreEndpoint: Swift.String?
-                    /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
+                    /// `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last fifteen minutes. Absent: `true`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_path_style`.
                     public var objectStorePathStyle: Swift.Bool?
-                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
+                    /// The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last fifteen minutes. Absent: `marfa`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_prefix`.
                     public var objectStorePrefix: Swift.String?
@@ -166484,7 +166693,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_access_key_id`.
                     public var objectStoreAccessKeyId: Swift.String?
-                    /// `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+                    /// `true` if Marfa may send webhooks, the heartbeat, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last fifteen minutes. Absent: `false`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/allow_private_addresses`.
                     public var allowPrivateAddresses: Swift.Bool?
@@ -166496,10 +166705,6 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/heartbeat_url`.
                     public var heartbeatUrl: Swift.String?
-                    /// The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
-                    ///
-                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/error_webhook_url`.
-                    public var errorWebhookUrl: Swift.String?
                     /// The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/posthog_host`.
@@ -166508,6 +166713,54 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/posthog_project_token`.
                     public var posthogProjectToken: Swift.String?
+                    /// `true` if Marfa sends telemetry about itself: traces, log records and metrics to the OTLP endpoints, and exception reports to `posthog_host`. `false` sends none of them and keeps every telemetry setting. Absent: `true`.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/telemetry_enabled`.
+                    public var telemetryEnabled: Swift.Bool?
+                    /// The base URL of the OTLP receiver Marfa exports traces to, under `v1/traces`, log records to, under `v1/logs`, and metrics to, under `v1/metrics`, keeping its query. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_endpoint`.
+                    public var otelExporterOtlpEndpoint: Swift.String?
+                    /// The URL Marfa posts traces to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_traces_endpoint`.
+                    public var otelExporterOtlpTracesEndpoint: Swift.String?
+                    /// The URL Marfa posts log records to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_logs_endpoint`.
+                    public var otelExporterOtlpLogsEndpoint: Swift.String?
+                    /// The URL Marfa posts metrics to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_metrics_endpoint`.
+                    public var otelExporterOtlpMetricsEndpoint: Swift.String?
+                    /// The headers Marfa sends with every OTLP export, as comma-separated `key=value` pairs with percent-encoded values and no whitespace around them. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_headers`.
+                    public var otelExporterOtlpHeaders: Swift.String?
+                    /// The headers Marfa sends with trace exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_traces_headers`.
+                    public var otelExporterOtlpTracesHeaders: Swift.String?
+                    /// The headers Marfa sends with log exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_logs_headers`.
+                    public var otelExporterOtlpLogsHeaders: Swift.String?
+                    /// The headers Marfa sends with metric exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_exporter_otlp_metrics_headers`.
+                    public var otelExporterOtlpMetricsHeaders: Swift.String?
+                    /// The share of traces Marfa exports, from 0 to 1. A trace that holds an error is exported whatever this says. Absent: `0.05`.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_sample_ratio`.
+                    public var otelSampleRatio: Swift.Double?
+                    /// The service name on everything Marfa exports, in place of a `service.name` in `otel_resource_attributes`. Absent: `marfa-server`. An archive doesn't carry it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_service_name`.
+                    public var otelServiceName: Swift.String?
+                    /// Attributes Marfa adds to everything it exports, as comma-separated `key=value` pairs with percent-encoded values. One named here replaces Marfa's own of the same name, such as `service.version`. An archive doesn't carry it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/otel_resource_attributes`.
+                    public var otelResourceAttributes: Swift.String?
                     /// The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/secrets_set`.
@@ -166647,7 +166900,7 @@ public enum Operations {
                     ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement.
                     ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
                     ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
-                    ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
+                    ///   - errorReportingEnabled: `true` if exception reports are sent. Enabling requires both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
                     ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
                     ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
                     ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
@@ -166661,19 +166914,30 @@ public enum Operations {
                     ///   - signInAddress: The address people sign in at, an origin with no path. Absent: this computer's own address.
                     ///   - confirmSignInAddressChange: `true` to confirm a change that moves the sign-in address of a claimed instance. It sets nothing.
                     ///   - skipSignInAddressCheck: `true` moves the sign-in address without first checking that it answers as this instance, for a host that answers only after the move. Only the private local command can send it.
-                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last five minutes. Absent: no backup folder.
-                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store.
-                    ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1`, `eu-west-2` or `auto`. Changing it needs a sign-in from the last five minutes. Absent: `us-east-1`.
-                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last five minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it.
-                    ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
-                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
+                    ///   - backupPath: The absolute path of the folder Marfa backs itself up to and keeps a second copy of each file in, outside the data directory and the blob folder. Changing it needs a sign-in from the last fifteen minutes. Absent: no backup folder.
+                    ///   - objectStoreBucket: The bucket of an S3-compatible object store that also keeps each file and the backups: 1 to 255 ASCII letters, digits, `.`, `:`, `-` and `_`, other than `.` and `..`. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: no object store.
+                    ///   - objectStoreRegion: The region of the object store: a name of 1 to 63 ASCII letters, digits, hyphens and underscores that can be part of a host name, such as `us-east-1` or `auto`. Changing it needs a sign-in from the last fifteen minutes. Absent: `us-east-1`.
+                    ///   - objectStoreEndpoint: The endpoint of the object store, an `http` or `https` URL with no user name or password. Changing it needs a sign-in from the last fifteen minutes, and removes `object_store_secret_access_key` unless the same request sets it. Absent: the store's provider chooses it.
+                    ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last fifteen minutes. Absent: `true`.
+                    ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last fifteen minutes. Absent: `marfa`.
                     ///   - objectStoreAccessKeyId: The access key ID for the object store.
-                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last fifteen minutes. Absent: `false`.
                     ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. A `PUT` that leaves it out keeps it, unless the `PUT` changes `object_store_bucket` or `object_store_endpoint`; `PATCH` with `null` removes it.
                     ///   - heartbeatUrl: The `http` or `https` URL Marfa requests on a schedule, so that something else can notice when the requests stop. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
-                    ///   - errorWebhookUrl: The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///   - posthogHost: The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///   - posthogProjectToken: The PostHog project token Marfa sends its fault reports with, with no whitespace around it. It needs `posthog_host` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - telemetryEnabled: `true` if Marfa sends telemetry about itself: traces, log records and metrics to the OTLP endpoints, and exception reports to `posthog_host`. `false` sends none of them and keeps every telemetry setting. Absent: `true`.
+                    ///   - otelExporterOtlpEndpoint: The base URL of the OTLP receiver Marfa exports traces to, under `v1/traces`, log records to, under `v1/logs`, and metrics to, under `v1/metrics`, keeping its query. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpTracesEndpoint: The URL Marfa posts traces to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpLogsEndpoint: The URL Marfa posts log records to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpMetricsEndpoint: The URL Marfa posts metrics to, used as written, in place of the one under `otel_exporter_otlp_endpoint`, which must also be set. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpHeaders: The headers Marfa sends with every OTLP export, as comma-separated `key=value` pairs with percent-encoded values and no whitespace around them. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpTracesHeaders: The headers Marfa sends with trace exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpLogsHeaders: The headers Marfa sends with log exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelExporterOtlpMetricsHeaders: The headers Marfa sends with metric exports, as comma-separated `key=value` pairs with percent-encoded values. One here replaces the one of the same name in `otel_exporter_otlp_headers`. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - otelSampleRatio: The share of traces Marfa exports, from 0 to 1. A trace that holds an error is exported whatever this says. Absent: `0.05`.
+                    ///   - otelServiceName: The service name on everything Marfa exports, in place of a `service.name` in `otel_resource_attributes`. Absent: `marfa-server`. An archive doesn't carry it.
+                    ///   - otelResourceAttributes: Attributes Marfa adds to everything it exports, as comma-separated `key=value` pairs with percent-encoded values. One named here replaces Marfa's own of the same name, such as `service.version`. An archive doesn't carry it.
                     ///   - secretsSet: The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link. Absent: the server's default applies.
                     ///   - maxBulkRequestBytes: The largest body the bulk operations accept, in bytes, and the largest row a restore reads. The most you can set is 33554432, half the 67108864 bytes a restore reads on one archive line. Absent: the server's default applies.
@@ -166739,9 +167003,20 @@ public enum Operations {
                         allowPrivateAddresses: Swift.Bool? = nil,
                         objectStoreSecretAccessKey: Swift.String? = nil,
                         heartbeatUrl: Swift.String? = nil,
-                        errorWebhookUrl: Swift.String? = nil,
                         posthogHost: Swift.String? = nil,
                         posthogProjectToken: Swift.String? = nil,
+                        telemetryEnabled: Swift.Bool? = nil,
+                        otelExporterOtlpEndpoint: Swift.String? = nil,
+                        otelExporterOtlpTracesEndpoint: Swift.String? = nil,
+                        otelExporterOtlpLogsEndpoint: Swift.String? = nil,
+                        otelExporterOtlpMetricsEndpoint: Swift.String? = nil,
+                        otelExporterOtlpHeaders: Swift.String? = nil,
+                        otelExporterOtlpTracesHeaders: Swift.String? = nil,
+                        otelExporterOtlpLogsHeaders: Swift.String? = nil,
+                        otelExporterOtlpMetricsHeaders: Swift.String? = nil,
+                        otelSampleRatio: Swift.Double? = nil,
+                        otelServiceName: Swift.String? = nil,
+                        otelResourceAttributes: Swift.String? = nil,
                         secretsSet: [Swift.String]? = nil,
                         maxRequestBytes: Swift.Int? = nil,
                         maxBulkRequestBytes: Swift.Int? = nil,
@@ -166807,9 +167082,20 @@ public enum Operations {
                         self.allowPrivateAddresses = allowPrivateAddresses
                         self.objectStoreSecretAccessKey = objectStoreSecretAccessKey
                         self.heartbeatUrl = heartbeatUrl
-                        self.errorWebhookUrl = errorWebhookUrl
                         self.posthogHost = posthogHost
                         self.posthogProjectToken = posthogProjectToken
+                        self.telemetryEnabled = telemetryEnabled
+                        self.otelExporterOtlpEndpoint = otelExporterOtlpEndpoint
+                        self.otelExporterOtlpTracesEndpoint = otelExporterOtlpTracesEndpoint
+                        self.otelExporterOtlpLogsEndpoint = otelExporterOtlpLogsEndpoint
+                        self.otelExporterOtlpMetricsEndpoint = otelExporterOtlpMetricsEndpoint
+                        self.otelExporterOtlpHeaders = otelExporterOtlpHeaders
+                        self.otelExporterOtlpTracesHeaders = otelExporterOtlpTracesHeaders
+                        self.otelExporterOtlpLogsHeaders = otelExporterOtlpLogsHeaders
+                        self.otelExporterOtlpMetricsHeaders = otelExporterOtlpMetricsHeaders
+                        self.otelSampleRatio = otelSampleRatio
+                        self.otelServiceName = otelServiceName
+                        self.otelResourceAttributes = otelResourceAttributes
                         self.secretsSet = secretsSet
                         self.maxRequestBytes = maxRequestBytes
                         self.maxBulkRequestBytes = maxBulkRequestBytes
@@ -166876,9 +167162,20 @@ public enum Operations {
                         case allowPrivateAddresses = "allow_private_addresses"
                         case objectStoreSecretAccessKey = "object_store_secret_access_key"
                         case heartbeatUrl = "heartbeat_url"
-                        case errorWebhookUrl = "error_webhook_url"
                         case posthogHost = "posthog_host"
                         case posthogProjectToken = "posthog_project_token"
+                        case telemetryEnabled = "telemetry_enabled"
+                        case otelExporterOtlpEndpoint = "otel_exporter_otlp_endpoint"
+                        case otelExporterOtlpTracesEndpoint = "otel_exporter_otlp_traces_endpoint"
+                        case otelExporterOtlpLogsEndpoint = "otel_exporter_otlp_logs_endpoint"
+                        case otelExporterOtlpMetricsEndpoint = "otel_exporter_otlp_metrics_endpoint"
+                        case otelExporterOtlpHeaders = "otel_exporter_otlp_headers"
+                        case otelExporterOtlpTracesHeaders = "otel_exporter_otlp_traces_headers"
+                        case otelExporterOtlpLogsHeaders = "otel_exporter_otlp_logs_headers"
+                        case otelExporterOtlpMetricsHeaders = "otel_exporter_otlp_metrics_headers"
+                        case otelSampleRatio = "otel_sample_ratio"
+                        case otelServiceName = "otel_service_name"
+                        case otelResourceAttributes = "otel_resource_attributes"
                         case secretsSet = "secrets_set"
                         case maxRequestBytes = "max_request_bytes"
                         case maxBulkRequestBytes = "max_bulk_request_bytes"
@@ -167042,10 +167339,6 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .heartbeatUrl
                         )
-                        self.errorWebhookUrl = try container.decodeIfPresent(
-                            Swift.String.self,
-                            forKey: .errorWebhookUrl
-                        )
                         self.posthogHost = try container.decodeIfPresent(
                             Swift.String.self,
                             forKey: .posthogHost
@@ -167053,6 +167346,54 @@ public enum Operations {
                         self.posthogProjectToken = try container.decodeIfPresent(
                             Swift.String.self,
                             forKey: .posthogProjectToken
+                        )
+                        self.telemetryEnabled = try container.decodeIfPresent(
+                            Swift.Bool.self,
+                            forKey: .telemetryEnabled
+                        )
+                        self.otelExporterOtlpEndpoint = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpEndpoint
+                        )
+                        self.otelExporterOtlpTracesEndpoint = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpTracesEndpoint
+                        )
+                        self.otelExporterOtlpLogsEndpoint = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpLogsEndpoint
+                        )
+                        self.otelExporterOtlpMetricsEndpoint = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpMetricsEndpoint
+                        )
+                        self.otelExporterOtlpHeaders = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpHeaders
+                        )
+                        self.otelExporterOtlpTracesHeaders = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpTracesHeaders
+                        )
+                        self.otelExporterOtlpLogsHeaders = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpLogsHeaders
+                        )
+                        self.otelExporterOtlpMetricsHeaders = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelExporterOtlpMetricsHeaders
+                        )
+                        self.otelSampleRatio = try container.decodeIfPresent(
+                            Swift.Double.self,
+                            forKey: .otelSampleRatio
+                        )
+                        self.otelServiceName = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelServiceName
+                        )
+                        self.otelResourceAttributes = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .otelResourceAttributes
                         )
                         self.secretsSet = try container.decodeIfPresent(
                             [Swift.String].self,
@@ -167215,9 +167556,20 @@ public enum Operations {
                             "allow_private_addresses",
                             "object_store_secret_access_key",
                             "heartbeat_url",
-                            "error_webhook_url",
                             "posthog_host",
                             "posthog_project_token",
+                            "telemetry_enabled",
+                            "otel_exporter_otlp_endpoint",
+                            "otel_exporter_otlp_traces_endpoint",
+                            "otel_exporter_otlp_logs_endpoint",
+                            "otel_exporter_otlp_metrics_endpoint",
+                            "otel_exporter_otlp_headers",
+                            "otel_exporter_otlp_traces_headers",
+                            "otel_exporter_otlp_logs_headers",
+                            "otel_exporter_otlp_metrics_headers",
+                            "otel_sample_ratio",
+                            "otel_service_name",
+                            "otel_resource_attributes",
                             "secrets_set",
                             "max_request_bytes",
                             "max_bulk_request_bytes",
@@ -167456,7 +167808,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/responses/401/headers/WWW-Authenticate`.
                     public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
@@ -167466,7 +167818,7 @@ public enum Operations {
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -167514,7 +167866,7 @@ public enum Operations {
                 }
             }
             /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
-            /// - `insufficient_user_authentication`: your app's owner signed in more than five minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
+            /// - `insufficient_user_authentication`: your app's owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//config/put(replaceConfig)/responses/401`.
             ///
@@ -179879,7 +180231,7 @@ public enum Operations {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -180474,7 +180826,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/restore/POST/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     ///
                     /// - Remark: Generated from `#/paths/restore/POST/responses/401/headers/WWW-Authenticate`.
                     public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
@@ -180484,7 +180836,7 @@ public enum Operations {
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -180532,7 +180884,7 @@ public enum Operations {
                 }
             }
             /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
-            /// - `insufficient_user_authentication`: your app's owner signed in more than five minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
+            /// - `insufficient_user_authentication`: your app's owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/401`.
             ///
@@ -184649,7 +185001,7 @@ public enum Operations {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -185308,7 +185660,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
-                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     ///
                     /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/401/headers/WWW-Authenticate`.
                     public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
@@ -185318,7 +185670,7 @@ public enum Operations {
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
@@ -185366,7 +185718,7 @@ public enum Operations {
                 }
             }
             /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
-            /// - `insufficient_user_authentication`: your app's owner signed in more than five minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
+            /// - `insufficient_user_authentication`: your app's owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)/responses/401`.
             ///

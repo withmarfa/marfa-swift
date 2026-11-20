@@ -276,29 +276,37 @@ extension InMemoryCore {
 
     func addTag(id: String, tag: String) throws -> QueuedWrite {
         try Checks.tags([tag])
-        return try tagged(id, .addTag, tag: tag, body: Self.tags([tag]), .add(tag))
+        return try tagged(id, .addTag, tag: tag, .add(tag)) { _ in Self.tags([tag]) }
     }
 
     func removeTag(id: String, tag: String) throws -> QueuedWrite {
-        try tagged(id, .removeTag, tag: tag, body: JsonObject(), .remove(tag))
+        try tagged(id, .removeTag, tag: tag, .remove(tag)) { _ in JsonObject() }
     }
 
     func replaceTags(id: String, tags: [String]) throws -> QueuedWrite {
         try Checks.tags(tags)
-        return try tagged(id, .replaceTags, tag: nil, body: Self.tags(tags), .replace(tags))
+        return try tagged(id, .replaceTags, tag: nil, .replace(tags)) { read in
+            var body = Self.tags(tags)
+            body.members.append(JsonMember(key: "read_tags", value: .array(read.map { .string($0) })))
+            return body
+        }
     }
 
+    /// `body` answers the write's payload from the tags the copy held before the change.
     private func tagged(
-        _ id: String, _ kind: WriteKind, tag: String?, body: JsonObject, _ change: InMemoryCore.TagChange
+        _ id: String, _ kind: WriteKind, tag: String?, _ change: InMemoryCore.TagChange,
+        body: ([String]) -> JsonObject
     ) throws -> QueuedWrite {
         try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
+            let read = held.tags
             let before = held.tags.count
             held.tags = Self.applying(change, to: held.tags)
             try Checks.tagCount(before: before, after: held.tags.count)
             state.items[id] = held
             return state.append(
-                kind, item: id, tag: tag, body: body, dependsOn: state.pendingCreates(of: id), effect: .tags(change))
+                kind, item: id, tag: tag, body: body(read), dependsOn: state.pendingCreates(of: id),
+                effect: .tags(change))
         }
     }
 

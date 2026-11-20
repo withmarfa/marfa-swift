@@ -136,25 +136,37 @@ struct ClientTests {
         #expect(target.requests.isEmpty)
     }
 
+    @Test func aRefusalCarriesTheRequestIdTheServerStampedOnIt() async {
+        let stamped = ScriptedAuthServer.Reply.json(
+            404, ["error": ["code": "not_found", "message": "scripted not_found"]],
+            headers: contract.merging(["X-Request-ID": "req-7"]) { $1 })
+        let scripted = ScriptedAuthServer { _ in stamped }
+        let error = await failure { try await client(scripted).listTags() }
+        #expect(error?.server?.requestId == "req-7", "\(String(describing: error))")
+        let bare = ScriptedAuthServer { _ in refused(404, "not_found") }
+        let unstamped = await failure { try await client(bare).listTags() }
+        #expect(unstamped?.server?.requestId == nil, "\(String(describing: unstamped))")
+    }
+
     @Test func aConflictAndAnotherInstanceArriveAsTheWorkingCopyNamesThem() async {
         let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
             (
                 refused(409, "version_conflict"),
                 .versionConflict(
                     message: "scripted version_conflict",
-                    server: ServerAnswer(status: 409, code: "version_conflict", details: nil))
+                    server: ServerAnswer(status: 409, code: "version_conflict", details: nil, requestId: nil))
             ),
             (
                 refused(409, "instance_changed"),
                 .instanceChanged(
                     message: "scripted instance_changed",
-                    server: ServerAnswer(status: 409, code: "instance_changed", details: nil))
+                    server: ServerAnswer(status: 409, code: "instance_changed", details: nil, requestId: nil))
             ),
             (
                 refused(409, "conflict"),
                 .server(
                     status: 409, code: "conflict", message: "scripted conflict", details: nil,
-                    server: ServerAnswer(status: 409, code: "conflict", details: nil))
+                    server: ServerAnswer(status: 409, code: "conflict", details: nil, requestId: nil))
             ),
         ]
         for (reply, expected) in answers {
