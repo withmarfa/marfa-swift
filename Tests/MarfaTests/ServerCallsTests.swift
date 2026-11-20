@@ -52,6 +52,22 @@ private let versions = """
 
 @Suite(.timeLimit(.minutes(1)))
 struct ServerCallsTests {
+    @Test func aRefusalOfAServerCallCarriesTheRequestIdTheServerStampedOnIt() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let stamped = ScriptedAuthServer.Reply.json(
+                404, ["error": ["code": "not_found", "message": "scripted not_found"]],
+                headers: contract.merging(["X-Request-ID": "req-9"]) { $1 })
+            let scripted = ScriptedAuthServer { _ in stamped }
+            let server = try signedIn(scripted, keychain)
+            let error = await failure { try await server.snapshots(ofItem: "i1") }
+            #expect(error?.server?.requestId == "req-9", "\(String(describing: error))")
+            let bare = ScriptedAuthServer { _ in refused(404, "not_found") }
+            let plain = try signedIn(bare, keychain)
+            let unstamped = await failure { try await plain.snapshots(ofItem: "i1") }
+            #expect(unstamped?.server != nil && unstamped?.server?.requestId == nil, "\(String(describing: unstamped))")
+        }
+    }
+
     @Test func snapshotsReadOnePageWithTheCursorAndLimitSent() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer { _ in reply(versions) }

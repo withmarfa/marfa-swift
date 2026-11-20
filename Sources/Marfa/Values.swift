@@ -516,7 +516,7 @@ public struct ServerAnswer: Sendable, Hashable {
     /// The server's `X-Request-ID`, which a report of a problem can quote. `nil` where the server sent none.
     public var requestId: String?
 
-    public init(status: UInt16, code: String?, details: JSONValue?, requestId: String? = nil) {
+    public init(status: UInt16, code: String?, details: JSONValue?, requestId: String?) {
         self.status = status
         self.code = code
         self.details = details

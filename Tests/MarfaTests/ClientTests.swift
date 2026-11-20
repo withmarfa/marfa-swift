@@ -154,19 +154,19 @@ struct ClientTests {
                 refused(409, "version_conflict"),
                 .versionConflict(
                     message: "scripted version_conflict",
-                    server: ServerAnswer(status: 409, code: "version_conflict", details: nil))
+                    server: ServerAnswer(status: 409, code: "version_conflict", details: nil, requestId: nil))
             ),
             (
                 refused(409, "instance_changed"),
                 .instanceChanged(
                     message: "scripted instance_changed",
-                    server: ServerAnswer(status: 409, code: "instance_changed", details: nil))
+                    server: ServerAnswer(status: 409, code: "instance_changed", details: nil, requestId: nil))
             ),
             (
                 refused(409, "conflict"),
                 .server(
                     status: 409, code: "conflict", message: "scripted conflict", details: nil,
-                    server: ServerAnswer(status: 409, code: "conflict", details: nil))
+                    server: ServerAnswer(status: 409, code: "conflict", details: nil, requestId: nil))
             ),
         ]
         for (reply, expected) in answers {

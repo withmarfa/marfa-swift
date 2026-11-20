@@ -288,7 +288,8 @@ struct Errors {
                     requestId: nil)),
             .trashPlanChanged(
                 message: "m",
-                server: Marfa.ServerAnswer(status: 409, code: "trash_plan_changed", details: .object(["digest": "d"])))
+                server: Marfa.ServerAnswer(
+                    status: 409, code: "trash_plan_changed", details: .object(["digest": "d"]), requestId: nil))
         ),
         (
             .Server(
@@ -318,7 +319,8 @@ struct Errors {
                     requestId: nil)),
             .server(
                 status: 413, code: "payload_too_large", message: "m", details: .object(["limit": "9"]),
-                server: Marfa.ServerAnswer(status: 413, code: "payload_too_large", details: .object(["limit": "9"])))
+                server: Marfa.ServerAnswer(
+                    status: 413, code: "payload_too_large", details: .object(["limit": "9"]), requestId: nil))
         ),
     ]
 
