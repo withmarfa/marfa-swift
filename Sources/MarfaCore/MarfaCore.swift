@@ -19218,8 +19218,8 @@ public func removeStoreLosingAll(path: String)throws   {try rustCallWithError(Ff
 }
 /**
  * Sets aside the store at `path`, which `open` refuses with `StoreDamaged`:
- * moves it and its logs to `<path>.damaged-<n>` beside it, never deleting
- * them, and makes a new store at `path` that carries every write its queue
+ * moves it and its logs to `<path>.damaged-<n>` beside it (beside the file
+ * a symbolic link at `path` leads to), never deleting them, and makes a new store at `path` that carries every write its queue
  * lets be read, under its id and idempotency key, with its body, base
  * version and verdict, and the server and instance it was built from. Drop
  * every `Core` on the store first. The new store holds no copy: hydrate it,
@@ -19305,7 +19305,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_func_remove_store_losing_all() != 34447) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_func_set_aside_damaged() != 15762) {
+    if (uniffi_marfa_core_ffi_checksum_func_set_aside_damaged() != 32017) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_func_decode_filter() != 57210) {

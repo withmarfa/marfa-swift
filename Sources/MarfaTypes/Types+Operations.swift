@@ -164295,7 +164295,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/enrichment_ocr_enabled`.
                     public var enrichmentOcrEnabled: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
-                    /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies. `null` removes it, so the server's default applies.
+                    /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/error_reporting_enabled`.
                     public var errorReportingEnabled: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
@@ -164383,7 +164383,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/object_store_access_key_id`.
                     public var objectStoreAccessKeyId: Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54?
-                    /// `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
+                    /// `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/allow_private_addresses`.
                     public var allowPrivateAddresses: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754?
@@ -164399,6 +164399,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/error_webhook_url`.
                     public var errorWebhookUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+                    /// The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/posthog_host`.
+                    public var posthogHost: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55?
+                    /// The PostHog project token Marfa sends its fault reports with, with no whitespace around it. It needs `posthog_host` set too. Marfa never returns it. `null` or an empty string removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/posthog_project_token`.
+                    public var posthogProjectToken: Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54?
                     /// The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/secrets_set`.
@@ -164537,7 +164545,7 @@ public enum Operations {
                     ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement. `null` removes it, so the server's default applies.
                     ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies. `null` removes it, so the server's default applies.
-                    ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies. `null` removes it, so the server's default applies.
+                    ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies. `null` removes it, so the server's default applies.
                     ///   - instanceId: This instance's ID, accepted so you can send back what `GET /config` returned. It sets nothing.
                     ///   - name: The instance's display name. `null` removes it, so the server's default applies.
@@ -164559,10 +164567,12 @@ public enum Operations {
                     ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`. `null` removes it, so the server's default applies.
                     ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`. `null` removes it, so the server's default applies.
                     ///   - objectStoreAccessKeyId: The access key ID for the object store. `null` removes it, so the server's default applies.
-                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
+                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`. `null` removes it, so the server's default applies.
                     ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. `null` or an empty string removes it, and so does a change to `object_store_bucket` or `object_store_endpoint` that doesn't set it.
                     ///   - heartbeatUrl: The `http` or `https` URL Marfa requests on a schedule, so that something else can notice when the requests stop. Marfa never returns it. `null` or an empty string removes it.
                     ///   - errorWebhookUrl: The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - posthogHost: The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. `null` or an empty string removes it.
+                    ///   - posthogProjectToken: The PostHog project token Marfa sends its fault reports with, with no whitespace around it. It needs `posthog_host` set too. Marfa never returns it. `null` or an empty string removes it.
                     ///   - secretsSet: The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link. `null` removes it, so the server's default applies.
                     ///   - maxBulkRequestBytes: The largest body the bulk operations accept, in bytes, and the largest row a restore reads. The most you can set is 33554432, half the 67108864 bytes a restore reads on one archive line. `null` removes it, so the server's default applies.
@@ -164629,6 +164639,8 @@ public enum Operations {
                         objectStoreSecretAccessKey: Components.Schemas.MarfaNullableMarfaInline66f34441032fb10a? = nil,
                         heartbeatUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
                         errorWebhookUrl: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
+                        posthogHost: Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55? = nil,
+                        posthogProjectToken: Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54? = nil,
                         secretsSet: [Swift.String]? = nil,
                         maxRequestBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d? = nil,
                         maxBulkRequestBytes: Components.Schemas.MarfaNullableMarfaInlineb7a5eebe6656cb32? = nil,
@@ -164695,6 +164707,8 @@ public enum Operations {
                         self.objectStoreSecretAccessKey = objectStoreSecretAccessKey
                         self.heartbeatUrl = heartbeatUrl
                         self.errorWebhookUrl = errorWebhookUrl
+                        self.posthogHost = posthogHost
+                        self.posthogProjectToken = posthogProjectToken
                         self.secretsSet = secretsSet
                         self.maxRequestBytes = maxRequestBytes
                         self.maxBulkRequestBytes = maxBulkRequestBytes
@@ -164762,6 +164776,8 @@ public enum Operations {
                         case objectStoreSecretAccessKey = "object_store_secret_access_key"
                         case heartbeatUrl = "heartbeat_url"
                         case errorWebhookUrl = "error_webhook_url"
+                        case posthogHost = "posthog_host"
+                        case posthogProjectToken = "posthog_project_token"
                         case secretsSet = "secrets_set"
                         case maxRequestBytes = "max_request_bytes"
                         case maxBulkRequestBytes = "max_bulk_request_bytes"
@@ -164929,6 +164945,14 @@ public enum Operations {
                             Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
                             forKey: .errorWebhookUrl
                         )
+                        self.posthogHost = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinef9757109fae32f55.self,
+                            forKey: .posthogHost
+                        )
+                        self.posthogProjectToken = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInlinef9d1ebbef8c9bb54.self,
+                            forKey: .posthogProjectToken
+                        )
                         self.secretsSet = try container.decodeIfPresent(
                             [Swift.String].self,
                             forKey: .secretsSet
@@ -165091,6 +165115,8 @@ public enum Operations {
                             "object_store_secret_access_key",
                             "heartbeat_url",
                             "error_webhook_url",
+                            "posthog_host",
+                            "posthog_project_token",
                             "secrets_set",
                             "max_request_bytes",
                             "max_bulk_request_bytes",
@@ -166317,7 +166343,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/enrichment_ocr_enabled`.
                     public var enrichmentOcrEnabled: Swift.Bool?
-                    /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies.
+                    /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/error_reporting_enabled`.
                     public var errorReportingEnabled: Swift.Bool?
@@ -166458,7 +166484,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/object_store_access_key_id`.
                     public var objectStoreAccessKeyId: Swift.String?
-                    /// `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+                    /// `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/allow_private_addresses`.
                     public var allowPrivateAddresses: Swift.Bool?
@@ -166474,6 +166500,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/error_webhook_url`.
                     public var errorWebhookUrl: Swift.String?
+                    /// The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/posthog_host`.
+                    public var posthogHost: Swift.String?
+                    /// The PostHog project token Marfa sends its fault reports with, with no whitespace around it. It needs `posthog_host` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/posthog_project_token`.
+                    public var posthogProjectToken: Swift.String?
                     /// The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/secrets_set`.
@@ -166613,7 +166647,7 @@ public enum Operations {
                     ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement.
                     ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
                     ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
-                    ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies.
+                    ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
                     ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
                     ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
                     ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
@@ -166634,10 +166668,12 @@ public enum Operations {
                     ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
                     ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
                     ///   - objectStoreAccessKeyId: The access key ID for the object store.
-                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+                    ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
                     ///   - objectStoreSecretAccessKey: The secret access key for the object store, with no whitespace around it. Marfa never returns it. A `PUT` that leaves it out keeps it, unless the `PUT` changes `object_store_bucket` or `object_store_endpoint`; `PATCH` with `null` removes it.
                     ///   - heartbeatUrl: The `http` or `https` URL Marfa requests on a schedule, so that something else can notice when the requests stop. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///   - errorWebhookUrl: The `http` or `https` URL Marfa posts a notice to when a request fails with a 500 error. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - posthogHost: The PostHog host Marfa sends a report of each of its own faults to, for PostHog's error tracking. It must be an `https` URL, or an `http` URL on this machine, with no user name or password, and it needs `posthog_project_token` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
+                    ///   - posthogProjectToken: The PostHog project token Marfa sends its fault reports with, with no whitespace around it. It needs `posthog_host` set too. Marfa never returns it. A `PUT` that leaves it out keeps it; `PATCH` with `null` removes it.
                     ///   - secretsSet: The secret settings `GET /config` says are set, accepted so you can send back what it returned. It sets nothing.
                     ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link. Absent: the server's default applies.
                     ///   - maxBulkRequestBytes: The largest body the bulk operations accept, in bytes, and the largest row a restore reads. The most you can set is 33554432, half the 67108864 bytes a restore reads on one archive line. Absent: the server's default applies.
@@ -166704,6 +166740,8 @@ public enum Operations {
                         objectStoreSecretAccessKey: Swift.String? = nil,
                         heartbeatUrl: Swift.String? = nil,
                         errorWebhookUrl: Swift.String? = nil,
+                        posthogHost: Swift.String? = nil,
+                        posthogProjectToken: Swift.String? = nil,
                         secretsSet: [Swift.String]? = nil,
                         maxRequestBytes: Swift.Int? = nil,
                         maxBulkRequestBytes: Swift.Int? = nil,
@@ -166770,6 +166808,8 @@ public enum Operations {
                         self.objectStoreSecretAccessKey = objectStoreSecretAccessKey
                         self.heartbeatUrl = heartbeatUrl
                         self.errorWebhookUrl = errorWebhookUrl
+                        self.posthogHost = posthogHost
+                        self.posthogProjectToken = posthogProjectToken
                         self.secretsSet = secretsSet
                         self.maxRequestBytes = maxRequestBytes
                         self.maxBulkRequestBytes = maxBulkRequestBytes
@@ -166837,6 +166877,8 @@ public enum Operations {
                         case objectStoreSecretAccessKey = "object_store_secret_access_key"
                         case heartbeatUrl = "heartbeat_url"
                         case errorWebhookUrl = "error_webhook_url"
+                        case posthogHost = "posthog_host"
+                        case posthogProjectToken = "posthog_project_token"
                         case secretsSet = "secrets_set"
                         case maxRequestBytes = "max_request_bytes"
                         case maxBulkRequestBytes = "max_bulk_request_bytes"
@@ -167004,6 +167046,14 @@ public enum Operations {
                             Swift.String.self,
                             forKey: .errorWebhookUrl
                         )
+                        self.posthogHost = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .posthogHost
+                        )
+                        self.posthogProjectToken = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .posthogProjectToken
+                        )
                         self.secretsSet = try container.decodeIfPresent(
                             [Swift.String].self,
                             forKey: .secretsSet
@@ -167166,6 +167216,8 @@ public enum Operations {
                             "object_store_secret_access_key",
                             "heartbeat_url",
                             "error_webhook_url",
+                            "posthog_host",
+                            "posthog_project_token",
                             "secrets_set",
                             "max_request_bytes",
                             "max_bulk_request_bytes",
@@ -180053,7 +180105,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/settings_dropped`.
                         public var settingsDropped: [Swift.String]
-                        /// The reporting switches Marfa stored as on that send nothing, because no receiver is configured where Marfa runs: `heartbeat_enabled` and `error_reporting_enabled`.
+                        /// The reporting switches Marfa stored as on that send nothing, because no receiver is set: `heartbeat_enabled` and `error_reporting_enabled`.
                         ///
                         /// - Remark: Generated from `#/paths/restore/POST/responses/200/content/json/settings_without_receiver`.
                         public var settingsWithoutReceiver: [Swift.String]
@@ -180144,7 +180196,7 @@ public enum Operations {
                         ///   - settingsAdded: How many settings Marfa stored, for settings the instance had not stored.
                         ///   - settingsSkipped: How many settings Marfa skipped because the instance already stores them.
                         ///   - settingsDropped: The names of the settings the archive carried that this instance does not have. Marfa left them out and stored nothing for them.
-                        ///   - settingsWithoutReceiver: The reporting switches Marfa stored as on that send nothing, because no receiver is configured where Marfa runs: `heartbeat_enabled` and `error_reporting_enabled`.
+                        ///   - settingsWithoutReceiver: The reporting switches Marfa stored as on that send nothing, because no receiver is set: `heartbeat_enabled` and `error_reporting_enabled`.
                         ///   - enforcementAdded: The archive's enforcement settings Marfa stored, each one the instance didn't store.
                         ///   - enforcementSkipped: The archive's enforcement settings Marfa skipped, because the instance already stores each one or stores enforcement settings that don't read.
                         ///   - connectorStatesAdded: How many connector state documents Marfa stored, for sources the instance held none for.
@@ -184850,7 +184902,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/200/content/json/settings_dropped`.
                         public var settingsDropped: [Swift.String]
-                        /// The reporting switches Marfa stored as on that send nothing, because no receiver is configured where Marfa runs: `heartbeat_enabled` and `error_reporting_enabled`.
+                        /// The reporting switches Marfa stored as on that send nothing, because no receiver is set: `heartbeat_enabled` and `error_reporting_enabled`.
                         ///
                         /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/200/content/json/settings_without_receiver`.
                         public var settingsWithoutReceiver: [Swift.String]
@@ -184974,7 +185026,7 @@ public enum Operations {
                         ///   - settingsAdded: How many settings Marfa stored, for settings the instance had not stored.
                         ///   - settingsSkipped: How many settings Marfa skipped because the instance already stores them.
                         ///   - settingsDropped: The names of the settings the archive carried that this instance does not have. Marfa left them out and stored nothing for them.
-                        ///   - settingsWithoutReceiver: The reporting switches Marfa stored as on that send nothing, because no receiver is configured where Marfa runs: `heartbeat_enabled` and `error_reporting_enabled`.
+                        ///   - settingsWithoutReceiver: The reporting switches Marfa stored as on that send nothing, because no receiver is set: `heartbeat_enabled` and `error_reporting_enabled`.
                         ///   - enforcementAdded: The archive's enforcement settings Marfa stored, each one the instance didn't store.
                         ///   - enforcementSkipped: The archive's enforcement settings Marfa skipped, because the instance already stores each one or stores enforcement settings that don't read.
                         ///   - connectorStatesAdded: How many connector state documents Marfa stored, for sources the instance held none for.

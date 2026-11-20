@@ -16255,7 +16255,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/enrichment_ocr_enabled`.
             public var enrichmentOcrEnabled: Swift.Bool?
-            /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies.
+            /// `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/error_reporting_enabled`.
             public var errorReportingEnabled: Swift.Bool?
@@ -16368,7 +16368,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/object_store_access_key_id`.
             public var objectStoreAccessKeyId: Swift.String?
-            /// `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+            /// `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/allow_private_addresses`.
             public var allowPrivateAddresses: Swift.Bool?
@@ -16515,7 +16515,7 @@ extension Components {
             ///   - grantInactivityDays: Disconnect apps unused for this many days. Zero disables retirement.
             ///   - enrichmentEnabled: `true` if Marfa reads text and dimensions from files. An active extraction can finish after disabling. Absent: the environment default applies.
             ///   - enrichmentOcrEnabled: `true` if file reading includes image text. Enabling reconsiders previously skipped images. Absent: the environment default applies.
-            ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url` or an exception receiver configured where Marfa runs. Absent: the environment default applies.
+            ///   - errorReportingEnabled: `true` if error alerts and exception reports are sent. Enabling requires `error_webhook_url`, or both `posthog_host` and `posthog_project_token`. Absent: the environment default applies.
             ///   - heartbeatEnabled: `true` if scheduled heartbeat requests are sent. Enabling requires `heartbeat_url`. Absent: the environment default applies.
             ///   - name: The instance's display name, without control or bidirectional formatting characters. Spaces at each end are trimmed. Absent: `Marfa`.
             ///   - enforcement: The instance's enforcement levers. Each applies to every credential that doesn't set the same lever itself. Absent: no lever is on.
@@ -16534,7 +16534,7 @@ extension Components {
             ///   - objectStorePathStyle: `true` if the store at `object_store_endpoint` is addressed by path. `false` puts the bucket, as lowercase host labels, before the endpoint's host, a name without the bucket. Changing it needs a sign-in from the last five minutes. Absent: `true`.
             ///   - objectStorePrefix: The folder in the bucket Marfa keeps files and backups under, as `/`-joined segments. Changing it needs a sign-in from the last five minutes. Absent: `marfa`.
             ///   - objectStoreAccessKeyId: The access key ID for the object store.
-            ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
+            ///   - allowPrivateAddresses: `true` if Marfa may send webhooks, the heartbeat, error notices, exception reports and object store requests to loopback, private and other addresses that aren't public. Changing it needs a sign-in from the last five minutes. Absent: `false`.
             ///   - secretsSet: The key of each secret setting stored with a value Marfa can read, present only while one is. Marfa never returns a secret's value.
             ///   - signInMoved: What the move did and what the owner does next. Present only in the answer to the write that moved the sign-in address.
             ///   - maxRequestBytes: The largest request body Marfa accepts, in bytes. Marfa waits 180 seconds for a body, so a body over about 21 MiB can't arrive in time over a 1 Mbit/s link.
