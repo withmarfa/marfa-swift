@@ -1,0 +1,8 @@
+# Paths that may name the analytics vendor in shipped code, one exact path per
+# line: the path, a tab, then why. check-vendor.sh fails when a path listed here
+# no longer exists, and does not read this file.
+Sources/MarfaBrandIcons/SimpleIcons.xcassets/simple-icons-posthog.imageset/Contents.json	a brand icon an item can show, not telemetry
+Sources/MarfaBrandIcons/SimpleIcons.xcassets/simple-icons-posthog.imageset/posthog.svg	the artwork of that brand icon, not telemetry
+Sources/MarfaBrandIcons/SimpleIconsIconSet.swift	the list of those brand icons, not telemetry
+Sources/MarfaTypes/Types+Components+Schemas.swift	generated from the server's OpenAPI, which names the server's own settings
+Sources/MarfaTypes/Types+Operations.swift	generated from the server's OpenAPI, which names the server's own settings
