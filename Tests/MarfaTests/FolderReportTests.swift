@@ -8,7 +8,7 @@ import Testing
 /// A core pass with nothing in it, for a test to set what it looks at.
 private func corePass(
     drain: MarfaCore.DrainReport = coreDrain(), flagged: [MarfaCore.FlaggedFile] = [], removed: UInt64 = 0,
-    purged: UInt64 = 0, unchanged: UInt64 = 0, waiting: UInt64 = 0
+    purged: UInt64 = 0, unchanged: UInt64 = 0, waiting: UInt64 = 0, busy: UInt64 = 0
 ) -> MarfaCore.FolderPass {
     MarfaCore.FolderPass(
         settings: MarfaCore.SettingsFileOutcome(sent: false, written: false, flagged: nil, unwritten: nil),
@@ -20,7 +20,7 @@ private func corePass(
         drain: drain, rebased: 0, gaveWay: 0,
         pull: MarfaCore.FolderPull(
             written: 0, rewritten: 0, moved: 0, unchanged: 0, skipped: 0, removed: removed, purged: purged, kept: 0,
-            unwritten: 0,
+            unwritten: 0, busy: busy,
             absent: 0, unplaced: 0, unmatched: 0, paused: 0, rootGone: nil),
         flagged: flagged)
 }
@@ -38,6 +38,11 @@ private func coreDrain(
     #expect(pass.pull?.removed == 5)
     #expect(pass.pull?.purged == 2, "of the removed, not on top of them")
     #expect(Marfa.FolderPass(corePass()).pull?.purged == 0)
+}
+
+@Test func aPassSaysHowManyFilesItLeftBecauseAProgramHoldsThemOpen() {
+    #expect(Marfa.FolderPass(corePass(busy: 3)).pull?.busy == 3)
+    #expect(Marfa.FolderPass(corePass()).pull?.busy == 0)
 }
 
 @Test func aPassCountsFilesWithAWriteWaitingApartFromUnchangedOnes() {

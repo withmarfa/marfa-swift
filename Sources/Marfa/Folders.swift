@@ -726,6 +726,9 @@ public struct FolderPull: Sendable, Hashable {
     public let kept: UInt64
     /// Files the folder didn't write, and won't write over.
     public let unwritten: UInt64
+    /// Files left because a program holds them open for writing, which a later pass writes or removes once the
+    /// program closes them.
+    public let busy: UInt64
     /// Items whose bytes couldn't be fetched.
     public let absent: UInt64
     /// Placements the server refused.
@@ -747,6 +750,7 @@ public struct FolderPull: Sendable, Hashable {
         purged = core.purged
         kept = core.kept
         unwritten = core.unwritten
+        busy = core.busy
         absent = core.absent
         unplaced = core.unplaced
         unmatched = core.unmatched
