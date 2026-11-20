@@ -12,11 +12,15 @@ import Synchronization
 /// ``FolderSyncResult/awaitingConfirmation(_:)`` with what the sync will do, and nothing is written into the
 /// directory or sent until `confirmFirstSync(in:)`. `remove(_:)` cancels it and leaves the files.
 ///
+/// `pause(_:)` stops a directory's sync until `resume(_:)`: a watch skips it, and a call that would read the
+/// server's side or write either side, such as `sync(_:)`, throws ``MarfaError/syncPaused(message:)``.
+///
 /// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `confirmFirstSync(in:)`,
-/// `confirmRemoval(in:)`, `restoreRemoval(in:)` or `remove(_:)` finds the folder held by a watch, whether this
-/// app's own or the command-line tool's, it asks the watch to let the folder go and waits up to 10 seconds. A
-/// watch of this app lets it go at the end of the step of its pass under way, tells ``FolderEvent/handedOver``,
-/// and takes the folder back once the call ends, telling ``FolderEvent/takenBack``. A folder that isn't let go in
+/// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` or `resume(_:)` finds the folder held
+/// by a watch, whether this app's own or the command-line tool's, it asks the watch to let the folder go and
+/// waits up to 10 seconds. A watch of this app lets it go at the end of the step of its pass under way, tells
+/// ``FolderEvent/handedOver``, and takes the folder back once the call ends, telling ``FolderEvent/takenBack``;
+/// while the sync is paused it tells ``FolderEvent/paused`` and holds nothing. A folder that isn't let go in
 /// that time throws `MarfaError.readingHandle`, naming the folder. `watch(_:)` doesn't ask: it throws
 /// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
@@ -27,7 +31,7 @@ public struct Folders: Sendable {
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
-    /// `restoreRemoval(in:)` and `remove(_:)` work.
+    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` and `resume(_:)` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -54,6 +58,26 @@ public struct Folders: Sendable {
     public func status(of directory: URL) async throws -> FolderStatus {
         let dir = directory.path(percentEncoded: false)
         return FolderStatus(try await run { folders in try folders.status(dir: dir) })
+    }
+
+    /// Pauses the directory's sync until ``resume(_:)``.
+    ///
+    /// A watch skips the folder, and `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)` and
+    /// `restoreRemoval(in:)` throw ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it
+    /// stands, and the files stay as they are. Returns whether the sync was running.
+    @discardableResult
+    public func pause(_ directory: URL) async throws -> Bool {
+        let dir = directory.path(percentEncoded: false)
+        return try await run { folders in try folders.pause(dir: dir) }
+    }
+
+    /// Lets a paused directory's sync go on.
+    ///
+    /// Returns whether it was paused.
+    @discardableResult
+    public func resume(_ directory: URL) async throws -> Bool {
+        let dir = directory.path(percentEncoded: false)
+        return try await run { folders in try folders.resume(dir: dir) }
     }
 
     /// Syncs the folder once: sends what changed on disk, catches up with the server, writes out what the
@@ -107,7 +131,8 @@ public struct Folders: Sendable {
     /// Starts keeping the folder in step while the app runs, as `marfa folders watch` does.
     ///
     /// Throws at once when the folder can't be opened, such as when another process holds it, and throws
-    /// `MarfaError.firstSyncWaiting` while the folder's first sync waits to be confirmed. Once started, the
+    /// `MarfaError.firstSyncWaiting` while the folder's first sync waits to be confirmed, and
+    /// ``MarfaError/syncPaused(message:)`` while its sync is paused. Once started, the
     /// watch holds the folder until it ends, except while it lets the folder go to a call of ``Folders`` or a
     /// command that asks for it: the watch tells ``FolderEvent/handedOver`` then, and ``FolderEvent/takenBack``
     /// once it has the folder again.
@@ -255,8 +280,12 @@ public enum FolderEvent: Sendable, Hashable {
     /// The watch let the folder go, and another process holds it past the time a caller waits, with no call
     /// asking for it. Reported once. The watch takes the folder back once that process lets it go.
     case heldElsewhere
-    /// The watch took the folder back and keeps it in step again. It follows `handedOver` or `heldElsewhere`,
-    /// and stands in for a second `watching`.
+    /// The directory's sync was paused with ``Folders/pause(_:)``, and the watch let the folder go and waits,
+    /// holding nothing, for ``Folders/resume(_:)``. Reported once for each pause. The watch takes the folder back
+    /// once the pause ends: `takenBack` says so.
+    case paused
+    /// The watch took the folder back and keeps it in step again. It follows `handedOver`, `heldElsewhere` or
+    /// `paused`, and stands in for a second `watching`.
     case takenBack
     /// The call the folder was let go to removed the folder from this Mac, so there is nothing to watch. The
     /// watch ends without an error.
@@ -277,6 +306,7 @@ public enum FolderEvent: Sendable, Hashable {
         case .passed(let pass): self = .passed(FolderPass(pass))
         case .handedOver: self = .handedOver
         case .heldElsewhere: self = .heldElsewhere
+        case .paused: self = .paused
         case .takenBack: self = .takenBack
         case .removed: self = .removed
         case .unlisted: self = .unlisted
@@ -290,14 +320,19 @@ public struct ListedFolder: Sendable, Hashable {
     public var directory: URL
     /// The id of the `system.folder` item whose settings the folder follows.
     public var folderId: String
+    /// The directory's sync is paused with ``Folders/pause(_:)``.
+    public var syncPaused: Bool
 
-    public init(directory: URL, folderId: String) {
+    public init(directory: URL, folderId: String, syncPaused: Bool = false) {
         self.directory = directory
         self.folderId = folderId
+        self.syncPaused = syncPaused
     }
 
     init(_ core: MarfaCore.ListedFolder) {
-        self.init(directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder)
+        self.init(
+            directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder,
+            syncPaused: core.paused)
     }
 }
 
@@ -378,17 +413,27 @@ public struct FolderStatus: Sendable, Hashable {
     public var paused: FolderPaused
     /// Set while the folder's first sync waits for `confirmFirstSync(in:)`.
     public var firstSync: WaitingFirstSync?
+    /// The directory's sync is paused with ``Folders/pause(_:)``, which is not the `paused` removal above.
+    public var syncPaused: Bool
+    /// How many directories a watch last found it could not watch, from the folder's last health report.
+    public var unwatched: UInt64
 
-    public init(files: [FileStatus], paused: FolderPaused = FolderPaused(), firstSync: WaitingFirstSync? = nil) {
+    public init(
+        files: [FileStatus], paused: FolderPaused = FolderPaused(), firstSync: WaitingFirstSync? = nil,
+        syncPaused: Bool = false, unwatched: UInt64 = 0
+    ) {
         self.files = files
         self.paused = paused
         self.firstSync = firstSync
+        self.syncPaused = syncPaused
+        self.unwatched = unwatched
     }
 
     init(_ core: MarfaCore.FolderStatus) {
         self.init(
             files: core.files.map(FileStatus.init), paused: FolderPaused(core.paused),
-            firstSync: core.firstSync.map(WaitingFirstSync.init))
+            firstSync: core.firstSync.map(WaitingFirstSync.init), syncPaused: core.syncPaused,
+            unwatched: core.unwatched)
     }
 }
 

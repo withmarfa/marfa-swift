@@ -500,6 +500,51 @@ extension LiveWorkingCopies {
             try await bounded("the watch to stop", within: 20) { await watch.stop() }
         }
 
+        @Test func aPausedFolderRefusesASyncAndSaysSoInItsStatusAndTheListUntilItIsResumed() async throws {
+            let directory = try await FolderFixture.synced()
+            #expect(try await !folders.status(of: directory).syncPaused)
+            #expect(try await folders.pause(directory), "it was running")
+            #expect(try await !folders.pause(directory), "it was already paused")
+            #expect(try await folders.status(of: directory).syncPaused)
+            let listed = try await folders.list().first { FolderFixture.listed(directory, in: [$0]) }
+            #expect(listed?.syncPaused == true)
+            await #expect {
+                try await folders.sync(directory)
+            } throws: { error in
+                if case .syncPaused = error as? MarfaError { true } else { false }
+            }
+            #expect(try await folders.resume(directory), "it was paused")
+            #expect(try await !folders.resume(directory), "it was already running")
+            #expect(try await !folders.status(of: directory).syncPaused)
+            #expect(try await !(folders.list().first { FolderFixture.listed(directory, in: [$0]) }?.syncPaused ?? true))
+            _ = try await FolderFixture.sync(directory)
+        }
+
+        @Test func aWatchTellsPausedWhenTheFolderIsPausedAndTakesTheFolderBackWhenItIsResumed() async throws {
+            let directory = try await FolderFixture.synced()
+            let watch = try await folders.watch(directory)
+            let started = WatchStarted()
+            let heard = Task {
+                var events: [FolderEvent] = []
+                for try await event in watch {
+                    started.hear(event)
+                    events.append(event)
+                    if case .takenBack = event { break }
+                }
+                return events
+            }
+            try await started.wait()
+            _ = try await bounded("the pause", within: 30) { try await folders.pause(directory) }
+            try await Task.sleep(for: .seconds(2))
+            _ = try await bounded("the resume", within: 30) { try await folders.resume(directory) }
+            let events = try await bounded("the watch to take the folder back", within: 60) { try await heard.value }
+            let paused = events.firstIndex { if case .paused = $0 { true } else { false } }
+            let takenBack = events.firstIndex { if case .takenBack = $0 { true } else { false } }
+            #expect(paused != nil, "\(events)")
+            if let paused, let takenBack { #expect(paused < takenBack, "\(events)") }
+            try await bounded("the watch to stop", within: 20) { await watch.stop() }
+        }
+
         @Test func removingAFolderTheAppsOwnWatchHoldsEndsTheWatchAfterTellingRemoved() async throws {
             let directory = try await FolderFixture.synced()
             let watch = try await folders.watch(directory)

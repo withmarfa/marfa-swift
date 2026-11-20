@@ -122,6 +122,8 @@ extension MarfaError {
             FixedErrorText(type: "canceled", sentence: "the operation was stopped before it finished")
         case .firstSyncWaiting:
             FixedErrorText(type: "first_sync_waiting", sentence: "a folder's first sync waits for confirmation")
+        case .syncPaused:
+            FixedErrorText(type: "sync_paused", sentence: "a folder's sync is paused")
         case .invalid:
             FixedErrorText(type: "invalid", sentence: "a value was not accepted")
         case .renewalRefused:

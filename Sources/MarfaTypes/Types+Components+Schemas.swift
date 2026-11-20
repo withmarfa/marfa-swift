@@ -15003,7 +15003,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/FolderStatusProblem`.
         public struct FolderStatusProblem: Codable, Hashable, Sendable {
-            /// conflict: unresolved conflict; refused: current refused write; credential_refused: rejected credential; unreadable: unreadable entry; held_file: held file; unavailable: failed sync; root_gone: unavailable root; settings_invalid: invalid settings.
+            /// What is wrong: an unresolved `conflict`, a `refused` write, a `credential_refused`, an `unreadable` entry, a `held_file`, an `unavailable` sync, `root_gone`, `settings_invalid`, an `unwatched` part, or the sync is `paused`.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusProblem/code`.
             @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -15015,8 +15015,10 @@ extension Components {
                 case unavailable = "unavailable"
                 case rootGone = "root_gone"
                 case settingsInvalid = "settings_invalid"
+                case unwatched = "unwatched"
+                case paused = "paused"
             }
-            /// conflict: unresolved conflict; refused: current refused write; credential_refused: rejected credential; unreadable: unreadable entry; held_file: held file; unavailable: failed sync; root_gone: unavailable root; settings_invalid: invalid settings.
+            /// What is wrong: an unresolved `conflict`, a `refused` write, a `credential_refused`, an `unreadable` entry, a `held_file`, an `unavailable` sync, `root_gone`, `settings_invalid`, an `unwatched` part, or the sync is `paused`.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusProblem/code`.
             public var code: Components.Schemas.FolderStatusProblem.CodePayload
@@ -15027,7 +15029,7 @@ extension Components {
             /// Creates a new `FolderStatusProblem`.
             ///
             /// - Parameters:
-            ///   - code: conflict: unresolved conflict; refused: current refused write; credential_refused: rejected credential; unreadable: unreadable entry; held_file: held file; unavailable: failed sync; root_gone: unavailable root; settings_invalid: invalid settings.
+            ///   - code: What is wrong: an unresolved `conflict`, a `refused` write, a `credential_refused`, an `unreadable` entry, a `held_file`, an `unavailable` sync, `root_gone`, `settings_invalid`, an `unwatched` part, or the sync is `paused`.
             ///   - count: The number of current observations with this problem.
             public init(
                 code: Components.Schemas.FolderStatusProblem.CodePayload,

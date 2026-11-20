@@ -3605,6 +3605,15 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     func list() throws  -> [ListedFolder]
     
     /**
+     * Pauses the directory's sync until `resume`: a watch skips it, and
+     * `sync`, `confirm`, `restore` and the other calls that read the
+     * server's side or write either side are refused with `SyncPaused`.
+     * Answers whether it was running. Asks a watch that holds the folder
+     * to let it go, as `add` does.
+     */
+    func pause(dir: String) throws  -> Bool
+    
+    /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
      * still waiting to be confirmed, which this cancels. Follows no symbolic
@@ -3623,6 +3632,13 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * holds the folder to let it go, as `add` does.
      */
     func restore(dir: String) throws  -> RestoredRemoval
+    
+    /**
+     * Lets a paused directory's sync go on. Answers whether it was
+     * paused. Asks a watch that holds the folder to let it go, as `add`
+     * does.
+     */
+    func resume(dir: String) throws  -> Bool
     
     /**
      * Where every file stands, read from the folder's store without asking
@@ -3793,6 +3809,22 @@ open func list()throws  -> [ListedFolder]  {
 }
     
     /**
+     * Pauses the directory's sync until `resume`: a watch skips it, and
+     * `sync`, `confirm`, `restore` and the other calls that read the
+     * server's side or write either side are refused with `SyncPaused`.
+     * Answers whether it was running. Asks a watch that holds the folder
+     * to let it go, as `add` does.
+     */
+open func pause(dir: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_pause(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
      * still waiting to be confirmed, which this cancels. Follows no symbolic
@@ -3819,6 +3851,20 @@ open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMar
 open func restore(dir: String)throws  -> RestoredRemoval  {
     return try  FfiConverterTypeRestoredRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_restore(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Lets a paused directory's sync go on. Answers whether it was
+     * paused. Asks a watch that holds the folder to let it go, as `add`
+     * does.
+     */
+open func resume(dir: String)throws  -> Bool  {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_resume(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
     )
@@ -7746,17 +7792,35 @@ public struct FolderStatus: Equatable, Hashable {
      * Set while the folder's first sync waits to be confirmed.
      */
     public var firstSync: WaitingFirstSync?
+    /**
+     * The directory's sync is paused with `Folders.pause`.
+     */
+    public var syncPaused: Bool
+    /**
+     * How many directories a watch last found it could not watch, from the
+     * folder's last health report.
+     */
+    public var unwatched: UInt64
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(directories: [FlaggedFile], files: [FileStatus], paused: FolderPaused, 
         /**
          * Set while the folder's first sync waits to be confirmed.
-         */firstSync: WaitingFirstSync?) {
+         */firstSync: WaitingFirstSync?, 
+        /**
+         * The directory's sync is paused with `Folders.pause`.
+         */syncPaused: Bool, 
+        /**
+         * How many directories a watch last found it could not watch, from the
+         * folder's last health report.
+         */unwatched: UInt64) {
         self.directories = directories
         self.files = files
         self.paused = paused
         self.firstSync = firstSync
+        self.syncPaused = syncPaused
+        self.unwatched = unwatched
     }
 
     
@@ -7778,7 +7842,9 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
                 directories: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
                 files: FfiConverterSequenceTypeFileStatus.read(from: &buf), 
                 paused: FfiConverterTypeFolderPaused.read(from: &buf), 
-                firstSync: FfiConverterOptionTypeWaitingFirstSync.read(from: &buf)
+                firstSync: FfiConverterOptionTypeWaitingFirstSync.read(from: &buf), 
+                syncPaused: FfiConverterBool.read(from: &buf), 
+                unwatched: FfiConverterUInt64.read(from: &buf)
         )
     }
 
@@ -7787,6 +7853,8 @@ public struct FfiConverterTypeFolderStatus: FfiConverterRustBuffer {
         FfiConverterSequenceTypeFileStatus.write(value.files, into: &buf)
         FfiConverterTypeFolderPaused.write(value.paused, into: &buf)
         FfiConverterOptionTypeWaitingFirstSync.write(value.firstSync, into: &buf)
+        FfiConverterBool.write(value.syncPaused, into: &buf)
+        FfiConverterUInt64.write(value.unwatched, into: &buf)
     }
 }
 
@@ -9491,6 +9559,10 @@ public struct ListedFolder: Equatable, Hashable {
      * The id of the `system.folder` whose settings it follows.
      */
     public var folder: String
+    /**
+     * Its sync is paused with `Folders.pause`.
+     */
+    public var paused: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -9500,9 +9572,13 @@ public struct ListedFolder: Equatable, Hashable {
          */dir: String, 
         /**
          * The id of the `system.folder` whose settings it follows.
-         */folder: String) {
+         */folder: String, 
+        /**
+         * Its sync is paused with `Folders.pause`.
+         */paused: Bool) {
         self.dir = dir
         self.folder = folder
+        self.paused = paused
     }
 
     
@@ -9522,13 +9598,15 @@ public struct FfiConverterTypeListedFolder: FfiConverterRustBuffer {
         return
             try ListedFolder(
                 dir: FfiConverterString.read(from: &buf), 
-                folder: FfiConverterString.read(from: &buf)
+                folder: FfiConverterString.read(from: &buf), 
+                paused: FfiConverterBool.read(from: &buf)
         )
     }
 
     public static func write(_ value: ListedFolder, into buf: inout [UInt8]) {
         FfiConverterString.write(value.dir, into: &buf)
         FfiConverterString.write(value.folder, into: &buf)
+        FfiConverterBool.write(value.paused, into: &buf)
     }
 }
 
@@ -14173,8 +14251,15 @@ public enum FolderEvent: Equatable, Hashable {
      */
     case heldElsewhere
     /**
+     * The directory's sync was paused with `Folders.pause`, and the watch
+     * let the folder go and waits, holding nothing, for `Folders.resume`. Told
+     * once for each pause; the watch takes the folder back once it ends.
+     */
+    case paused
+    /**
      * The watch took the folder back and keeps it in step again. It follows
-     * `HandedOver` or `HeldElsewhere`, and stands in for a second `Watching`.
+     * `HandedOver`, `HeldElsewhere` or `Paused`, and stands in for a second
+     * `Watching`.
      */
     case takenBack
     /**
@@ -14233,11 +14318,13 @@ public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
         
         case 9: return .heldElsewhere
         
-        case 10: return .takenBack
+        case 10: return .paused
         
-        case 11: return .removed
+        case 11: return .takenBack
         
-        case 12: return .unlisted
+        case 12: return .removed
+        
+        case 13: return .unlisted
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -14291,16 +14378,20 @@ public struct FfiConverterTypeFolderEvent: FfiConverterRustBuffer {
             writeInt(&buf, Int32(9))
         
         
-        case .takenBack:
+        case .paused:
             writeInt(&buf, Int32(10))
         
         
-        case .removed:
+        case .takenBack:
             writeInt(&buf, Int32(11))
         
         
-        case .unlisted:
+        case .removed:
             writeInt(&buf, Int32(12))
+        
+        
+        case .unlisted:
+            writeInt(&buf, Int32(13))
         
         }
     }
@@ -15175,6 +15266,12 @@ public enum MarfaError: Swift.Error, Equatable, Hashable, Foundation.LocalizedEr
     case FirstSyncWaiting(message: String
     )
     /**
+     * A directory's sync is paused, so the call that would read the server's
+     * side or write either side was refused until `Folders.resume`.
+     */
+    case SyncPaused(message: String
+    )
+    /**
      * The app's `CredentialRenewer` threw `Refused`: the renewal failed for
      * `reason` and the sign-in still stands, which is neither the app's own
      * bad arguments nor a network failure. Queued writes stay queued and the
@@ -15389,17 +15486,20 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
         case 34: return .FirstSyncWaiting(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 35: return .RenewalRefused(
+        case 35: return .SyncPaused(
+            message: try FfiConverterString.read(from: &buf)
+            )
+        case 36: return .RenewalRefused(
             reason: try FfiConverterTypeRenewalFailure.read(from: &buf), 
             message: try FfiConverterString.read(from: &buf)
             )
-        case 36: return .Invalid(
+        case 37: return .Invalid(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 37: return .NotAnswerable(
+        case 38: return .NotAnswerable(
             message: try FfiConverterString.read(from: &buf)
             )
-        case 38: return .Fault(
+        case 39: return .Fault(
             message: try FfiConverterString.read(from: &buf)
             )
 
@@ -15635,24 +15735,29 @@ public struct FfiConverterTypeMarfaError: FfiConverterRustBuffer {
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .RenewalRefused(reason,message):
+        case let .SyncPaused(message):
             writeInt(&buf, Int32(35))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .RenewalRefused(reason,message):
+            writeInt(&buf, Int32(36))
             FfiConverterTypeRenewalFailure.write(reason, into: &buf)
             FfiConverterString.write(message, into: &buf)
             
         
         case let .Invalid(message):
-            writeInt(&buf, Int32(36))
-            FfiConverterString.write(message, into: &buf)
-            
-        
-        case let .NotAnswerable(message):
             writeInt(&buf, Int32(37))
             FfiConverterString.write(message, into: &buf)
             
         
-        case let .Fault(message):
+        case let .NotAnswerable(message):
             writeInt(&buf, Int32(38))
+            FfiConverterString.write(message, into: &buf)
+            
+        
+        case let .Fault(message):
+            writeInt(&buf, Int32(39))
             FfiConverterString.write(message, into: &buf)
             
         }
@@ -19686,10 +19791,16 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_pause() != 37864) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 10975) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 57957) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_resume() != 64691) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_status() != 56073) {

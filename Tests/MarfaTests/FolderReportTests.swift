@@ -112,6 +112,29 @@ func aFolderInSyncedOrNetworkStorageIsAddedWithTheCause(core: MarfaCore.StorageC
     #expect(watching == .watching(URL(filePath: "/Notes", directoryHint: .isDirectory), storage: expected))
 }
 
+@Test(arguments: [true, false])
+func aListedFolderSaysWhetherItsSyncIsPaused(paused: Bool) {
+    let listed = Marfa.ListedFolder(MarfaCore.ListedFolder(dir: "/Notes", folder: "f", paused: paused))
+    #expect(listed.syncPaused == paused)
+    #expect(listed.folderId == "f")
+}
+
+@Test(arguments: [(true, UInt64(3)), (false, UInt64(0)), (false, UInt64(7))])
+func aFolderStatusSaysWhetherItsSyncIsPausedAndHowManyDirectoriesAreUnwatched(paused: Bool, unwatched: UInt64) {
+    let status = Marfa.FolderStatus(
+        MarfaCore.FolderStatus(
+            directories: [], files: [],
+            paused: MarfaCore.FolderPaused(disk: 0, pull: 0, additions: 0, outsideQuery: 0), firstSync: nil,
+            syncPaused: paused, unwatched: unwatched))
+    #expect(status.syncPaused == paused)
+    #expect(status.unwatched == unwatched)
+    #expect(!status.paused.isPaused, "a paused sync is not a paused removal")
+}
+
+@Test func aWatchTellsWhenTheFolderSyncWasPaused() {
+    #expect(Marfa.FolderEvent(MarfaCore.FolderEvent.paused) == .paused)
+}
+
 @Test func aFolderInPlainStorageIsAddedWithNoCause() {
     let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: nil))
     #expect(added.storage == nil)
