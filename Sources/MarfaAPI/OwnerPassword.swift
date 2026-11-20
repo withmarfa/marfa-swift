@@ -17,7 +17,7 @@ public enum PasswordChangeOutcome: Sendable, Hashable {
     /// changed.
     case newPasswordRefused(message: String)
     /// The credential lacks the permission that changes the password, `requiredScope` as the server names it, which is
-    /// `sign_ins.manage`. Nothing was sent that holds a password.
+    /// `sign_ins.manage`. Nothing changed.
     case notPermitted(requiredScope: String?, message: String)
     /// Too many passwords were tried for the owner, so the server judged none. Try again after `retryAfterSeconds`,
     /// where the server says.
@@ -35,7 +35,9 @@ extension Client {
     /// password twice. So this call first makes one cheap call under the same permission, which renews an expired
     /// token and refuses a credential without the permission before any password is sent, and then sends the
     /// password once. A `401` to that first call is thrown as ``MarfaError/unauthorized(code:message:server:)``, and
-    /// a `401` to the change is ``PasswordChangeOutcome/currentPasswordWrong(message:)``.
+    /// a `401` to the change is ``PasswordChangeOutcome/currentPasswordWrong(message:)``. A token that ends between
+    /// the two calls is answered the same `401`, so it reads as a wrong password too, and the server has not counted
+    /// it as one.
     ///
     /// An answer this call cannot tell for certain, such as a connection lost after the request left, throws, and the
     /// password may or may not have changed: the owner's next sign-in with the new password shows which.
