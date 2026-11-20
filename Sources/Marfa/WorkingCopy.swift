@@ -1155,10 +1155,11 @@ public struct Queue: Sendable {
         try await drainQueue(holder, feed, reporting: lifecycle)
     }
 
-    /// Queues a blocked or dead write to go again on the next drain, under a fresh key.
+    /// Queues a blocked or dead write to go again on the next drain.
     ///
-    /// A row write is released with every other write of its batch, and the batch keeps the key it went under
-    /// unless it was blocked `keySpent`, `conflictUnresolved` or `ancestorUnavailable`.
+    /// The write keeps the idempotency key it was queued under, unless it was blocked `keySpent`,
+    /// `conflictUnresolved` or `ancestorUnavailable`, which go under a fresh one. A row write is released with every
+    /// other write of its batch.
     public func release(_ id: String) async throws -> Bool {
         try await holder.run { core in try core.release(id: id) }
     }
@@ -1170,9 +1171,9 @@ public struct Queue: Sendable {
     /// Takes a write that can never be sent out of the queue, and puts its
     /// row back to what the server holds.
     ///
-    /// Only a dead write, or one blocked `ancestorUnavailable`, `conflictUnresolved`,
-    /// `failingAlone`, `instanceChanged`, `recordUnread` or `serverRestored`, is taken; any other answers an empty list. Writes waiting on it
-    /// are refused unsent. It reads the row from the server first, so it needs
+    /// Only a dead write, or one blocked `ancestorUnavailable`, `conflictUnresolved`, `failingAlone`,
+    /// `instanceChanged`, `recordUnread` or `serverRestored`, is taken; any other answers an empty list. Writes
+    /// waiting on it are refused unsent. It reads the row from the server first, so it needs
     /// the server, and answers an empty list when the copy moved during the read;
     /// ask again. It answers the id of every write it took out of the queue, which holds more than `id` where
     /// the write belonged to a batch the core withdraws whole.

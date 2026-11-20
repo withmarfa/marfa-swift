@@ -12,7 +12,7 @@ import MarfaTypes
 ///    as this instance. It answers an ``AddressChangeCheck``, which holds the change it checked.
 /// 2. Show the owner the check's `consequences` and, once they agree, ``Client/apply(_:expecting:)`` the check. It
 ///    makes exactly the change that was checked, and confirms the move for the owner when the server asks for that.
-///    The server wants the owner to have signed in within the last five minutes: a ``Server`` set up with
+///    The server wants the owner to have signed in within the last fifteen minutes: a ``Server`` set up with
 ///    ``Server/confirming(from:prefersEphemeralWebBrowserSession:)`` signs them in again by itself, and a key is
 ///    refused with ``MarfaError/appSignInRequired(message:server:)``.
 /// 3. Take the owner through `nextSteps` in order: sign in at the new address, then add a passkey there.
