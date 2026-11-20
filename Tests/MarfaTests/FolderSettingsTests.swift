@@ -14,10 +14,12 @@ import Testing
                 type: "core.note", tier: .feed, properties: ["rating": 3, "cuisine": "any"], tags: ["new"],
                 edges: ["about": ["topic"]]),
             include: ["*.md"], ignore: ["drafts/"], firstPlacement: ["core.note": "Notes"],
-            removalThreshold: RemovalThreshold(files: 4, fraction: 0.5),
+            removalThreshold: RemovalThreshold(files: 4, fraction: 0.5, ceiling: 3),
             additionThreshold: AdditionThreshold(files: 7, fraction: 0.5), outsideQuery: .hold)
         let crossed = FolderSettings(settings.core)
         #expect(crossed == settings)
+        #expect(crossed.removalThreshold.ceiling == 3, "the removal threshold's ceiling")
+        #expect(FolderSettings(FolderSettings().core).removalThreshold.ceiling == nil, "no ceiling is 100, not 0")
         #expect(crossed.query.tier == .all, "a query of both tiers")
         #expect(FolderSettings(FolderSettings().core).query.tier == nil, "no tier is the library tier, not a tier")
         #expect(crossed.defaults.properties.keys == ["rating", "cuisine"], "the defaults' key order")
@@ -104,6 +106,28 @@ extension LiveWorkingCopies {
             }
             #expect(
                 try await copy.items.folder(made.id)?.settings.title == "Twice", "the refused change left it as it was")
+            _ = try await copy.revokeFolder(made.id)
+        }
+
+        @Test func aRemovalThresholdCeilingIsMadeReadBackAndKeptThroughAChange() async throws {
+            let copy = try await Self.copy()
+            let made = try await copy.createFolder(
+                FolderSettings(
+                    title: "Ceiling", query: FolderQuery(types: ["core.note"]),
+                    removalThreshold: RemovalThreshold(files: 4, fraction: 0.5, ceiling: 3)))
+            #expect(made.settings.removalThreshold == RemovalThreshold(files: 4, fraction: 0.5, ceiling: 3))
+            #expect(try await copy.items.folder(made.id)?.settings.removalThreshold.ceiling == 3)
+            let renamed = try await copy.changeFolder(
+                made.id, FolderSettingsChange(title: "Ceiling kept"), baseVersion: made.version)
+            #expect(renamed.settings.removalThreshold.ceiling == 3, "a change that leaves the threshold alone")
+            let changed = try await copy.changeFolder(
+                made.id, FolderSettingsChange(removalThreshold: RemovalThreshold(files: 5, ceiling: 7)),
+                baseVersion: renamed.version)
+            #expect(changed.settings.removalThreshold == RemovalThreshold(files: 5, fraction: nil, ceiling: 7))
+            let unset = try await copy.changeFolder(
+                made.id, FolderSettingsChange(removalThreshold: RemovalThreshold(files: 5)),
+                baseVersion: changed.version)
+            #expect(unset.settings.removalThreshold.ceiling == nil, "a threshold with no ceiling is the default of 100")
             _ = try await copy.revokeFolder(made.id)
         }
 
