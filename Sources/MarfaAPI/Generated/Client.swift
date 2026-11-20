@@ -145,7 +145,7 @@ public struct Client: ClientProtocol {
     }
     /// List the trash
     ///
-    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can read. Requires `items.purge`.
+    /// Returns a page of trash summaries, newest creation first, without item content, of the types you can write. Requires `items.purge`.
     ///
     /// - Remark: HTTP `GET /trash`.
     /// - Remark: Generated from `#/paths//trash/get(listTrash)`.
@@ -250,7 +250,7 @@ public struct Client: ClientProtocol {
     }
     /// Empty the trash
     ///
-    /// Empties one page of the trash: deletes up to 200 items of the types you can read permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
+    /// Empties one page of the trash: deletes up to 200 items of the types you can write permanently if their state and version still match. Returns partial results and a continuation cursor. Items trashed meanwhile may remain. Requires `items.purge`.
     ///
     /// - Remark: HTTP `POST /trash/empty`.
     /// - Remark: Generated from `#/paths//trash/empty/post(emptyTrash)`.
@@ -5075,7 +5075,7 @@ public struct Client: ClientProtocol {
     }
     /// Get the owner's profile
     ///
-    /// Returns the fields of the owner's profile that your credential can read: `name`, `email` and `avatar`, each only with profile read permission for that field. A field you can't read is left out, so a credential that can read none gets an empty object.
+    /// Returns the owner's profile fields that your credential can read: `name`, `username`, `email` and `avatar`, each with its own read permission. A field you can't read is left out, so a credential that can read none gets an empty object.
     ///
     /// - Remark: HTTP `GET /profile`.
     /// - Remark: Generated from `#/paths//profile/get(getProfile)`.
@@ -5152,7 +5152,7 @@ public struct Client: ClientProtocol {
     }
     /// Update the owner's profile
     ///
-    /// Updates the owner's email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the email needs no confirmation.
+    /// Updates the owner's username, email or name, or removes the avatar, and returns the profile fields you can read. Requires profile write permission for every submitted field. All fields commit together. Changing the username needs no confirmation.
     ///
     /// - Remark: HTTP `PATCH /profile`.
     /// - Remark: Generated from `#/paths//profile/patch(updateProfile)`.
@@ -5882,7 +5882,7 @@ public struct Client: ClientProtocol {
     }
     /// Rename a passkey
     ///
-    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Renames the passkey and returns its public details. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `PATCH /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/patch(renameOwnerPasskey)`.
@@ -5975,7 +5975,7 @@ public struct Client: ClientProtocol {
     }
     /// Delete a passkey
     ///
-    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within five minutes, or `sign_ins.manage`.
+    /// Deletes one passkey so it cannot sign in again. Existing sign-ins remain usable. Requires the owner's browser session, signed in within fifteen minutes, or `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/passkeys/{id}`.
     /// - Remark: Generated from `#/paths//owner/passkeys/{id}/delete(deleteOwnerPasskey)`.
@@ -7461,7 +7461,7 @@ public struct Client: ClientProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -7783,7 +7783,7 @@ public struct Client: ClientProtocol {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last five minutes.
+    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
