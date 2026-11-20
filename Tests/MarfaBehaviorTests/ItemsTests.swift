@@ -284,8 +284,11 @@ struct ItemsOffline {
         #expect(try await copy.items.get(id)?.tags == ["y", "z"])
 
         let replaced = try await copy.metadata.replaceTags(of: id, with: ["q"])
-        #expect(replaced.kind == .replaceTags && replaced.body == ["tags": ["q"]])
+        #expect(replaced.kind == .replaceTags && replaced.body == ["tags": ["q"], "read_tags": ["y", "z"]])
         #expect(try await copy.items.get(id)?.tags == ["q"])
+        let bare = try await Self.note("B", in: copy)
+        let none = try await copy.metadata.replaceTags(of: bare, with: ["p"])
+        #expect(none.body == ["tags": ["p"], "read_tags": []])
         await #expect {
             _ = try await copy.tags.add("z", to: "absent")
         } throws: { Self.notFound("item_not_found")($0) }

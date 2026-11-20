@@ -7,18 +7,17 @@ import Testing
 /// The owner's calls against a server of the test's own: one call for each area, then an owner sign-in that asks
 /// for instance permissions by name.
 ///
-/// The step-up test waits out the server's five minutes after the sign-in, so it runs only where
+/// The step-up test waits out the server's fifteen minutes after the sign-in, so it runs only where
 /// `MARFA_LIVE_WAIT` is set.
 @Suite(
     .serialized,
-    .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"),
-    .timeLimit(.minutes(10)))
+    .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"))
 struct LiveOwner {
     static let every = InstancePermission.allCases
     static let waits = ProcessInfo.processInfo.environment["MARFA_LIVE_WAIT"] != nil
     static let service = "com.withmarfa.marfa-swift.tests"
 
-    @Test func everyAreaAnswersAnOwnerSignedInWithEveryPermission() async throws {
+    @Test(.timeLimit(.minutes(10))) func everyAreaAnswersAnOwnerSignedInWithEveryPermission() async throws {
         let own = try await OwnServer.boot()
         do {
             try await inIsolatedKeychainAsync { keychain, _ async throws in
@@ -31,7 +30,7 @@ struct LiveOwner {
         try await own.end()
     }
 
-    @Test func aKeyIsToldWhichPermissionItLacks() async throws {
+    @Test(.timeLimit(.minutes(10))) func aKeyIsToldWhichPermissionItLacks() async throws {
         let own = try await OwnServer.boot()
         do {
             let narrow = try await Self.keyWithoutInstancePermissions(own)
@@ -63,8 +62,8 @@ struct LiveOwner {
 
     @Test(
         .enabled(
-            if: waits, "set MARFA_LIVE_WAIT to wait the five minutes after the sign-in the server asks for"),
-        .timeLimit(.minutes(8)))
+            if: waits, "set MARFA_LIVE_WAIT to wait the fifteen minutes after the sign-in the server asks for"),
+        .timeLimit(.minutes(20)))
     func aWriteAfterTheSignInGrewOldAsksTheOwnerAgain() async throws {
         let own = try await OwnServer.boot()
         do {
@@ -120,7 +119,7 @@ struct LiveOwner {
         let api = Client(server)
         _ = try await api.getConfig()
         let kept = try #require(try authorization.place.read())
-        try await Task.sleep(for: .seconds(305))
+        try await Task.sleep(for: .seconds(905))
         let before = kept
         let body = Operations.UpdateConfig.Input.Body.JsonPayload(allowPrivateAddresses: .value(true))
         let changed = try await api.updateConfig(body: .json(body)).ok.body.json

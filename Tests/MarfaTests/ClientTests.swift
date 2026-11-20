@@ -136,6 +136,18 @@ struct ClientTests {
         #expect(target.requests.isEmpty)
     }
 
+    @Test func aRefusalCarriesTheRequestIdTheServerStampedOnIt() async {
+        let stamped = ScriptedAuthServer.Reply.json(
+            404, ["error": ["code": "not_found", "message": "scripted not_found"]],
+            headers: contract.merging(["X-Request-ID": "req-7"]) { $1 })
+        let scripted = ScriptedAuthServer { _ in stamped }
+        let error = await failure { try await client(scripted).listTags() }
+        #expect(error?.server?.requestId == "req-7", "\(String(describing: error))")
+        let bare = ScriptedAuthServer { _ in refused(404, "not_found") }
+        let unstamped = await failure { try await client(bare).listTags() }
+        #expect(unstamped?.server?.requestId == nil, "\(String(describing: unstamped))")
+    }
+
     @Test func aConflictAndAnotherInstanceArriveAsTheWorkingCopyNamesThem() async {
         let answers: [(ScriptedAuthServer.Reply, MarfaError)] = [
             (
