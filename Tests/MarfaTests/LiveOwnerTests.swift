@@ -43,6 +43,48 @@ struct LiveOwner {
         try await own.end()
     }
 
+    @Test(.timeLimit(.minutes(5))) func theOwnersPasswordChangesAndChangesBack() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            try await Self.changePassword(own)
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    private static func changePassword(_ own: OwnServer) async throws {
+        let original = try #require(own.owner?.password, "the server booted without an owner")
+        let replaced = original + "-changed"
+        let api = Client(own.server)
+        let wrong = try await api.changePassword(from: "not the password", to: replaced)
+        guard case .currentPasswordWrong = wrong else {
+            Issue.record("expected currentPasswordWrong, got \(wrong)")
+            return
+        }
+        let short = try await api.changePassword(from: original, to: "short")
+        guard case .newPasswordRefused = short else {
+            Issue.record("expected newPasswordRefused, got \(short)")
+            return
+        }
+        #expect(try await api.changePassword(from: original, to: replaced) == .changed)
+        // The old password no longer proves right, and the new one does: changing back needs the new one.
+        let stale = try await api.changePassword(from: original, to: original)
+        guard case .currentPasswordWrong = stale else {
+            Issue.record("the replaced password still proved right: \(stale)")
+            return
+        }
+        #expect(try await api.changePassword(from: replaced, to: original) == .changed)
+        let narrow = try await Self.keyWithoutInstancePermissions(own)
+        let refused = try await Client(narrow).changePassword(from: original, to: replaced)
+        guard case .notPermitted(let scope, _) = refused else {
+            Issue.record("expected notPermitted, got \(refused)")
+            return
+        }
+        #expect(scope == "sign_ins.manage")
+    }
+
     /// A key that may read notes and holds no instance permission, minted with the server's own key, which
     /// holds every one.
     private static func keyWithoutInstancePermissions(_ own: OwnServer) async throws -> Server {

@@ -25,6 +25,8 @@ struct Access: ClientMiddleware {
             let again: String?
             switch refused {
             case .unauthorized:
+                // A wrong current password is answered like a refused token, and sending it again would count it twice.
+                guard operationID != "replaceOwnerPassword" else { throw refused }
                 again = try await server.renewedToken(refused: token)
                 guard body?.iterationBehavior != .single else { throw refused }
             case .confirmationRequired:
