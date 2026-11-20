@@ -437,6 +437,7 @@ extension LiveWorkingCopies {
             let confirmed = try await folders.confirmRemoval(in: directory)
             #expect(confirmed.deleted == 3)
             #expect(confirmed.unsure.isEmpty)
+            #expect(confirmed.refused.isEmpty)
             let sent = try await FolderFixture.sync(directory)
             #expect(sent.pass.drain.answered >= 3)
             #expect(try await folders.status(of: directory) == FolderStatus(files: []))

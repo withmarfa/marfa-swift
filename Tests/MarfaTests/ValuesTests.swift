@@ -284,10 +284,12 @@ struct Errors {
                 details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])),
                 server: ServerAnswer(
                     status: 409, code: "trash_plan_changed",
-                    details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])))),
+                    details: .object(JsonObject(members: [JsonMember(key: "digest", value: .string("d"))])),
+                    requestId: "req-1")),
             .trashPlanChanged(
                 message: "m",
-                server: Marfa.ServerAnswer(status: 409, code: "trash_plan_changed", details: .object(["digest": "d"])))
+                server: Marfa.ServerAnswer(
+                    status: 409, code: "trash_plan_changed", details: .object(["digest": "d"]), requestId: "req-1"))
         ),
         (
             .Validation(
@@ -305,7 +307,8 @@ struct Errors {
                 details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])),
                 server: ServerAnswer(
                     status: 413, code: "payload_too_large",
-                    details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])))),
+                    details: .object(JsonObject(members: [JsonMember(key: "limit", value: .string("9"))])),
+                    requestId: nil)),
             .server(
                 status: 413, code: "payload_too_large", message: "m", details: .object(["limit": "9"]),
                 server: Marfa.ServerAnswer(status: 413, code: "payload_too_large", details: .object(["limit": "9"])))

@@ -38,7 +38,7 @@ extension Components {
         @frozen public enum IdempotencyReplayed: String, Codable, Hashable, Sendable, CaseIterable {
             case _true = "true"
         }
-        /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="300"`, where `max_age` is how many seconds old the owner's sign-in may be.
+        /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
         ///
         /// - Remark: Generated from `#/components/headers/WWW-Authenticate`.
         public typealias WWWAuthenticate = Swift.String

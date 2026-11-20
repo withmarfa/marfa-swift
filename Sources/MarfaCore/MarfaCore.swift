@@ -1262,9 +1262,10 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func queue() throws  -> [QueuedWrite]
     
     /**
-     * Sends a blocked or dead write again, under a fresh idempotency key but
-     * for a row write or an undo, which keeps its key unless blocked
-     * `key_spent`. Answers whether the row was one a release applies to.
+     * Sends a blocked or dead write again. It keeps its idempotency key
+     * unless it was blocked `key_spent`, `conflict_unresolved` or
+     * `ancestor_unavailable`, which go under a fresh one. Answers whether
+     * the row was one a release applies to.
      */
     func release(id: String) throws  -> Bool
     
@@ -2300,9 +2301,10 @@ open func queue()throws  -> [QueuedWrite]  {
 }
     
     /**
-     * Sends a blocked or dead write again, under a fresh idempotency key but
-     * for a row write or an undo, which keeps its key unless blocked
-     * `key_spent`. Answers whether the row was one a release applies to.
+     * Sends a blocked or dead write again. It keeps its idempotency key
+     * unless it was blocked `key_spent`, `conflict_unresolved` or
+     * `ancestor_unavailable`, which go under a fresh one. Answers whether
+     * the row was one a release applies to.
      */
 open func release(id: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -5006,6 +5008,11 @@ public struct ConfirmedFolder: Equatable, Hashable {
      * Files not let go, because the other folders could not all be read.
      */
     public var unsure: [UnsureFile]
+    /**
+     * Paused files the volume could not take away safely, which stay
+     * paused.
+     */
+    public var refused: [UnsureFile]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -5025,12 +5032,17 @@ public struct ConfirmedFolder: Equatable, Hashable {
          */added: UInt64, 
         /**
          * Files not let go, because the other folders could not all be read.
-         */unsure: [UnsureFile]) {
+         */unsure: [UnsureFile], 
+        /**
+         * Paused files the volume could not take away safely, which stay
+         * paused.
+         */refused: [UnsureFile]) {
         self.deleted = deleted
         self.moved = moved
         self.removed = removed
         self.added = added
         self.unsure = unsure
+        self.refused = refused
     }
 
     
@@ -5053,7 +5065,8 @@ public struct FfiConverterTypeConfirmedFolder: FfiConverterRustBuffer {
                 moved: FfiConverterUInt64.read(from: &buf), 
                 removed: FfiConverterUInt64.read(from: &buf), 
                 added: FfiConverterUInt64.read(from: &buf), 
-                unsure: FfiConverterSequenceTypeUnsureFile.read(from: &buf)
+                unsure: FfiConverterSequenceTypeUnsureFile.read(from: &buf), 
+                refused: FfiConverterSequenceTypeUnsureFile.read(from: &buf)
         )
     }
 
@@ -5063,6 +5076,7 @@ public struct FfiConverterTypeConfirmedFolder: FfiConverterRustBuffer {
         FfiConverterUInt64.write(value.removed, into: &buf)
         FfiConverterUInt64.write(value.added, into: &buf)
         FfiConverterSequenceTypeUnsureFile.write(value.unsure, into: &buf)
+        FfiConverterSequenceTypeUnsureFile.write(value.refused, into: &buf)
     }
 }
 
@@ -10706,13 +10720,21 @@ public struct ServerAnswer: Equatable, Hashable {
     public var status: UInt16
     public var code: String?
     public var details: JsonValue?
+    /**
+     * The server's `X-Request-ID`, which a report of a problem can quote.
+     */
+    public var requestId: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(status: UInt16, code: String?, details: JsonValue?) {
+    public init(status: UInt16, code: String?, details: JsonValue?, 
+        /**
+         * The server's `X-Request-ID`, which a report of a problem can quote.
+         */requestId: String?) {
         self.status = status
         self.code = code
         self.details = details
+        self.requestId = requestId
     }
 
     
@@ -10733,7 +10755,8 @@ public struct FfiConverterTypeServerAnswer: FfiConverterRustBuffer {
             try ServerAnswer(
                 status: FfiConverterUInt16.read(from: &buf), 
                 code: FfiConverterOptionString.read(from: &buf), 
-                details: FfiConverterOptionTypeJsonValue.read(from: &buf)
+                details: FfiConverterOptionTypeJsonValue.read(from: &buf), 
+                requestId: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -10741,6 +10764,7 @@ public struct FfiConverterTypeServerAnswer: FfiConverterRustBuffer {
         FfiConverterUInt16.write(value.status, into: &buf)
         FfiConverterOptionString.write(value.code, into: &buf)
         FfiConverterOptionTypeJsonValue.write(value.details, into: &buf)
+        FfiConverterOptionString.write(value.requestId, into: &buf)
     }
 }
 
@@ -12600,6 +12624,12 @@ public enum BlockedReason: Equatable, Hashable, CaseIterable {
      * released.
      */
     case recordUnread
+    /**
+     * The device queued the write to put back what it held that a server
+     * restored to an earlier point no longer holds, and it is sent only once
+     * released.
+     */
+    case serverRestored
 
 
 
@@ -12635,6 +12665,8 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case 7: return .recordUnread
         
+        case 8: return .serverRestored
+        
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
@@ -12669,6 +12701,10 @@ public struct FfiConverterTypeBlockedReason: FfiConverterRustBuffer {
         
         case .recordUnread:
             writeInt(&buf, Int32(7))
+        
+        
+        case .serverRestored:
+            writeInt(&buf, Int32(8))
         
         }
     }
@@ -19467,7 +19503,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_queue() != 63256) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_release() != 55536) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_release() != 36394) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_release_reason() != 2563) {
