@@ -260,6 +260,7 @@ struct Errors {
         ),
         (.Canceled(message: "m"), .canceled(message: "m")),
         (.FirstSyncWaiting(message: "m"), .firstSyncWaiting(message: "m")),
+        (.SyncPaused(message: "m"), .syncPaused(message: "m")),
         (.Invalid(message: "m"), .invalid(message: "m")),
         (.StoreBusy(message: "m"), .storeBusy(message: "m")),
         (

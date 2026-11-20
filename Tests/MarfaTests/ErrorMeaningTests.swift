@@ -77,6 +77,7 @@ import Testing
         (.itemBeingRemoved(id: nil, message: "m"), .none),
         (.canceled(message: "m"), .none),
         (.firstSyncWaiting(message: "m"), .hydration),
+        (.syncPaused(message: "m"), .none),
         (.invalid(message: "m"), .none),
         (.renewalRefused(reason: .refused, message: "m"), .none),
         (.renewalRefused(reason: .redirected, message: "m"), .none),
@@ -164,6 +165,8 @@ import Testing
                 == "server_too_old")
         #expect(Marfa.MarfaError.trashPlanChanged(message: "m", server: nil).fixedText.code == "trash_plan_changed")
         #expect(Marfa.MarfaError.itemBeingRemoved(id: "a", message: "m").fixedText.code == "item_being_removed")
+        #expect(Marfa.MarfaError.syncPaused(message: "m").code() == "sync_paused")
+        #expect(Marfa.MarfaError.syncPaused(message: "m").fixedText.code == "sync_paused")
         for (error, _) in Self.meanings {
             #expect(error.fixedText.type == error.code(), "\(error)")
             #expect(error.message == "m")

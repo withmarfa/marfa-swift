@@ -164,6 +164,10 @@ import Testing
 @Test func anAppMakesItsOwnFolderValues() {
     let listed = ListedFolder(directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f")
     #expect(listed.folderId == "f")
+    #expect(!listed.syncPaused)
+    #expect(
+        ListedFolder(directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f", syncPaused: true)
+            .syncPaused)
     let added = AddedFolder(
         directory: URL(filePath: "/Notes", directoryHint: .isDirectory), folderId: "f", storage: .cloudSynced)
     #expect(added.storage == .cloudSynced)
@@ -176,6 +180,8 @@ import Testing
         files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: FolderPaused(disk: 2),
         firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0, left: 0)))
     #expect(status.firstSync?.plan?.send == 2)
+    #expect(!status.syncPaused && status.unwatched == 0)
+    #expect(FolderStatus(files: [], syncPaused: true, unwatched: 2).unwatched == 2)
     #expect(status.paused.isPaused)
     #expect(!FolderPaused().isPaused)
     #expect(FolderPaused(additions: 1).isPaused, "held new files wait for confirmation")
@@ -195,7 +201,7 @@ import Testing
     let told: Bool =
         switch event {
         case .watching, .watcherFailed, .retrying, .unreachable, .reachable, .waiting, .passed, .handedOver,
-            .heldElsewhere, .takenBack, .removed, .unlisted:
+            .heldElsewhere, .paused, .takenBack, .removed, .unlisted:
             true
         }
     #expect(told)
@@ -223,8 +229,8 @@ private func exhaustive(_ verdict: Verdict, _ origin: Change.Origin, _ error: Ma
             .hydrationIncomplete, .noCatalog, .wrongSchema,
             .readingHandle, .unsentDiffers,
             .copyExpired, .streamIncomplete, .wrongServer, .bytesAbsent, .noRoom, .contractMismatch, .canceled,
-            .firstSyncWaiting, .invalid, .renewalRefused, .notAnswerable, .fault, .keyChanging, .versionConflict,
-            .instanceChanged,
+            .firstSyncWaiting, .syncPaused, .invalid, .renewalRefused, .notAnswerable, .fault, .keyChanging,
+            .versionConflict, .instanceChanged,
             .closed, .noConnection, .confirmationRequired, .appSignInRequired, .serverTooOld, .trashPlanChanged,
             .itemBeingRemoved:
             true

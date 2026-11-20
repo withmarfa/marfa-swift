@@ -150,6 +150,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// A folder's first sync waits for the person to confirm it, so the call that would write or send for it
     /// was refused.
     case firstSyncWaiting(message: String)
+    /// A folder's sync is paused, so the call that would read the server's side or write either side was refused.
+    /// Nothing was sent or written. ``Folders/resume(_:)`` lets the sync go on.
+    case syncPaused(message: String)
     /// A value given to the call cannot be used, such as an unwritable JSON value or a malformed argument.
     case invalid(message: String)
     /// The app's renewer could not renew the sign-in, and the sign-in is kept. ``RenewalRefusalReason`` says why.
@@ -267,7 +270,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             .noRoom(_, _, _, let message),
             .contractMismatch(_, _, _, _, let message, _), .serverTooOld(_, _, let message),
             .trashPlanChanged(let message, _), .itemBeingRemoved(_, let message),
-            .canceled(let message), .firstSyncWaiting(let message),
+            .canceled(let message), .firstSyncWaiting(let message), .syncPaused(let message),
             .invalid(let message), .renewalRefused(_, let message), .notAnswerable(let message), .fault(let message),
             .keyChanging(let message),
             .versionConflict(let message, _),
@@ -293,7 +296,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             server
         case .io, .network, .decoding, .store, .storeBusy, .storeDamaged, .storageFull, .signedOut, .noKeychain,
             .noServer, .noCursor, .hydrationIncomplete, .noCatalog, .wrongSchema, .readingHandle, .unsentDiffers,
-            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .invalid, .renewalRefused,
+            .wrongServer, .bytesAbsent, .noRoom, .canceled, .firstSyncWaiting, .syncPaused, .invalid, .renewalRefused,
             .notAnswerable,
             .fault, .keyChanging, .serverTooOld, .itemBeingRemoved,
             .closed, .noConnection:
@@ -373,6 +376,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
                 details: id.map { JSONValue.object(["id": .string($0)]).core }, server: nil)
         case .canceled(let message): core = .Canceled(message: message)
         case .firstSyncWaiting(let message): core = .FirstSyncWaiting(message: message)
+        case .syncPaused(let message): core = .SyncPaused(message: message)
         case .invalid(let message): core = .Invalid(message: message)
         case .renewalRefused(let reason, let message):
             core = .RenewalRefused(reason: reason.core, message: message)
@@ -473,6 +477,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .serverTooOld(served: served, oldest: oldest, message: message)
         case .Canceled(let message): self = .canceled(message: message)
         case .FirstSyncWaiting(let message): self = .firstSyncWaiting(message: message)
+        case .SyncPaused(let message): self = .syncPaused(message: message)
         case .Invalid(let message): self = .invalid(message: message)
         case .RenewalRefused(let reason, let message):
             self = .renewalRefused(reason: RenewalRefusalReason(reason), message: message)
