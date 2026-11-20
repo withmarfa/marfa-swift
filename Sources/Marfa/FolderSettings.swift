@@ -143,17 +143,22 @@ public struct RemovalThreshold: Sendable, Hashable {
     public var files: UInt64?
     /// `nil` is 0.25.
     public var fraction: Double?
+    /// More files than this wait whatever their share. `nil` is 100.
+    public var ceiling: UInt64?
 
-    public init(files: UInt64? = nil, fraction: Double? = nil) {
+    public init(files: UInt64? = nil, fraction: Double? = nil, ceiling: UInt64? = nil) {
         self.files = files
         self.fraction = fraction
+        self.ceiling = ceiling
     }
 
     init(_ core: MarfaCore.RemovalThreshold) {
-        self.init(files: core.files, fraction: core.fraction)
+        self.init(files: core.files, fraction: core.fraction, ceiling: core.ceiling)
     }
 
-    var core: MarfaCore.RemovalThreshold { MarfaCore.RemovalThreshold(files: files, fraction: fraction) }
+    var core: MarfaCore.RemovalThreshold {
+        MarfaCore.RemovalThreshold(files: files, fraction: fraction, ceiling: ceiling)
+    }
 }
 
 /// How large a drop of new files into a folder on disk must be to wait for confirmation.
