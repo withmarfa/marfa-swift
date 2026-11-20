@@ -63,7 +63,8 @@ jobs:
       - run: scripts/lint.sh --portable
 
   # On every change, since `Build + test` skips one only to `.github/`, and
-  # `release.yml` runs only from main.
+  # `release.yml` runs only from main. It also runs the vendor check, which a
+  # draft needs as much as a ready pull request.
   lint-workflows:
     name: Lint workflows
     runs-on: ubuntu-latest
@@ -85,11 +86,14 @@ jobs:
           tar -xzf "${archive}" -C "${RUNNER_TEMP}" actionlint
           "${RUNNER_TEMP}/actionlint"
           shellcheck scripts/*.sh
-      - name: Test the retry, failure and release archive scripts
+      - name: Check shipped code names no analytics vendor
+        run: scripts/check-vendor.sh
+      - name: Test the retry, failure, release archive and vendor scripts
         run: |
           scripts/test-verdict.test.sh
           scripts/report-pin-bump-failure.test.sh
           scripts/release-archive.test.sh
+          scripts/check-vendor.test.sh
 
   # Not on a draft, and on a pull request not until `Lint Swift` has passed. A
   # push to `main` runs it whatever the lint said, so its verdict is the whole
