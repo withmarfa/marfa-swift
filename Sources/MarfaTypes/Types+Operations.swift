@@ -63703,7 +63703,7 @@ public enum Operations {
             }
             /// - `missing_required_field`: `fields` is missing.
             /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes too deep a chain.
-            /// - `invalid_schema`: the schema is invalid or has a key it doesn't define (`details.errors` names each path).
+            /// - `invalid_schema`: the schema is invalid, or has an unknown key or overlong text (`details.errors` names each path).
             /// - `property_shadows_field`: a field is named like one every item has.
             /// - `inheritance_violation`: the type reshapes an inherited field.
             ///
@@ -63881,8 +63881,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't have `metadata.types:write`, or the identifier is under `core.*`, `system.*` or `marfa.*`, which no credential can register.
-            /// - `type_not_permitted`: your type map lacks write on the identifier or a non-platform `parent` or `compatible_with` target (`details.grant` names it).
+            /// - `forbidden`: you don't have `metadata.types:write`, the type has `guidance` and you lack `schema.write`, or the identifier is under `core.*`, `system.*` or `marfa.*`, which no credential can register.
+            /// - `type_not_permitted`: your type map lacks write on the identifier or a non-platform `parent` (`details.grant` names it).
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/403`.
             ///
@@ -64303,94 +64303,6 @@ public enum Operations {
                     }
                 }
             }
-            public struct UnprocessableContent: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/types/POST/responses/422/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/POST/responses/422/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/POST/responses/422/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/POST/responses/422/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.RegisterType.Output.UnprocessableContent.Headers
-                /// - Remark: Generated from `#/paths/types/POST/responses/422/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/types/POST/responses/422/content/application\/json`.
-                    case json(Components.Schemas.CompatibleWithViolationRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.RegisterType.Output.UnprocessableContent.Body
-                /// Creates a new `UnprocessableContent`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.RegisterType.Output.UnprocessableContent.Headers = .init(),
-                    body: Operations.RegisterType.Output.UnprocessableContent.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `compatible_with_violation`: `compatible_with` names a type this instance doesn't hold, or one the type doesn't satisfy.
-            ///
-            /// - Remark: Generated from `#/paths//types/post(registerType)/responses/422`.
-            ///
-            /// HTTP response code: `422 unprocessableContent`.
-            case unprocessableContent(Operations.RegisterType.Output.UnprocessableContent)
-            /// The associated value of the enum case if `self` is `.unprocessableContent`.
-            ///
-            /// - Throws: An error if `self` is not `.unprocessableContent`.
-            /// - SeeAlso: `.unprocessableContent`.
-            public var unprocessableContent: Operations.RegisterType.Output.UnprocessableContent {
-                get throws {
-                    switch self {
-                    case let .unprocessableContent(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "unprocessableContent",
-                            response: self
-                        )
-                    }
-                }
-            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/types/POST/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -64790,7 +64702,7 @@ public enum Operations {
     }
     /// Get a type
     ///
-    /// Returns a type's schema, with the fields and policies it inherits from its ancestors. Every credential reads any type, whatever its type map reaches.
+    /// Returns a type's schema, with the fields and policies it inherits from its ancestors, and the guidance of its ancestors. Every credential reads any type, whatever its type map reaches.
     ///
     /// - Remark: HTTP `GET /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/get(getType)`.
@@ -65989,8 +65901,8 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `fields` is missing.
-            /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes a bad chain.
-            /// - `invalid_schema`: the schema is invalid or has a key it doesn't define (`details.errors` names each path).
+            /// - `validation_error`: `id` is malformed, or `parent` isn't registered or chains badly.
+            /// - `invalid_schema`: the schema is invalid, or has an unknown key or overlong text (`details.errors` names each path).
             /// - `property_shadows_field`: a field has the name of one every item has.
             /// - `inheritance_violation`: a field's shape differs in a parent or subtype.
             ///
@@ -66170,7 +66082,7 @@ public enum Operations {
             }
             /// - `forbidden`: you lack `schema.write` and `metadata.types:write`, or `details.changes` names changes needing `schema.write`.
             /// - `core_type_immutable`: Marfa ships this type.
-            /// - `type_not_permitted`: your type map lacks write on the type or a new non-platform `parent` or `compatible_with` target (`details.grant` names it).
+            /// - `type_not_permitted`: your type map lacks write on the type or a new non-platform `parent` (`details.grant` names it).
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)/responses/403`.
             ///
@@ -66691,94 +66603,6 @@ public enum Operations {
                     }
                 }
             }
-            public struct UnprocessableContent: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.ReplaceType.Output.UnprocessableContent.Headers
-                /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/422/content/application\/json`.
-                    case json(Components.Schemas.CompatibleWithViolationRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.ReplaceType.Output.UnprocessableContent.Body
-                /// Creates a new `UnprocessableContent`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.ReplaceType.Output.UnprocessableContent.Headers = .init(),
-                    body: Operations.ReplaceType.Output.UnprocessableContent.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `compatible_with_violation`: `compatible_with` names a type this instance doesn't hold, or one the type doesn't satisfy, or the change breaks another type's claim (`details.dependent_type_ids`).
-            ///
-            /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)/responses/422`.
-            ///
-            /// HTTP response code: `422 unprocessableContent`.
-            case unprocessableContent(Operations.ReplaceType.Output.UnprocessableContent)
-            /// The associated value of the enum case if `self` is `.unprocessableContent`.
-            ///
-            /// - Throws: An error if `self` is not `.unprocessableContent`.
-            /// - SeeAlso: `.unprocessableContent`.
-            public var unprocessableContent: Operations.ReplaceType.Output.UnprocessableContent {
-                get throws {
-                    switch self {
-                    case let .unprocessableContent(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "unprocessableContent",
-                            response: self
-                        )
-                    }
-                }
-            }
             public struct TooManyRequests: Sendable, Hashable {
                 /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/429/headers`.
                 public struct Headers: Sendable, Hashable {
@@ -67202,14 +67026,14 @@ public enum Operations {
             public var path: Operations.DeleteType.Input.Path
             /// - Remark: Generated from `#/paths/types/{id}/DELETE/query`.
             public struct Query: Sendable, Hashable {
-                /// Delete the type even if items of it exist, in any state, or a folder, view or webhook names it. It doesn't cover subtypes or compatibility dependents.
+                /// Delete the type even if items of it exist, in any state, or a folder, view or webhook names it. It doesn't cover subtypes.
                 ///
                 /// - Remark: Generated from `#/paths/types/{id}/DELETE/query/force`.
                 public var force: Swift.Bool?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - force: Delete the type even if items of it exist, in any state, or a folder, view or webhook names it. It doesn't cover subtypes or compatibility dependents.
+                ///   - force: Delete the type even if items of it exist, in any state, or a folder, view or webhook names it. It doesn't cover subtypes.
                 public init(force: Swift.Bool? = nil) {
                     self.force = force
                 }
@@ -67993,94 +67817,6 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "contentTooLarge",
-                            response: self
-                        )
-                    }
-                }
-            }
-            public struct UnprocessableContent: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.DeleteType.Output.UnprocessableContent.Headers
-                /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/422/content/application\/json`.
-                    case json(Components.Schemas.CompatibleWithViolationRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.DeleteType.Output.UnprocessableContent.Body
-                /// Creates a new `UnprocessableContent`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.DeleteType.Output.UnprocessableContent.Headers = .init(),
-                    body: Operations.DeleteType.Output.UnprocessableContent.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `compatible_with_violation`: other types name this type in `compatible_with`. `details.dependent_type_ids` lists them. Remove their claims before deleting the target; `force=true` does not bypass this check.
-            ///
-            /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/422`.
-            ///
-            /// HTTP response code: `422 unprocessableContent`.
-            case unprocessableContent(Operations.DeleteType.Output.UnprocessableContent)
-            /// The associated value of the enum case if `self` is `.unprocessableContent`.
-            ///
-            /// - Throws: An error if `self` is not `.unprocessableContent`.
-            /// - SeeAlso: `.unprocessableContent`.
-            public var unprocessableContent: Operations.DeleteType.Output.UnprocessableContent {
-                get throws {
-                    switch self {
-                    case let .unprocessableContent(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "unprocessableContent",
                             response: self
                         )
                     }
@@ -70136,7 +69872,7 @@ public enum Operations {
             }
             /// - `missing_required_field`: `fields` is missing.
             /// - `validation_error`: `id` is malformed, or `parent` isn't registered or makes too deep a chain.
-            /// - `invalid_schema`: the schema is invalid or has a key it doesn't define (`details.errors` names each path).
+            /// - `invalid_schema`: the schema is invalid, or has an unknown key or overlong text (`details.errors` names each path).
             /// - `property_shadows_field`: a field is named like one every item has.
             /// - `inheritance_violation`: the type reshapes an inherited field.
             ///
@@ -70641,94 +70377,6 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "contentTooLarge",
-                            response: self
-                        )
-                    }
-                }
-            }
-            public struct UnprocessableContent: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/types/normalize/POST/responses/422/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/normalize/POST/responses/422/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/normalize/POST/responses/422/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/types/normalize/POST/responses/422/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.NormalizeType.Output.UnprocessableContent.Headers
-                /// - Remark: Generated from `#/paths/types/normalize/POST/responses/422/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/types/normalize/POST/responses/422/content/application\/json`.
-                    case json(Components.Schemas.CompatibleWithViolationRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.NormalizeType.Output.UnprocessableContent.Body
-                /// Creates a new `UnprocessableContent`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.NormalizeType.Output.UnprocessableContent.Headers = .init(),
-                    body: Operations.NormalizeType.Output.UnprocessableContent.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `compatible_with_violation`: `compatible_with` names a type this instance doesn't hold, or one the type doesn't satisfy.
-            ///
-            /// - Remark: Generated from `#/paths//types/normalize/post(normalizeType)/responses/422`.
-            ///
-            /// HTTP response code: `422 unprocessableContent`.
-            case unprocessableContent(Operations.NormalizeType.Output.UnprocessableContent)
-            /// The associated value of the enum case if `self` is `.unprocessableContent`.
-            ///
-            /// - Throws: An error if `self` is not `.unprocessableContent`.
-            /// - SeeAlso: `.unprocessableContent`.
-            public var unprocessableContent: Operations.NormalizeType.Output.UnprocessableContent {
-                get throws {
-                    switch self {
-                    case let .unprocessableContent(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "unprocessableContent",
                             response: self
                         )
                     }
@@ -86033,7 +85681,7 @@ public enum Operations {
     }
     /// List webhooks
     ///
-    /// Returns webhooks and their makers, with secrets redacted. The local command sees every subscription; keys and apps see only their own.
+    /// Returns webhooks and their makers, with secrets redacted. A key or app sees only its own, unless it also holds `keys.manage`: then, as the local command does, it sees every key's and app's.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -86893,7 +86541,7 @@ public enum Operations {
     }
     /// Create a webhook
     ///
-    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when that is revoked, and sends nothing while it lacks `webhooks.manage` or the key has expired.
+    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when the grant is revoked, and sends nothing while its key or app is revoked, lacks `webhooks.manage` or has expired.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
@@ -88171,7 +87819,7 @@ public enum Operations {
     }
     /// Get a webhook
     ///
-    /// Returns a webhook and its maker, with its secret redacted. The local command can read any subscription; keys and apps can read only their own.
+    /// Returns a webhook and its maker, with its secret redacted. A key or app reads only its own, unless it also holds `keys.manage`: then, as the local command does, it reads any.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -88629,7 +88277,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `webhook_not_found`: no webhook of yours has this ID.
+            /// - `webhook_not_found`: no webhook you can reach has this ID.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)/responses/404`.
             ///
@@ -89139,7 +88787,7 @@ public enum Operations {
     }
     /// Update a webhook
     ///
-    /// Updates a webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
+    /// Updates your webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
@@ -89614,7 +89262,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't have `webhooks.manage`.
+            /// - `forbidden`: you don't have `webhooks.manage`, or you hold `keys.manage` and another key or app registered the webhook.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/403`.
             ///
@@ -89702,7 +89350,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `webhook_not_found`: no webhook of yours has this ID.
+            /// - `webhook_not_found`: no webhook you can reach has this ID.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/404`.
             ///
@@ -90476,7 +90124,7 @@ public enum Operations {
     }
     /// Delete a webhook
     ///
-    /// Deletes a webhook and cancels its pending deliveries.
+    /// Deletes a webhook and cancels its pending deliveries. A key or app deletes only its own, unless it also holds `keys.manage`: then, as the local command does, it deletes any, including one whose key was revoked or has expired.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
@@ -90943,7 +90591,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `webhook_not_found`: no webhook of yours has this ID.
+            /// - `webhook_not_found`: no webhook you can reach has this ID.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)/responses/404`.
             ///
@@ -91629,7 +91277,7 @@ public enum Operations {
     }
     /// List webhook deliveries
     ///
-    /// Returns delivery metadata without event payloads, newest first. The local command can inspect any subscription; keys and apps can inspect only their own.
+    /// Returns delivery metadata without event payloads, newest first. A key or app inspects only its own webhooks, unless it also holds `keys.manage`: then, as the local command does, it inspects any.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -92114,7 +91762,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `webhook_not_found`: no webhook of yours has this ID.
+            /// - `webhook_not_found`: no webhook you can reach has this ID.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)/responses/404`.
             ///
@@ -92624,7 +92272,7 @@ public enum Operations {
     }
     /// Redeliver a webhook delivery
     ///
-    /// Redelivers a failed delivery, queuing it again at the current URL. The local command can retry any subscription; keys and apps can retry only their own.
+    /// Redelivers a failed delivery, queuing it again at the current URL. A key or app retries only webhooks it registered; the local command can retry any.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -93012,7 +92660,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't have `webhooks.manage`.
+            /// - `forbidden`: you don't have `webhooks.manage`, or you hold `keys.manage` and another key or app registered the webhook.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/403`.
             ///
@@ -93100,7 +92748,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `webhook_not_found`: no webhook of yours has this ID, or it has no delivery with this `delivery_id`.
+            /// - `webhook_not_found`: no webhook you can reach has this ID, or it has no delivery with this `delivery_id`.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/404`.
             ///
@@ -137269,7 +136917,7 @@ public enum Operations {
     }
     /// Update an API key
     ///
-    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
+    /// Updates a key and returns it, keeping its secret. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -137436,7 +137084,7 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/enforcement_override`.
                     public var enforcementOverride: Components.Schemas.MarfaNullableEnforcementOverride?
-                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than the key's current one for a key an app made, with `narrow_only`, or without `keys.mint`. It also can't be later than your own key's `expires_at`, unless you hold `keys.manage` and it isn't later than the key's current one.
+                    /// Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than the key's current one with `narrow_only`, or for a key an app made without `keys.manage`. It also can't be later than your own key's `expires_at`, unless you hold `keys.manage` and it isn't later than the key's current one.
                     ///
                     /// - Remark: Generated from `#/paths/keys/{id}/PATCH/requestBody/json/expires_at`.
                     public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
@@ -137461,7 +137109,7 @@ public enum Operations {
                     ///   - profilePermissions: Profile access by `name`, `username`, `email`, `avatar`, or `*`. `write` implies read. `write` on a field changes it, and only `username` at `write` changes the username. `*` reads every field and at `write` changes every field but the username.
                     ///   - permissions: The permissions the key holds, such as `audit.read`.
                     ///   - enforcementOverride: Replaces the key's enforcement levers whole. `null` clears them.
-                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than the key's current one for a key an app made, with `narrow_only`, or without `keys.mint`. It also can't be later than your own key's `expires_at`, unless you hold `keys.manage` and it isn't later than the key's current one.
+                    ///   - expiresAt: Replaces when the key stops working, as an ISO 8601 date and time in the future. `null` clears it. Leave it out to keep it. It can't be later than the key's current one with `narrow_only`, or for a key an app made without `keys.manage`. It also can't be later than your own key's `expires_at`, unless you hold `keys.manage` and it isn't later than the key's current one.
                     ///   - source: Can't change. To give a key another source, create a new key and revoke this one.
                     ///   - narrowOnly: `true` to refuse the update if it would give the key more: a permission, map entry or claimed source it doesn't hold, a later `expires_at` or none, or an `enforcement_override` other than its own. Defaults to `false`.
                     public init(
@@ -137923,7 +137571,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you hold neither `keys.mint` nor `keys.manage`, or only `keys.manage` and it widens or lengthens the key; it gives more than you hold or an `expires_at` later than yours, unless `keys.manage` narrows it; it widens or lengthens an app's key, or any key with `narrow_only`, which also refuses a changed `enforcement_override`; or it names `enforcement_override` without `config.manage`.
+            /// - `forbidden`: you hold neither `keys.mint` nor `keys.manage`; the update widens reach without `keys.mint`, beyond your access, or for an app's key; its expiry exceeds yours when widening or lengthening; it lengthens an app's key without `keys.manage`; `narrow_only` refuses wider reach, longer life or a changed override; or changing `enforcement_override` needs `config.manage`.
             ///
             /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)/responses/403`.
             ///
@@ -180231,7 +179879,7 @@ public enum Operations {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
+    /// Restores an archive atomically and returns write and skip counts. Marfa blocks other writes during the restore. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -180972,8 +180620,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `backups.manage`, or the archive would store settings and you don't hold `config.manage`. `details.required_scope` names the missing permission. For `config.manage`, `details.settings` lists the settings.
-            /// - `app_sign_in_required`: you are an API key. A person restores from an app they signed in to, or with the private local command.
+            /// - `forbidden`: `details.required_scope` names the missing permission. `details.settings` lists settings for `config.manage`, and `details.changes` lists `guidance` for `schema.write`.
+            /// - `app_sign_in_required`: you are using an API key. Use an app you signed in to or the private local command.
             ///
             /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/403`.
             ///
@@ -181389,94 +181037,6 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "contentTooLarge",
-                            response: self
-                        )
-                    }
-                }
-            }
-            public struct UnprocessableContent: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/restore/POST/responses/422/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/restore/POST/responses/422/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/restore/POST/responses/422/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/restore/POST/responses/422/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.RestoreArchive.Output.UnprocessableContent.Headers
-                /// - Remark: Generated from `#/paths/restore/POST/responses/422/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/restore/POST/responses/422/content/application\/json`.
-                    case json(Components.Schemas.CompatibleWithViolationRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.RestoreArchive.Output.UnprocessableContent.Body
-                /// Creates a new `UnprocessableContent`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.RestoreArchive.Output.UnprocessableContent.Headers = .init(),
-                    body: Operations.RestoreArchive.Output.UnprocessableContent.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `compatible_with_violation`: an archived type's `compatible_with` names a type neither the archive nor this instance holds, or one the type doesn't satisfy.
-            ///
-            /// - Remark: Generated from `#/paths//restore/post(restoreArchive)/responses/422`.
-            ///
-            /// HTTP response code: `422 unprocessableContent`.
-            case unprocessableContent(Operations.RestoreArchive.Output.UnprocessableContent)
-            /// The associated value of the enum case if `self` is `.unprocessableContent`.
-            ///
-            /// - Throws: An error if `self` is not `.unprocessableContent`.
-            /// - SeeAlso: `.unprocessableContent`.
-            public var unprocessableContent: Operations.RestoreArchive.Output.UnprocessableContent {
-                get throws {
-                    switch self {
-                    case let .unprocessableContent(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "unprocessableContent",
                             response: self
                         )
                     }
@@ -185001,7 +184561,7 @@ public enum Operations {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
+    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -185806,8 +185366,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you don't hold `backups.manage`, or the archive would store settings and you don't hold `config.manage`. `details.required_scope` names the missing permission. For `config.manage`, `details.settings` lists the settings.
-            /// - `app_sign_in_required`: you are an API key. A person restores from an app they signed in to, or with the private local command.
+            /// - `forbidden`: `details.required_scope` names the missing permission. `details.settings` lists settings for `config.manage`, and `details.changes` lists `guidance` for `schema.write`.
+            /// - `app_sign_in_required`: you are using an API key. Use an app you signed in to or the private local command.
             ///
             /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)/responses/403`.
             ///
@@ -186261,94 +185821,6 @@ public enum Operations {
                     default:
                         try throwUnexpectedResponseStatus(
                             expectedStatus: "contentTooLarge",
-                            response: self
-                        )
-                    }
-                }
-            }
-            public struct UnprocessableContent: Sendable, Hashable {
-                /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/422/headers`.
-                public struct Headers: Sendable, Hashable {
-                    /// The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///
-                    /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/422/headers/X-Marfa-Contract`.
-                    public var xMarfaContract: Components.Headers.XMarfaContract?
-                    /// This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///
-                    /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/422/headers/X-Request-ID`.
-                    public var xRequestID: Components.Headers.XRequestID?
-                    /// The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    ///
-                    /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/422/headers/X-Error-Code`.
-                    public var xErrorCode: Components.Headers.XErrorCode?
-                    /// Creates a new `Headers`.
-                    ///
-                    /// - Parameters:
-                    ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
-                    ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
-                    ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
-                    public init(
-                        xMarfaContract: Components.Headers.XMarfaContract? = nil,
-                        xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
-                    ) {
-                        self.xMarfaContract = xMarfaContract
-                        self.xRequestID = xRequestID
-                        self.xErrorCode = xErrorCode
-                    }
-                }
-                /// Received HTTP response headers
-                public var headers: Operations.RestoreBackup.Output.UnprocessableContent.Headers
-                /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/422/content`.
-                @frozen public enum Body: Sendable, Hashable {
-                    /// - Remark: Generated from `#/paths/backups/{instance_id}/{name}/restore/POST/responses/422/content/application\/json`.
-                    case json(Components.Schemas.CompatibleWithViolationRefusal)
-                    /// The associated value of the enum case if `self` is `.json`.
-                    ///
-                    /// - Throws: An error if `self` is not `.json`.
-                    /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.CompatibleWithViolationRefusal {
-                        get throws {
-                            switch self {
-                            case let .json(body):
-                                return body
-                            }
-                        }
-                    }
-                }
-                /// Received HTTP response body
-                public var body: Operations.RestoreBackup.Output.UnprocessableContent.Body
-                /// Creates a new `UnprocessableContent`.
-                ///
-                /// - Parameters:
-                ///   - headers: Received HTTP response headers
-                ///   - body: Received HTTP response body
-                public init(
-                    headers: Operations.RestoreBackup.Output.UnprocessableContent.Headers = .init(),
-                    body: Operations.RestoreBackup.Output.UnprocessableContent.Body
-                ) {
-                    self.headers = headers
-                    self.body = body
-                }
-            }
-            /// `compatible_with_violation`: an archived type's `compatible_with` names a type neither the archive nor this instance holds, or one the type doesn't satisfy.
-            ///
-            /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)/responses/422`.
-            ///
-            /// HTTP response code: `422 unprocessableContent`.
-            case unprocessableContent(Operations.RestoreBackup.Output.UnprocessableContent)
-            /// The associated value of the enum case if `self` is `.unprocessableContent`.
-            ///
-            /// - Throws: An error if `self` is not `.unprocessableContent`.
-            /// - SeeAlso: `.unprocessableContent`.
-            public var unprocessableContent: Operations.RestoreBackup.Output.UnprocessableContent {
-                get throws {
-                    switch self {
-                    case let .unprocessableContent(response):
-                        return response
-                    default:
-                        try throwUnexpectedResponseStatus(
-                            expectedStatus: "unprocessableContent",
                             response: self
                         )
                     }

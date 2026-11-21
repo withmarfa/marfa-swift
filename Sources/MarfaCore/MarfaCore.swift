@@ -8803,7 +8803,6 @@ public struct ItemType: Equatable, Hashable {
     public var icon: String?
     public var linkField: String?
     public var roles: [String]
-    public var compatibleWith: [String]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -8821,7 +8820,7 @@ public struct ItemType: Equatable, Hashable {
          */nameFromBody: Bool, 
         /**
          * The Iconify icon ID, `<set>:<name>`, such as `lucide:book-open`.
-         */icon: String?, linkField: String?, roles: [String], compatibleWith: [String]) {
+         */icon: String?, linkField: String?, roles: [String]) {
         self.id = id
         self.label = label
         self.plural = plural
@@ -8836,7 +8835,6 @@ public struct ItemType: Equatable, Hashable {
         self.icon = icon
         self.linkField = linkField
         self.roles = roles
-        self.compatibleWith = compatibleWith
     }
 
     
@@ -8868,8 +8866,7 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
                 nameFromBody: FfiConverterBool.read(from: &buf), 
                 icon: FfiConverterOptionString.read(from: &buf), 
                 linkField: FfiConverterOptionString.read(from: &buf), 
-                roles: FfiConverterSequenceString.read(from: &buf), 
-                compatibleWith: FfiConverterSequenceString.read(from: &buf)
+                roles: FfiConverterSequenceString.read(from: &buf)
         )
     }
 
@@ -8888,7 +8885,6 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.icon, into: &buf)
         FfiConverterOptionString.write(value.linkField, into: &buf)
         FfiConverterSequenceString.write(value.roles, into: &buf)
-        FfiConverterSequenceString.write(value.compatibleWith, into: &buf)
     }
 }
 

@@ -29,7 +29,7 @@ private let catalog = URL(fileURLWithPath: #filePath)
 private func pinnedList() throws -> (version: String, ids: [String])? {
     guard let checkout = ProcessInfo.processInfo.environment["MARFA_MONOREPO"] else { return nil }
     let file = URL(fileURLWithPath: checkout).appendingPathComponent(
-        "packages/types/generated/icon-set-simple-icons.json")
+        "core/marfa-rules/icons/icon-set-simple-icons.json")
     struct List: Decodable {
         let version: String
         let icons: [String]

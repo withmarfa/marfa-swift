@@ -33,7 +33,7 @@ private let sourceRoot = URL(fileURLWithPath: #filePath)
 /// The list marfa generates for an icon set at the pinned commit, from the checkout `MARFA_MONOREPO` names.
 private func pinnedList(_ prefix: String) throws -> (version: String, ids: [String])? {
     guard let checkout = ProcessInfo.processInfo.environment["MARFA_MONOREPO"] else { return nil }
-    let file = URL(fileURLWithPath: checkout).appendingPathComponent("packages/types/generated/icon-set-\(prefix).json")
+    let file = URL(fileURLWithPath: checkout).appendingPathComponent("core/marfa-rules/icons/icon-set-\(prefix).json")
     struct List: Decodable {
         let version: String
         let icons: [String]
@@ -133,7 +133,7 @@ private let someBrandArtwork = BrandArtwork(
         #expect(TypeIconArtwork(id: id, brand: nil) == .symbol(symbol))
     }
 
-    /// The `icon` of every type in marfa's `packages/types/core` at the pin.
+    /// The `icon` of every type in marfa's `core/marfa-rules/types` at the pin.
     @Test(arguments: [
         "lucide:bookmark", "lucide:layers", "lucide:shapes", "lucide:user", "lucide:map-pin", "lucide:calendar",
         "lucide:file-music", "lucide:file-image", "lucide:file", "lucide:file-video-camera", "lucide:globe",

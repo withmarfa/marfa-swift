@@ -8682,7 +8682,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/label`.
             public var label: Swift.String?
-            /// What the field holds.
+            /// What the field holds. Registration, replacement, and normalization accept up to 300 Unicode code points.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/description`.
             public var description: Swift.String?
@@ -8770,7 +8770,7 @@ extension Components {
             /// - Parameters:
             ///   - _type: The field's type. A `thumbnail` is a base64 `data:` URI of a PNG, JPEG or WebP image up to 16 KiB, never `title`, `body`, `description` or `name`; a `status` is a word from `status_values`. A type has at most one of each, never as `items_type`.
             ///   - label: A name for people to read, up to 100 characters. Leave it out and a type read answers the nearest one a type above names, else one made from the field's name, such as `Due At` for `due_at`. The type list answers only the declared label.
-            ///   - description: What the field holds.
+            ///   - description: What the field holds. Registration, replacement, and normalization accept up to 300 Unicode code points.
             ///   - required: `true` if an item of the type must have a value for it.
             ///   - enumValues: The values an `enum` field allows.
             ///   - statusValues: The words a `status` field takes, each in a group: `not_started`, `in_progress`, `completed` or `canceled`. A subtype lists only the words it adds. A type read answers every word, inherited first; the type list answers the type's own.
@@ -8968,7 +8968,7 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
-        /// One word a `status` field takes, with its group.
+        /// One word a `status` field takes, with its group and, optionally, what it means.
         ///
         /// - Remark: Generated from `#/components/schemas/StatusValue`.
         public struct StatusValue: Codable, Hashable, Sendable {
@@ -8989,21 +8989,29 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/StatusValue/group`.
             public var group: Components.Schemas.StatusValue.GroupPayload
+            /// What the word means. Registration, replacement, and normalization accept up to 120 Unicode code points.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StatusValue/description`.
+            public var description: Swift.String?
             /// Creates a new `StatusValue`.
             ///
             /// - Parameters:
             ///   - value: The word, such as `in_review`: a lowercase letter, then up to 63 lowercase letters, digits and underscores.
             ///   - group: The group the word belongs to.
+            ///   - description: What the word means. Registration, replacement, and normalization accept up to 120 Unicode code points.
             public init(
                 value: Swift.String,
-                group: Components.Schemas.StatusValue.GroupPayload
+                group: Components.Schemas.StatusValue.GroupPayload,
+                description: Swift.String? = nil
             ) {
                 self.value = value
                 self.group = group
+                self.description = description
             }
             public enum CodingKeys: String, CodingKey {
                 case value
                 case group
+                case description
             }
         }
         /// One member of the entries of an `array` field.
@@ -9036,7 +9044,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/EntryMember/label`.
             public var label: Swift.String?
-            /// What the member holds.
+            /// What the member holds. Registration, replacement, and normalization accept up to 300 Unicode code points.
             ///
             /// - Remark: Generated from `#/components/schemas/EntryMember/description`.
             public var description: Swift.String?
@@ -9084,7 +9092,7 @@ extension Components {
             /// - Parameters:
             ///   - _type: The member's type: `string`, `email`, `url`, `enum`, `boolean`, `integer`, `number`, `date` or `datetime`.
             ///   - label: A name for people to read, up to 100 characters. Leave it out and a type read answers the nearest one a type above names, else one made from the member's name, such as `Due At` for `due_at`. The type list answers only the declared label.
-            ///   - description: What the member holds.
+            ///   - description: What the member holds. Registration, replacement, and normalization accept up to 300 Unicode code points.
             ///   - required: `true` if every entry must have the member.
             ///   - enumValues: The values an `enum` member allows.
             ///   - format: A refinement of a `string` member, as a field's `format`.
@@ -9286,18 +9294,18 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/plural`.
             public var plural: Swift.String?
-            /// What the type is for.
+            /// What the type is for. Registration, replacement, and normalization accept up to 200 Unicode code points.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/description`.
             public var description: Swift.String?
+            /// Markdown that tells an agent or an app builder how to use the type. Present only where the type carries some. `GET /types/{id}` also lists the guidance of its ancestors.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinition/guidance`.
+            public var guidance: Swift.String?
             /// The identifier of the type this one inherits from.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/parent`.
             public var parent: Swift.String?
-            /// The types this one is a structural superset of.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinition/compatible_with`.
-            public var compatibleWith: [Swift.String]?
             /// The structural roles the type plays, including those it inherits.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinition/roles`.
@@ -9380,9 +9388,9 @@ extension Components {
             ///   - id: Unique identifier for the type.
             ///   - label: The type's name for people to read.
             ///   - plural: The type's plural name for people to read, such as `People`. Never inherited. Left out of the list of types where the type declares none.
-            ///   - description: What the type is for.
+            ///   - description: What the type is for. Registration, replacement, and normalization accept up to 200 Unicode code points.
+            ///   - guidance: Markdown that tells an agent or an app builder how to use the type. Present only where the type carries some. `GET /types/{id}` also lists the guidance of its ancestors.
             ///   - parent: The identifier of the type this one inherits from.
-            ///   - compatibleWith: The types this one is a structural superset of.
             ///   - roles: The structural roles the type plays, including those it inherits.
             ///   - fields: The type's own fields, by name. `GET /types/{id}` adds the fields it inherits.
             ///   - tables: The type's own tables, by name. `GET /types/{id}` adds the tables it inherits.
@@ -9397,8 +9405,8 @@ extension Components {
                 label: Swift.String? = nil,
                 plural: Swift.String? = nil,
                 description: Swift.String? = nil,
+                guidance: Swift.String? = nil,
                 parent: Swift.String? = nil,
-                compatibleWith: [Swift.String]? = nil,
                 roles: [Components.Schemas.TypeRole]? = nil,
                 fields: Components.Schemas.TypeDefinition.FieldsPayload,
                 tables: Components.Schemas.TypeDefinition.TablesPayload? = nil,
@@ -9413,8 +9421,8 @@ extension Components {
                 self.label = label
                 self.plural = plural
                 self.description = description
+                self.guidance = guidance
                 self.parent = parent
-                self.compatibleWith = compatibleWith
                 self.roles = roles
                 self.fields = fields
                 self.tables = tables
@@ -9430,8 +9438,8 @@ extension Components {
                 case label
                 case plural
                 case description
+                case guidance
                 case parent
-                case compatibleWith = "compatible_with"
                 case roles
                 case fields
                 case tables
@@ -9459,21 +9467,29 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/provenance`.
                 public var provenance: Components.Schemas.TypeProvenance
+                /// The guidance of the types above this one, nearest first. Present only where one of them carries some. The type's own guidance is `guidance`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/ancestor_guidance`.
+                public var ancestorGuidance: [Components.Schemas.TypeGuidance]?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
                 ///   - plural: The type's plural name for people to read, such as `People`: the one the type declares, else one made from its label. Never inherited.
                 ///   - provenance: The type's recorded origin and creator.
+                ///   - ancestorGuidance: The guidance of the types above this one, nearest first. Present only where one of them carries some. The type's own guidance is `guidance`.
                 public init(
                     plural: Swift.String,
-                    provenance: Components.Schemas.TypeProvenance
+                    provenance: Components.Schemas.TypeProvenance,
+                    ancestorGuidance: [Components.Schemas.TypeGuidance]? = nil
                 ) {
                     self.plural = plural
                     self.provenance = provenance
+                    self.ancestorGuidance = ancestorGuidance
                 }
                 public enum CodingKeys: String, CodingKey {
                     case plural
                     case provenance
+                    case ancestorGuidance = "ancestor_guidance"
                 }
             }
             /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
@@ -9497,6 +9513,35 @@ extension Components {
             public func encode(to encoder: any Swift.Encoder) throws {
                 try self.value1.encode(to: encoder)
                 try self.value2.encode(to: encoder)
+            }
+        }
+        /// One type's guidance, as read for a type below it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/TypeGuidance`.
+        public struct TypeGuidance: Codable, Hashable, Sendable {
+            /// The identifier of the type that carries the guidance.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeGuidance/type`.
+            public var _type: Swift.String
+            /// That type's own guidance.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeGuidance/guidance`.
+            public var guidance: Swift.String
+            /// Creates a new `TypeGuidance`.
+            ///
+            /// - Parameters:
+            ///   - _type: The identifier of the type that carries the guidance.
+            ///   - guidance: That type's own guidance.
+            public init(
+                _type: Swift.String,
+                guidance: Swift.String
+            ) {
+                self._type = _type
+                self.guidance = guidance
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case guidance
             }
         }
         /// An error response.
@@ -9786,88 +9831,6 @@ extension Components {
                 case error
             }
         }
-        /// An error response.
-        ///
-        /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal`.
-        public struct CompatibleWithViolationRefusal: Codable, Hashable, Sendable {
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error`.
-            public struct _ErrorPayload: Codable, Hashable, Sendable {
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/code`.
-                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case compatibleWithViolation = "compatible_with_violation"
-                }
-                /// A machine-readable code for the error. Use it in your logic.
-                ///
-                /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/code`.
-                public var code: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.CodePayload
-                /// A description of the error for a person to read. It can change, so don't match on it.
-                ///
-                /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/message`.
-                public var message: Swift.String
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/details`.
-                public struct DetailsPayload: Codable, Hashable, Sendable {
-                    /// A container of undocumented properties.
-                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                    /// Creates a new `DetailsPayload`.
-                    ///
-                    /// - Parameters:
-                    ///   - additionalProperties: A container of undocumented properties.
-                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                        self.additionalProperties = additionalProperties
-                    }
-                    public init(from decoder: any Swift.Decoder) throws {
-                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                    }
-                    public func encode(to encoder: any Swift.Encoder) throws {
-                        try encoder.encodeAdditionalProperties(additionalProperties)
-                    }
-                }
-                /// More about the error, such as the field it concerns. Each code defines its own details.
-                ///
-                /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error/details`.
-                public var details: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.DetailsPayload?
-                /// Creates a new `_ErrorPayload`.
-                ///
-                /// - Parameters:
-                ///   - code: A machine-readable code for the error. Use it in your logic.
-                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
-                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
-                public init(
-                    code: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.CodePayload,
-                    message: Swift.String,
-                    details: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload.DetailsPayload? = nil
-                ) {
-                    self.code = code
-                    self.message = message
-                    self.details = details
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case code
-                    case message
-                    case details
-                }
-            }
-            /// What went wrong.
-            ///
-            /// - Remark: Generated from `#/components/schemas/CompatibleWithViolationRefusal/error`.
-            public var error: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload
-            /// Creates a new `CompatibleWithViolationRefusal`.
-            ///
-            /// - Parameters:
-            ///   - error: What went wrong.
-            public init(error: Components.Schemas.CompatibleWithViolationRefusal._ErrorPayload) {
-                self.error = error
-            }
-            public enum CodingKeys: String, CodingKey {
-                case error
-            }
-        }
         /// A declared item type.
         ///
         /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput`.
@@ -9936,10 +9899,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/plural`.
             public var plural: Swift.String?
-            /// What the type is for.
+            /// A sentence saying what the type is for, up to 200 Unicode code points.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/description`.
             public var description: Swift.String?
+            /// Markdown on how to use the type, up to 1,000 Unicode code points. For registration, non-empty guidance needs `schema.write`. Omit it or send an empty string for no guidance. An `app.*` type takes no guidance.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/guidance`.
+            public var guidance: Swift.String?
             /// The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/roles`.
@@ -9948,59 +9915,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/required`.
             public var required: [Swift.String]?
-            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with`.
-            public struct CompatibleWithPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with/value1`.
-                public var value1: Swift.String?
-                /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with/value2`.
-                public var value2: [Swift.String]?
-                /// Creates a new `CompatibleWithPayload`.
-                ///
-                /// - Parameters:
-                ///   - value1:
-                ///   - value2:
-                public init(
-                    value1: Swift.String? = nil,
-                    value2: [Swift.String]? = nil
-                ) {
-                    self.value1 = value1
-                    self.value2 = value2
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    var errors: [any Swift.Error] = []
-                    do {
-                        self.value1 = try decoder.decodeFromSingleValueContainer()
-                    } catch {
-                        errors.append(error)
-                    }
-                    do {
-                        self.value2 = try decoder.decodeFromSingleValueContainer()
-                    } catch {
-                        errors.append(error)
-                    }
-                    try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
-                        [
-                            self.value1,
-                            self.value2
-                        ],
-                        type: Self.self,
-                        codingPath: decoder.codingPath,
-                        errors: errors
-                    )
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeFirstNonNilValueToSingleValueContainer([
-                        self.value1,
-                        self.value2
-                    ])
-                }
-            }
-            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/compatible_with`.
-            public var compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload?
             /// How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionInput/display_hints`.
@@ -10034,10 +9948,10 @@ extension Components {
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
             ///   - label: A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
             ///   - plural: The label's plural, up to 100 characters, such as `People`. Leave it out and Marfa adds `s`, `es` or `ies` to the label by the regular English rule.
-            ///   - description: What the type is for.
+            ///   - description: A sentence saying what the type is for, up to 200 Unicode code points.
+            ///   - guidance: Markdown on how to use the type, up to 1,000 Unicode code points. For registration, non-empty guidance needs `schema.write`. Omit it or send an empty string for no guidance. An `app.*` type takes no guidance.
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
-            ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///   - displayHints: How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
@@ -10052,9 +9966,9 @@ extension Components {
                 label: Swift.String? = nil,
                 plural: Swift.String? = nil,
                 description: Swift.String? = nil,
+                guidance: Swift.String? = nil,
                 roles: [Swift.String]? = nil,
                 required: [Swift.String]? = nil,
-                compatibleWith: Components.Schemas.TypeDefinitionInput.CompatibleWithPayload? = nil,
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
@@ -10069,9 +9983,9 @@ extension Components {
                 self.label = label
                 self.plural = plural
                 self.description = description
+                self.guidance = guidance
                 self.roles = roles
                 self.required = required
-                self.compatibleWith = compatibleWith
                 self.displayHints = displayHints
                 self.linkField = linkField
                 self.versionPolicy = versionPolicy
@@ -10087,9 +10001,9 @@ extension Components {
                 case label
                 case plural
                 case description
+                case guidance
                 case roles
                 case required
-                case compatibleWith = "compatible_with"
                 case displayHints = "display_hints"
                 case linkField = "link_field"
                 case versionPolicy = "version_policy"
@@ -10127,6 +10041,10 @@ extension Components {
                     Swift.String.self,
                     forKey: .description
                 )
+                self.guidance = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .guidance
+                )
                 self.roles = try container.decodeIfPresent(
                     [Swift.String].self,
                     forKey: .roles
@@ -10134,10 +10052,6 @@ extension Components {
                 self.required = try container.decodeIfPresent(
                     [Swift.String].self,
                     forKey: .required
-                )
-                self.compatibleWith = try container.decodeIfPresent(
-                    Components.Schemas.TypeDefinitionInput.CompatibleWithPayload.self,
-                    forKey: .compatibleWith
                 )
                 self.displayHints = try container.decodeIfPresent(
                     Components.Schemas.DisplayHints.self,
@@ -10171,9 +10085,9 @@ extension Components {
                     "label",
                     "plural",
                     "description",
+                    "guidance",
                     "roles",
                     "required",
-                    "compatible_with",
                     "display_hints",
                     "link_field",
                     "version_policy",
@@ -10500,10 +10414,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/plural`.
             public var plural: Swift.String?
-            /// What the type is for.
+            /// A sentence saying what the type is for, up to 200 Unicode code points.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/description`.
             public var description: Swift.String?
+            /// Markdown on how to use the type, up to 1,000 Unicode code points. Omit it or send an empty string to clear it. Adding, changing, or removing it needs `schema.write`. An `app.*` type takes no guidance.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/guidance`.
+            public var guidance: Swift.String?
             /// The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/roles`.
@@ -10512,59 +10430,6 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/required`.
             public var required: [Swift.String]?
-            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with`.
-            public struct CompatibleWithPayload: Codable, Hashable, Sendable {
-                /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with/value1`.
-                public var value1: Swift.String?
-                /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with/value2`.
-                public var value2: [Swift.String]?
-                /// Creates a new `CompatibleWithPayload`.
-                ///
-                /// - Parameters:
-                ///   - value1:
-                ///   - value2:
-                public init(
-                    value1: Swift.String? = nil,
-                    value2: [Swift.String]? = nil
-                ) {
-                    self.value1 = value1
-                    self.value2 = value2
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    var errors: [any Swift.Error] = []
-                    do {
-                        self.value1 = try decoder.decodeFromSingleValueContainer()
-                    } catch {
-                        errors.append(error)
-                    }
-                    do {
-                        self.value2 = try decoder.decodeFromSingleValueContainer()
-                    } catch {
-                        errors.append(error)
-                    }
-                    try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
-                        [
-                            self.value1,
-                            self.value2
-                        ],
-                        type: Self.self,
-                        codingPath: decoder.codingPath,
-                        errors: errors
-                    )
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeFirstNonNilValueToSingleValueContainer([
-                        self.value1,
-                        self.value2
-                    ])
-                }
-            }
-            /// The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
-            ///
-            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/compatible_with`.
-            public var compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload?
             /// How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/display_hints`.
@@ -10593,6 +10458,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/id`.
             public var id: Swift.String?
+            /// The guidance of the types above, accepted when replacing a read response. This field changes nothing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/ancestor_guidance`.
+            public var ancestorGuidance: [Components.Schemas.TypeGuidance]?
             /// Creates a new `TypeDefinitionUpdate`.
             ///
             /// - Parameters:
@@ -10602,10 +10471,10 @@ extension Components {
             ///   - parent: The identifier of the type this one inherits from. To set or change it, you need write on it, unless Marfa ships it. Leave it out for a type with no parent.
             ///   - label: A name for people to read, up to 100 characters. Leave it out and Marfa derives one from the last segment of the identifier.
             ///   - plural: The label's plural, up to 100 characters, such as `People`. Leave it out and Marfa adds `s`, `es` or `ies` to the label by the regular English rule.
-            ///   - description: What the type is for.
+            ///   - description: A sentence saying what the type is for, up to 200 Unicode code points.
+            ///   - guidance: Markdown on how to use the type, up to 1,000 Unicode code points. Omit it or send an empty string to clear it. Adding, changing, or removing it needs `schema.write`. An `app.*` type takes no guidance.
             ///   - roles: The structural roles the type plays: `container`. An edge type's `role:<name>` constraint matches types by role.
             ///   - required: The names of the fields an item of the type must have. It means the same as `required: true` on each of them.
-            ///   - compatibleWith: The types this one is a structural superset of. Marfa checks the claim when you save the type. A bare string names one type.
             ///   - displayHints: How clients show the type and its items: the title field, the body field, whether the body names an item, and the icon.
             ///   - linkField: The name of a string field, declared or inherited, that holds each item's own ID at the vendor that writes the type. No two items of the type, in any state, hold the same value. A subtype names its own link. The name has no `"` or `\`.
             ///   - versionPolicy: How long Marfa keeps the versions of the type's items.
@@ -10613,6 +10482,7 @@ extension Components {
             ///   - retentionPolicy: How long Marfa keeps the type's items in the feed tier.
             ///   - provenance: The recorded origin and creator, accepted when replacing a read response. This field cannot change either value.
             ///   - id: The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
+            ///   - ancestorGuidance: The guidance of the types above, accepted when replacing a read response. This field changes nothing.
             public init(
                 fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload,
                 tables: Components.Schemas.TypeDefinitionUpdate.TablesPayload? = nil,
@@ -10621,16 +10491,17 @@ extension Components {
                 label: Swift.String? = nil,
                 plural: Swift.String? = nil,
                 description: Swift.String? = nil,
+                guidance: Swift.String? = nil,
                 roles: [Swift.String]? = nil,
                 required: [Swift.String]? = nil,
-                compatibleWith: Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload? = nil,
                 displayHints: Components.Schemas.DisplayHints? = nil,
                 linkField: Swift.String? = nil,
                 versionPolicy: Components.Schemas.VersionPolicy? = nil,
                 mergePolicy: Components.Schemas.MergePolicy? = nil,
                 retentionPolicy: Components.Schemas.RetentionPolicy? = nil,
                 provenance: Components.Schemas.TypeProvenance? = nil,
-                id: Swift.String? = nil
+                id: Swift.String? = nil,
+                ancestorGuidance: [Components.Schemas.TypeGuidance]? = nil
             ) {
                 self.fields = fields
                 self.tables = tables
@@ -10639,9 +10510,9 @@ extension Components {
                 self.label = label
                 self.plural = plural
                 self.description = description
+                self.guidance = guidance
                 self.roles = roles
                 self.required = required
-                self.compatibleWith = compatibleWith
                 self.displayHints = displayHints
                 self.linkField = linkField
                 self.versionPolicy = versionPolicy
@@ -10649,6 +10520,7 @@ extension Components {
                 self.retentionPolicy = retentionPolicy
                 self.provenance = provenance
                 self.id = id
+                self.ancestorGuidance = ancestorGuidance
             }
             public enum CodingKeys: String, CodingKey {
                 case fields
@@ -10658,9 +10530,9 @@ extension Components {
                 case label
                 case plural
                 case description
+                case guidance
                 case roles
                 case required
-                case compatibleWith = "compatible_with"
                 case displayHints = "display_hints"
                 case linkField = "link_field"
                 case versionPolicy = "version_policy"
@@ -10668,6 +10540,7 @@ extension Components {
                 case retentionPolicy = "retention_policy"
                 case provenance
                 case id
+                case ancestorGuidance = "ancestor_guidance"
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -10699,6 +10572,10 @@ extension Components {
                     Swift.String.self,
                     forKey: .description
                 )
+                self.guidance = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .guidance
+                )
                 self.roles = try container.decodeIfPresent(
                     [Swift.String].self,
                     forKey: .roles
@@ -10706,10 +10583,6 @@ extension Components {
                 self.required = try container.decodeIfPresent(
                     [Swift.String].self,
                     forKey: .required
-                )
-                self.compatibleWith = try container.decodeIfPresent(
-                    Components.Schemas.TypeDefinitionUpdate.CompatibleWithPayload.self,
-                    forKey: .compatibleWith
                 )
                 self.displayHints = try container.decodeIfPresent(
                     Components.Schemas.DisplayHints.self,
@@ -10739,6 +10612,10 @@ extension Components {
                     Swift.String.self,
                     forKey: .id
                 )
+                self.ancestorGuidance = try container.decodeIfPresent(
+                    [Components.Schemas.TypeGuidance].self,
+                    forKey: .ancestorGuidance
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "fields",
                     "tables",
@@ -10747,16 +10624,17 @@ extension Components {
                     "label",
                     "plural",
                     "description",
+                    "guidance",
                     "roles",
                     "required",
-                    "compatible_with",
                     "display_hints",
                     "link_field",
                     "version_policy",
                     "merge_policy",
                     "retention_policy",
                     "provenance",
-                    "id"
+                    "id",
+                    "ancestor_guidance"
                 ])
             }
         }
