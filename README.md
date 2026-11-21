@@ -32,7 +32,7 @@ Replace `<latest release>` with the version of the [latest release](https://gith
 
 The SDK's enums are exhaustive. Switch over them without `@unknown default`, so a case a later release adds stops the build at each switch that must handle it.
 
-The core is built for Apple silicon only. Set **Excluded Architectures** for **Any iOS Simulator SDK** to `x86_64` in your app target, or some simulator builds fail to link.
+The core is built for Apple silicon only. Set **Excluded Architectures** to `x86_64` in your app target, for **Any iOS Simulator SDK** in an iOS target and for every SDK in a Mac or multiplatform target, as the sample app does, or some builds fail to link.
 
 ## Documentation
 
