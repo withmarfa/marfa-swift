@@ -20,15 +20,15 @@ An app built on it keeps a working copy of its data on the device. The app reads
 
 The SDK supports iOS 27 and macOS 27, and builds with Xcode 27 on a Mac with Apple silicon.
 
-In Xcode, choose **File** > **Add Package Dependencies**, enter `https://github.com/withmarfa/marfa-swift`, and set **Dependency Rule** to **Up to Next Major Version**. In a `Package.swift`:
+In Xcode, choose **File** > **Add Package Dependencies**, enter `https://github.com/withmarfa/marfa-swift`, set **Dependency Rule** to **Exact Version**, and enter the [latest release](https://github.com/withmarfa/marfa-swift/releases/latest). In a `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/withmarfa/marfa-swift", from: "<latest release>"),
+.package(url: "https://github.com/withmarfa/marfa-swift", exact: "<latest release>"),
 // in your target's dependencies:
 .product(name: "Marfa", package: "marfa-swift"),
 ```
 
-Replace `<latest release>` with the version of the [latest release](https://github.com/withmarfa/marfa-swift/releases/latest). Each release carries the core already built, so your app needs no Rust toolchain. Read the [release notes](https://github.com/withmarfa/marfa-swift/releases) before you update: any release can change a call.
+Replace `<latest release>` with the version of the latest release. Each release is built against one Marfa release and carries its core already built, so your app needs no Rust toolchain. Move to a new SDK version, and the server release it pairs with, on purpose. Read the [release notes](https://github.com/withmarfa/marfa-swift/releases) before you update: any release can change a call.
 
 The SDK's enums are exhaustive. Switch over them without `@unknown default`, so a case a later release adds stops the build at each switch that must handle it.
 
