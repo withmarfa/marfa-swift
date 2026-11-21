@@ -114,6 +114,25 @@ extension LiveWorkingCopies {
             try await api.delete(itemType: id)
         }
 
+        @Test func healthIsReadWithNoCredentialAndWithTheKey() async throws {
+            let server = try #require(Live.server)
+            let open = try await Server(url: server.url, key: "").health()
+            #expect(open.status == .ok || open.status == .degraded)
+            #expect(open.components.database.status == .ok && open.components.blobStorage.status == .ok)
+            #expect(open.housekeeping == nil, "a read with no credential gets no housekeeping")
+            #expect(open.backups.lastBackup == nil && open.backups.failures == nil)
+
+            let granted = try await server.health()
+            #expect(granted.components.database.status == .ok)
+            let key = try await Client(server).getCurrentKey().ok.body.json
+            if key.permissions.map(\.rawValue).contains("instance.read") {
+                #expect(granted.housekeeping != nil, "a key holding instance.read gets housekeeping")
+                #expect(granted.backups.failures != nil)
+            } else {
+                #expect(granted.housekeeping == nil)
+            }
+        }
+
         /// A type holding `count` items, and a second to move them to.
         private static func movable(_ api: Client, count: Int) async throws -> (from: String, to: String) {
             let name = Self.suffix()

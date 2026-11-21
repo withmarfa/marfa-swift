@@ -152,32 +152,41 @@ extension Server {
     /// the sheet counts toward no limit, and the call sent again gets the whole limit.
     func send(
         _ method: String, _ path: String, query: [URLQueryItem] = [], headers: [String: String] = [:],
-        body: Data? = nil, timeout: Duration
+        body: Data? = nil, timeout: Duration, openWhenSignedOut: Bool = false,
+        accepting: (@Sendable (_ status: UInt16, _ body: Data) -> Bool)? = nil
     ) async throws(MarfaError) -> Data {
         let mark = confirmationMark()
-        let token = try currentToken()
+        let token: String
+        do {
+            token = try currentToken()
+        } catch .signedOut where openWhenSignedOut {
+            token = ""
+        }
         do {
             return try await timed(
-                method, path, query: query, headers: headers, body: body, timeout: timeout, token: token)
+                method, path, query: query, headers: headers, body: body, timeout: timeout, token: token,
+                accepting: accepting)
         } catch .confirmationRequired(let maxAge, let message, let answer) {
             // The sheet waits for a person, so the call's time limit starts again once it closes.
             let confirmed = try await confirmedToken(
                 since: mark,
                 challenge: .confirmationRequired(maxAgeSeconds: maxAge, message: message, server: answer))
             return try await timed(
-                method, path, query: query, headers: headers, body: body, timeout: timeout, token: confirmed)
+                method, path, query: query, headers: headers, body: body, timeout: timeout, token: confirmed,
+                accepting: accepting)
         }
     }
 
     private func timed(
         _ method: String, _ path: String, query: [URLQueryItem], headers: [String: String], body: Data?,
-        timeout: Duration, token: String
+        timeout: Duration, token: String, accepting: (@Sendable (UInt16, Data) -> Bool)?
     ) async throws(MarfaError) -> Data {
         let first = FirstAnswer<Result<Data, MarfaError>>()
         let work = Task {
             do throws(MarfaError) {
                 let data = try await unlimited(
-                    method, path, query: query, headers: headers, body: body, timeout: timeout, token: token)
+                    method, path, query: query, headers: headers, body: body, timeout: timeout, token: token,
+                    accepting: accepting)
                 first.answer(.success(data))
             } catch {
                 first.answer(.failure(error))
@@ -200,7 +209,7 @@ extension Server {
 
     private func unlimited(
         _ method: String, _ path: String, query: [URLQueryItem], headers: [String: String], body: Data?,
-        timeout: Duration, token: String
+        timeout: Duration, token: String, accepting: (@Sendable (UInt16, Data) -> Bool)?
     ) async throws(MarfaError) -> Data {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             throw .invalid(message: "the address of \(origin) is not one a request can be made to")
@@ -226,6 +235,11 @@ extension Server {
         let connection = Connection(base: signInSession, timeout: timeout)
         let write = method != "GET" && method != "HEAD"
         let first = try await exchange(request, token, connection)
+        if let accepting, first.0.value(forHTTPHeaderField: ContractHeader.name) == String(marfaContractVersion),
+            accepting(UInt16(clamping: first.0.statusCode), first.1)
+        {
+            return first.1
+        }
         guard let refused = await refusal(first, write: write) else { return first.1 }
         guard case .unauthorized = refused, let renewed = try await renewedToken(refused: token) else { throw refused }
         let again = try await exchange(request, renewed, connection)
@@ -237,7 +251,7 @@ extension Server {
         _ request: URLRequest, _ token: String, _ connection: Connection
     ) async throws(MarfaError) -> (HTTPURLResponse, Data) {
         var request = request
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         do {
             let (data, response) = try await connection.session.data(for: request)
             guard let response = response as? HTTPURLResponse else {
