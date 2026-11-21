@@ -659,8 +659,9 @@ extension InMemoryCore.State {
         }
     }
 
-    /// The creates of these items that the server has not taken: unanswered, blocked or dead. A write sent past one is
-    /// refused, so it waits behind it.
+    /// The creates of these items that the server has not taken: unanswered, blocked or dead.
+    ///
+    /// A write sent past one is refused, so it waits behind it.
     func pendingCreates(of ids: String...) -> [String] {
         pendingCreates(of: ids)
     }
