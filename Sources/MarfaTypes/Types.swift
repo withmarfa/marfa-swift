@@ -370,7 +370,7 @@ public protocol APIProtocol: Sendable {
     func registerType(_ input: Operations.RegisterType.Input) async throws -> Operations.RegisterType.Output
     /// Get a type
     ///
-    /// Returns a type's schema, with the fields and policies it inherits from its ancestors. Every credential reads any type, whatever its type map reaches.
+    /// Returns a type's schema, with the fields and policies it inherits from its ancestors, and the guidance of its ancestors. Every credential reads any type, whatever its type map reaches.
     ///
     /// - Remark: HTTP `GET /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/get(getType)`.
@@ -503,49 +503,49 @@ public protocol APIProtocol: Sendable {
     func streamEvents(_ input: Operations.StreamEvents.Input) async throws -> Operations.StreamEvents.Output
     /// List webhooks
     ///
-    /// Returns webhooks and their makers, with secrets redacted. The local command sees every subscription; keys and apps see only their own.
+    /// Returns webhooks and their makers, with secrets redacted. A key or app sees only its own, unless it also holds `keys.manage`: then, as the local command does, it sees every key's and app's.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
     func listWebhooks(_ input: Operations.ListWebhooks.Input) async throws -> Operations.ListWebhooks.Output
     /// Create a webhook
     ///
-    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when that is revoked, and sends nothing while it lacks `webhooks.manage` or the key has expired.
+    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when the grant is revoked, and sends nothing while its key or app is revoked, lacks `webhooks.manage` or has expired.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
     func createWebhook(_ input: Operations.CreateWebhook.Input) async throws -> Operations.CreateWebhook.Output
     /// Get a webhook
     ///
-    /// Returns a webhook and its maker, with its secret redacted. The local command can read any subscription; keys and apps can read only their own.
+    /// Returns a webhook and its maker, with its secret redacted. A key or app reads only its own, unless it also holds `keys.manage`: then, as the local command does, it reads any.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
     func getWebhook(_ input: Operations.GetWebhook.Input) async throws -> Operations.GetWebhook.Output
     /// Update a webhook
     ///
-    /// Updates a webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
+    /// Updates your webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
     func updateWebhook(_ input: Operations.UpdateWebhook.Input) async throws -> Operations.UpdateWebhook.Output
     /// Delete a webhook
     ///
-    /// Deletes a webhook and cancels its pending deliveries.
+    /// Deletes a webhook and cancels its pending deliveries. A key or app deletes only its own, unless it also holds `keys.manage`: then, as the local command does, it deletes any, including one whose key was revoked or has expired.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
     func deleteWebhook(_ input: Operations.DeleteWebhook.Input) async throws -> Operations.DeleteWebhook.Output
     /// List webhook deliveries
     ///
-    /// Returns delivery metadata without event payloads, newest first. The local command can inspect any subscription; keys and apps can inspect only their own.
+    /// Returns delivery metadata without event payloads, newest first. A key or app inspects only its own webhooks, unless it also holds `keys.manage`: then, as the local command does, it inspects any.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
     func listWebhookDeliveries(_ input: Operations.ListWebhookDeliveries.Input) async throws -> Operations.ListWebhookDeliveries.Output
     /// Redeliver a webhook delivery
     ///
-    /// Redelivers a failed delivery, queuing it again at the current URL. The local command can retry any subscription; keys and apps can retry only their own.
+    /// Redelivers a failed delivery, queuing it again at the current URL. A key or app retries only webhooks it registered; the local command can retry any.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -811,7 +811,7 @@ public protocol APIProtocol: Sendable {
     func getCurrentKey(_ input: Operations.GetCurrentKey.Input) async throws -> Operations.GetCurrentKey.Output
     /// Update an API key
     ///
-    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
+    /// Updates a key and returns it, keeping its secret. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -1091,7 +1091,7 @@ public protocol APIProtocol: Sendable {
     func exportArchive(_ input: Operations.ExportArchive.Input) async throws -> Operations.ExportArchive.Output
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
+    /// Restores an archive atomically and returns write and skip counts. Marfa blocks other writes during the restore. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -1119,7 +1119,7 @@ public protocol APIProtocol: Sendable {
     func adoptBackupFolder(_ input: Operations.AdoptBackupFolder.Input) async throws -> Operations.AdoptBackupFolder.Output
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
+    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -1929,7 +1929,7 @@ extension APIProtocol {
     }
     /// Get a type
     ///
-    /// Returns a type's schema, with the fields and policies it inherits from its ancestors. Every credential reads any type, whatever its type map reaches.
+    /// Returns a type's schema, with the fields and policies it inherits from its ancestors, and the guidance of its ancestors. Every credential reads any type, whatever its type map reaches.
     ///
     /// - Remark: HTTP `GET /types/{id}`.
     /// - Remark: Generated from `#/paths//types/{id}/get(getType)`.
@@ -2204,7 +2204,7 @@ extension APIProtocol {
     }
     /// List webhooks
     ///
-    /// Returns webhooks and their makers, with secrets redacted. The local command sees every subscription; keys and apps see only their own.
+    /// Returns webhooks and their makers, with secrets redacted. A key or app sees only its own, unless it also holds `keys.manage`: then, as the local command does, it sees every key's and app's.
     ///
     /// - Remark: HTTP `GET /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/get(listWebhooks)`.
@@ -2213,7 +2213,7 @@ extension APIProtocol {
     }
     /// Create a webhook
     ///
-    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when that is revoked, and sends nothing while it lacks `webhooks.manage` or the key has expired.
+    /// Creates a webhook that sends the events you name to `url`. It belongs to your key, or your app's grant: Marfa deletes it when the grant is revoked, and sends nothing while its key or app is revoked, lacks `webhooks.manage` or has expired.
     ///
     /// - Remark: HTTP `POST /webhooks`.
     /// - Remark: Generated from `#/paths//webhooks/post(createWebhook)`.
@@ -2228,7 +2228,7 @@ extension APIProtocol {
     }
     /// Get a webhook
     ///
-    /// Returns a webhook and its maker, with its secret redacted. The local command can read any subscription; keys and apps can read only their own.
+    /// Returns a webhook and its maker, with its secret redacted. A key or app reads only its own, unless it also holds `keys.manage`: then, as the local command does, it reads any.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/get(getWebhook)`.
@@ -2243,7 +2243,7 @@ extension APIProtocol {
     }
     /// Update a webhook
     ///
-    /// Updates a webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
+    /// Updates your webhook and returns it. Fields you leave out keep their values. Marfa cancels a pending delivery if you change `url`, set `active` to `false`, or change `events` or `type_filter` to exclude it. To change the secret, create a new webhook.
     ///
     /// - Remark: HTTP `PATCH /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)`.
@@ -2260,7 +2260,7 @@ extension APIProtocol {
     }
     /// Delete a webhook
     ///
-    /// Deletes a webhook and cancels its pending deliveries.
+    /// Deletes a webhook and cancels its pending deliveries. A key or app deletes only its own, unless it also holds `keys.manage`: then, as the local command does, it deletes any, including one whose key was revoked or has expired.
     ///
     /// - Remark: HTTP `DELETE /webhooks/{id}`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/delete(deleteWebhook)`.
@@ -2275,7 +2275,7 @@ extension APIProtocol {
     }
     /// List webhook deliveries
     ///
-    /// Returns delivery metadata without event payloads, newest first. The local command can inspect any subscription; keys and apps can inspect only their own.
+    /// Returns delivery metadata without event payloads, newest first. A key or app inspects only its own webhooks, unless it also holds `keys.manage`: then, as the local command does, it inspects any.
     ///
     /// - Remark: HTTP `GET /webhooks/{id}/deliveries`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/get(listWebhookDeliveries)`.
@@ -2292,7 +2292,7 @@ extension APIProtocol {
     }
     /// Redeliver a webhook delivery
     ///
-    /// Redelivers a failed delivery, queuing it again at the current URL. The local command can retry any subscription; keys and apps can retry only their own.
+    /// Redelivers a failed delivery, queuing it again at the current URL. A key or app retries only webhooks it registered; the local command can retry any.
     ///
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
@@ -2870,7 +2870,7 @@ extension APIProtocol {
     }
     /// Update an API key
     ///
-    /// Updates a key and returns it. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
+    /// Updates a key and returns it, keeping its secret. Each supplied field replaces its value; omitted fields stay unchanged. Requires `keys.mint`, `keys.manage`, or local authority.
     ///
     /// - Remark: HTTP `PATCH /keys/{id}`.
     /// - Remark: Generated from `#/paths//keys/{id}/patch(updateKey)`.
@@ -3380,7 +3380,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an exported archive atomically and returns counts of written and skipped records. While it writes, Marfa turns other writes away. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
+    /// Restores an archive atomically and returns write and skip counts. Marfa blocks other writes during the restore. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -3422,7 +3422,7 @@ extension APIProtocol {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store, as `POST /restore` does, reading a folder's files from it. Requires `backups.manage`, `config.manage` to add settings, and a sign-in from the last fifteen minutes.
+    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.

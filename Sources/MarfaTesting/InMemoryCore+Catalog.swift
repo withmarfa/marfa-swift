@@ -236,8 +236,7 @@ enum Declaring {
             bodyField: hints.flatMap { Properties.string($0, "body_field") } ?? inherited?.bodyField,
             nameFromBody: hints.flatMap { Properties.bool($0, "name_from_body") } ?? inherited?.nameFromBody ?? true,
             icon: hints.flatMap { Properties.string($0, "icon") } ?? inherited?.icon,
-            linkField: Properties.string(row, "link_field"), roles: Properties.strings(row, "roles"),
-            compatibleWith: Properties.strings(row, "compatible_with"))
+            linkField: Properties.string(row, "link_field"), roles: Properties.strings(row, "roles"))
     }
 }
 #endif

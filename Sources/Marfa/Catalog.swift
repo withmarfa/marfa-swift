@@ -99,8 +99,6 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// exactly this type.
     public let linkField: String?
     public let roles: [String]
-    /// The sibling types this one asserts a structural superset of.
-    public let compatibleWith: [String]
     /// The name of the type's `status` field, or `nil` for a type with none.
     ///
     /// A type has at most one.
@@ -116,7 +114,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         id: String, label: String? = nil, plural: String? = nil, description: String? = nil, parent: String? = nil,
         version: Int64 = 0, fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil,
         nameFromBody: Bool = true, icon: String? = nil,
-        linkField: String? = nil, roles: [String] = [], compatibleWith: [String] = []
+        linkField: String? = nil, roles: [String] = []
     ) {
         // An empty label or plural names nothing, as the core reads one.
         let label = label.flatMap { $0.isEmpty ? nil : $0 }
@@ -135,7 +133,6 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.icon = icon
         self.linkField = linkField
         self.roles = roles
-        self.compatibleWith = compatibleWith
         let status = fields.first { $0.type == "status" }
         statusField = status?.name
         statusWords = status.map { StatusWord.words(in: $0.definition) } ?? []
@@ -147,7 +144,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
             parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
             titleField: core.titleField,
             bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField,
-            roles: core.roles, compatibleWith: core.compatibleWith)
+            roles: core.roles)
     }
 }
 

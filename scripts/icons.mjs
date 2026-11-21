@@ -87,7 +87,7 @@ const run = (command, args, cwd) => {
 
 try {
   for (const set of sets) {
-    const listPath = join(source, `packages/types/generated/icon-set-${set.prefix}.json`);
+    const listPath = join(source, `core/marfa-rules/icons/icon-set-${set.prefix}.json`);
     if (!existsSync(listPath)) fail(`${listPath} does not exist; run scripts/core.sh first, or set MARFA_MONOREPO`);
     const list = JSON.parse(readFileSync(listPath, "utf8"));
     const { version, icons: names } = list;

@@ -473,7 +473,7 @@ struct CatalogTypes {
             ],
             tables: JsonObject(members: []),
             titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-            linkField: "vendor_id", roles: ["container"], compatibleWith: ["user.meal"])
+            linkField: "vendor_id", roles: ["container"])
         let type = Marfa.ItemType(core)
         #expect(
             type
@@ -489,7 +489,7 @@ struct CatalogTypes {
                             declaredBy: "user.recipe", definition: ["type": "string"]),
                     ],
                     titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-                    linkField: "vendor_id", roles: ["container"], compatibleWith: ["user.meal"]))
+                    linkField: "vendor_id", roles: ["container"]))
     }
 
     @Test func anEdgeTypeArrivesWithItsReverseNameAndTheEndThatWritesIt() {

@@ -4,8 +4,8 @@ import MarfaCore
 import SQLite3
 
 /// Search over the fake's rows, answered by the engine the real core's index is: SQLite's FTS5 with the
-/// `porter unicode61` tokenizer, the columns and the ranking (`bm25`, ties by item ID) and the excerpt
-/// (`snippet`, 32 words) the core uses.
+/// `porter unicode61` tokenizer, the columns and the ranking (`bm25` with a title word counting three times,
+/// ties by item ID) and the excerpt (`snippet`, 32 words) the core uses.
 ///
 /// Matching, stemming, ranking and excerpts are therefore not reimplemented here. Each search builds a
 /// throwaway in-memory index of the rows the copy holds outside the bin, which costs one pass over the
@@ -203,12 +203,12 @@ private final class FullTextIndex {
         let select = try Statement(
             database,
             """
-            SELECT items.id, bm25(items_fts), snippet(items_fts, -1, ?2, ?3, '...', 32)
+            SELECT items.id, bm25(items_fts, 3, 1, 1, 1, 1, 1), snippet(items_fts, -1, ?2, ?3, '...', 32)
               FROM items_fts
               JOIN items ON items.seq = items_fts.rowid
               JOIN allowed ON allowed.seq = items.seq
              WHERE items_fts MATCH ?1
-             ORDER BY bm25(items_fts), items.id
+             ORDER BY bm25(items_fts, 3, 1, 1, 1, 1, 1), items.id
              LIMIT ?4
             """)
         return try select.rows([.text(expression), .text(open), .text(close), .integer(limit)]) { row in
