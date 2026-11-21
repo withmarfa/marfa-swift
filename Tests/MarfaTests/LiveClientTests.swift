@@ -114,19 +114,6 @@ extension LiveWorkingCopies {
             try await api.delete(itemType: id)
         }
 
-        @Test func anOwnerListsAnInstancesFoldersAndAFolderItNeverRegisteredIsNotFound() async throws {
-            let api = Client(try #require(Live.server))
-            _ = try await api.listFolders().ok.body.json
-            let missing = Live.uuidV7()
-            let refused = await #expect(throws: MarfaError.self) {
-                _ = try await api.revokeFolder(path: .init(id: missing))
-            }
-            guard case .notFound? = refused else {
-                Issue.record("expected not found for an unregistered folder, got \(String(describing: refused))")
-                return
-            }
-        }
-
         @Test func healthIsReadWithNoCredentialAndWithTheKey() async throws {
             let server = try #require(Live.server)
             let open = try await Server(url: server.url, key: "").health()

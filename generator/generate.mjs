@@ -253,10 +253,7 @@ const copyTags = new Set([
   "Folders",
   "Views",
 ]);
-// What the server answers from those areas and a copy does not hold. A copy syncs a directory on its own Mac and keeps
-// that Mac's registry; only the server holds the instance's folder registrations, so listing, changing and revoking them
-// are the client's. `createFolder` and `reportFolderStatus` stay out: an app registers a folder only by syncing it, and
-// a copy reports its own status.
+// What the server answers from those areas and a copy does not hold.
 const serverOnly = new Set([
   "getItemStats",
   "listOccurrences",
@@ -265,9 +262,6 @@ const serverOnly = new Set([
   "getItemExtension",
   "listItemExtensions",
   "getFolderStatus",
-  "listFolders",
-  "updateFolder",
-  "revokeFolder",
   "countItemLinks",
 ]);
 // A copy uploads a blob's bytes and fetches them itself.

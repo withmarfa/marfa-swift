@@ -18,6 +18,12 @@ private func refused(_ status: Int, _ code: String) -> ScriptedAuthServer.Reply 
 
 /// A server signed in to `scripted` with the access token `at-1`, whose requests never leave the process.
 private func signedIn(_ scripted: ScriptedAuthServer, _ keychain: Keychain) throws -> Server {
+    try signedInWithAuthorization(scripted, keychain).server
+}
+
+private func signedInWithAuthorization(
+    _ scripted: ScriptedAuthServer, _ keychain: Keychain
+) throws -> (server: Server, authorization: Authorization) {
     let authorization = try Authorization(
         server: scripted.url, client: .init(name: "Server calls tests", scopes: ["core.note:read"]),
         keychain: keychain, service: service, transport: scripted.transport())
@@ -27,7 +33,7 @@ private func signedIn(_ scripted: ScriptedAuthServer, _ keychain: Keychain) thro
             refreshToken: "rt-1", scope: "core.note:read offline_access",
             tokenEndpoint: "\(scripted.origin)/oauth/token",
             revocationEndpoint: "\(scripted.origin)/oauth/revoke"))
-    return try Server(url: scripted.url, credential: #require(try authorization.credential()))
+    return (try Server(url: scripted.url, credential: #require(try authorization.credential())), authorization)
 }
 
 private func failure(_ call: () async throws -> some Any) async -> MarfaError? {
@@ -354,6 +360,41 @@ struct ServerCallsTests {
             #expect(housekeeping.failed?.first?.error == "locked")
             #expect(housekeeping.unreadableSettings == ["backup_path"])
             #expect(housekeeping.held?.reason == .clockAhead && housekeeping.held?.endsAt != nil)
+        }
+    }
+
+    @Test func healthWithATokenTheServerNoLongerAcceptsIsTheOpenFieldsAndRenewsNothing() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            // The server reads an expired or unknown token on /health as no token: 200 with only the open fields.
+            let scripted = ScriptedAuthServer { _ in reply(Self.openHealth) }
+            let health = try await signedIn(scripted, keychain).health()
+            let request = try #require(scripted.requests(to: "/health").first)
+            #expect(request.headers["Authorization"] == "Bearer at-1", "the token goes, though the server ignores it")
+            #expect(health.housekeeping == nil && health.version == nil && health.placement == nil)
+            #expect(health.backups.lastBackup == nil && health.backups.failures == nil)
+            #expect(health.backups.storeError == nil)
+            #expect(health.components.database.error == nil)
+            #expect(scripted.requests(to: "/oauth/token").isEmpty, "health never renews the sign-in")
+        }
+    }
+
+    @Test func healthOfAServerWhoseSignInHasEndedSendsNoTokenAndReadsTheOpenFields() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer { _ in reply(Self.openHealth) }
+            let (server, authorization) = try signedInWithAuthorization(scripted, keychain)
+            try authorization.place.drop()
+
+            // The witness: a call that needs the sign-in is still refused as signed out.
+            let other = await failure { try await server.snapshots(ofItem: "i1") }
+            guard case .signedOut? = other else {
+                Issue.record("expected signed out, got \(String(describing: other))")
+                return
+            }
+
+            let health = try await server.health()
+            let request = try #require(scripted.requests(to: "/health").first)
+            #expect(request.headers["Authorization"] == nil, "no token is sent once the sign-in has ended")
+            #expect(health.status == .ok && health.housekeeping == nil)
         }
     }
 

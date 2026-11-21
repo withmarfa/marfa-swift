@@ -33,8 +33,8 @@ public enum HealthStatus: Sendable, Hashable {
 
 /// What the server's `GET /health` answers: whether the instance is serving and how each part it depends on is.
 ///
-/// A caller holding no credential, or a credential without `instance.read`, gets the status, each component's
-/// status and latency and the backup status. A credential holding `instance.read` also gets each failing
+/// A caller holding no credential, a credential without `instance.read` or a token the server no longer accepts
+/// gets the status, each component's status and latency and the backup status. A credential holding `instance.read` also gets each failing
 /// component's `error`, the rest of ``InstanceHealth/Backups`` and ``InstanceHealth/housekeeping``, which stay
 /// `nil` otherwise.
 public struct InstanceHealth: Sendable, Hashable {
@@ -283,16 +283,23 @@ public struct InstanceHealth: Sendable, Hashable {
 extension Server {
     /// Reads the instance's health.
     ///
-    /// The server answers this without a credential, so an app can call it before it is signed in or granted
-    /// anything: an empty key sends no `Authorization` header. With a key or sign-in that holds `instance.read`,
-    /// the answer also carries the components' errors, the backups' detail and ``InstanceHealth/housekeeping``.
+    /// The server answers this without a credential, so a server made with an empty key can call it before an app
+    /// is signed in or granted anything: an empty key sends no `Authorization` header. A server whose sign-in has
+    /// ended sends none either, and reads the open fields rather than throwing
+    /// ``MarfaError/signedOut(origin:message:)``.
+    ///
+    /// With a key or sign-in that holds `instance.read`, the answer also carries the components' errors, the
+    /// backups' detail and ``InstanceHealth/housekeeping``. The server treats a token it no longer accepts, such as
+    /// an expired access token, like no token: it answers `200` with only the open fields and no refusal, and this
+    /// never renews the token. A caller that needs the detail reads it after an authenticated call, which renews
+    /// the sign-in.
     ///
     /// An instance that is down answers `503` with the same body, and this returns it with ``InstanceHealth/status``
     /// `.down`, so a down component can be shown. An unreachable server, any other refusal or a body that is not
     /// a health report throws a ``MarfaError``.
     public func health(timeout: Duration = Server.defaultTimeout) async throws(MarfaError) -> InstanceHealth {
         let data = try await send(
-            "GET", "/health", timeout: timeout,
+            "GET", "/health", timeout: timeout, openWhenSignedOut: true,
             accepting: { status, body in
                 status == 503 && (try? JSONDecoder().decode(HealthWire.self, from: body)) != nil
             })

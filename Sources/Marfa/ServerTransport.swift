@@ -152,10 +152,16 @@ extension Server {
     /// the sheet counts toward no limit, and the call sent again gets the whole limit.
     func send(
         _ method: String, _ path: String, query: [URLQueryItem] = [], headers: [String: String] = [:],
-        body: Data? = nil, timeout: Duration, accepting: (@Sendable (_ status: UInt16, _ body: Data) -> Bool)? = nil
+        body: Data? = nil, timeout: Duration, openWhenSignedOut: Bool = false,
+        accepting: (@Sendable (_ status: UInt16, _ body: Data) -> Bool)? = nil
     ) async throws(MarfaError) -> Data {
         let mark = confirmationMark()
-        let token = try currentToken()
+        let token: String
+        do {
+            token = try currentToken()
+        } catch .signedOut where openWhenSignedOut {
+            token = ""
+        }
         do {
             return try await timed(
                 method, path, query: query, headers: headers, body: body, timeout: timeout, token: token,

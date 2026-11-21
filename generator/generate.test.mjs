@@ -432,16 +432,6 @@ test("the client keeps what an app's credential calls on the server and a workin
         put: operation("setTypeIcon", ["Types"]),
         delete: operation("clearTypeIcon", ["Types"]),
       },
-      "/folders": {
-        get: operation("listFolders", ["Folders"]),
-        post: operation("createFolder", ["Folders"]),
-      },
-      "/folders/{id}": { patch: operation("updateFolder", ["Folders"]) },
-      "/folders/{id}/revoke": { post: operation("revokeFolder", ["Folders"]) },
-      "/folders/{id}/status": {
-        get: operation("getFolderStatus", ["Folders"]),
-        put: operation("reportFolderStatus", ["Folders"]),
-      },
       "/blobs": { post: operation("uploadBlob", ["Blobs"]) },
       "/blobs/stores": { get: operation("listBlobStores", ["Blobs"]) },
       "/new": { get: operation("aNewServerOperation", ["Something new"]) },
@@ -449,8 +439,8 @@ test("the client keeps what an app's credential calls on the server and a workin
   };
   assert.deepEqual(clientOperations(input), [
     "aNewServerOperation", "applyBulkAction", "cancelBulkActionJob", "createInboundEndpoint", "deleteConnector", "deleteConnectorState",
-    "getBulkActionJob", "getConfig", "getConnector", "getFolderStatus", "listBlobStores", "listConnectors",
-    "listFolders", "listInboundEndpoints", "registerType", "replaceConfig", "revokeFolder", "updateConfig", "updateFolder",
+    "getBulkActionJob", "getConfig", "getConnector", "listBlobStores", "listConnectors", "listInboundEndpoints",
+    "registerType", "replaceConfig", "updateConfig",
   ]);
 });
 
@@ -468,7 +458,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
     "endSignIn", "listAppGrants", "narrowAppGrant", "revokeAppGrant", "getProfile", "updateProfile", "getProfileAvatar",
     "replaceProfileAvatar", "listTrash", "emptyTrash", "listAttention", "listConnectors", "getConnector",
     "deleteConnector", "listConnectorRuns", "deleteConnectorState", "listInboundEndpoints", "createInboundEndpoint",
-    "retireInboundEndpoint", "listFolders", "updateFolder", "revokeFolder", "getFolderStatus",
+    "retireInboundEndpoint",
   ];
   for (const kept of ["registerType", "moveType", "applyBulkAction", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", ...owner])
     assert.ok(client.has(kept), kept);
@@ -476,7 +466,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
     "createItem", "trashItems", "previewItemTrash", "registerConnector", "sendConnectorHeartbeat", "reportConnectorRun",
     "takeConnectorHold", "replaceConnectorState", "listInboundDeliveries", "createOwner", "getInstance", "listItemVersions",
     "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
-    "countItemLinks", "createFolder", "reportFolderStatus",
+    "countItemLinks",
   ]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);
