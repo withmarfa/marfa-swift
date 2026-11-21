@@ -659,7 +659,9 @@ extension InMemoryCore.State {
         }
     }
 
-    /// The creates of these items that no answer has settled.
+    /// The creates of these items that the server has not taken: unanswered, blocked or dead.
+    ///
+    /// A write sent past one is refused, so it waits behind it.
     func pendingCreates(of ids: String...) -> [String] {
         pendingCreates(of: ids)
     }
@@ -669,9 +671,12 @@ extension InMemoryCore.State {
         for id in ids {
             for entry in entries
             where entry.inQueue && entry.write.kind == .createItem && entry.write.itemId == id
-                && entry.write.verdict == nil && !found.contains(entry.write.id)
+                && !found.contains(entry.write.id)
             {
-                found.append(entry.write.id)
+                switch entry.write.verdict {
+                case nil, .blocked?, .dead?: found.append(entry.write.id)
+                default: break
+                }
             }
         }
         return found

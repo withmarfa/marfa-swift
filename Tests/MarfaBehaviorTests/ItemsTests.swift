@@ -869,6 +869,42 @@ struct ItemsOffline {
         await copy.close()
     }
 
+    /// The real copy blocks or kills a create only for a server's own reasons, so these script the verdict.
+    @Test(arguments: [Verdict.blocked(reason: .failingAlone), Verdict.dead])
+    func anEditReadAtVersionZeroWaitsBehindItsOwnCreateThatWasNotTaken(answer: Verdict) async throws {
+        let fake = WorkingCopy.fake(itemTypes: [Self.noteType])
+        let copy = fake.copy
+        fake.verdict = { $0.kind == .createItem ? answer : .accepted }
+        let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "A", "body": "b"]))
+        let id = try #require(created.itemId)
+        _ = try await copy.queue.drain()
+
+        let edit = try await copy.items.updateAsRead(id, Edit(properties: ["title": "B"], baseVersion: 0))
+
+        #expect(edit.dependsOn == [created.id])
+        let drained = try await copy.queue.drain()
+        #expect(drained.verdicts.first { $0.id == edit.id }?.verdict != .accepted)
+        await copy.close()
+    }
+
+    @Test func anEditQueuedBehindABlockedCreateIsNotAcceptedWhenTheCreateIsWithdrawn() async throws {
+        let fake = WorkingCopy.fake(itemTypes: [Self.noteType])
+        let copy = fake.copy
+        fake.verdict = { $0.kind == .createItem ? .blocked(reason: .failingAlone) : .accepted }
+        let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "A", "body": "b"]))
+        let id = try #require(created.itemId)
+        _ = try await copy.queue.drain()
+        let edit = try await copy.items.updateAsRead(id, Edit(properties: ["title": "B"], baseVersion: 0))
+        _ = try await copy.queue.drain()
+
+        #expect(try await copy.queue.withdraw(created.id) == [created.id])
+
+        let after = try #require(try await copy.queue.all().first { $0.id == edit.id })
+        #expect(after.verdict != .accepted)
+        #expect(try await copy.items.get(id) == nil)
+        await copy.close()
+    }
+
     @Test(arguments: CopyKind.allCases)
     func anOptionalFieldTakesANullAndKeepsItsValue(kind: CopyKind) async throws {
         let copy = try await kind.open()

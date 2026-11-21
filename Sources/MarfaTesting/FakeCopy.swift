@@ -189,8 +189,8 @@ public final class FakeCopy: Sendable {
     /// Returning `nil` leaves the write unanswered, as when the server is lost.
     /// The default accepts every write.
     ///
-    /// A write behind one left unanswered waits, and a write behind one that
-    /// was refused, blocked or dead is refused without being offered.
+    /// A write that depends on an unanswered or blocked write waits, and one that
+    /// depends on a refused or dead write is refused without being offered.
     public var verdict: @Sendable (Marfa.QueuedWrite) -> Marfa.Verdict? {
         get { chooser.verdict }
         set { chooser.verdict = newValue }
