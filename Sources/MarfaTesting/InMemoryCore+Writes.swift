@@ -118,8 +118,13 @@ extension InMemoryCore {
             if let retype, types[retype] == nil {
                 throw Refuse.unknownType("\(retype) is not a type this copy holds, so \(id) cannot move to it")
             }
-            let base = edit.baseVersion
-            let readEarlier = asRead && base > 0 && base <= held.version
+            // Version 0 is how this copy shows its own create until the server takes it, so an editor can still hold
+            // the item as read there. Once the create is taken the edit goes on the version it made; until then it
+            // stays on 0 and waits behind it.
+            let ownCreate = asRead && edit.baseVersion == 0 && held.version > 0 && state.made.contains(id)
+            let behindOwnCreate = ownCreate && !state.pendingCreates(of: id).isEmpty
+            let base: Int64 = ownCreate && !behindOwnCreate ? 1 : edit.baseVersion
+            let readEarlier = asRead && (base > 0 || behindOwnCreate) && base <= held.version
             guard base == held.version || readEarlier else {
                 throw Refuse.invalid(
                     "the update to \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
