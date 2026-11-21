@@ -82,8 +82,8 @@ enum Declaring {
     private static let shippedRoots = ["core", "system", "marfa"]
 
     private static let reservedRoots = [
-        "app", "audit", "blobs", "config", "connectors", "content", "core", "edge", "grants", "instance", "items",
-        "keys", "marfa", "metadata", "profile", "schema", "space", "system", "user", "webhooks",
+        "app", "audit", "backups", "blobs", "config", "connectors", "content", "core", "edge", "grants", "instance",
+        "items", "keys", "marfa", "metadata", "profile", "schema", "sign_ins", "space", "system", "user", "webhooks",
     ]
 
     private static let fieldTypes = [
@@ -136,6 +136,9 @@ enum Declaring {
                 "\(id) is Marfa's, and an app declares types under its own namespace: `app.`, `user.` or a name of its own"
             )
         }
+        if let issue = textIssue(definition, id: id) {
+            throw Refuse.invalid("\(id) declares text that does not hold: \(issue)")
+        }
         var row = definition
         switch Properties.value(definition, "fields") {
         case nil:
@@ -167,6 +170,51 @@ enum Declaring {
                 "\(id) names the parent \(parent), which is neither a type Marfa ships nor one declared")
         }
         return (id, row)
+    }
+
+    /// The first fault in a type's description, guidance and nested descriptions.
+    ///
+    /// Limits count Unicode code points.
+    private static func textIssue(_ definition: JsonObject, id: String) -> String? {
+        func tooLong(_ value: JsonValue?, _ limit: Int, _ path: String) -> String? {
+            guard case .string(let text)? = value, text.unicodeScalars.count > limit else { return nil }
+            return "\(path): a string of at most \(limit) characters"
+        }
+        switch Properties.value(definition, "description") {
+        case nil, .string?: break
+        case .some: return "description: a string, or nothing"
+        }
+        if let issue = tooLong(Properties.value(definition, "description"), 200, "description") { return issue }
+        switch Properties.value(definition, "guidance") {
+        case nil: break
+        case .string(let guidance)?:
+            if !guidance.isEmpty, id.split(separator: ".").first == "app" {
+                return "guidance: no guidance on a type an app owns"
+            }
+            if let issue = tooLong(.string(guidance), 1_000, "guidance") { return issue }
+        case .some: return "guidance: a string of Markdown, or nothing"
+        }
+        guard case .object(let fields)? = Properties.value(definition, "fields") else { return nil }
+        for member in fields.members {
+            guard case .object(let field) = member.value else { continue }
+            let path = "fields.\(member.key)"
+            if let issue = tooLong(Properties.value(field, "description"), 300, "\(path).description") { return issue }
+            if case .object(let entries)? = Properties.value(field, "items_fields") {
+                for entry in entries.members {
+                    guard case .object(let held) = entry.value else { continue }
+                    let at = "\(path).items_fields.\(entry.key).description"
+                    if let issue = tooLong(Properties.value(held, "description"), 300, at) { return issue }
+                }
+            }
+            if case .array(let words)? = Properties.value(field, "status_values") {
+                for (index, word) in words.enumerated() {
+                    guard case .object(let held) = word else { continue }
+                    let at = "\(path).status_values.\(index).description"
+                    if let issue = tooLong(Properties.value(held, "description"), 120, at) { return issue }
+                }
+            }
+        }
+        return nil
     }
 
     /// The definition with every label filled, as `GET /types/{id}` answers it: a field, or a member of its entries,
