@@ -180,7 +180,7 @@ import Testing
         files: [FileStatus(path: "a.md", state: .waiting, waits: ["create"])], paused: FolderPaused(disk: 2),
         firstSync: WaitingFirstSync(plan: FirstSyncPlan(write: 1, send: 2, beside: 0, left: 0)))
     #expect(status.firstSync?.plan?.send == 2)
-    #expect(!status.syncPaused && status.unwatched == 0)
+    #expect(!status.syncPaused && status.unwatched == 0 && status.directories.isEmpty)
     #expect(FolderStatus(files: [], syncPaused: true, unwatched: 2).unwatched == 2)
     #expect(status.paused.isPaused)
     #expect(!FolderPaused().isPaused)

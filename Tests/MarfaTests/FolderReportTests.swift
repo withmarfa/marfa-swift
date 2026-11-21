@@ -136,6 +136,30 @@ func aFolderStatusSaysWhetherItsSyncIsPausedAndHowManyDirectoriesAreUnwatched(pa
     #expect(!status.paused.isPaused, "a paused sync is not a paused removal")
 }
 
+@Test func aFolderStatusNamesTheDirectoriesItFlagged() {
+    let status = Marfa.FolderStatus(
+        MarfaCore.FolderStatus(
+            directories: [
+                MarfaCore.FlaggedFile(path: "Notes/.ssh", flag: "outside", reason: "a secret's name", item: nil),
+                MarfaCore.FlaggedFile(path: "Notes/big", flag: "unreadable", reason: "cannot be read", item: "item-1"),
+            ],
+            files: [], paused: MarfaCore.FolderPaused(disk: 0, pull: 0, additions: 0, outsideQuery: 0), firstSync: nil,
+            syncPaused: false, unwatched: 0))
+    #expect(status.directories.map(\.path) == ["Notes/.ssh", "Notes/big"])
+    #expect(status.directories.map(\.flag) == ["outside", "unreadable"])
+    #expect(status.directories.map(\.reason) == ["a secret's name", "cannot be read"])
+    #expect(status.directories.map(\.item) == [nil, "item-1"])
+}
+
+@Test func aFolderStatusWithNoFlaggedDirectoriesHasNone() {
+    let status = Marfa.FolderStatus(
+        MarfaCore.FolderStatus(
+            directories: [], files: [], paused: MarfaCore.FolderPaused(disk: 0, pull: 0, additions: 0, outsideQuery: 0),
+            firstSync: nil, syncPaused: false, unwatched: 0))
+    #expect(status.directories.isEmpty)
+    #expect(Marfa.FolderStatus(files: []).directories.isEmpty)
+}
+
 @Test func aWatchTellsWhenTheFolderSyncWasPaused() {
     #expect(Marfa.FolderEvent(MarfaCore.FolderEvent.paused) == .paused)
 }

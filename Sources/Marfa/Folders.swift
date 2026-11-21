@@ -407,6 +407,8 @@ public enum StorageCause: Sendable, Hashable {
 
 /// Where every file in a folder stands.
 public struct FolderStatus: Sendable, Hashable {
+    /// The directories the folder flagged, each with the reason.
+    public var directories: [FlaggedFile]
     public var files: [FileStatus]
     /// A large removal or a large drop of new files waiting for `confirmRemoval(in:)`; a removal can also wait for
     /// `restoreRemoval(in:)`.
@@ -419,9 +421,10 @@ public struct FolderStatus: Sendable, Hashable {
     public var unwatched: UInt64
 
     public init(
-        files: [FileStatus], paused: FolderPaused = FolderPaused(), firstSync: WaitingFirstSync? = nil,
-        syncPaused: Bool = false, unwatched: UInt64 = 0
+        files: [FileStatus], directories: [FlaggedFile] = [], paused: FolderPaused = FolderPaused(),
+        firstSync: WaitingFirstSync? = nil, syncPaused: Bool = false, unwatched: UInt64 = 0
     ) {
+        self.directories = directories
         self.files = files
         self.paused = paused
         self.firstSync = firstSync
@@ -431,9 +434,9 @@ public struct FolderStatus: Sendable, Hashable {
 
     init(_ core: MarfaCore.FolderStatus) {
         self.init(
-            files: core.files.map(FileStatus.init), paused: FolderPaused(core.paused),
-            firstSync: core.firstSync.map(WaitingFirstSync.init), syncPaused: core.syncPaused,
-            unwatched: core.unwatched)
+            files: core.files.map(FileStatus.init), directories: core.directories.map(FlaggedFile.init),
+            paused: FolderPaused(core.paused), firstSync: core.firstSync.map(WaitingFirstSync.init),
+            syncPaused: core.syncPaused, unwatched: core.unwatched)
     }
 }
 
