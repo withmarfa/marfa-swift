@@ -38,7 +38,7 @@ The core is built for Apple silicon only. Set **Excluded Architectures** for **A
 
 - [Swift SDK](https://docs.marfa.so/reference/swift-sdk): the reference, with the products, the working copy, items, files, the queue, views, folders, sign-in, errors and testing.
 - [Build an app with Swift](https://docs.marfa.so/build/swift-app): a tutorial that builds a SwiftUI app for iPhone and Mac.
-- [Devices](https://docs.marfa.so/build/devices): how an app keeps a working copy and sends its changes.
+- [Working copies](https://docs.marfa.so/build/working-copies): how an app keeps a working copy and sends its changes.
 
 The server, the core and the contract are in [withmarfa/marfa](https://github.com/withmarfa/marfa).
 
