@@ -644,8 +644,9 @@ extension InMemoryCore.State {
         }
     }
 
-    /// Whether the server answered this copy's own create of `id` accepted or merged. The answer stays in the entries
-    /// after the queue forgets it, as the core keeps the version the create made.
+    /// Whether the server answered this copy's own create of `id` accepted or merged.
+    ///
+    /// The answer stays in the entries after the queue forgets it, as the core keeps the version the create made.
     func tookOwnCreate(of id: String) -> Bool {
         entries.contains { entry in
             guard !entry.withdrawn, entry.write.kind == .createItem, entry.write.itemId == id,
