@@ -285,6 +285,27 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `POST /webhooks/{id}/deliveries/{delivery_id}/redeliver`.
     /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)`.
     func redeliverWebhookDelivery(_ input: Operations.RedeliverWebhookDelivery.Input) async throws -> Operations.RedeliverWebhookDelivery.Output
+    /// List folders
+    ///
+    /// Returns active folder summaries, newest first. Requires read on `system.folder`. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
+    ///
+    /// - Remark: HTTP `GET /folders`.
+    /// - Remark: Generated from `#/paths//folders/get(listFolders)`.
+    func listFolders(_ input: Operations.ListFolders.Input) async throws -> Operations.ListFolders.Output
+    /// Update a folder
+    ///
+    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay.
+    ///
+    /// - Remark: HTTP `PATCH /folders/{id}`.
+    /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
+    func updateFolder(_ input: Operations.UpdateFolder.Input) async throws -> Operations.UpdateFolder.Output
+    /// Revoke a folder
+    ///
+    /// Revokes a folder: moves it to `revoked`, a terminal state, and sets `revoked_at`. The items placed in it keep their `in-folder` edges.
+    ///
+    /// - Remark: HTTP `POST /folders/{id}/revoke`.
+    /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)`.
+    func revokeFolder(_ input: Operations.RevokeFolder.Input) async throws -> Operations.RevokeFolder.Output
     /// Get a folder status
     ///
     /// Returns the latest folder-copy reports grouped by sign-in, with receipt ages and totals from sign-ins that still stand. A sign-in's reports stay as history until its key or app grant is removed.
@@ -1195,6 +1216,53 @@ extension ClientProtocol {
         headers: Operations.RedeliverWebhookDelivery.Input.Headers = .init()
     ) async throws -> Operations.RedeliverWebhookDelivery.Output {
         try await redeliverWebhookDelivery(Operations.RedeliverWebhookDelivery.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List folders
+    ///
+    /// Returns active folder summaries, newest first. Requires read on `system.folder`. Revoked folders are excluded. Read reported copies with `GET /folders/{id}/status`.
+    ///
+    /// - Remark: HTTP `GET /folders`.
+    /// - Remark: Generated from `#/paths//folders/get(listFolders)`.
+    public func listFolders(
+        query: Operations.ListFolders.Input.Query = .init(),
+        headers: Operations.ListFolders.Input.Headers = .init()
+    ) async throws -> Operations.ListFolders.Output {
+        try await listFolders(Operations.ListFolders.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Update a folder
+    ///
+    /// Updates a folder's title and settings at the version you read. Each setting you send replaces its value whole; omitted settings stay.
+    ///
+    /// - Remark: HTTP `PATCH /folders/{id}`.
+    /// - Remark: Generated from `#/paths//folders/{id}/patch(updateFolder)`.
+    public func updateFolder(
+        path: Operations.UpdateFolder.Input.Path,
+        headers: Operations.UpdateFolder.Input.Headers = .init(),
+        body: Operations.UpdateFolder.Input.Body
+    ) async throws -> Operations.UpdateFolder.Output {
+        try await updateFolder(Operations.UpdateFolder.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Revoke a folder
+    ///
+    /// Revokes a folder: moves it to `revoked`, a terminal state, and sets `revoked_at`. The items placed in it keep their `in-folder` edges.
+    ///
+    /// - Remark: HTTP `POST /folders/{id}/revoke`.
+    /// - Remark: Generated from `#/paths//folders/{id}/revoke/post(revokeFolder)`.
+    public func revokeFolder(
+        path: Operations.RevokeFolder.Input.Path,
+        headers: Operations.RevokeFolder.Input.Headers = .init()
+    ) async throws -> Operations.RevokeFolder.Output {
+        try await revokeFolder(Operations.RevokeFolder.Input(
             path: path,
             headers: headers
         ))

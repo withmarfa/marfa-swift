@@ -293,4 +293,120 @@ struct ServerCallsTests {
             }
         }
     }
+
+    private static let openHealth = """
+        {"status": "ok", "claimed": true,
+         "components": {"database": {"status": "ok", "latency_ms": 1}, "database_write": {"status": "ok", "latency_ms": 4},
+                        "disk": {"status": "ok"}, "blob_storage": {"status": "ok"}},
+         "backups": {"status": "off", "reason": "no_backup_destination"}}
+        """
+
+    private static let fullHealth = """
+        {"status": "degraded", "claimed": false, "version": "0.0.89", "placement": {"region": "eu"},
+         "components": {"database": {"status": "ok", "latency_ms": 1}, "database_write": {"status": "ok", "latency_ms": 4},
+                        "disk": {"status": "degraded", "error": "2 GB free"}, "blob_storage": {"status": "ok"}},
+         "backups": {"status": "failing", "reason": "destination_unusable", "destination": "bucket",
+                     "last_backup": "20261109T101530.250Z.json", "last_backup_at": "2026-11-09T10:15:30.250Z",
+                     "failures": 3, "last_error": "refused", "last_failed_at": "2026-11-10T08:00:00.000Z",
+                     "copies_waiting": 2, "last_backup_files_waiting": null, "store_error": "no route",
+                     "damaged_parts": 0},
+         "housekeeping": {"failed": [{"name": "trash-purge", "at": "2026-11-10T08:00:00.000Z", "error": "locked"}],
+                          "unreadable_settings": ["backup_path"],
+                          "held": {"reason": "clock_ahead", "clock_at": "2026-12-01T00:00:00.000Z",
+                                   "trusted_at": "2026-11-10T00:00:00.000Z", "ends_at": "2026-12-08T00:00:00.000Z"}}}
+        """
+
+    @Test func healthReadsTheOpenFieldsAndLeavesWhatNeedsInstanceReadEmpty() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer { _ in reply(Self.openHealth) }
+            let server = try signedIn(scripted, keychain)
+            let health = try await server.health()
+            let request = try #require(scripted.requests(to: "/health").first)
+            #expect(request.method == "GET")
+            #expect(request.headers["X-Marfa-Contract"] == nil, "a read of /health names no contract")
+            #expect(health.status == .ok && health.claimed == true)
+            #expect(health.components.database == .init(status: .ok, latencyMs: 1))
+            #expect(health.components.databaseWrite.latencyMs == 4)
+            #expect(health.components.disk == .init(status: .ok) && health.components.blobStorage.status == .ok)
+            #expect(health.backups.status == .off && health.backups.reason == .noBackupDestination)
+            #expect(health.backups.lastBackupAt == nil && health.backups.failures == nil)
+            #expect(health.housekeeping == nil && health.version == nil && health.placement == nil)
+        }
+    }
+
+    @Test func healthReadsTheDetailAKeyHoldingInstanceReadGets() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer { _ in reply(Self.fullHealth) }
+            let server = try signedIn(scripted, keychain)
+            let health = try await server.health()
+            let request = try #require(scripted.requests(to: "/health").first)
+            #expect(request.headers["Authorization"] == "Bearer at-1", "the credential is sent for the detail")
+            #expect(health.status == .degraded && health.claimed == false && health.version == "0.0.89")
+            #expect(health.placement == .init(region: "eu"))
+            #expect(health.components.disk == .init(status: .degraded, error: "2 GB free"))
+            let backups = health.backups
+            #expect(backups.status == .failing && backups.reason == .destinationUnusable)
+            #expect(backups.destination == .bucket && backups.failures == 3 && backups.copiesWaiting == 2)
+            #expect(backups.lastBackupFilesWaiting == nil && backups.storeError == "no route")
+            #expect(backups.lastBackupAt?.timeIntervalSince1970 == 1_794_219_330.25)
+            let housekeeping = try #require(health.housekeeping)
+            #expect(housekeeping.failed?.map(\.name) == ["trash-purge"])
+            #expect(housekeeping.failed?.first?.error == "locked")
+            #expect(housekeeping.unreadableSettings == ["backup_path"])
+            #expect(housekeeping.held?.reason == .clockAhead && housekeeping.held?.endsAt != nil)
+        }
+    }
+
+    @Test func healthKeepsAStatusOrReasonThisBuildDoesNotKnow() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let paused = Self.openHealth.replacingOccurrences(
+                of: "\"status\": \"ok\", \"claimed\"", with: "\"status\": \"paused\", \"claimed\"")
+            let text = paused.replacingOccurrences(of: "no_backup_destination", with: "somewhere_new")
+            let scripted = ScriptedAuthServer { _ in reply(text) }
+            let health = try await signedIn(scripted, keychain).health()
+            #expect(health.status == .other("paused"))
+            #expect(health.backups.reason == .other("somewhere_new"))
+        }
+    }
+
+    @Test func healthOfAnInstanceThatIsDownIsTheReportItAnsweredWith503() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let down = Self.openHealth
+                .replacingOccurrences(of: "\"status\": \"ok\", \"claimed\"", with: "\"status\": \"down\", \"claimed\"")
+                .replacingOccurrences(
+                    of: "\"database_write\": {\"status\": \"ok\"", with: "\"database_write\": {\"status\": \"down\"")
+            let scripted = ScriptedAuthServer { _ in .raw(503, Data(down.utf8), headers: json) }
+            let health = try await signedIn(scripted, keychain).health()
+            #expect(health.status == .down && health.components.databaseWrite.status == .down)
+            #expect(health.components.database.status == .ok)
+        }
+    }
+
+    @Test func aRefusalOfHealthStaysARefusalAndIsNeverReadAsAReport() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let envelope = ScriptedAuthServer { _ in refused(503, "unavailable") }
+            let first = await failure { try await signedIn(envelope, keychain).health() }
+            guard case .server(let status, let code, _, _, _)? = first else {
+                Issue.record("expected a server refusal, got \(String(describing: first))")
+                return
+            }
+            #expect(status == 503 && code == "unavailable")
+
+            // A 503 from something in front of the server names no contract, whatever its body says.
+            let proxy = ScriptedAuthServer { _ in .raw(503, Data(Self.openHealth.utf8)) }
+            let second = await failure { try await signedIn(proxy, keychain).health() }
+            guard case .unnamed(let proxied, _, _)? = second else {
+                Issue.record("expected an unnamed answer, got \(String(describing: second))")
+                return
+            }
+            #expect(proxied == 503)
+
+            let garbled = ScriptedAuthServer { _ in reply("{\"status\": \"ok\"}") }
+            let third = await failure { try await signedIn(garbled, keychain).health() }
+            guard case .decoding? = third else {
+                Issue.record("expected a decoding failure, got \(String(describing: third))")
+                return
+            }
+        }
+    }
 }
