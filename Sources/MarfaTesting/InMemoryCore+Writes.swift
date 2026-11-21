@@ -118,8 +118,13 @@ extension InMemoryCore {
             if let retype, types[retype] == nil {
                 throw Refuse.unknownType("\(retype) is not a type this copy holds, so \(id) cannot move to it")
             }
-            let base = edit.baseVersion
-            let readEarlier = asRead && base > 0 && base <= held.version
+            // Version 0 is how this copy shows its own create until the server takes it, so an editor can still hold
+            // the item as read there. Once the create is taken the edit goes on the version it made; until then it
+            // stays on 0 and waits behind it. A create that was refused or withdrawn made nothing.
+            let ownCreate = asRead && edit.baseVersion == 0 && held.version > 0
+            let base: Int64 = ownCreate && state.tookOwnCreate(of: id) ? 1 : edit.baseVersion
+            let behindOwnCreate = ownCreate && base == 0 && !state.pendingCreates(of: id).isEmpty
+            let readEarlier = asRead && (base > 0 || behindOwnCreate) && base <= held.version
             guard base == held.version || readEarlier else {
                 throw Refuse.invalid(
                     "the update to \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
@@ -635,6 +640,21 @@ extension InMemoryCore.State {
                         sourceId: sourceId, occurredAt: nil)
                 }
             default: break
+            }
+        }
+    }
+
+    /// Whether the server answered this copy's own create of `id` accepted or merged.
+    ///
+    /// The answer stays in the entries after the queue forgets it, as the core keeps the version the create made.
+    func tookOwnCreate(of id: String) -> Bool {
+        entries.contains { entry in
+            guard !entry.withdrawn, entry.write.kind == .createItem, entry.write.itemId == id,
+                entry.write.baseVersion.map({ $0 == 0 }) ?? true
+            else { return false }
+            switch entry.write.verdict {
+            case .accepted?, .merged?: return true
+            default: return false
             }
         }
     }

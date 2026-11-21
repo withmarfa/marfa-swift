@@ -726,6 +726,149 @@ struct ItemsOffline {
         }
     }
 
+    static let seeded = Item(
+        id: "01a1500d-78bd-73f0-8c55-2a4160c5ff01", type: "core.note", properties: ["title": "Seed", "body": "b"],
+        state: .active, tier: .library, version: 4, schemaVersion: 1, source: "app", sourceId: nil,
+        occurredAt: "2026-09-26T00:00:00.000Z", createdAt: "2026-09-26T00:00:00.000Z",
+        updatedAt: "2026-09-26T00:00:00.000Z", tags: [], title: "Seed", body: "b")
+    static let noteType = ItemType(
+        id: "core.note", fields: [TypeField(name: "body", type: "string", required: true, declaredBy: "core.note")],
+        titleField: "title", bodyField: "body")
+
+    /// A copy that has had its own create of a note taken, and the note's id.
+    ///
+    /// A real copy has it taken only by a server, so it needs `MARFA_API_URL` and `MARFA_API_KEY`; the fake takes it
+    /// at a drain.
+    static func copyThatTookItsOwnCreate(
+        _ kind: CopyKind
+    ) async throws -> (copy: WorkingCopy, id: String, taken: Verdict?) {
+        let copy: WorkingCopy
+        switch kind {
+        case .real:
+            guard let server = LiveServer.server else {
+                try Test.cancel("set MARFA_API_URL and MARFA_API_KEY to run against a server")
+                throw CancellationError()
+            }
+            copy = try await WorkingCopy.open(store: temporaryStore(), server: server)
+            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+        case .fake:
+            copy = try await kind.open()
+        }
+        let id = try await Self.note("A", in: copy, tier: .feed)
+        let report = try await copy.queue.drain()
+        return (copy, id, report.verdicts.first { $0.itemId == id }?.verdict)
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEditReadAtVersionZeroOfItsOwnCreateIsBasedOnTheVersionTheCreateMade(kind: CopyKind) async throws {
+        let (copy, id, taken) = try await Self.copyThatTookItsOwnCreate(kind)
+        #expect(taken == .accepted)
+        #expect(try await copy.items.get(id)?.version == 1)
+
+        let write = try await copy.items.updateAsRead(id, Edit(properties: ["title": "B"], baseVersion: 0))
+
+        #expect(write.baseVersion == 1)
+        #expect(try await copy.items.get(id)?.title == "B")
+        let report = try await copy.queue.drain()
+        #expect(report.verdicts.first { $0.id == write.id }?.verdict == .accepted)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEditReadAtVersionZeroOfItsOwnCreateStaysBehindTheCreateWhileItIsUntaken(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let created = try await copy.items.create(
+            Draft(type: "core.note", properties: ["title": "A", "body": "b"], tier: .feed))
+        let id = try #require(created.itemId)
+
+        let write = try await copy.items.updateAsRead(id, Edit(properties: ["title": "B"], baseVersion: 0))
+
+        #expect(write.baseVersion == 0)
+        #expect(write.dependsOn == [created.id])
+        #expect(try await copy.items.get(id)?.title == "B")
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEditReadAtVersionZeroOfARowTheCopyDidNotCreateIsRefused(kind: CopyKind) async throws {
+        let copy: WorkingCopy
+        let id: String
+        switch kind {
+        case .real:
+            let (maker, made, _) = try await Self.copyThatTookItsOwnCreate(kind)
+            await maker.close()
+            copy = try await WorkingCopy.open(store: temporaryStore(), server: try #require(LiveServer.server))
+            _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
+            id = made
+        case .fake:
+            copy = WorkingCopy.fake(items: [Self.seeded], itemTypes: [Self.noteType]).copy
+            id = Self.seeded.id
+        }
+        let before = try await copy.queue.all()
+
+        await #expect {
+            _ = try await copy.items.updateAsRead(id, Edit(properties: ["title": "B"], baseVersion: 0))
+        } throws: { Self.invalid($0) }
+
+        #expect(try await copy.queue.all() == before)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEditNotReadAtVersionZeroOfItsOwnTakenCreateIsStillRefused(kind: CopyKind) async throws {
+        let (copy, id, _) = try await Self.copyThatTookItsOwnCreate(kind)
+        let before = try await copy.queue.all()
+
+        await #expect {
+            _ = try await copy.items.update(id, Edit(properties: ["title": "B"], baseVersion: 0))
+        } throws: { Self.invalid($0) }
+
+        #expect(try await copy.queue.all() == before)
+        #expect(try await copy.items.get(id)?.title == "A")
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEditReadAtVersionZeroStaysOnTheVersionOfItsOwnCreateAfterTheAnswersAreForgotten(
+        kind: CopyKind
+    ) async throws {
+        let (copy, id, _) = try await Self.copyThatTookItsOwnCreate(kind)
+        _ = try await copy.items.update(id, Edit(properties: ["title": "B"], baseVersion: 1))
+        _ = try await copy.queue.drain()
+        #expect(try await copy.queue.forgetAnswered() == 2)
+        #expect(try await copy.items.get(id)?.version == 2)
+
+        let write = try await copy.items.updateAsRead(id, Edit(properties: ["body": "C"], baseVersion: 0))
+
+        #expect(write.baseVersion == 1)
+        await copy.close()
+    }
+
+    /// The real copy refuses or blocks a create only for a server's own reasons, so these two script the verdict.
+    @Test(arguments: [
+        Verdict.refused(Refusal(reason: "forbidden", code: "type_not_permitted")),
+        Verdict.blocked(reason: .failingAlone),
+    ])
+    func aCreateNamingASeededRowThatTheServerDidNotTakeDoesNotMakeItTheCopysOwn(answer: Verdict) async throws {
+        let fake = WorkingCopy.fake(items: [Self.seeded], itemTypes: [Self.noteType])
+        let copy = fake.copy
+        fake.verdict = { _ in answer }
+        let attempt = try await copy.items.create(
+            Draft(type: "core.note", properties: ["title": "Attempt", "body": "b"], id: Self.seeded.id))
+        _ = try await copy.queue.drain()
+        if case .blocked = answer { #expect(try await copy.queue.withdraw(attempt.id) == [attempt.id]) }
+        #expect(try await copy.items.get(Self.seeded.id)?.version == 4)
+        let before = try await copy.queue.all()
+
+        await #expect {
+            _ = try await copy.items.updateAsRead(
+                Self.seeded.id, Edit(properties: ["title": "Changed"], baseVersion: 0))
+        } throws: { Self.invalid($0) }
+
+        #expect(try await copy.queue.all() == before)
+        await copy.close()
+    }
+
     @Test(arguments: CopyKind.allCases)
     func anOptionalFieldTakesANullAndKeepsItsValue(kind: CopyKind) async throws {
         let copy = try await kind.open()
