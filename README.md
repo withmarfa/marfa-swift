@@ -32,13 +32,13 @@ Replace `<latest release>` with the version of the [latest release](https://gith
 
 The SDK's enums are exhaustive. Switch over them without `@unknown default`, so a case a later release adds stops the build at each switch that must handle it.
 
-The core is built for Apple silicon only. Set **Excluded Architectures** for **Any iOS Simulator SDK** to `x86_64` in your app target, or some simulator builds fail to link.
+The core is built for Apple silicon only. Set **Excluded Architectures** to `x86_64` in your app target, for **Any iOS Simulator SDK** in an iOS target and for every SDK in a Mac or multiplatform target, as the sample app does, or some builds fail to link.
 
 ## Documentation
 
 - [Swift SDK](https://docs.marfa.so/reference/swift-sdk): the reference, with the products, the working copy, items, files, the queue, views, folders, sign-in, errors and testing.
 - [Build an app with Swift](https://docs.marfa.so/build/swift-app): a tutorial that builds a SwiftUI app for iPhone and Mac.
-- [Devices](https://docs.marfa.so/build/devices): how an app keeps a working copy and sends its changes.
+- [Working copies](https://docs.marfa.so/build/working-copies): how an app keeps a working copy and sends its changes.
 
 The server, the core and the contract are in [withmarfa/marfa](https://github.com/withmarfa/marfa).
 
