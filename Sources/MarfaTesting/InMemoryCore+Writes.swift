@@ -318,7 +318,7 @@ extension InMemoryCore {
     /// The fake holds no extension namespace, so it cannot tell a revision stale: like the core, it keeps the
     /// write whole and leaves the answer to the verdict chooser, which stands for the server.
     func writeExtension(id: String, namespace: String, body: JsonObject, readRevision: String?) throws -> QueuedWrite {
-        try Self.refuseEmpty(readRevision)
+        try Self.refuseEmpty(namespace, readRevision)
         try Properties.cross(body)
         try Properties.keptAsWritten(body)
         return try state.withLock { state in
@@ -330,7 +330,7 @@ extension InMemoryCore {
     }
 
     func deleteExtension(id: String, namespace: String, readRevision: String?) throws -> QueuedWrite {
-        try Self.refuseEmpty(readRevision)
+        try Self.refuseEmpty(namespace, readRevision)
         return try state.withLock { state in
             guard state.items[id] != nil else { throw Refuse.item(id) }
             return state.append(
@@ -339,7 +339,10 @@ extension InMemoryCore {
         }
     }
 
-    private static func refuseEmpty(_ readRevision: String?) throws {
+    private static func refuseEmpty(_ namespace: String, _ readRevision: String?) throws {
+        if namespace.isEmpty {
+            throw Refuse.invalid("an extension write names no namespace, and the namespace is where it goes")
+        }
         if readRevision?.isEmpty == true {
             throw Refuse.invalid(
                 "an extension write names an empty read revision; name the revision a read of the namespace "

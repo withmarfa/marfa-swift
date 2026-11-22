@@ -121,12 +121,15 @@ public struct Folders: Sendable {
     /// On a folder whose first sync waits, it cancels that sync.
     ///
     /// Throws `MarfaError.invalid` while writes wait to be sent; sync first, except where another Marfa instance
-    /// answers at the folder's server, which none of those writes can reach: the answer then names each file that
-    /// holds a change the folder could not send (``FolderRemoval/files``). A folder whose directory is gone is
-    /// only taken off the registry. It also throws `invalid` for a path that passes through a symbolic link,
-    /// unless it is the path the registry lists, which `list()` gives and the error names.
+    /// answers at the folder's server, or the server cannot be asked after another instance answered there. None of
+    /// those writes can reach such a server, so the folder is removed and the answer names each file that holds a
+    /// change the folder could not send (``FolderRemoval/files``). A folder whose directory is gone is only taken
+    /// off the registry. It also throws `invalid` for a path that passes through a symbolic link, unless it is the
+    /// path the registry lists, which `list()` gives and the error names.
     ///
-    /// Show the person every file in the answer: a deleted file and a moved one are in no file of the folder.
+    /// Show the person every file in the answer: a deleted file and a moved one are in no file of the folder. The
+    /// changes to changed, new and moved files stay in the directory. The answer names only what the folder could
+    /// not send, so also ask the person to check any other file that differs from that instance's copy.
     public func remove(_ directory: URL) async throws -> FolderRemoval {
         let dir = directory.path(percentEncoded: false)
         return FolderRemoval(try await run { folders in try folders.remove(dir: dir) })
@@ -378,9 +381,14 @@ public struct FolderRemoval: Sendable, Hashable {
     /// The id of the `system.folder` item the folder followed, where its state went: what
     /// ``Folders/add(_:following:)`` takes to follow that folder again.
     public let folderId: String?
-    /// How many writes waited unsent, because another Marfa instance answers at the folder's server.
+    /// How many writes waited unsent.
+    ///
+    /// It counts them when another Marfa instance answers at the folder's server, and is 0 otherwise.
     public let unsent: UInt64
     /// The files that hold changes the folder could not send.
+    ///
+    /// It is empty where ``unsent`` is 0. An empty list does not show that no other file differs from that
+    /// instance's copy.
     public let files: [UnsentFile]
 
     init(_ core: MarfaCore.FolderRemoval) {
