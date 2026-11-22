@@ -89,11 +89,28 @@ struct DeclaredTypesOffline {
         await copy.close()
     }
 
-    @Test(arguments: CopyKind.allCases, ["app.a.b", "app.a-b.c_d", "user.recipe", "acme.memo", "x.y"])
-    func anIdentifierInTheGrammarIsDeclared(kind: CopyKind, id: String) async throws {
+    @Test(arguments: CopyKind.allCases, ["app.a.b", "app.a-b.c_d"])
+    func anAppIdentifierInTheGrammarIsDeclared(kind: CopyKind, id: String) async throws {
         let copy = try await kind.open()
         try await copy.declareTypes([["id": .string(id)]])
         #expect(try await copy.declaredTypes().map { $0["id"] } == [.string(id)])
+        await copy.close()
+    }
+
+    @Test(
+        arguments: CopyKind.allCases,
+        ["user.recipe", "acme.memo", "x.y", "common.entry", "acme.calendar.event", "acme-publisher.recipe"])
+    func aDeclarationOutsideAppTypesIsRefusedAndLeavesTheSetAsItWas(kind: CopyKind, id: String) async throws {
+        let copy = try await kind.open()
+        try await copy.declareTypes([Self.definition])
+        let before = try await copy.declaredTypes()
+        await #expect {
+            try await copy.declareTypes([["id": .string(id), "fields": [:]]])
+        } throws: { error in
+            guard case MarfaError.invalid(let message) = error else { return false }
+            return message.contains("\(id) is not an app type")
+        }
+        #expect(try await copy.declaredTypes() == before)
         await copy.close()
     }
 

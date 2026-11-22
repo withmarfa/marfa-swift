@@ -328,17 +328,23 @@ struct ItemsOffline {
             ).itemId)
         let ascending = Sort(field: .occurredAt, direction: .ascending)
 
-        #expect(try await copy.items.list(sort: ascending).map(\.id) == [first, second, third, memo, task])
-        #expect(try await copy.items.list().map(\.id) == [task, memo, third, second, first])
+        // The memo is an `app.*` item, hidden unless a request names its type exactly.
+        #expect(try await copy.items.list(sort: ascending).map(\.id) == [first, second, third, task])
+        #expect(try await copy.items.list().map(\.id) == [task, third, second, first])
         #expect(
             try await copy.items.list(ListFilters(types: ["core.note"]), sort: ascending).map(\.id) == [
-                first, second, third, memo,
+                first, second, third,
             ])
+        #expect(
+            try await copy.items.list(ListFilters(types: ["core.note", "app.notes.memo"]), sort: ascending).map(\.id)
+                == [first, second, third, memo])
+        #expect(try await copy.items.list(ListFilters(types: ["app.notes.memo"]), sort: ascending).map(\.id) == [memo])
+        #expect(try await copy.items.list(ListFilters(types: ["app.notes.*"]), sort: ascending).isEmpty)
         #expect(try await copy.items.list(ListFilters(types: ["core.task"]), sort: ascending).map(\.id) == [task])
-        #expect(try await copy.items.list(ListFilters(), sort: ascending).count == 5)
+        #expect(try await copy.items.list(ListFilters(), sort: ascending).count == 4)
         var several = ListFilters()
         several.types = ["core.task", "core.note"]
-        #expect(try await copy.items.list(several, sort: ascending).count == 5)
+        #expect(try await copy.items.list(several, sort: ascending).count == 4)
         several.types = ["core.task"]
         several.states = [.active, .archived]
         #expect(try await copy.items.list(several, sort: ascending).map(\.id) == [task])
