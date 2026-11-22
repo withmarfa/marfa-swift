@@ -26804,6 +26804,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnector/kinds`.
             public var kinds: [Components.Schemas.PluginConnectorKind]
+            /// The IDs of the edge types the connector writes, each one of the bundle's own `edge_types` or one Marfa ships whose ends aren't `system` types. Its key may write each.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/edge_types`.
+            public var edgeTypes: [Swift.String]?
             /// The settings the connector reads as it runs.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnector/settings`.
@@ -26863,6 +26867,7 @@ extension Components {
             ///   - sourceName: The name people see for the source.
             ///   - sourceMark: The icon the source is shown by, an Iconify icon ID.
             ///   - kinds: The kinds of record the connector brings.
+            ///   - edgeTypes: The IDs of the edge types the connector writes, each one of the bundle's own `edge_types` or one Marfa ships whose ends aren't `system` types. Its key may write each.
             ///   - settings: The settings the connector reads as it runs.
             ///   - signIn: How the connector signs in to its service. Present only for a connector that signs in.
             ///   - runs: Where the connector runs.
@@ -26871,6 +26876,7 @@ extension Components {
                 sourceName: Swift.String,
                 sourceMark: Swift.String? = nil,
                 kinds: [Components.Schemas.PluginConnectorKind],
+                edgeTypes: [Swift.String]? = nil,
                 settings: [Components.Schemas.PluginConnectorSetting]? = nil,
                 signIn: Components.Schemas.PluginConnector.SignInPayload? = nil,
                 runs: Components.Schemas.PluginConnector.RunsPayload
@@ -26879,6 +26885,7 @@ extension Components {
                 self.sourceName = sourceName
                 self.sourceMark = sourceMark
                 self.kinds = kinds
+                self.edgeTypes = edgeTypes
                 self.settings = settings
                 self.signIn = signIn
                 self.runs = runs
@@ -26888,6 +26895,7 @@ extension Components {
                 case sourceName = "source_name"
                 case sourceMark = "source_mark"
                 case kinds
+                case edgeTypes = "edge_types"
                 case settings
                 case signIn = "sign_in"
                 case runs
@@ -26910,6 +26918,10 @@ extension Components {
                     [Components.Schemas.PluginConnectorKind].self,
                     forKey: .kinds
                 )
+                self.edgeTypes = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .edgeTypes
+                )
                 self.settings = try container.decodeIfPresent(
                     [Components.Schemas.PluginConnectorSetting].self,
                     forKey: .settings
@@ -26927,6 +26939,7 @@ extension Components {
                     "source_name",
                     "source_mark",
                     "kinds",
+                    "edge_types",
                     "settings",
                     "sign_in",
                     "runs"
@@ -30270,30 +30283,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/status`.
             public var status: Components.Schemas.ConnectorPreview.StatusPayload
-            /// The fields the connector rendered, as it sent them, once `status` is `ready`.
+            /// The item the connector rendered, as it sent it, once `status` is `ready`.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/result`.
-            public struct ResultPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                /// Creates a new `ResultPayload`.
-                ///
-                /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                    self.additionalProperties = additionalProperties
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
-                }
-            }
-            /// The fields the connector rendered, as it sent them, once `status` is `ready`.
-            ///
-            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/result`.
-            public var result: Components.Schemas.ConnectorPreview.ResultPayload?
+            public var result: Components.Schemas.MarfaNullableConnectorPreviewResult
             /// Why the connector could not render the preview, once `status` is `failed`.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/error`.
@@ -30318,7 +30311,7 @@ extension Components {
             ///   - itemId: The ID of the item the connector renders the preview from, or `null` to let the connector choose a recent one.
             ///   - mapping: The draft of the kind's mapping to render with, or `null` for the mapping in force.
             ///   - status: `pending` until the connector answers, then `ready` with `result` or `failed` with `error`.
-            ///   - result: The fields the connector rendered, as it sent them, once `status` is `ready`.
+            ///   - result: The item the connector rendered, as it sent it, once `status` is `ready`.
             ///   - error: Why the connector could not render the preview, once `status` is `failed`.
             ///   - createdAt: When the preview was asked for, in UTC.
             ///   - expiresAt: When Marfa stops returning the preview, in UTC: 10 minutes after `created_at`.
@@ -30329,7 +30322,7 @@ extension Components {
                 itemId: Swift.String? = nil,
                 mapping: Components.Schemas.MarfaNullableConnectorMappingKind,
                 status: Components.Schemas.ConnectorPreview.StatusPayload,
-                result: Components.Schemas.ConnectorPreview.ResultPayload? = nil,
+                result: Components.Schemas.MarfaNullableConnectorPreviewResult,
                 error: Swift.String? = nil,
                 createdAt: Foundation.Date,
                 expiresAt: Foundation.Date,
@@ -30380,8 +30373,8 @@ extension Components {
                     Components.Schemas.ConnectorPreview.StatusPayload.self,
                     forKey: .status
                 )
-                self.result = try container.decodeIfPresent(
-                    Components.Schemas.ConnectorPreview.ResultPayload.self,
+                self.result = try container.decode(
+                    Components.Schemas.MarfaNullableConnectorPreviewResult.self,
                     forKey: .result
                 )
                 self.error = try container.decodeIfPresent(
@@ -30539,27 +30532,27 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer`.
         public struct ConnectorPreviewAnswer: Codable, Hashable, Sendable {
-            /// The fields the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
+            /// The item the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer/result`.
             public struct ResultPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer/result/value1`.
+                public var value1: Components.Schemas.ConnectorPreviewResult
                 /// Creates a new `ResultPayload`.
                 ///
                 /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                    self.additionalProperties = additionalProperties
+                ///   - value1:
+                public init(value1: Components.Schemas.ConnectorPreviewResult) {
+                    self.value1 = value1
                 }
                 public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    self.value1 = try .init(from: decoder)
                 }
                 public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
+                    try self.value1.encode(to: encoder)
                 }
             }
-            /// The fields the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
+            /// The item the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer/result`.
             public var result: Components.Schemas.ConnectorPreviewAnswer.ResultPayload?
@@ -30570,7 +30563,7 @@ extension Components {
             /// Creates a new `ConnectorPreviewAnswer`.
             ///
             /// - Parameters:
-            ///   - result: The fields the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
+            ///   - result: The item the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
             ///   - error: Why the connector could not render the preview. Send this or `result`.
             public init(
                 result: Components.Schemas.ConnectorPreviewAnswer.ResultPayload? = nil,
@@ -30596,6 +30589,96 @@ extension Components {
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "result",
                     "error"
+                ])
+            }
+        }
+        /// A mapping preview the connector rendered: the item as it would land under the mapping.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewResult`.
+        public struct ConnectorPreviewResult: Codable, Hashable, Sendable {
+            /// The type the item would land as: the `target_type` of the preview's `mapping`, or of its kind in the mapping in force.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewResult/type`.
+            public var _type: Swift.String
+            /// The fields the item would land with, by the target type's field names.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewResult/properties`.
+            public struct PropertiesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `PropertiesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The fields the item would land with, by the target type's field names.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewResult/properties`.
+            public var properties: Components.Schemas.ConnectorPreviewResult.PropertiesPayload
+            /// The title the item would show. Present only if the connector sent one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewResult/title`.
+            public var title: Swift.String?
+            /// The ID of the item the connector rendered, or `null` if it rendered from its service. Present only if the connector sent it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewResult/source_item`.
+            public var sourceItem: Components.Schemas.MarfaNullableMarfaInline00404e686415370f?
+            /// Creates a new `ConnectorPreviewResult`.
+            ///
+            /// - Parameters:
+            ///   - _type: The type the item would land as: the `target_type` of the preview's `mapping`, or of its kind in the mapping in force.
+            ///   - properties: The fields the item would land with, by the target type's field names.
+            ///   - title: The title the item would show. Present only if the connector sent one.
+            ///   - sourceItem: The ID of the item the connector rendered, or `null` if it rendered from its service. Present only if the connector sent it.
+            public init(
+                _type: Swift.String,
+                properties: Components.Schemas.ConnectorPreviewResult.PropertiesPayload,
+                title: Swift.String? = nil,
+                sourceItem: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil
+            ) {
+                self._type = _type
+                self.properties = properties
+                self.title = title
+                self.sourceItem = sourceItem
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case properties
+                case title
+                case sourceItem = "source_item"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decode(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.properties = try container.decode(
+                    Components.Schemas.ConnectorPreviewResult.PropertiesPayload.self,
+                    forKey: .properties
+                )
+                self.title = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .title
+                )
+                self.sourceItem = try container.decodeIfPresent(
+                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                    forKey: .sourceItem
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "type",
+                    "properties",
+                    "title",
+                    "source_item"
                 ])
             }
         }
@@ -31001,5 +31084,7 @@ extension Components {
         public typealias MarfaNullablePluginInstaller = MarfaNullable<Components.Schemas.PluginInstaller>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorMappingKind`.
         public typealias MarfaNullableConnectorMappingKind = MarfaNullable<Components.Schemas.ConnectorMappingKind>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorPreviewResult`.
+        public typealias MarfaNullableConnectorPreviewResult = MarfaNullable<Components.Schemas.ConnectorPreviewResult>
     }
 }
