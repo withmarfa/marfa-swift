@@ -50,6 +50,46 @@ import Testing
         #expect(dated.settings.group == ViewGrouping(by: "created_at", bucket: .week) && dated.settings.sort.isEmpty)
     }
 
+    @Test func everyBucketTheContractNamesReadsAsItsOwnConstant() throws {
+        let known: [(String, ViewGrouping.Bucket)] = [
+            ("day", .day), ("week", .week), ("month", .month), ("year", .year), ("presence", .presence),
+        ]
+        for (text, bucket) in known {
+            let view = try read(["title": "t", "group": ["by": "created_at", "bucket": .string(text)]])
+            #expect(view.settings.group?.bucket == bucket && bucket.rawValue == text)
+        }
+    }
+
+    @Test func aBucketThePackageDoesNotKnowIsKeptListedBesideOthersAndWrittenBackUnchanged() throws {
+        let fortnight: JSONObject = [
+            "title": "Fortnightly",
+            "group": [
+                "by": "created_at", "bucket": "fortnight", "order": ["2026-11-01", nil], "hidden": ["2026-10-01"],
+            ],
+        ]
+        let bare: JSONObject = ["title": "Bare"]
+        let rows = try [
+            MarfaCore.ViewRow(id: "a", version: 1, state: .active, settings: Self.settings.core),
+            MarfaCore.ViewRow(id: "b", version: 2, state: .active, settings: fortnight.core),
+            MarfaCore.ViewRow(id: "c", version: 3, state: .active, settings: bare.core),
+        ].map(SavedView.init)
+        #expect(rows.map(\.id) == ["a", "b", "c"], "one view the package cannot place does not hide the rest")
+
+        let group = try #require(rows[1].settings.group)
+        #expect(group.bucket == ViewGrouping.Bucket(rawValue: "fortnight") && group.bucket?.rawValue == "fortnight")
+        let sent = try #require(rows[1].settings.json["group"]?.object)
+        let held = try #require(fortnight["group"]?.object)
+        #expect(try ViewWritesOffline.sorted(sent) == ViewWritesOffline.sorted(held), "byte for byte")
+    }
+
+    @Test func aGroupByTheSettingNamesIsKeptWhateverItsValue() throws {
+        for by in ["status_group", "source", "edge[parent-of]", "a_field_nothing_knows"] {
+            let view = try read(["title": "t", "group": ["by": .string(by), "bucket": "presence"]])
+            #expect(view.settings.group == ViewGrouping(by: by, bucket: .presence))
+            #expect(view.settings.json["group"] == ["by": .string(by), "bucket": "presence"])
+        }
+    }
+
     @Test func aQueryThatNamesNothingListsEveryTypeAndBothTiers() throws {
         let view = try read(["title": "All"])
         #expect(view.settings.query == ViewQuery())
@@ -66,7 +106,7 @@ import Testing
             ),
             ("a sort with no field", ["title": "t", "sort": [["direction": "asc"]]], "sort.0.by"),
             ("a group that is not an object", ["title": "t", "group": "type"], "group"),
-            ("a bucket of no span", ["title": "t", "group": ["by": "created_at", "bucket": "hour"]], "group.bucket"),
+            ("a bucket that is not text", ["title": "t", "group": ["by": "created_at", "bucket": 7]], "group.bucket"),
             ("a tier no view lists", ["title": "t", "query": ["tier": "everywhere"]], "query.tier"),
         ] as [(String, JSONObject, String)])
     func settingsThisBuildCannotReadNameTheSettingAndTheView(_ what: String, _ settings: JSONObject, _ path: String)

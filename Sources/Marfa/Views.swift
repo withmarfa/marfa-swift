@@ -133,24 +133,40 @@ public struct ViewSort: Sendable, Hashable {
 }
 
 /// How a view groups its items.
+///
+/// A grouping read from Marfa writes back as read: ``by`` and ``bucket`` keep a value this build does not know.
 public struct ViewGrouping: Sendable, Hashable {
-    /// A field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+    /// A field, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins. `status_group` groups
+    /// by the status group of an item's status, and `source` by where the item came from.
     public var by: String
     /// For a date field, the span each group covers. `nil` groups by the value.
     public var bucket: Bucket?
     /// The keys whose groups come first, in this order.
+    ///
+    /// A group by ``Bucket/presence`` has the keys `true` and `false`.
     public var order: [JSONValue]
     /// The keys whose groups the view leaves out.
     ///
-    /// The view still lists their items.
+    /// The view still lists their items. A group by ``Bucket/presence`` has the keys `true` and `false`.
     public var hidden: [JSONValue]
 
-    public enum Bucket: Sendable, Hashable, CaseIterable {
-        case day
+    /// A span, or another way Marfa buckets a value.
+    ///
+    /// A bucket this build does not name is kept as read, so a view that uses one still lists and writes back.
+    public struct Bucket: RawRepresentable, Sendable, Hashable {
+        public let rawValue: String
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public static let day = Bucket(rawValue: "day")
         /// Weeks begin on Monday.
-        case week
-        case month
-        case year
+        public static let week = Bucket(rawValue: "week")
+        public static let month = Bucket(rawValue: "month")
+        public static let year = Bucket(rawValue: "year")
+        /// Groups by whether the field holds a value: the key `true` or `false`.
+        public static let presence = Bucket(rawValue: "presence")
     }
 
     public init(by: String, bucket: Bucket? = nil, order: [JSONValue] = [], hidden: [JSONValue] = []) {
@@ -161,17 +177,9 @@ public struct ViewGrouping: Sendable, Hashable {
     }
 
     fileprivate init(_ core: JSONObject, _ reader: ViewReader, path: String) throws {
-        let bucket = try reader.optionalString(core["bucket"], "\(path).bucket").map { text in
-            switch text {
-            case "day": Bucket.day
-            case "week": Bucket.week
-            case "month": Bucket.month
-            case "year": Bucket.year
-            default: throw reader.refusal("\(path).bucket", "is \(text)")
-            }
-        }
         self.init(
-            by: try reader.string(core["by"], "\(path).by"), bucket: bucket,
+            by: try reader.string(core["by"], "\(path).by"),
+            bucket: try reader.optionalString(core["bucket"], "\(path).bucket").map(Bucket.init(rawValue:)),
             order: try reader.optionalArray(core["order"], "\(path).order") ?? [],
             hidden: try reader.optionalArray(core["hidden"], "\(path).hidden") ?? [])
     }

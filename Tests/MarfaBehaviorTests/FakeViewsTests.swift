@@ -245,6 +245,23 @@ struct FakeViews {
         #expect(london.map(\.key.string) == ["2026-08-31"] && london.map(\.count) == [4])
     }
 
+    @Test func aViewWithABucketTheFakeCannotComputeIsKeptListedAndNeverGroupedWrongly() async throws {
+        let copy = Self.fake().copy
+        let grouping = ViewGrouping(by: "created_at", bucket: ViewGrouping.Bucket(rawValue: "fortnight"))
+        let query = ViewQuery(types: ["core.note"])
+        let made = try await copy.createView(ViewSettings(title: "f", query: query, group: grouping))
+        #expect(made.settings.group == grouping)
+        #expect(try await copy.items.views().map(\.id) == [made.id], "it lists")
+        await #expect {
+            try await copy.items.groups(inView: made.id)
+        } throws: { error in
+            (error as? FakeCopyError) == .unsupported(call: "items.groups(inView:) by the bucket \"fortnight\"")
+        }
+        let presence = try await copy.createView(
+            ViewSettings(title: "p", query: query, group: ViewGrouping(by: "tags", bucket: .presence)))
+        #expect(try await copy.items.view(presence.id)?.settings.group?.bucket == .presence)
+    }
+
     @Test func aSeededViewIsServedAndARevokedOneIsNotEvaluated() async throws {
         let seeded = SavedView(
             id: "01a1500d-78bd-73f0-8c55-2a4160c5ff90", version: 5, state: .active,
