@@ -214,7 +214,9 @@ struct LiveQueries {
     @Test func aSearchAnItemAndTheQueueAreReadings() async throws {
         let copy = try await Self.open()
         let id = try await Self.make(copy, ["title": "zebra crossing"])
-        let search = LiveQuery(copy, reading: Reading<Rows<Marfa.Item>>.search("zebra"))
+        // An `app.*` item is hidden, so the search names its type.
+        let search = LiveQuery(
+            copy, reading: Reading<Rows<Marfa.Item>>.search("zebra", filters: SearchFilters(types: ["app.test.entry"])))
         let item = LiveQuery(copy, reading: Reading<Marfa.Item?>.item(id))
         let queue = LiveQuery(copy, reading: Reading<[Marfa.QueuedWrite]>.queue)
         try await eventually("all three read") {
