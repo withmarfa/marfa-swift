@@ -138,8 +138,9 @@ extension LiveWorkingCopies {
             let name = Self.suffix()
             let title = Components.Schemas.FieldDefinition(_type: .string)
             let fields = Components.Schemas.TypeDefinitionInput.FieldsPayload(additionalProperties: ["title": title])
-            let from = "app.swift\(name).old"
-            let to = "app.swift\(name).new"
+            // A view or a webhook names no hidden type, so these are a publisher's types, not `app.*`.
+            let from = "swift\(name).old"
+            let to = "swift\(name).new"
             _ = try await api.register(itemType: .init(fields: fields, id: from))
             _ = try await api.register(itemType: .init(fields: fields, id: to))
             let server = try #require(Live.server)

@@ -39,7 +39,9 @@ struct PropertyValues {
         try Self.damage(store, "UPDATE items SET properties = '[1]' WHERE id = '\(ids[2])'")
 
         let reopened = try await WorkingCopy.open(store: store)
-        let listed = try await reopened.items.list(ListFilters(), sort: Sort(field: .createdAt, direction: .ascending))
+        // An `app.*` item is hidden, so a list or search names the type to read it.
+        let entries = ListFilters(types: ["app.test.entry"])
+        let listed = try await reopened.items.list(entries, sort: Sort(field: .createdAt, direction: .ascending))
         #expect(listed.map(\.id) == ids)
         #expect(listed[0].unreadableProperties == nil)
         #expect(listed[0].properties == ["title": "kept zebra"])
@@ -49,14 +51,16 @@ struct PropertyValues {
             #expect(damaged.title == nil)
             #expect(damaged.state == .active)
         }
-        let hits = try await reopened.search("zebra")
+        let hits = try await reopened.search("zebra", filters: SearchFilters(types: ["app.test.entry"]))
         #expect(hits.count == 3)
         #expect(hits.filter { $0.item.unreadableProperties != nil }.count == 2)
         // A damaged row matches no property condition, so a filtered list and
         // a filtered search leave it out and still answer.
         let filter = #"properties.title eq "kept zebra""#
-        #expect(try await reopened.items.list(ListFilters(filter: filter)).map(\.id) == [ids[0]])
-        #expect(try await reopened.search("zebra", filters: SearchFilters(filter: filter)).map(\.item.id) == [ids[0]])
+        let listedWhere = ListFilters(types: ["app.test.entry"], filter: filter)
+        #expect(try await reopened.items.list(listedWhere).map(\.id) == [ids[0]])
+        let searchedWhere = SearchFilters(types: ["app.test.entry"], filter: filter)
+        #expect(try await reopened.search("zebra", filters: searchedWhere).map(\.item.id) == [ids[0]])
         let torn = try #require(try await reopened.items.get(ids[1]))
         #expect(torn.unreadableProperties != nil)
         #expect(try await reopened.status().items == 3)

@@ -1577,7 +1577,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/title_field`.
             public var titleField: Swift.String?
-            /// The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `max_length` says otherwise.
+            /// The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 Unicode characters unless its `max_length` says otherwise.
             ///
             /// - Remark: Generated from `#/components/schemas/DisplayHints/body_field`.
             public var bodyField: Swift.String?
@@ -1595,7 +1595,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - titleField: The field that holds an item's title for display.
-            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 UTF-16 code units unless its `max_length` says otherwise.
+            ///   - bodyField: The field that holds an item's body for display. The field holds Markdown, and a `string` field named here holds up to 1,000,000 Unicode characters unless its `max_length` says otherwise.
             ///   - nameFromBody: Whether an item with no title is named by the first line of its body. `false` where the body is not a name, such as a highlight's passage: such an item is named after what it comes from, or `Untitled`. Defaults to `true`.
             ///   - icon: The type's icon, as an Iconify ID, `<set>:<name>`, from a pinned version of `lucide` or `simple-icons`, such as `lucide:calendar-days`. On a type read back, the owner's own choice replaces the author's.
             ///   - additionalProperties: A container of undocumented properties.
@@ -1803,22 +1803,71 @@ extension Components {
                 try encoder.encodeAdditionalProperties(additionalProperties)
             }
         }
-        /// Whether Marfa ships the type, and the sign-in that first registered it when known.
+        /// Where the type came from, the plugin that installed it, and the sign-in that first registered it when known.
         ///
         /// - Remark: Generated from `#/components/schemas/TypeProvenance`.
         public struct TypeProvenance: Codable, Hashable, Sendable {
-            /// Where the type came from: shipped by Marfa, registered by a caller, or unknown.
+            /// Where the type came from: shipped by Marfa, registered through `POST /types` or a restore, installed by a plugin, or unknown.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeProvenance/origin`.
             @frozen public enum OriginPayload: String, Codable, Hashable, Sendable, CaseIterable {
                 case platform = "platform"
-                case user = "user"
+                case registered = "registered"
+                case plugin = "plugin"
                 case unknown = "unknown"
             }
-            /// Where the type came from: shipped by Marfa, registered by a caller, or unknown.
+            /// Where the type came from: shipped by Marfa, registered through `POST /types` or a restore, installed by a plugin, or unknown.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeProvenance/origin`.
             public var origin: Components.Schemas.TypeProvenance.OriginPayload
+            /// The plugin that installed the type, or `null` for a type no plugin installed. It stays after the plugin is removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeProvenance/plugin`.
+            public struct PluginPayload: Codable, Hashable, Sendable {
+                /// The plugin's name.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeProvenance/plugin/name`.
+                public var name: Swift.String
+                /// The version of the plugin that last installed the type.
+                ///
+                /// - Remark: Generated from `#/components/schemas/TypeProvenance/plugin/version`.
+                public var version: Swift.String
+                /// Creates a new `PluginPayload`.
+                ///
+                /// - Parameters:
+                ///   - name: The plugin's name.
+                ///   - version: The version of the plugin that last installed the type.
+                public init(
+                    name: Swift.String,
+                    version: Swift.String
+                ) {
+                    self.name = name
+                    self.version = version
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case name
+                    case version
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.name = try container.decode(
+                        Swift.String.self,
+                        forKey: .name
+                    )
+                    self.version = try container.decode(
+                        Swift.String.self,
+                        forKey: .version
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "name",
+                        "version"
+                    ])
+                }
+            }
+            /// The plugin that installed the type, or `null` for a type no plugin installed. It stays after the plugin is removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeProvenance/plugin`.
+            public var plugin: Components.Schemas.TypeProvenance.PluginPayload?
             /// The sign-in that first registered the type, or null when none is recorded.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeProvenance/created_by`.
@@ -1872,17 +1921,21 @@ extension Components {
             /// Creates a new `TypeProvenance`.
             ///
             /// - Parameters:
-            ///   - origin: Where the type came from: shipped by Marfa, registered by a caller, or unknown.
+            ///   - origin: Where the type came from: shipped by Marfa, registered through `POST /types` or a restore, installed by a plugin, or unknown.
+            ///   - plugin: The plugin that installed the type, or `null` for a type no plugin installed. It stays after the plugin is removed.
             ///   - createdBy: The sign-in that first registered the type, or null when none is recorded.
             public init(
                 origin: Components.Schemas.TypeProvenance.OriginPayload,
+                plugin: Components.Schemas.TypeProvenance.PluginPayload? = nil,
                 createdBy: Components.Schemas.TypeProvenance.CreatedByPayload? = nil
             ) {
                 self.origin = origin
+                self.plugin = plugin
                 self.createdBy = createdBy
             }
             public enum CodingKeys: String, CodingKey {
                 case origin
+                case plugin
                 case createdBy = "created_by"
             }
         }
@@ -4797,7 +4850,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/listed`.
             public var listed: Swift.Bool?
-            /// The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
+            /// The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` and `app.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemDetail/neighbors`.
             public var neighbors: [Components.Schemas.ItemReadWithMetadata]?
@@ -4820,7 +4873,7 @@ extension Components {
             ///   - metadata: The item's metadata.
             ///   - backrefs: The item's inbound edges you can read, by edge type. Each holds the first page of that type, which `GET /items/{id}/backrefs` continues. An edge whose from item `source_filter` leaves out doesn't appear. Present with `include=backrefs`.
             ///   - listed: `true` if listings show you this item, `false` if `source_filter` leaves it out of them and you can read it only by ID. Present only when you send `X-Marfa-Reach`.
-            ///   - neighbors: The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
+            ///   - neighbors: The items you can read at the far end of `item.edges`, and of `backrefs` if you asked for both, with their metadata. Leaves out `system.*` and `app.*` items without counting them in `neighbors_omitted`. Present with `include=neighbors`.
             ///   - neighborsTruncated: `true` if this answer's edges reach more than 100 items, so `neighbors` leaves some out. Page `GET /items/{id}/edges` and `GET /items/{id}/backrefs` for the rest. Present with `include=neighbors`.
             ///   - neighborsOmitted: How many neighbors `neighbors` leaves out because you can't read their type. Present with `include=neighbors`.
             ///   - versions: The first page of the item's version snapshots you can read, oldest first, which `GET /items/{id}/versions` continues. Present with `include=versions`.
@@ -8747,7 +8800,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/searchable`.
             public var searchable: Swift.Bool?
-            /// The longest value a `string` or `enum` field allows, in UTF-16 code units. Defaults to 1,000,000 on the `string` field `display_hints.body_field` names, and to 100,000 on any other.
+            /// The longest `string` value, in Unicode characters, not UTF-16 code units. Defaults to 1,000,000 on the field `display_hints.body_field` names, and to 100,000 on any other. Ignored on `enum` fields.
             ///
             /// - Remark: Generated from `#/components/schemas/FieldDefinition/max_length`.
             public var maxLength: Swift.Int?
@@ -8778,7 +8831,7 @@ extension Components {
             ///   - itemsFields: The members of each entry of an `array` field whose `items_type` is `object`, by name. A write is refused if an entry has another member, lacks a required one, holds a value a member does not take, or has none.
             ///   - format: Refines a `string` field or an array of strings. `url`, `email`, `date` and `thumbnail` become the `type` or `items_type`. `bcp47`, `iso3166`, `currency` and `phone` stay as `format`; a `currency` is three capital letters, such as `GBP`.
             ///   - searchable: `false` if full-text search should skip the field. Items still return it.
-            ///   - maxLength: The longest value a `string` or `enum` field allows, in UTF-16 code units. Defaults to 1,000,000 on the `string` field `display_hints.body_field` names, and to 100,000 on any other.
+            ///   - maxLength: The longest `string` value, in Unicode characters, not UTF-16 code units. Defaults to 1,000,000 on the field `display_hints.body_field` names, and to 100,000 on any other. Ignored on `enum` fields.
             ///   - maxItems: The most elements an `array` field allows.
             ///   - minimum: The lowest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may raise it, never lower or drop it.
             ///   - maximum: The highest value the field allows, itself included. Only a `number` or `integer` field takes it. A subtype may lower it, never raise or drop it.
@@ -14311,7 +14364,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/FolderQuery`.
         public struct FolderQuery: Codable, Hashable, Sendable {
-            /// The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*`.
+            /// The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*` and `app.*`.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderQuery/types`.
             public var types: [Swift.String]?
@@ -14351,7 +14404,7 @@ extension Components {
             /// Creates a new `FolderQuery`.
             ///
             /// - Parameters:
-            ///   - types: The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*`.
+            ///   - types: The types the folder holds, each with its subtypes. Empty or absent holds every type the machine's key can read, except `system.*` and `app.*`.
             ///   - tier: The tiers the folder holds: `library`, `feed`, or `all` for both. Absent means `library`.
             ///   - state: The states the folder holds. Absent means both.
             ///   - filter: A filter expression, as on `GET /items`, that narrows what the folder holds.
@@ -15208,11 +15261,11 @@ extension Components {
                 case ageSeconds = "age_seconds"
             }
         }
-        /// Which items the view lists. Absent lists every item the reading key can read, except `system.*`.
+        /// Which items the view lists. Absent lists every item the reading key can read, except `system.*` and `app.*`.
         ///
         /// - Remark: Generated from `#/components/schemas/ViewQuery`.
         public struct ViewQuery: Codable, Hashable, Sendable {
-            /// The types the view lists, each with its subtypes. Empty or absent lists every type the reading key can read, except `system.*`.
+            /// The types the view lists, each with its subtypes. Empty or absent lists every type the reading key can read, except `system.*` and `app.*`.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewQuery/types`.
             public var types: [Swift.String]?
@@ -15244,7 +15297,7 @@ extension Components {
             /// Creates a new `ViewQuery`.
             ///
             /// - Parameters:
-            ///   - types: The types the view lists, each with its subtypes. Empty or absent lists every type the reading key can read, except `system.*`.
+            ///   - types: The types the view lists, each with its subtypes. Empty or absent lists every type the reading key can read, except `system.*` and `app.*`.
             ///   - tier: The tier the view lists. Absent means `all`.
             ///   - state: The states the view lists. Absent means both.
             ///   - filter: A filter expression, as on `GET /items`, that narrows what the view lists.
@@ -23863,6 +23916,1361 @@ extension Components {
                 ])
             }
         }
+        /// A plugin's bundle, `<name>.plugin.json`: its identity, version, types and edge types.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginBundle`.
+        public struct PluginBundle: Codable, Hashable, Sendable {
+            /// The bundle format.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/format`.
+            @frozen public enum FormatPayload: Int, Codable, Hashable, Sendable, CaseIterable {
+                case _1 = 1
+            }
+            /// The bundle format.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/format`.
+            public var format: Components.Schemas.PluginBundle.FormatPayload
+            /// The plugin's name: lowercase words and numbers joined by hyphens.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/name`.
+            public var name: Swift.String
+            /// The name people see for the plugin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/title`.
+            public var title: Swift.String
+            /// What the plugin adds, in a sentence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/description`.
+            public var description: Swift.String
+            /// The icon the plugin is shown by, an Iconify icon ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/mark`.
+            public var mark: Swift.String
+            /// Who made the plugin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/maker`.
+            public var maker: Swift.String
+            /// The oldest Marfa release the plugin works with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/marfa`.
+            public var marfa: Swift.String
+            /// The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/version`.
+            public var version: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/TypesPayload`.
+            public struct TypesPayloadPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `TypesPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The type definitions the plugin installs, each as `POST /types` takes it, with its `guidance`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/types`.
+            public typealias TypesPayload = [Components.Schemas.PluginBundle.TypesPayloadPayload]
+            /// The type definitions the plugin installs, each as `POST /types` takes it, with its `guidance`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/types`.
+            public var types: Components.Schemas.PluginBundle.TypesPayload
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/EdgeTypesPayload`.
+            public struct EdgeTypesPayloadPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `EdgeTypesPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The edge types the plugin installs, each as `POST /edge-types` takes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/edge_types`.
+            public typealias EdgeTypesPayload = [Components.Schemas.PluginBundle.EdgeTypesPayloadPayload]
+            /// The edge types the plugin installs, each as `POST /edge-types` takes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/edge_types`.
+            public var edgeTypes: Components.Schemas.PluginBundle.EdgeTypesPayload
+            /// The plugin's connector. Marfa keeps it with the install record as it is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/connector`.
+            public struct ConnectorPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ConnectorPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The plugin's connector. Marfa keeps it with the install record as it is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundle/connector`.
+            public var connector: Components.Schemas.PluginBundle.ConnectorPayload?
+            /// Creates a new `PluginBundle`.
+            ///
+            /// - Parameters:
+            ///   - format: The bundle format.
+            ///   - name: The plugin's name: lowercase words and numbers joined by hyphens.
+            ///   - title: The name people see for the plugin.
+            ///   - description: What the plugin adds, in a sentence.
+            ///   - mark: The icon the plugin is shown by, an Iconify icon ID.
+            ///   - maker: Who made the plugin.
+            ///   - marfa: The oldest Marfa release the plugin works with.
+            ///   - version: The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+            ///   - types: The type definitions the plugin installs, each as `POST /types` takes it, with its `guidance`.
+            ///   - edgeTypes: The edge types the plugin installs, each as `POST /edge-types` takes it.
+            ///   - connector: The plugin's connector. Marfa keeps it with the install record as it is.
+            public init(
+                format: Components.Schemas.PluginBundle.FormatPayload,
+                name: Swift.String,
+                title: Swift.String,
+                description: Swift.String,
+                mark: Swift.String,
+                maker: Swift.String,
+                marfa: Swift.String,
+                version: Swift.String,
+                types: Components.Schemas.PluginBundle.TypesPayload,
+                edgeTypes: Components.Schemas.PluginBundle.EdgeTypesPayload,
+                connector: Components.Schemas.PluginBundle.ConnectorPayload? = nil
+            ) {
+                self.format = format
+                self.name = name
+                self.title = title
+                self.description = description
+                self.mark = mark
+                self.maker = maker
+                self.marfa = marfa
+                self.version = version
+                self.types = types
+                self.edgeTypes = edgeTypes
+                self.connector = connector
+            }
+            public enum CodingKeys: String, CodingKey {
+                case format
+                case name
+                case title
+                case description
+                case mark
+                case maker
+                case marfa
+                case version
+                case types
+                case edgeTypes = "edge_types"
+                case connector
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.format = try container.decode(
+                    Components.Schemas.PluginBundle.FormatPayload.self,
+                    forKey: .format
+                )
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.title = try container.decode(
+                    Swift.String.self,
+                    forKey: .title
+                )
+                self.description = try container.decode(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.mark = try container.decode(
+                    Swift.String.self,
+                    forKey: .mark
+                )
+                self.maker = try container.decode(
+                    Swift.String.self,
+                    forKey: .maker
+                )
+                self.marfa = try container.decode(
+                    Swift.String.self,
+                    forKey: .marfa
+                )
+                self.version = try container.decode(
+                    Swift.String.self,
+                    forKey: .version
+                )
+                self.types = try container.decode(
+                    Components.Schemas.PluginBundle.TypesPayload.self,
+                    forKey: .types
+                )
+                self.edgeTypes = try container.decode(
+                    Components.Schemas.PluginBundle.EdgeTypesPayload.self,
+                    forKey: .edgeTypes
+                )
+                self.connector = try container.decodeIfPresent(
+                    Components.Schemas.PluginBundle.ConnectorPayload.self,
+                    forKey: .connector
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "format",
+                    "name",
+                    "title",
+                    "description",
+                    "mark",
+                    "maker",
+                    "marfa",
+                    "version",
+                    "types",
+                    "edge_types",
+                    "connector"
+                ])
+            }
+        }
+        /// An installed plugin.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Plugin`.
+        public struct Plugin: Codable, Hashable, Sendable {
+            /// The plugin's name: lowercase words and numbers joined by hyphens.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/name`.
+            public var name: Swift.String
+            /// The name people see for the plugin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/title`.
+            public var title: Swift.String
+            /// What the plugin adds, in a sentence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/description`.
+            public var description: Swift.String
+            /// The icon the plugin is shown by, an Iconify icon ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/mark`.
+            public var mark: Swift.String
+            /// Who made the plugin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/maker`.
+            public var maker: Swift.String
+            /// The oldest Marfa release the plugin works with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/marfa`.
+            public var marfa: Swift.String
+            /// The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/version`.
+            public var version: Swift.String
+            /// The IDs of the types the plugin installed, at any version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/types`.
+            public var types: [Swift.String]
+            /// The IDs of the edge types any installed version of the plugin brought that the instance still holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/edge_types`.
+            public var edgeTypes: [Swift.String]
+            /// The installed version's connector, as its bundle gave it, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/connector`.
+            public struct ConnectorPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ConnectorPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The installed version's connector, as its bundle gave it, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/connector`.
+            public var connector: Components.Schemas.Plugin.ConnectorPayload?
+            /// The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/fingerprint`.
+            public var fingerprint: Swift.String
+            /// When the plugin was first installed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/installed_at`.
+            public var installedAt: Foundation.Date
+            /// The sign-in that first installed the plugin, or `null` when it is not known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/installed_by`.
+            public var installedBy: Components.Schemas.MarfaNullablePluginInstaller
+            /// When the installed version last changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Plugin/updated_at`.
+            public var updatedAt: Foundation.Date
+            /// Creates a new `Plugin`.
+            ///
+            /// - Parameters:
+            ///   - name: The plugin's name: lowercase words and numbers joined by hyphens.
+            ///   - title: The name people see for the plugin.
+            ///   - description: What the plugin adds, in a sentence.
+            ///   - mark: The icon the plugin is shown by, an Iconify icon ID.
+            ///   - maker: Who made the plugin.
+            ///   - marfa: The oldest Marfa release the plugin works with.
+            ///   - version: The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+            ///   - types: The IDs of the types the plugin installed, at any version.
+            ///   - edgeTypes: The IDs of the edge types any installed version of the plugin brought that the instance still holds.
+            ///   - connector: The installed version's connector, as its bundle gave it, or `null`.
+            ///   - fingerprint: The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
+            ///   - installedAt: When the plugin was first installed.
+            ///   - installedBy: The sign-in that first installed the plugin, or `null` when it is not known.
+            ///   - updatedAt: When the installed version last changed.
+            public init(
+                name: Swift.String,
+                title: Swift.String,
+                description: Swift.String,
+                mark: Swift.String,
+                maker: Swift.String,
+                marfa: Swift.String,
+                version: Swift.String,
+                types: [Swift.String],
+                edgeTypes: [Swift.String],
+                connector: Components.Schemas.Plugin.ConnectorPayload? = nil,
+                fingerprint: Swift.String,
+                installedAt: Foundation.Date,
+                installedBy: Components.Schemas.MarfaNullablePluginInstaller,
+                updatedAt: Foundation.Date
+            ) {
+                self.name = name
+                self.title = title
+                self.description = description
+                self.mark = mark
+                self.maker = maker
+                self.marfa = marfa
+                self.version = version
+                self.types = types
+                self.edgeTypes = edgeTypes
+                self.connector = connector
+                self.fingerprint = fingerprint
+                self.installedAt = installedAt
+                self.installedBy = installedBy
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case title
+                case description
+                case mark
+                case maker
+                case marfa
+                case version
+                case types
+                case edgeTypes = "edge_types"
+                case connector
+                case fingerprint
+                case installedAt = "installed_at"
+                case installedBy = "installed_by"
+                case updatedAt = "updated_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.title = try container.decode(
+                    Swift.String.self,
+                    forKey: .title
+                )
+                self.description = try container.decode(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.mark = try container.decode(
+                    Swift.String.self,
+                    forKey: .mark
+                )
+                self.maker = try container.decode(
+                    Swift.String.self,
+                    forKey: .maker
+                )
+                self.marfa = try container.decode(
+                    Swift.String.self,
+                    forKey: .marfa
+                )
+                self.version = try container.decode(
+                    Swift.String.self,
+                    forKey: .version
+                )
+                self.types = try container.decode(
+                    [Swift.String].self,
+                    forKey: .types
+                )
+                self.edgeTypes = try container.decode(
+                    [Swift.String].self,
+                    forKey: .edgeTypes
+                )
+                self.connector = try container.decodeIfPresent(
+                    Components.Schemas.Plugin.ConnectorPayload.self,
+                    forKey: .connector
+                )
+                self.fingerprint = try container.decode(
+                    Swift.String.self,
+                    forKey: .fingerprint
+                )
+                self.installedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .installedAt
+                )
+                self.installedBy = try container.decode(
+                    Components.Schemas.MarfaNullablePluginInstaller.self,
+                    forKey: .installedBy
+                )
+                self.updatedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .updatedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "title",
+                    "description",
+                    "mark",
+                    "maker",
+                    "marfa",
+                    "version",
+                    "types",
+                    "edge_types",
+                    "connector",
+                    "fingerprint",
+                    "installed_at",
+                    "installed_by",
+                    "updated_at"
+                ])
+            }
+        }
+        /// The installed plugin, and what installing did.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginInstalled`.
+        public struct PluginInstalled: Codable, Hashable, Sendable {
+            /// The plugin's name: lowercase words and numbers joined by hyphens.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/name`.
+            public var name: Swift.String
+            /// The name people see for the plugin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/title`.
+            public var title: Swift.String
+            /// What the plugin adds, in a sentence.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/description`.
+            public var description: Swift.String
+            /// The icon the plugin is shown by, an Iconify icon ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/mark`.
+            public var mark: Swift.String
+            /// Who made the plugin.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/maker`.
+            public var maker: Swift.String
+            /// The oldest Marfa release the plugin works with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/marfa`.
+            public var marfa: Swift.String
+            /// The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/version`.
+            public var version: Swift.String
+            /// The IDs of the types the plugin installed, at any version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/types`.
+            public var types: [Swift.String]
+            /// The IDs of the edge types any installed version of the plugin brought that the instance still holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/edge_types`.
+            public var edgeTypes: [Swift.String]
+            /// The installed version's connector, as its bundle gave it, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/connector`.
+            public struct ConnectorPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ConnectorPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The installed version's connector, as its bundle gave it, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/connector`.
+            public var connector: Components.Schemas.PluginInstalled.ConnectorPayload?
+            /// The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/fingerprint`.
+            public var fingerprint: Swift.String
+            /// When the plugin was first installed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/installed_at`.
+            public var installedAt: Foundation.Date
+            /// The sign-in that first installed the plugin, or `null` when it is not known.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/installed_by`.
+            public var installedBy: Components.Schemas.MarfaNullablePluginInstaller
+            /// When the installed version last changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/updated_at`.
+            public var updatedAt: Foundation.Date
+            /// `installed` for a new plugin, `updated` for a newer version, or `unchanged` when this version is already installed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/outcome`.
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case installed = "installed"
+                case updated = "updated"
+                case unchanged = "unchanged"
+            }
+            /// `installed` for a new plugin, `updated` for a newer version, or `unchanged` when this version is already installed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/outcome`.
+            public var outcome: Components.Schemas.PluginInstalled.OutcomePayload
+            /// Creates a new `PluginInstalled`.
+            ///
+            /// - Parameters:
+            ///   - name: The plugin's name: lowercase words and numbers joined by hyphens.
+            ///   - title: The name people see for the plugin.
+            ///   - description: What the plugin adds, in a sentence.
+            ///   - mark: The icon the plugin is shown by, an Iconify icon ID.
+            ///   - maker: Who made the plugin.
+            ///   - marfa: The oldest Marfa release the plugin works with.
+            ///   - version: The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+            ///   - types: The IDs of the types the plugin installed, at any version.
+            ///   - edgeTypes: The IDs of the edge types any installed version of the plugin brought that the instance still holds.
+            ///   - connector: The installed version's connector, as its bundle gave it, or `null`.
+            ///   - fingerprint: The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
+            ///   - installedAt: When the plugin was first installed.
+            ///   - installedBy: The sign-in that first installed the plugin, or `null` when it is not known.
+            ///   - updatedAt: When the installed version last changed.
+            ///   - outcome: `installed` for a new plugin, `updated` for a newer version, or `unchanged` when this version is already installed.
+            public init(
+                name: Swift.String,
+                title: Swift.String,
+                description: Swift.String,
+                mark: Swift.String,
+                maker: Swift.String,
+                marfa: Swift.String,
+                version: Swift.String,
+                types: [Swift.String],
+                edgeTypes: [Swift.String],
+                connector: Components.Schemas.PluginInstalled.ConnectorPayload? = nil,
+                fingerprint: Swift.String,
+                installedAt: Foundation.Date,
+                installedBy: Components.Schemas.MarfaNullablePluginInstaller,
+                updatedAt: Foundation.Date,
+                outcome: Components.Schemas.PluginInstalled.OutcomePayload
+            ) {
+                self.name = name
+                self.title = title
+                self.description = description
+                self.mark = mark
+                self.maker = maker
+                self.marfa = marfa
+                self.version = version
+                self.types = types
+                self.edgeTypes = edgeTypes
+                self.connector = connector
+                self.fingerprint = fingerprint
+                self.installedAt = installedAt
+                self.installedBy = installedBy
+                self.updatedAt = updatedAt
+                self.outcome = outcome
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case title
+                case description
+                case mark
+                case maker
+                case marfa
+                case version
+                case types
+                case edgeTypes = "edge_types"
+                case connector
+                case fingerprint
+                case installedAt = "installed_at"
+                case installedBy = "installed_by"
+                case updatedAt = "updated_at"
+                case outcome
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.title = try container.decode(
+                    Swift.String.self,
+                    forKey: .title
+                )
+                self.description = try container.decode(
+                    Swift.String.self,
+                    forKey: .description
+                )
+                self.mark = try container.decode(
+                    Swift.String.self,
+                    forKey: .mark
+                )
+                self.maker = try container.decode(
+                    Swift.String.self,
+                    forKey: .maker
+                )
+                self.marfa = try container.decode(
+                    Swift.String.self,
+                    forKey: .marfa
+                )
+                self.version = try container.decode(
+                    Swift.String.self,
+                    forKey: .version
+                )
+                self.types = try container.decode(
+                    [Swift.String].self,
+                    forKey: .types
+                )
+                self.edgeTypes = try container.decode(
+                    [Swift.String].self,
+                    forKey: .edgeTypes
+                )
+                self.connector = try container.decodeIfPresent(
+                    Components.Schemas.PluginInstalled.ConnectorPayload.self,
+                    forKey: .connector
+                )
+                self.fingerprint = try container.decode(
+                    Swift.String.self,
+                    forKey: .fingerprint
+                )
+                self.installedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .installedAt
+                )
+                self.installedBy = try container.decode(
+                    Components.Schemas.MarfaNullablePluginInstaller.self,
+                    forKey: .installedBy
+                )
+                self.updatedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .updatedAt
+                )
+                self.outcome = try container.decode(
+                    Components.Schemas.PluginInstalled.OutcomePayload.self,
+                    forKey: .outcome
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "title",
+                    "description",
+                    "mark",
+                    "maker",
+                    "marfa",
+                    "version",
+                    "types",
+                    "edge_types",
+                    "connector",
+                    "fingerprint",
+                    "installed_at",
+                    "installed_by",
+                    "updated_at",
+                    "outcome"
+                ])
+            }
+        }
+        /// What removing the plugin removed, and what it kept.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginRemoved`.
+        public struct PluginRemoved: Codable, Hashable, Sendable {
+            /// The install record Marfa removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed`.
+            public struct RemovedPayload: Codable, Hashable, Sendable {
+                /// The plugin's name: lowercase words and numbers joined by hyphens.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/name`.
+                public var name: Swift.String
+                /// The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/version`.
+                public var version: Swift.String
+                /// Creates a new `RemovedPayload`.
+                ///
+                /// - Parameters:
+                ///   - name: The plugin's name: lowercase words and numbers joined by hyphens.
+                ///   - version: The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+                public init(
+                    name: Swift.String,
+                    version: Swift.String
+                ) {
+                    self.name = name
+                    self.version = version
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case name
+                    case version
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.name = try container.decode(
+                        Swift.String.self,
+                        forKey: .name
+                    )
+                    self.version = try container.decode(
+                        Swift.String.self,
+                        forKey: .version
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "name",
+                        "version"
+                    ])
+                }
+            }
+            /// The install record Marfa removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed`.
+            public var removed: Components.Schemas.PluginRemoved.RemovedPayload
+            /// What stays.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept`.
+            public struct KeptPayload: Codable, Hashable, Sendable {
+                /// The types the plugin installed that the instance still holds, which stay with their items and provenance.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/types`.
+                public var types: [Swift.String]
+                /// The edge types any installed version of the plugin brought that the instance still holds, which stay with their edges.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/edge_types`.
+                public var edgeTypes: [Swift.String]
+                /// Creates a new `KeptPayload`.
+                ///
+                /// - Parameters:
+                ///   - types: The types the plugin installed that the instance still holds, which stay with their items and provenance.
+                ///   - edgeTypes: The edge types any installed version of the plugin brought that the instance still holds, which stay with their edges.
+                public init(
+                    types: [Swift.String],
+                    edgeTypes: [Swift.String]
+                ) {
+                    self.types = types
+                    self.edgeTypes = edgeTypes
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case types
+                    case edgeTypes = "edge_types"
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.types = try container.decode(
+                        [Swift.String].self,
+                        forKey: .types
+                    )
+                    self.edgeTypes = try container.decode(
+                        [Swift.String].self,
+                        forKey: .edgeTypes
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "types",
+                        "edge_types"
+                    ])
+                }
+            }
+            /// What stays.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept`.
+            public var kept: Components.Schemas.PluginRemoved.KeptPayload
+            /// Creates a new `PluginRemoved`.
+            ///
+            /// - Parameters:
+            ///   - removed: The install record Marfa removed.
+            ///   - kept: What stays.
+            public init(
+                removed: Components.Schemas.PluginRemoved.RemovedPayload,
+                kept: Components.Schemas.PluginRemoved.KeptPayload
+            ) {
+                self.removed = removed
+                self.kept = kept
+            }
+            public enum CodingKeys: String, CodingKey {
+                case removed
+                case kept
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.removed = try container.decode(
+                    Components.Schemas.PluginRemoved.RemovedPayload.self,
+                    forKey: .removed
+                )
+                self.kept = try container.decode(
+                    Components.Schemas.PluginRemoved.KeptPayload.self,
+                    forKey: .kept
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "removed",
+                    "kept"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal`.
+        public struct PluginNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case pluginNotFound = "plugin_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.PluginNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.PluginNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PluginNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PluginNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginNotFoundRefusal/error`.
+            public var error: Components.Schemas.PluginNotFoundRefusal._ErrorPayload
+            /// Creates a new `PluginNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PluginNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal`.
+        public struct PluginBundleRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case validationError = "validation_error"
+                    case missingRequiredField = "missing_required_field"
+                    case invalidSchema = "invalid_schema"
+                    case inheritanceViolation = "inheritance_violation"
+                    case propertyShadowsField = "property_shadows_field"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error/code`.
+                public var code: Components.Schemas.PluginBundleRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error/details`.
+                public var details: Components.Schemas.PluginBundleRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PluginBundleRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PluginBundleRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginBundleRefusal/error`.
+            public var error: Components.Schemas.PluginBundleRefusal._ErrorPayload
+            /// Creates a new `PluginBundleRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PluginBundleRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal`.
+        public struct PluginInstallForbiddenRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case forbidden = "forbidden"
+                    case typeNotPermitted = "type_not_permitted"
+                    case edgeTypeNotPermitted = "edge_type_not_permitted"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error/code`.
+                public var code: Components.Schemas.PluginInstallForbiddenRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error/details`.
+                public var details: Components.Schemas.PluginInstallForbiddenRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PluginInstallForbiddenRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PluginInstallForbiddenRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstallForbiddenRefusal/error`.
+            public var error: Components.Schemas.PluginInstallForbiddenRefusal._ErrorPayload
+            /// Creates a new `PluginInstallForbiddenRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PluginInstallForbiddenRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal`.
+        public struct PluginInstallConflictRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case conflict = "conflict"
+                    case typeExists = "type_exists"
+                    case pluginChildConflict = "plugin_child_conflict"
+                    case pluginNarrows = "plugin_narrows"
+                    case pluginNeedsNewerServer = "plugin_needs_newer_server"
+                    case pluginVersionOlder = "plugin_version_older"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error/code`.
+                public var code: Components.Schemas.PluginInstallConflictRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error/details`.
+                public var details: Components.Schemas.PluginInstallConflictRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PluginInstallConflictRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PluginInstallConflictRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstallConflictRefusal/error`.
+            public var error: Components.Schemas.PluginInstallConflictRefusal._ErrorPayload
+            /// Creates a new `PluginInstallConflictRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PluginInstallConflictRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// The sign-in that first installed a plugin.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginInstaller`.
+        public struct PluginInstaller: Codable, Hashable, Sendable {
+            /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstaller/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case browser = "browser"
+                case app = "app"
+                case key = "key"
+                case local = "local"
+            }
+            /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstaller/kind`.
+            public var kind: Components.Schemas.PluginInstaller.KindPayload
+            /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstaller/id`.
+            public var id: Swift.String
+            /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginInstaller/name`.
+            public var name: Swift.String
+            /// Creates a new `PluginInstaller`.
+            ///
+            /// - Parameters:
+            ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+            ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+            ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+            public init(
+                kind: Components.Schemas.PluginInstaller.KindPayload,
+                id: Swift.String,
+                name: Swift.String
+            ) {
+                self.kind = kind
+                self.id = id
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case id
+                case name
+            }
+        }
+        /// A page holding every installed plugin.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginPage`.
+        public struct PluginPage: Codable, Hashable, Sendable {
+            /// Every installed plugin, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginPage/data`.
+            public var data: [Components.Schemas.Plugin]
+            /// Always `null`: Marfa returns every installed plugin in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `PluginPage`.
+            ///
+            /// - Parameters:
+            ///   - data: Every installed plugin, by name.
+            ///   - nextCursor: Always `null`: Marfa returns every installed plugin in one page.
+            public init(
+                data: [Components.Schemas.Plugin],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.data = try container.decode(
+                    [Components.Schemas.Plugin].self,
+                    forKey: .data
+                )
+                self.nextCursor = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .nextCursor
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "data",
+                    "next_cursor"
+                ])
+            }
+        }
+        /// An `app.<vendor>` namespace and who holds it. Only the app that holds it registers types under it, and that app reaches the namespace's items without a scope that names them. While the owner holds it, no app does until the owner gives it to one.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppVendor`.
+        public struct AppVendor: Codable, Hashable, Sendable {
+            /// The namespace, as `app.<vendor>`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendor/vendor`.
+            public var vendor: Swift.String
+            /// The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it because no one app is known to have made its types.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendor/client_id`.
+            public var clientId: Swift.String?
+            /// When the namespace was first held, or when it was given to the app that holds it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendor/claimed_at`.
+            public var claimedAt: Foundation.Date
+            /// Creates a new `AppVendor`.
+            ///
+            /// - Parameters:
+            ///   - vendor: The namespace, as `app.<vendor>`.
+            ///   - clientId: The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it because no one app is known to have made its types.
+            ///   - claimedAt: When the namespace was first held, or when it was given to the app that holds it.
+            public init(
+                vendor: Swift.String,
+                clientId: Swift.String? = nil,
+                claimedAt: Foundation.Date
+            ) {
+                self.vendor = vendor
+                self.clientId = clientId
+                self.claimedAt = claimedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case vendor
+                case clientId = "client_id"
+                case claimedAt = "claimed_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.vendor = try container.decode(
+                    Swift.String.self,
+                    forKey: .vendor
+                )
+                self.clientId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .clientId
+                )
+                self.claimedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .claimedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "vendor",
+                    "client_id",
+                    "claimed_at"
+                ])
+            }
+        }
+        /// A page holding every held `app.<vendor>` namespace.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppVendorPage`.
+        public struct AppVendorPage: Codable, Hashable, Sendable {
+            /// Every held namespace, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorPage/data`.
+            public var data: [Components.Schemas.AppVendor]
+            /// Always `null`: every binding comes in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorPage/next_cursor`.
+            public var nextCursor: Components.Schemas.MarfaNull
+            /// Creates a new `AppVendorPage`.
+            ///
+            /// - Parameters:
+            ///   - data: Every held namespace, by name.
+            ///   - nextCursor: Always `null`: every binding comes in one page.
+            public init(
+                data: [Components.Schemas.AppVendor],
+                nextCursor: Components.Schemas.MarfaNull
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.data = try container.decode(
+                    [Components.Schemas.AppVendor].self,
+                    forKey: .data
+                )
+                self.nextCursor = try container.decode(
+                    Components.Schemas.MarfaNull.self,
+                    forKey: .nextCursor
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "data",
+                    "next_cursor"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/MarfaNull`.
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaInline00404e686415370f`.
@@ -24259,5 +25667,7 @@ extension Components {
         public typealias MarfaNullableUpdateLatest = MarfaNullable<Components.Schemas.UpdateLatest>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateLast`.
         public typealias MarfaNullableUpdateLast = MarfaNullable<Components.Schemas.UpdateLast>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullablePluginInstaller`.
+        public typealias MarfaNullablePluginInstaller = MarfaNullable<Components.Schemas.PluginInstaller>
     }
 }

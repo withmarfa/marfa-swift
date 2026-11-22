@@ -185,9 +185,11 @@ struct SearchOffline {
             )
         )
         let id = try #require(made.itemId)
-        #expect(try await copy.search("wombat").map(\.item.id) == [id])
-        #expect(try await copy.search("quokka").isEmpty)
-        #expect(try await copy.search("numbat").isEmpty)
+        // An `app.*` item is hidden, so each search names the type.
+        let entries = SearchFilters(types: ["app.test.entry"])
+        #expect(try await copy.search("wombat", filters: entries).map(\.item.id) == [id])
+        #expect(try await copy.search("quokka", filters: entries).isEmpty)
+        #expect(try await copy.search("numbat", filters: entries).isEmpty)
         await copy.close()
     }
 

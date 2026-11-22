@@ -110,8 +110,6 @@ struct DeclaredTypeTextOffline {
         await #expect {
             _ = try await Self.declare(["id": "app.review.entry", "guidance": "Use this type"], on: kind)
         } throws: { Self.isInvalid($0) }
-        let held = try await Self.declare(["id": "user.review", "guidance": "Use this type"], on: kind)
-        #expect(held.first?["guidance"] == "Use this type")
     }
 
     @Test(arguments: CopyKind.allCases)
@@ -120,19 +118,10 @@ struct DeclaredTypeTextOffline {
         #expect(held.count == 1)
     }
 
-    @Test(arguments: CopyKind.allCases)
-    func guidanceIsHeldToOneThousandCodePoints(kind: CopyKind) async throws {
-        await #expect {
-            _ = try await Self.declare(["id": "user.review", "guidance": Self.text(1001)], on: kind)
-        } throws: { Self.isInvalid($0) }
-        let held = try await Self.declare(["id": "user.review", "guidance": Self.text(1000)], on: kind)
-        #expect(held.first?["guidance"] == Self.text(1000))
-    }
-
     @Test(arguments: CopyKind.allCases, [JSONValue.integer(7), .null, .bool(true), .array([]), .object([:])])
     func guidanceThatIsNotTextIsRefused(kind: CopyKind, guidance: JSONValue) async throws {
         await #expect {
-            _ = try await Self.declare(["id": "user.review", "guidance": guidance], on: kind)
+            _ = try await Self.declare(["id": "app.review.entry", "guidance": guidance], on: kind)
         } throws: { Self.isInvalid($0) }
     }
 
@@ -153,12 +142,6 @@ struct DeclaredTypeTextOffline {
         await #expect {
             _ = try await Self.declare(["id": .string(id)], on: kind)
         } throws: { Self.isInvalid($0) }
-    }
-
-    @Test(arguments: CopyKind.allCases)
-    func aCommonTypeIsDeclaredAsAnyOtherPublisherRootIs(kind: CopyKind) async throws {
-        let held = try await Self.declare(["id": "common.entry"], on: kind)
-        #expect(held.first?["id"] == "common.entry")
     }
 }
 

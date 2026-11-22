@@ -47,6 +47,7 @@ extension InMemoryCore {
             var rows: [String: JsonObject] = [:]
             for definition in types {
                 let (id, row) = try Declaring.declaration(definition, known: known)
+                try Declaring.requireAppType(id)
                 rows[id] = row
             }
             let changed = Set(state.declared.keys).union(rows.keys)
@@ -93,7 +94,8 @@ enum Declaring {
 
     private static let grammar =
         "a type is two or more lowercase dotted segments, each a letter followed by letters, digits, hyphens and "
-        + "underscores, at most 128 characters, with exactly three under `app.` and none under a root Marfa reserves"
+        + "underscores, at most 128 characters, with exactly three under `app.`, two or more under `common.`, and "
+        + "none under a root Marfa reserves for permissions or scopes or under `space`"
 
     /// A type identifier, or a namespace under `.*`.
     static func isTypePattern(_ name: String) -> Bool {
@@ -122,6 +124,15 @@ enum Declaring {
         !name.hasSuffix(".*") && isTypePattern(name)
     }
 
+    /// An app's device declares only `app.*`.
+    static func requireAppType(_ id: String) throws {
+        guard id.hasPrefix("app.") else {
+            throw Refuse.invalid(
+                "\(id) is not an app type: an app declares only types under `app.`, such as `app.<app>.<name>`. "
+                    + "An owner's own types go under `user.`, and shared types come from a plugin")
+        }
+    }
+
     /// A declaration as the core keeps it: the empty `fields` and the
     /// `version` a registration needs filled in where the app left them out.
     static func declaration(_ definition: JsonObject, known: Set<String>) throws -> (String, JsonObject) {
@@ -133,8 +144,7 @@ enum Declaring {
         }
         guard !shippedRoots.contains(String(id.split(separator: ".")[0])) else {
             throw Refuse.invalid(
-                "\(id) is Marfa's, and an app declares types under its own namespace: `app.`, `user.` or a name of its own"
-            )
+                "\(id) is Marfa's, and no type of yours goes under `core.`, `system.` or `marfa.`")
         }
         if let issue = textIssue(definition, id: id) {
             throw Refuse.invalid("\(id) declares text that does not hold: \(issue)")

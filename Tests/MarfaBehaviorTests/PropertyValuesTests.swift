@@ -43,7 +43,7 @@ struct PropertyValuesOffline {
         #expect(held.properties["ratio"] == .number(0.1))
         #expect(held.properties["nothing"] == .null)
         #expect(held.properties["list"]?.array?[1].array?[1].array?[1].object?["deep"]?.array?.count == 2)
-        let listed = try #require(try await copy.items.list().first)
+        let listed = try #require(try await copy.items.list(ListFilters(types: ["app.test.entry"])).first)
         #expect(listed.properties == properties)
         let queued = try #require(try await copy.queue.all().first)
         #expect(queued.body["properties"]?.object == properties)

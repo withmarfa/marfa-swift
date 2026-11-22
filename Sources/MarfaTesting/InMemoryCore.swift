@@ -119,11 +119,10 @@ final class InMemoryCore: CoreProtocol, Sendable {
             let types = state.resolvedItemTypes()
             let roots = try Self.roots(of: filters.types, in: types)
             let named = try Self.states(of: filters.states, allStates: filters.allStates)
+            let bin = Self.listsTheBinAlone(filters)
             let beneath = filters.beneath.map { state.reached(from: $0) }
             var found = state.items.values.filter { item in
-                if let roots {
-                    guard roots.contains(where: { Self.reaches(item.type, $0, in: types) }) else { return false }
-                }
+                guard Self.admits(item.type, roots, in: types, bin: bin) else { return false }
                 if let named, !named.contains(item.state) { return false }
                 if let tier = filters.tier, item.tier != tier { return false }
                 if let source = filters.source, !item.source.isBytes(source) { return false }
@@ -181,11 +180,36 @@ final class InMemoryCore: CoreProtocol, Sendable {
         state.withLock { $0.edgesInOrder.filter { $0.edgeType == edgeType } }
     }
 
+    /// A type entry of a `types` list: the root it names, and whether it opens the hidden types it reaches.
+    struct Root {
+        let name: String
+        let opensHidden: Bool
+    }
+
+    /// A `system.*` or `app.*` type, left out of a local list or search unless the request opens it.
+    static func isHidden(_ type: String) -> Bool {
+        type.hasPrefix("system.") || type.hasPrefix("app.")
+    }
+
+    /// Whether a list names the bin's state alone, which shows hidden items as any other.
+    static func listsTheBinAlone(_ filters: ListFilters) -> Bool {
+        !filters.allStates && filters.states.map { !$0.isEmpty && $0.allSatisfy { $0 == .trashed } } == true
+    }
+
+    /// Whether a row of `type` is read: an entry of the list reaches it, or the list names none, and, unless the bin is
+    /// read, a hidden row needs an entry that names its type or a hidden type above it exactly, never as a wildcard.
+    static func admits(_ type: String, _ roots: [Root]?, in types: [String: ItemType], bin: Bool = false) -> Bool {
+        guard let roots else { return bin || !isHidden(type) }
+        return roots.contains { root in
+            reaches(type, root.name, in: types) && (bin || !isHidden(type) || root.opensHidden)
+        }
+    }
+
     /// The roots a `types` list names, as the core reads one.
     ///
     /// Entries are trimmed, blank ones dropped, repeats removed, and `*` refused. A concrete type the copy's catalog does not hold is refused `unknownType`, as the core
     /// refuses it before it reads anything. `nil` where the list is unset.
-    static func roots(of types: [String]?, in held: [String: ItemType]) throws -> [String]? {
+    static func roots(of types: [String]?, in held: [String: ItemType]) throws -> [Root]? {
         guard let types else { return nil }
         var entries: [String] = []
         for entry in types.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
@@ -205,7 +229,7 @@ final class InMemoryCore: CoreProtocol, Sendable {
             }
             let root = try root(of: entry) ?? entry
             guard entry.hasSuffix(".*") || held[entry] != nil else { throw Refuse.unknownTypeInQuery(entry) }
-            return root
+            return Root(name: root, opensHidden: isHidden(entry) && !entry.hasSuffix(".*"))
         }
     }
 
