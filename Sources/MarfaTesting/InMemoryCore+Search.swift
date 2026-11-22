@@ -22,7 +22,7 @@ extension InMemoryCore {
             let roots = try Self.roots(of: filters.types, in: types)
             let beneath = filters.beneath.map { state.reached(from: $0) }
             let allowed = state.items.values.filter { item in
-                if let roots, !roots.contains(where: { Self.reaches(item.type, $0, in: types) }) { return false }
+                if !Self.admits(item.type, roots, in: types) { return false }
                 if let named, !named.contains(item.state) { return false }
                 if let tier = filters.tier, item.tier != tier { return false }
                 if let occurredAfter, item.occurredAt <= occurredAfter { return false }

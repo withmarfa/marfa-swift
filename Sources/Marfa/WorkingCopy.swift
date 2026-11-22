@@ -275,6 +275,8 @@ public final class WorkingCopy: Sendable {
 
     /// Replaces the app's declared types, each a type definition.
     ///
+    /// An app declares only types under `app.`, such as `app.<app>.<name>`: any other id is refused `invalid`.
+    ///
     /// Offline creates are checked against them before the first hydration.
     /// Hydration registers any the instance lacks and reports refusals.
     public func declareTypes(_ types: [JSONObject]) async throws {
@@ -326,6 +328,9 @@ public final class WorkingCopy: Sendable {
     }
 
     /// Full-text search over indexed fields and tags, best match first.
+    ///
+    /// An `app.*` or `system.*` item is hidden: a search leaves it out unless `filters.types` names its type, or a
+    /// hidden type above it, exactly. A wildcard such as `app.acme.*` opens none.
     ///
     /// While a hydration fills the copy the hits are those of the rows that have arrived, and `completeness` says
     /// `.partial`.
@@ -657,6 +662,10 @@ public struct Items: Sendable {
     let feed: Feed
 
     /// The items `filters` select.
+    ///
+    /// An `app.*` or `system.*` item is hidden: a list leaves it out unless `filters.types` names its type, or a
+    /// hidden type above it, exactly. A wildcard such as `app.acme.*` opens none. A list of the bin's state alone
+    /// shows hidden items.
     ///
     /// While a hydration fills the copy the list holds the rows that have arrived, and `completeness` says
     /// `.partial`.

@@ -294,7 +294,7 @@ extension InMemoryCore {
         let beneath = Properties.string(query, "beneath").map { state.reached(from: $0) }
         let types = state.resolvedItemTypes()
         let matched = state.items.values.filter { item in
-            if item.type.hasPrefix("system.") || !states.contains(item.state.name) { return false }
+            if Self.isHidden(item.type) || !states.contains(item.state.name) { return false }
             if let roots, !roots.contains(where: { reaches(item.type, $0, in: types) }) { return false }
             switch tier {
             case .all: break

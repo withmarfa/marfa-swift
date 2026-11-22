@@ -31,6 +31,9 @@ import Synchronization
 ///   an in-memory database, which costs a pass over the rows and needs a SQLite built with FTS5 (the system's
 ///   on Apple platforms). A `filter` throws ``FakeCopyError/unsupported(call:)``. The copy is never filling,
 ///   so `completeness` is always `.complete`.
+/// - Hidden items: a list or search leaves out an `app.*` or `system.*` row unless a request names its hidden type, or
+///   one above it, exactly, and a wildcard opens none; a list of the bin's state alone shows them. `declareTypes(_:)`
+///   refuses an id outside `app.` as the core does.
 /// - Writes: `items.create(_:)` without `sourceId`, including `state`, a
 ///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`,
 ///   `clearOccurredAt` and `clearProperties`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
