@@ -152,6 +152,13 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `DELETE /plugins/{name}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
     func removePlugin(_ input: Operations.RemovePlugin.Input) async throws -> Operations.RemovePlugin.Output
+    /// Get a connector's state
+    ///
+    /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/get(getPluginConnector)`.
+    func getPluginConnector(_ input: Operations.GetPluginConnector.Input) async throws -> Operations.GetPluginConnector.Output
     /// Replace a connector's host
     ///
     /// Assigns a plugin's connector to a connector host, or to none. Moving it revokes the key its former host minted for it.
@@ -201,6 +208,69 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `POST /plugins/{name}/connector/mapping/rewrite/done`.
     /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/rewrite/done/post(finishConnectorRewrite)`.
     func finishConnectorRewrite(_ input: Operations.FinishConnectorRewrite.Input) async throws -> Operations.FinishConnectorRewrite.Output
+    /// Get a connector's sign-in
+    ///
+    /// Returns the status of the latest sign-in started for a plugin's connector, so you can tell when the owner's browser finished it.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/sign-in`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/sign-in/get(getPluginConnectorSignIn)`.
+    func getPluginConnectorSignIn(_ input: Operations.GetPluginConnectorSignIn.Input) async throws -> Operations.GetPluginConnectorSignIn.Output
+    /// Start a connector's sign-in
+    ///
+    /// Starts a sign-in to the provider a plugin's connector declares, and returns the address to open in the owner's browser. The provider sends the browser back to Marfa, which seals the refresh token into the connector's token setting.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/sign-in`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/sign-in/post(startPluginConnectorSignIn)`.
+    func startPluginConnectorSignIn(_ input: Operations.StartPluginConnectorSignIn.Input) async throws -> Operations.StartPluginConnectorSignIn.Output
+    /// Pause a connector
+    ///
+    /// Stores that the owner paused the plugin's connector, and drops a run asked for. The connector stops itself; Marfa still takes its writes, so a run under way finishes.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/pause`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/pause/post(pausePluginConnector)`.
+    func pausePluginConnector(_ input: Operations.PausePluginConnector.Input) async throws -> Operations.PausePluginConnector.Output
+    /// Resume a connector
+    ///
+    /// Stores that the owner resumed the plugin's connector, so it runs again.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/resume`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/resume/post(resumePluginConnector)`.
+    func resumePluginConnector(_ input: Operations.ResumePluginConnector.Input) async throws -> Operations.ResumePluginConnector.Output
+    /// Run a connector now
+    ///
+    /// Stores the time you asked the plugin's connector to run, which it reads and follows. A run the connector reports naming that time as its `run_requested_at` clears it.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/run`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/run/post(runPluginConnector)`.
+    func runPluginConnector(_ input: Operations.RunPluginConnector.Input) async throws -> Operations.RunPluginConnector.Output
+    /// List mapping previews
+    ///
+    /// Returns the plugin's mapping previews that have not expired, oldest first. The connector lists the pending ones to find work. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/previews`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/get(listMappingPreviews)`.
+    func listMappingPreviews(_ input: Operations.ListMappingPreviews.Input) async throws -> Operations.ListMappingPreviews.Output
+    /// Create a mapping preview
+    ///
+    /// Asks the plugin's connector to render one kind on one of its items, and returns the preview pending until the connector answers. A plugin holds at most 20 previews, so Marfa removes the oldest answered one to make room.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/previews`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/post(createMappingPreview)`.
+    func createMappingPreview(_ input: Operations.CreateMappingPreview.Input) async throws -> Operations.CreateMappingPreview.Output
+    /// Get a mapping preview
+    ///
+    /// Returns a mapping preview: pending, or ready with the fields the connector rendered, or failed with its reason. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/previews/{id}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/get(getMappingPreview)`.
+    func getMappingPreview(_ input: Operations.GetMappingPreview.Input) async throws -> Operations.GetMappingPreview.Output
+    /// Answer a mapping preview
+    ///
+    /// Keeps the connector's answer to a pending preview as it sends it: the rendered fields as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/previews/{id}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)`.
+    func answerMappingPreview(_ input: Operations.AnswerMappingPreview.Input) async throws -> Operations.AnswerMappingPreview.Output
     /// List connector hosts
     ///
     /// Returns every connector host, oldest first, with the connectors assigned to each.
@@ -670,6 +740,27 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `POST /config/address-check`.
     /// - Remark: Generated from `#/paths//config/address-check/post(checkAddressChange)`.
     func checkAddressChange(_ input: Operations.CheckAddressChange.Input) async throws -> Operations.CheckAddressChange.Output
+    /// Get the link to Marfa Cloud
+    ///
+    /// Returns this instance's link to Marfa Cloud: whether it is linking, linked or failed, and where the sign-in address stands. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/get(getCloudLink)`.
+    func getCloudLink(_ input: Operations.GetCloudLink.Input) async throws -> Operations.GetCloudLink.Output
+    /// Start a link to Marfa Cloud
+    ///
+    /// Starts linking this instance to Marfa Cloud and returns the link, with the code to approve it on Marfa Cloud. Once linked, the sign-in address moves to the Marfa Cloud address unless you keep it. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `POST /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/post(startCloudLink)`.
+    func startCloudLink(_ input: Operations.StartCloudLink.Input) async throws -> Operations.StartCloudLink.Output
+    /// Unlink from Marfa Cloud
+    ///
+    /// Ends the link to Marfa Cloud, or cancels one that is linking, and tells Marfa Cloud. If the sign-in address is the Marfa Cloud address, it moves back to the one before. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `DELETE /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/delete(unlinkCloud)`.
+    func unlinkCloud(_ input: Operations.UnlinkCloud.Input) async throws -> Operations.UnlinkCloud.Output
     /// List attention items
     ///
     /// Returns what needs the owner's attention. Requires `instance.read`. A check that fails or runs out of time appears as an unavailable item beside the known concerns. An empty list means every check completed without a concern.
@@ -1068,6 +1159,21 @@ extension ClientProtocol {
             headers: headers
         ))
     }
+    /// Get a connector's state
+    ///
+    /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/get(getPluginConnector)`.
+    public func getPluginConnector(
+        path: Operations.GetPluginConnector.Input.Path,
+        headers: Operations.GetPluginConnector.Input.Headers = .init()
+    ) async throws -> Operations.GetPluginConnector.Output {
+        try await getPluginConnector(Operations.GetPluginConnector.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// Replace a connector's host
     ///
     /// Assigns a plugin's connector to a connector host, or to none. Moving it revokes the key its former host minted for it.
@@ -1178,6 +1284,149 @@ extension ClientProtocol {
         body: Operations.FinishConnectorRewrite.Input.Body
     ) async throws -> Operations.FinishConnectorRewrite.Output {
         try await finishConnectorRewrite(Operations.FinishConnectorRewrite.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a connector's sign-in
+    ///
+    /// Returns the status of the latest sign-in started for a plugin's connector, so you can tell when the owner's browser finished it.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/sign-in`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/sign-in/get(getPluginConnectorSignIn)`.
+    public func getPluginConnectorSignIn(
+        path: Operations.GetPluginConnectorSignIn.Input.Path,
+        headers: Operations.GetPluginConnectorSignIn.Input.Headers = .init()
+    ) async throws -> Operations.GetPluginConnectorSignIn.Output {
+        try await getPluginConnectorSignIn(Operations.GetPluginConnectorSignIn.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Start a connector's sign-in
+    ///
+    /// Starts a sign-in to the provider a plugin's connector declares, and returns the address to open in the owner's browser. The provider sends the browser back to Marfa, which seals the refresh token into the connector's token setting.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/sign-in`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/sign-in/post(startPluginConnectorSignIn)`.
+    public func startPluginConnectorSignIn(
+        path: Operations.StartPluginConnectorSignIn.Input.Path,
+        headers: Operations.StartPluginConnectorSignIn.Input.Headers = .init(),
+        body: Operations.StartPluginConnectorSignIn.Input.Body
+    ) async throws -> Operations.StartPluginConnectorSignIn.Output {
+        try await startPluginConnectorSignIn(Operations.StartPluginConnectorSignIn.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Pause a connector
+    ///
+    /// Stores that the owner paused the plugin's connector, and drops a run asked for. The connector stops itself; Marfa still takes its writes, so a run under way finishes.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/pause`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/pause/post(pausePluginConnector)`.
+    public func pausePluginConnector(
+        path: Operations.PausePluginConnector.Input.Path,
+        headers: Operations.PausePluginConnector.Input.Headers = .init()
+    ) async throws -> Operations.PausePluginConnector.Output {
+        try await pausePluginConnector(Operations.PausePluginConnector.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Resume a connector
+    ///
+    /// Stores that the owner resumed the plugin's connector, so it runs again.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/resume`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/resume/post(resumePluginConnector)`.
+    public func resumePluginConnector(
+        path: Operations.ResumePluginConnector.Input.Path,
+        headers: Operations.ResumePluginConnector.Input.Headers = .init()
+    ) async throws -> Operations.ResumePluginConnector.Output {
+        try await resumePluginConnector(Operations.ResumePluginConnector.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Run a connector now
+    ///
+    /// Stores the time you asked the plugin's connector to run, which it reads and follows. A run the connector reports naming that time as its `run_requested_at` clears it.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/run`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/run/post(runPluginConnector)`.
+    public func runPluginConnector(
+        path: Operations.RunPluginConnector.Input.Path,
+        headers: Operations.RunPluginConnector.Input.Headers = .init()
+    ) async throws -> Operations.RunPluginConnector.Output {
+        try await runPluginConnector(Operations.RunPluginConnector.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// List mapping previews
+    ///
+    /// Returns the plugin's mapping previews that have not expired, oldest first. The connector lists the pending ones to find work. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/previews`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/get(listMappingPreviews)`.
+    public func listMappingPreviews(
+        path: Operations.ListMappingPreviews.Input.Path,
+        query: Operations.ListMappingPreviews.Input.Query = .init(),
+        headers: Operations.ListMappingPreviews.Input.Headers = .init()
+    ) async throws -> Operations.ListMappingPreviews.Output {
+        try await listMappingPreviews(Operations.ListMappingPreviews.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Create a mapping preview
+    ///
+    /// Asks the plugin's connector to render one kind on one of its items, and returns the preview pending until the connector answers. A plugin holds at most 20 previews, so Marfa removes the oldest answered one to make room.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/previews`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/post(createMappingPreview)`.
+    public func createMappingPreview(
+        path: Operations.CreateMappingPreview.Input.Path,
+        headers: Operations.CreateMappingPreview.Input.Headers = .init(),
+        body: Operations.CreateMappingPreview.Input.Body
+    ) async throws -> Operations.CreateMappingPreview.Output {
+        try await createMappingPreview(Operations.CreateMappingPreview.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a mapping preview
+    ///
+    /// Returns a mapping preview: pending, or ready with the fields the connector rendered, or failed with its reason. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/previews/{id}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/get(getMappingPreview)`.
+    public func getMappingPreview(
+        path: Operations.GetMappingPreview.Input.Path,
+        headers: Operations.GetMappingPreview.Input.Headers = .init()
+    ) async throws -> Operations.GetMappingPreview.Output {
+        try await getMappingPreview(Operations.GetMappingPreview.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Answer a mapping preview
+    ///
+    /// Keeps the connector's answer to a pending preview as it sends it: the rendered fields as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/previews/{id}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)`.
+    public func answerMappingPreview(
+        path: Operations.AnswerMappingPreview.Input.Path,
+        headers: Operations.AnswerMappingPreview.Input.Headers = .init(),
+        body: Operations.AnswerMappingPreview.Input.Body
+    ) async throws -> Operations.AnswerMappingPreview.Output {
+        try await answerMappingPreview(Operations.AnswerMappingPreview.Input(
             path: path,
             headers: headers,
             body: body
@@ -2094,6 +2343,45 @@ extension ClientProtocol {
         try await checkAddressChange(Operations.CheckAddressChange.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// Get the link to Marfa Cloud
+    ///
+    /// Returns this instance's link to Marfa Cloud: whether it is linking, linked or failed, and where the sign-in address stands. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/get(getCloudLink)`.
+    public func getCloudLink(headers: Operations.GetCloudLink.Input.Headers = .init()) async throws -> Operations.GetCloudLink.Output {
+        try await getCloudLink(Operations.GetCloudLink.Input(headers: headers))
+    }
+    /// Start a link to Marfa Cloud
+    ///
+    /// Starts linking this instance to Marfa Cloud and returns the link, with the code to approve it on Marfa Cloud. Once linked, the sign-in address moves to the Marfa Cloud address unless you keep it. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `POST /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/post(startCloudLink)`.
+    public func startCloudLink(
+        headers: Operations.StartCloudLink.Input.Headers = .init(),
+        body: Operations.StartCloudLink.Input.Body
+    ) async throws -> Operations.StartCloudLink.Output {
+        try await startCloudLink(Operations.StartCloudLink.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Unlink from Marfa Cloud
+    ///
+    /// Ends the link to Marfa Cloud, or cancels one that is linking, and tells Marfa Cloud. If the sign-in address is the Marfa Cloud address, it moves back to the one before. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `DELETE /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/delete(unlinkCloud)`.
+    public func unlinkCloud(
+        query: Operations.UnlinkCloud.Input.Query = .init(),
+        headers: Operations.UnlinkCloud.Input.Headers = .init()
+    ) async throws -> Operations.UnlinkCloud.Output {
+        try await unlinkCloud(Operations.UnlinkCloud.Input(
+            query: query,
+            headers: headers
         ))
     }
     /// List attention items

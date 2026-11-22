@@ -20142,14 +20142,16 @@ extension Components {
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case5`.
             case AttentionEventFrame(Components.Schemas.AttentionEventFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case6`.
-            case StreamLiveFrame(Components.Schemas.StreamLiveFrame)
+            case CloudLinkEventFrame(Components.Schemas.CloudLinkEventFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case7`.
-            case StreamIncompleteFrame(Components.Schemas.StreamIncompleteFrame)
+            case StreamLiveFrame(Components.Schemas.StreamLiveFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case8`.
-            case CatchupTooOldFrame(Components.Schemas.CatchupTooOldFrame)
+            case StreamIncompleteFrame(Components.Schemas.StreamIncompleteFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case9`.
-            case CursorAheadFrame(Components.Schemas.CursorAheadFrame)
+            case CatchupTooOldFrame(Components.Schemas.CatchupTooOldFrame)
             /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case10`.
+            case CursorAheadFrame(Components.Schemas.CursorAheadFrame)
+            /// - Remark: Generated from `#/components/schemas/EventStreamFrame/case11`.
             case ReachChangedFrame(Components.Schemas.ReachChangedFrame)
             public init(from decoder: any Swift.Decoder) throws {
                 var errors: [any Swift.Error] = []
@@ -20179,6 +20181,12 @@ extension Components {
                 }
                 do {
                     self = .AttentionEventFrame(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self = .CloudLinkEventFrame(try .init(from: decoder))
                     return
                 } catch {
                     errors.append(error)
@@ -20230,6 +20238,8 @@ extension Components {
                 case let .EdgeEventFrame(value):
                     try value.encode(to: encoder)
                 case let .AttentionEventFrame(value):
+                    try value.encode(to: encoder)
+                case let .CloudLinkEventFrame(value):
                     try value.encode(to: encoder)
                 case let .StreamLiveFrame(value):
                     try value.encode(to: encoder)
@@ -23954,6 +23964,985 @@ extension Components {
                 ])
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal`.
+        public struct CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case cloudLinkExists = "cloud_link_exists"
+                    case conflict = "conflict"
+                    case instanceChanged = "instance_changed"
+                    case noPublicListener = "no_public_listener"
+                    case signInAddressChangeUnconfirmed = "sign_in_address_change_unconfirmed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error/code`.
+                public var code: Components.Schemas.CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error/details`.
+                public var details: Components.Schemas.CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal/error`.
+            public var error: Components.Schemas.CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal._ErrorPayload
+            /// Creates a new `CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.CloudLinkExistsOrConflictOrInstanceChangedOrNoPublicListenerOrSignInAddressChangeUnconfirmedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal`.
+        public struct CloudUnavailableOrWriteContentionRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case cloudUnavailable = "cloud_unavailable"
+                    case writeContention = "write_contention"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error/code`.
+                public var code: Components.Schemas.CloudUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error/details`.
+                public var details: Components.Schemas.CloudUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.CloudUnavailableOrWriteContentionRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.CloudUnavailableOrWriteContentionRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudUnavailableOrWriteContentionRefusal/error`.
+            public var error: Components.Schemas.CloudUnavailableOrWriteContentionRefusal._ErrorPayload
+            /// Creates a new `CloudUnavailableOrWriteContentionRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.CloudUnavailableOrWriteContentionRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// What a link does with the sign-in address.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CloudLinkStart`.
+        public struct CloudLinkStart: Codable, Hashable, Sendable {
+            /// `move` makes the Marfa Cloud address the sign-in address once linked, which signs everyone out. `keep` leaves the sign-in address as it is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkStart/sign_in_address`.
+            @frozen public enum SignInAddressPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case move = "move"
+                case keep = "keep"
+            }
+            /// `move` makes the Marfa Cloud address the sign-in address once linked, which signs everyone out. `keep` leaves the sign-in address as it is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkStart/sign_in_address`.
+            public var signInAddress: Components.Schemas.CloudLinkStart.SignInAddressPayload?
+            /// `true` to confirm the move of the sign-in address. Without it, a move by a recent sign-in on an instance with an owner is refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkStart/confirm_sign_in_address_change`.
+            public var confirmSignInAddressChange: Swift.Bool?
+            /// Creates a new `CloudLinkStart`.
+            ///
+            /// - Parameters:
+            ///   - signInAddress: `move` makes the Marfa Cloud address the sign-in address once linked, which signs everyone out. `keep` leaves the sign-in address as it is.
+            ///   - confirmSignInAddressChange: `true` to confirm the move of the sign-in address. Without it, a move by a recent sign-in on an instance with an owner is refused.
+            public init(
+                signInAddress: Components.Schemas.CloudLinkStart.SignInAddressPayload? = nil,
+                confirmSignInAddressChange: Swift.Bool? = nil
+            ) {
+                self.signInAddress = signInAddress
+                self.confirmSignInAddressChange = confirmSignInAddressChange
+            }
+            public enum CodingKeys: String, CodingKey {
+                case signInAddress = "sign_in_address"
+                case confirmSignInAddressChange = "confirm_sign_in_address_change"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.signInAddress = try container.decodeIfPresent(
+                    Components.Schemas.CloudLinkStart.SignInAddressPayload.self,
+                    forKey: .signInAddress
+                )
+                self.confirmSignInAddressChange = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .confirmSignInAddressChange
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "sign_in_address",
+                    "confirm_sign_in_address_change"
+                ])
+            }
+        }
+        /// This instance's link to Marfa Cloud, which gives it a public name and address.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CloudLink`.
+        public struct CloudLink: Codable, Hashable, Sendable {
+            /// `not_linked`: no link, or Marfa Cloud ended it, as `ended` says. `linking`: waiting for approval on Marfa Cloud. `linked`: approved, with a name and address. `failed`: the link ended without linking, as `failure` says.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case notLinked = "not_linked"
+                case linking = "linking"
+                case linked = "linked"
+                case failed = "failed"
+            }
+            /// `not_linked`: no link, or Marfa Cloud ended it, as `ended` says. `linking`: waiting for approval on Marfa Cloud. `linked`: approved, with a name and address. `failed`: the link ended without linking, as `failure` says.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/state`.
+            public var state: Components.Schemas.CloudLink.StatePayload
+            /// `false` while Marfa Cloud hasn't been told of an unlink, which Marfa keeps trying to tell it. Present only then, while `state` is `not_linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/service_told`.
+            public var serviceTold: Swift.Bool?
+            /// Why the last link ended without an unlink here. Present while `state` is `not_linked` after Marfa Cloud ended the link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/ended`.
+            public struct EndedPayload: Codable, Hashable, Sendable {
+                /// `unlinked_by_service`: the link was ended on Marfa Cloud. Marfa put back the sign-in address if the link had moved it, unless `sign_in_address` says it could not.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/ended/reason`.
+                @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case unlinkedByService = "unlinked_by_service"
+                }
+                /// `unlinked_by_service`: the link was ended on Marfa Cloud. Marfa put back the sign-in address if the link had moved it, unless `sign_in_address` says it could not.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/ended/reason`.
+                public var reason: Components.Schemas.CloudLink.EndedPayload.ReasonPayload
+                /// When Marfa found the link ended, in UTC.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/ended/ended_at`.
+                public var endedAt: Foundation.Date?
+                /// Creates a new `EndedPayload`.
+                ///
+                /// - Parameters:
+                ///   - reason: `unlinked_by_service`: the link was ended on Marfa Cloud. Marfa put back the sign-in address if the link had moved it, unless `sign_in_address` says it could not.
+                ///   - endedAt: When Marfa found the link ended, in UTC.
+                public init(
+                    reason: Components.Schemas.CloudLink.EndedPayload.ReasonPayload,
+                    endedAt: Foundation.Date? = nil
+                ) {
+                    self.reason = reason
+                    self.endedAt = endedAt
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case reason
+                    case endedAt = "ended_at"
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.reason = try container.decode(
+                        Components.Schemas.CloudLink.EndedPayload.ReasonPayload.self,
+                        forKey: .reason
+                    )
+                    self.endedAt = try container.decodeIfPresent(
+                        Foundation.Date.self,
+                        forKey: .endedAt
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "reason",
+                        "ended_at"
+                    ])
+                }
+            }
+            /// Why the last link ended without an unlink here. Present while `state` is `not_linked` after Marfa Cloud ended the link.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/ended`.
+            public var ended: Components.Schemas.CloudLink.EndedPayload?
+            /// How to approve the link. Present while `state` is `linking`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/linking`.
+            public struct LinkingPayload: Codable, Hashable, Sendable {
+                /// The code to enter on Marfa Cloud to approve the link.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/linking/user_code`.
+                public var userCode: Swift.String
+                /// Where to approve the link on Marfa Cloud.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/linking/approval_url`.
+                public var approvalUrl: Swift.String
+                /// When the link stops waiting for approval, in UTC, timed on this instance's clock from when it started the link.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/linking/expires_at`.
+                public var expiresAt: Foundation.Date
+                /// `true` while another program holds the link's port on 127.0.0.1, where Marfa Cloud's connector reaches this instance. Present only then. Free the port, or unlink and link again for another.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/linking/port_taken`.
+                public var portTaken: Swift.Bool?
+                /// Creates a new `LinkingPayload`.
+                ///
+                /// - Parameters:
+                ///   - userCode: The code to enter on Marfa Cloud to approve the link.
+                ///   - approvalUrl: Where to approve the link on Marfa Cloud.
+                ///   - expiresAt: When the link stops waiting for approval, in UTC, timed on this instance's clock from when it started the link.
+                ///   - portTaken: `true` while another program holds the link's port on 127.0.0.1, where Marfa Cloud's connector reaches this instance. Present only then. Free the port, or unlink and link again for another.
+                public init(
+                    userCode: Swift.String,
+                    approvalUrl: Swift.String,
+                    expiresAt: Foundation.Date,
+                    portTaken: Swift.Bool? = nil
+                ) {
+                    self.userCode = userCode
+                    self.approvalUrl = approvalUrl
+                    self.expiresAt = expiresAt
+                    self.portTaken = portTaken
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case userCode = "user_code"
+                    case approvalUrl = "approval_url"
+                    case expiresAt = "expires_at"
+                    case portTaken = "port_taken"
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.userCode = try container.decode(
+                        Swift.String.self,
+                        forKey: .userCode
+                    )
+                    self.approvalUrl = try container.decode(
+                        Swift.String.self,
+                        forKey: .approvalUrl
+                    )
+                    self.expiresAt = try container.decode(
+                        Foundation.Date.self,
+                        forKey: .expiresAt
+                    )
+                    self.portTaken = try container.decodeIfPresent(
+                        Swift.Bool.self,
+                        forKey: .portTaken
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "user_code",
+                        "approval_url",
+                        "expires_at",
+                        "port_taken"
+                    ])
+                }
+            }
+            /// How to approve the link. Present while `state` is `linking`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/linking`.
+            public var linking: Components.Schemas.CloudLink.LinkingPayload?
+            /// The name Marfa Cloud gave this instance. Present while `state` is `linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/name`.
+            public var name: Swift.String?
+            /// The address Marfa Cloud gave this instance. Present while `state` is `linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/address`.
+            public var address: Swift.String?
+            /// When Marfa Cloud linked this instance, in UTC. Present while `state` is `linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/linked_at`.
+            public var linkedAt: Foundation.Date?
+            /// The connector that carries traffic through Marfa Cloud. Present while `state` is `linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/connector`.
+            public struct ConnectorPayload: Codable, Hashable, Sendable {
+                /// The connector's state: `stopped`, `starting`, `connected` (ready and carrying traffic), `reconnecting` (ended or no longer ready, being brought back) or `failed` (can't run; see `reason`).
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/connector/state`.
+                @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case stopped = "stopped"
+                    case starting = "starting"
+                    case connected = "connected"
+                    case reconnecting = "reconnecting"
+                    case failed = "failed"
+                }
+                /// The connector's state: `stopped`, `starting`, `connected` (ready and carrying traffic), `reconnecting` (ended or no longer ready, being brought back) or `failed` (can't run; see `reason`).
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/connector/state`.
+                public var state: Components.Schemas.CloudLink.ConnectorPayload.StatePayload
+                /// Why a `failed` connector can't run: `missing` (no connector file), `origin_unknown` (the link keeps no port for it; link again), `port_taken` (another program holds its port), `refused` (Marfa Cloud refuses its token) or `token` (no token file).
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/connector/reason`.
+                @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case missing = "missing"
+                    case originUnknown = "origin_unknown"
+                    case portTaken = "port_taken"
+                    case refused = "refused"
+                    case token = "token"
+                }
+                /// Why a `failed` connector can't run: `missing` (no connector file), `origin_unknown` (the link keeps no port for it; link again), `port_taken` (another program holds its port), `refused` (Marfa Cloud refuses its token) or `token` (no token file).
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/connector/reason`.
+                public var reason: Components.Schemas.CloudLink.ConnectorPayload.ReasonPayload?
+                /// Since when the connector has been in this state, in UTC.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/connector/since`.
+                public var since: Foundation.Date
+                /// Creates a new `ConnectorPayload`.
+                ///
+                /// - Parameters:
+                ///   - state: The connector's state: `stopped`, `starting`, `connected` (ready and carrying traffic), `reconnecting` (ended or no longer ready, being brought back) or `failed` (can't run; see `reason`).
+                ///   - reason: Why a `failed` connector can't run: `missing` (no connector file), `origin_unknown` (the link keeps no port for it; link again), `port_taken` (another program holds its port), `refused` (Marfa Cloud refuses its token) or `token` (no token file).
+                ///   - since: Since when the connector has been in this state, in UTC.
+                public init(
+                    state: Components.Schemas.CloudLink.ConnectorPayload.StatePayload,
+                    reason: Components.Schemas.CloudLink.ConnectorPayload.ReasonPayload? = nil,
+                    since: Foundation.Date
+                ) {
+                    self.state = state
+                    self.reason = reason
+                    self.since = since
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case state
+                    case reason
+                    case since
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.state = try container.decode(
+                        Components.Schemas.CloudLink.ConnectorPayload.StatePayload.self,
+                        forKey: .state
+                    )
+                    self.reason = try container.decodeIfPresent(
+                        Components.Schemas.CloudLink.ConnectorPayload.ReasonPayload.self,
+                        forKey: .reason
+                    )
+                    self.since = try container.decode(
+                        Foundation.Date.self,
+                        forKey: .since
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "state",
+                        "reason",
+                        "since"
+                    ])
+                }
+            }
+            /// The connector that carries traffic through Marfa Cloud. Present while `state` is `linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/connector`.
+            public var connector: Components.Schemas.CloudLink.ConnectorPayload?
+            /// Where the sign-in address stands. Present while `state` is `linking` or `linked`, while failed if the sign-in address is the Marfa Cloud address, and while not linked if the link ended with the sign-in address still at its Marfa Cloud address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address`.
+            public struct SignInAddressPayload: Codable, Hashable, Sendable {
+                /// `moved`: it is the Marfa Cloud address. `kept`: it stays as it is. `pending`: Marfa moves it once linked. `waiting`: it moves when you take `next_step`. `not_put_back`: the link ended, and Marfa couldn't move it back from the Marfa Cloud address.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/state`.
+                @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case moved = "moved"
+                    case kept = "kept"
+                    case pending = "pending"
+                    case waiting = "waiting"
+                    case notPutBack = "not_put_back"
+                }
+                /// `moved`: it is the Marfa Cloud address. `kept`: it stays as it is. `pending`: Marfa moves it once linked. `waiting`: it moves when you take `next_step`. `not_put_back`: the link ended, and Marfa couldn't move it back from the Marfa Cloud address.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/state`.
+                public var state: Components.Schemas.CloudLink.SignInAddressPayload.StatePayload
+                /// The sign-in address in force.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/address`.
+                public var address: Swift.String
+                /// Why Marfa couldn't move the sign-in address back. Present while `state` is `not_put_back`, after Marfa Cloud ended the link.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/failure`.
+                public struct FailurePayload: Codable, Hashable, Sendable {
+                    /// The error code of the write that failed.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/failure/reason`.
+                    public var reason: Swift.String
+                    /// Creates a new `FailurePayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - reason: The error code of the write that failed.
+                    public init(reason: Swift.String) {
+                        self.reason = reason
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case reason
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.reason = try container.decode(
+                            Swift.String.self,
+                            forKey: .reason
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "reason"
+                        ])
+                    }
+                }
+                /// Why Marfa couldn't move the sign-in address back. Present while `state` is `not_put_back`, after Marfa Cloud ended the link.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/failure`.
+                public var failure: Components.Schemas.CloudLink.SignInAddressPayload.FailurePayload?
+                /// How to move the sign-in address yourself. Present while linked and `state` is `waiting`, and while `state` is `not_put_back` and `addresses` reads.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step`.
+                public struct NextStepPayload: Codable, Hashable, Sendable {
+                    /// The request that moves it, sent from an app someone signed in to recently.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request`.
+                    public struct RequestPayload: Codable, Hashable, Sendable {
+                        /// The request's method.
+                        ///
+                        /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/method`.
+                        @frozen public enum MethodPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                            case patch = "PATCH"
+                        }
+                        /// The request's method.
+                        ///
+                        /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/method`.
+                        public var method: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.MethodPayload
+                        /// The request's path.
+                        ///
+                        /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/path`.
+                        @frozen public enum PathPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                            case _sol_config = "/config"
+                        }
+                        /// The request's path.
+                        ///
+                        /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/path`.
+                        public var path: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.PathPayload
+                        /// The request's body.
+                        ///
+                        /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/body`.
+                        public struct BodyPayload: Codable, Hashable, Sendable {
+                            /// The address it moves to: the Marfa Cloud address, or for `not_put_back`, the one Marfa would have moved it back to.
+                            ///
+                            /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/body/sign_in_address`.
+                            public var signInAddress: Swift.String
+                            /// Always `true`: the move signs everyone out.
+                            ///
+                            /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/body/confirm_sign_in_address_change`.
+                            public var confirmSignInAddressChange: Swift.Bool
+                            /// Creates a new `BodyPayload`.
+                            ///
+                            /// - Parameters:
+                            ///   - signInAddress: The address it moves to: the Marfa Cloud address, or for `not_put_back`, the one Marfa would have moved it back to.
+                            ///   - confirmSignInAddressChange: Always `true`: the move signs everyone out.
+                            public init(
+                                signInAddress: Swift.String,
+                                confirmSignInAddressChange: Swift.Bool
+                            ) {
+                                self.signInAddress = signInAddress
+                                self.confirmSignInAddressChange = confirmSignInAddressChange
+                            }
+                            public enum CodingKeys: String, CodingKey {
+                                case signInAddress = "sign_in_address"
+                                case confirmSignInAddressChange = "confirm_sign_in_address_change"
+                            }
+                            public init(from decoder: any Swift.Decoder) throws {
+                                let container = try decoder.container(keyedBy: CodingKeys.self)
+                                self.signInAddress = try container.decode(
+                                    Swift.String.self,
+                                    forKey: .signInAddress
+                                )
+                                self.confirmSignInAddressChange = try container.decode(
+                                    Swift.Bool.self,
+                                    forKey: .confirmSignInAddressChange
+                                )
+                                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                    "sign_in_address",
+                                    "confirm_sign_in_address_change"
+                                ])
+                            }
+                        }
+                        /// The request's body.
+                        ///
+                        /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request/body`.
+                        public var body: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.BodyPayload
+                        /// Creates a new `RequestPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - method: The request's method.
+                        ///   - path: The request's path.
+                        ///   - body: The request's body.
+                        public init(
+                            method: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.MethodPayload,
+                            path: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.PathPayload,
+                            body: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.BodyPayload
+                        ) {
+                            self.method = method
+                            self.path = path
+                            self.body = body
+                        }
+                        public enum CodingKeys: String, CodingKey {
+                            case method
+                            case path
+                            case body
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            let container = try decoder.container(keyedBy: CodingKeys.self)
+                            self.method = try container.decode(
+                                Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.MethodPayload.self,
+                                forKey: .method
+                            )
+                            self.path = try container.decode(
+                                Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.PathPayload.self,
+                                forKey: .path
+                            )
+                            self.body = try container.decode(
+                                Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.BodyPayload.self,
+                                forKey: .body
+                            )
+                            try decoder.ensureNoAdditionalProperties(knownKeys: [
+                                "method",
+                                "path",
+                                "body"
+                            ])
+                        }
+                    }
+                    /// The request that moves it, sent from an app someone signed in to recently.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/request`.
+                    public var request: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload
+                    /// The `marfa` command that moves it, run where the server runs.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step/command`.
+                    public var command: Swift.String
+                    /// Creates a new `NextStepPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - request: The request that moves it, sent from an app someone signed in to recently.
+                    ///   - command: The `marfa` command that moves it, run where the server runs.
+                    public init(
+                        request: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload,
+                        command: Swift.String
+                    ) {
+                        self.request = request
+                        self.command = command
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case request
+                        case command
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.request = try container.decode(
+                            Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.RequestPayload.self,
+                            forKey: .request
+                        )
+                        self.command = try container.decode(
+                            Swift.String.self,
+                            forKey: .command
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "request",
+                            "command"
+                        ])
+                    }
+                }
+                /// How to move the sign-in address yourself. Present while linked and `state` is `waiting`, and while `state` is `not_put_back` and `addresses` reads.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address/next_step`.
+                public var nextStep: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload?
+                /// Creates a new `SignInAddressPayload`.
+                ///
+                /// - Parameters:
+                ///   - state: `moved`: it is the Marfa Cloud address. `kept`: it stays as it is. `pending`: Marfa moves it once linked. `waiting`: it moves when you take `next_step`. `not_put_back`: the link ended, and Marfa couldn't move it back from the Marfa Cloud address.
+                ///   - address: The sign-in address in force.
+                ///   - failure: Why Marfa couldn't move the sign-in address back. Present while `state` is `not_put_back`, after Marfa Cloud ended the link.
+                ///   - nextStep: How to move the sign-in address yourself. Present while linked and `state` is `waiting`, and while `state` is `not_put_back` and `addresses` reads.
+                public init(
+                    state: Components.Schemas.CloudLink.SignInAddressPayload.StatePayload,
+                    address: Swift.String,
+                    failure: Components.Schemas.CloudLink.SignInAddressPayload.FailurePayload? = nil,
+                    nextStep: Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload? = nil
+                ) {
+                    self.state = state
+                    self.address = address
+                    self.failure = failure
+                    self.nextStep = nextStep
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case state
+                    case address
+                    case failure
+                    case nextStep = "next_step"
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.state = try container.decode(
+                        Components.Schemas.CloudLink.SignInAddressPayload.StatePayload.self,
+                        forKey: .state
+                    )
+                    self.address = try container.decode(
+                        Swift.String.self,
+                        forKey: .address
+                    )
+                    self.failure = try container.decodeIfPresent(
+                        Components.Schemas.CloudLink.SignInAddressPayload.FailurePayload.self,
+                        forKey: .failure
+                    )
+                    self.nextStep = try container.decodeIfPresent(
+                        Components.Schemas.CloudLink.SignInAddressPayload.NextStepPayload.self,
+                        forKey: .nextStep
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "state",
+                        "address",
+                        "failure",
+                        "next_step"
+                    ])
+                }
+            }
+            /// Where the sign-in address stands. Present while `state` is `linking` or `linked`, while failed if the sign-in address is the Marfa Cloud address, and while not linked if the link ended with the sign-in address still at its Marfa Cloud address.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/sign_in_address`.
+            public var signInAddress: Components.Schemas.CloudLink.SignInAddressPayload?
+            /// Why the link failed. Present while `state` is `failed`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/failure`.
+            public struct FailurePayload: Codable, Hashable, Sendable {
+                /// `denied`: the approval was declined. `expired`: it wasn't approved in time. `refused`: Marfa Cloud refused it, as `message` says. `unlinked`: Marfa Cloud ended it. `unreadable`: a secret of the link no longer opens.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/failure/reason`.
+                @frozen public enum ReasonPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case denied = "denied"
+                    case expired = "expired"
+                    case refused = "refused"
+                    case unlinked = "unlinked"
+                    case unreadable = "unreadable"
+                }
+                /// `denied`: the approval was declined. `expired`: it wasn't approved in time. `refused`: Marfa Cloud refused it, as `message` says. `unlinked`: Marfa Cloud ended it. `unreadable`: a secret of the link no longer opens.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/failure/reason`.
+                public var reason: Components.Schemas.CloudLink.FailurePayload.ReasonPayload
+                /// Marfa Cloud's reason for a refusal. Present when `reason` is `refused`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/CloudLink/failure/message`.
+                public var message: Swift.String?
+                /// Creates a new `FailurePayload`.
+                ///
+                /// - Parameters:
+                ///   - reason: `denied`: the approval was declined. `expired`: it wasn't approved in time. `refused`: Marfa Cloud refused it, as `message` says. `unlinked`: Marfa Cloud ended it. `unreadable`: a secret of the link no longer opens.
+                ///   - message: Marfa Cloud's reason for a refusal. Present when `reason` is `refused`.
+                public init(
+                    reason: Components.Schemas.CloudLink.FailurePayload.ReasonPayload,
+                    message: Swift.String? = nil
+                ) {
+                    self.reason = reason
+                    self.message = message
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case reason
+                    case message
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.reason = try container.decode(
+                        Components.Schemas.CloudLink.FailurePayload.ReasonPayload.self,
+                        forKey: .reason
+                    )
+                    self.message = try container.decodeIfPresent(
+                        Swift.String.self,
+                        forKey: .message
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "reason",
+                        "message"
+                    ])
+                }
+            }
+            /// Why the link failed. Present while `state` is `failed`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLink/failure`.
+            public var failure: Components.Schemas.CloudLink.FailurePayload?
+            /// Creates a new `CloudLink`.
+            ///
+            /// - Parameters:
+            ///   - state: `not_linked`: no link, or Marfa Cloud ended it, as `ended` says. `linking`: waiting for approval on Marfa Cloud. `linked`: approved, with a name and address. `failed`: the link ended without linking, as `failure` says.
+            ///   - serviceTold: `false` while Marfa Cloud hasn't been told of an unlink, which Marfa keeps trying to tell it. Present only then, while `state` is `not_linked`.
+            ///   - ended: Why the last link ended without an unlink here. Present while `state` is `not_linked` after Marfa Cloud ended the link.
+            ///   - linking: How to approve the link. Present while `state` is `linking`.
+            ///   - name: The name Marfa Cloud gave this instance. Present while `state` is `linked`.
+            ///   - address: The address Marfa Cloud gave this instance. Present while `state` is `linked`.
+            ///   - linkedAt: When Marfa Cloud linked this instance, in UTC. Present while `state` is `linked`.
+            ///   - connector: The connector that carries traffic through Marfa Cloud. Present while `state` is `linked`.
+            ///   - signInAddress: Where the sign-in address stands. Present while `state` is `linking` or `linked`, while failed if the sign-in address is the Marfa Cloud address, and while not linked if the link ended with the sign-in address still at its Marfa Cloud address.
+            ///   - failure: Why the link failed. Present while `state` is `failed`.
+            public init(
+                state: Components.Schemas.CloudLink.StatePayload,
+                serviceTold: Swift.Bool? = nil,
+                ended: Components.Schemas.CloudLink.EndedPayload? = nil,
+                linking: Components.Schemas.CloudLink.LinkingPayload? = nil,
+                name: Swift.String? = nil,
+                address: Swift.String? = nil,
+                linkedAt: Foundation.Date? = nil,
+                connector: Components.Schemas.CloudLink.ConnectorPayload? = nil,
+                signInAddress: Components.Schemas.CloudLink.SignInAddressPayload? = nil,
+                failure: Components.Schemas.CloudLink.FailurePayload? = nil
+            ) {
+                self.state = state
+                self.serviceTold = serviceTold
+                self.ended = ended
+                self.linking = linking
+                self.name = name
+                self.address = address
+                self.linkedAt = linkedAt
+                self.connector = connector
+                self.signInAddress = signInAddress
+                self.failure = failure
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case serviceTold = "service_told"
+                case ended
+                case linking
+                case name
+                case address
+                case linkedAt = "linked_at"
+                case connector
+                case signInAddress = "sign_in_address"
+                case failure
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.state = try container.decode(
+                    Components.Schemas.CloudLink.StatePayload.self,
+                    forKey: .state
+                )
+                self.serviceTold = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .serviceTold
+                )
+                self.ended = try container.decodeIfPresent(
+                    Components.Schemas.CloudLink.EndedPayload.self,
+                    forKey: .ended
+                )
+                self.linking = try container.decodeIfPresent(
+                    Components.Schemas.CloudLink.LinkingPayload.self,
+                    forKey: .linking
+                )
+                self.name = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.address = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .address
+                )
+                self.linkedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .linkedAt
+                )
+                self.connector = try container.decodeIfPresent(
+                    Components.Schemas.CloudLink.ConnectorPayload.self,
+                    forKey: .connector
+                )
+                self.signInAddress = try container.decodeIfPresent(
+                    Components.Schemas.CloudLink.SignInAddressPayload.self,
+                    forKey: .signInAddress
+                )
+                self.failure = try container.decodeIfPresent(
+                    Components.Schemas.CloudLink.FailurePayload.self,
+                    forKey: .failure
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "state",
+                    "service_told",
+                    "ended",
+                    "linking",
+                    "name",
+                    "address",
+                    "linked_at",
+                    "connector",
+                    "sign_in_address",
+                    "failure"
+                ])
+            }
+        }
+        /// What an unlink did.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CloudUnlinked`.
+        public struct CloudUnlinked: Codable, Hashable, Sendable {
+            /// Always `not_linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudUnlinked/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case notLinked = "not_linked"
+            }
+            /// Always `not_linked`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudUnlinked/state`.
+            public var state: Components.Schemas.CloudUnlinked.StatePayload
+            /// `true` if Marfa Cloud was told, or took the cancel of a link that was linking. `false` if it couldn't be reached, and Marfa keeps trying. Present when a link was linking or linked.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudUnlinked/service_told`.
+            public var serviceTold: Swift.Bool?
+            /// Creates a new `CloudUnlinked`.
+            ///
+            /// - Parameters:
+            ///   - state: Always `not_linked`.
+            ///   - serviceTold: `true` if Marfa Cloud was told, or took the cancel of a link that was linking. `false` if it couldn't be reached, and Marfa keeps trying. Present when a link was linking or linked.
+            public init(
+                state: Components.Schemas.CloudUnlinked.StatePayload,
+                serviceTold: Swift.Bool? = nil
+            ) {
+                self.state = state
+                self.serviceTold = serviceTold
+            }
+            public enum CodingKeys: String, CodingKey {
+                case state
+                case serviceTold = "service_told"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.state = try container.decode(
+                    Components.Schemas.CloudUnlinked.StatePayload.self,
+                    forKey: .state
+                )
+                self.serviceTold = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .serviceTold
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "state",
+                    "service_told"
+                ])
+            }
+        }
+        /// A change to the link to Marfa Cloud. You receive it only with `config.manage`, and only on a stream that names no `type` and isn't a copy stream.
+        ///
+        /// - Remark: Generated from `#/components/schemas/CloudLinkEventFrame`.
+        public struct CloudLinkEventFrame: Codable, Hashable, Sendable {
+            /// The event, which is also the frame's `event:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkEventFrame/event_type`.
+            @frozen public enum EventTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case cloudLink_changed = "cloud_link.changed"
+            }
+            /// The event, which is also the frame's `event:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkEventFrame/event_type`.
+            public var eventType: Components.Schemas.CloudLinkEventFrame.EventTypePayload
+            /// The link as `GET /cloud/link` returns it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CloudLinkEventFrame/cloud_link`.
+            public var cloudLink: Components.Schemas.CloudLink
+            /// Creates a new `CloudLinkEventFrame`.
+            ///
+            /// - Parameters:
+            ///   - eventType: The event, which is also the frame's `event:`.
+            ///   - cloudLink: The link as `GET /cloud/link` returns it.
+            public init(
+                eventType: Components.Schemas.CloudLinkEventFrame.EventTypePayload,
+                cloudLink: Components.Schemas.CloudLink
+            ) {
+                self.eventType = eventType
+                self.cloudLink = cloudLink
+            }
+            public enum CodingKeys: String, CodingKey {
+                case eventType = "event_type"
+                case cloudLink = "cloud_link"
+            }
+        }
         /// A plugin's bundle, `<name>.plugin.json`: its identity, version, types and edge types.
         ///
         /// - Remark: Generated from `#/components/schemas/PluginBundle`.
@@ -26422,6 +27411,14 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/key_minted`.
                 public var keyMinted: Swift.Bool
+                /// `true` if the owner paused the connector, so the host does not start it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/paused`.
+                public var paused: Swift.Bool
+                /// When the owner asked the connector to run now, in UTC, or `null` if no run is waiting.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/run_requested_at`.
+                public var runRequestedAt: Foundation.Date?
                 /// Creates a new `ConnectorsPayloadPayload`.
                 ///
                 /// - Parameters:
@@ -26431,13 +27428,17 @@ extension Components {
                 ///   - connector: The connector section of the installed bundle.
                 ///   - registrationId: The ID of the registration the connector's current key made, or `null`.
                 ///   - keyMinted: `true` if the host minted a key for the connector that still stands.
+                ///   - paused: `true` if the owner paused the connector, so the host does not start it.
+                ///   - runRequestedAt: When the owner asked the connector to run now, in UTC, or `null` if no run is waiting.
                 public init(
                     plugin: Swift.String,
                     version: Swift.String,
                     fingerprint: Swift.String,
                     connector: Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload.ConnectorPayload,
                     registrationId: Swift.String? = nil,
-                    keyMinted: Swift.Bool
+                    keyMinted: Swift.Bool,
+                    paused: Swift.Bool,
+                    runRequestedAt: Foundation.Date? = nil
                 ) {
                     self.plugin = plugin
                     self.version = version
@@ -26445,6 +27446,8 @@ extension Components {
                     self.connector = connector
                     self.registrationId = registrationId
                     self.keyMinted = keyMinted
+                    self.paused = paused
+                    self.runRequestedAt = runRequestedAt
                 }
                 public enum CodingKeys: String, CodingKey {
                     case plugin
@@ -26453,6 +27456,8 @@ extension Components {
                     case connector
                     case registrationId = "registration_id"
                     case keyMinted = "key_minted"
+                    case paused
+                    case runRequestedAt = "run_requested_at"
                 }
                 public init(from decoder: any Swift.Decoder) throws {
                     let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -26480,13 +27485,23 @@ extension Components {
                         Swift.Bool.self,
                         forKey: .keyMinted
                     )
+                    self.paused = try container.decode(
+                        Swift.Bool.self,
+                        forKey: .paused
+                    )
+                    self.runRequestedAt = try container.decodeIfPresent(
+                        Foundation.Date.self,
+                        forKey: .runRequestedAt
+                    )
                     try decoder.ensureNoAdditionalProperties(knownKeys: [
                         "plugin",
                         "version",
                         "fingerprint",
                         "connector",
                         "registration_id",
-                        "key_minted"
+                        "key_minted",
+                        "paused",
+                        "run_requested_at"
                     ])
                 }
             }
@@ -27151,6 +28166,349 @@ extension Components {
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "plugin",
                     "name"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal`.
+        public struct ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorSignInNotDeclared = "connector_sign_in_not_declared"
+                    case connectorSignInSettingsMissing = "connector_sign_in_settings_missing"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal/error`.
+            public var error: Components.Schemas.ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal._ErrorPayload
+            /// Creates a new `ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorSignInNotDeclaredOrConnectorSignInSettingsMissingOrInstanceChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal`.
+        public struct ConnectorSignInNotDeclaredOrInstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorSignInNotDeclared = "connector_sign_in_not_declared"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorSignInNotDeclaredOrInstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorSignInNotDeclaredOrInstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorSignInNotDeclaredOrInstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorSignInNotDeclaredOrInstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSignInNotDeclaredOrInstanceChangedRefusal/error`.
+            public var error: Components.Schemas.ConnectorSignInNotDeclaredOrInstanceChangedRefusal._ErrorPayload
+            /// Creates a new `ConnectorSignInNotDeclaredOrInstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorSignInNotDeclaredOrInstanceChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// A sign-in started for a plugin's connector.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStart`.
+        public struct PluginConnectorSignInStart: Codable, Hashable, Sendable {
+            /// The sign-in's ID, which `GET /plugins/{name}/connector/sign-in` returns while this sign-in is the latest, so you can tell it from one a later start replaced it with.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStart/id`.
+            public var id: Swift.String
+            /// The provider's address to open in the owner's browser. Its query carries the client ID, the address the provider sends the browser back to, the scopes, a state and a PKCE challenge.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStart/url`.
+            public var url: Swift.String
+            /// When the sign-in ends if the owner's browser hasn't come back, in UTC: ten minutes after the start.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStart/expires_at`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `PluginConnectorSignInStart`.
+            ///
+            /// - Parameters:
+            ///   - id: The sign-in's ID, which `GET /plugins/{name}/connector/sign-in` returns while this sign-in is the latest, so you can tell it from one a later start replaced it with.
+            ///   - url: The provider's address to open in the owner's browser. Its query carries the client ID, the address the provider sends the browser back to, the scopes, a state and a PKCE challenge.
+            ///   - expiresAt: When the sign-in ends if the owner's browser hasn't come back, in UTC: ten minutes after the start.
+            public init(
+                id: Swift.String,
+                url: Swift.String,
+                expiresAt: Foundation.Date
+            ) {
+                self.id = id
+                self.url = url
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case url
+                case expiresAt = "expires_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.url = try container.decode(
+                    Swift.String.self,
+                    forKey: .url
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "url",
+                    "expires_at"
+                ])
+            }
+        }
+        /// The latest sign-in started for a plugin's connector.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus`.
+        public struct PluginConnectorSignInStatus: Codable, Hashable, Sendable {
+            /// The plugin's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/plugin`.
+            public var plugin: Swift.String
+            /// Where the latest sign-in stands: `none` if none was started, `pending` while it waits for the owner's browser, `signed_in` once Marfa stored the refresh token, `failed` once it ended any other way, and `expired` once ten minutes passed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case none = "none"
+                case pending = "pending"
+                case signedIn = "signed_in"
+                case failed = "failed"
+                case expired = "expired"
+            }
+            /// Where the latest sign-in stands: `none` if none was started, `pending` while it waits for the owner's browser, `signed_in` once Marfa stored the refresh token, `failed` once it ended any other way, and `expired` once ten minutes passed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/status`.
+            public var status: Components.Schemas.PluginConnectorSignInStatus.StatusPayload
+            /// Why the latest sign-in failed, or `null` unless `status` is `failed`: an RFC 6749 error such as `invalid_client` (a wrong client ID or secret) or `access_denied`, or a word of Marfa's such as `timeout` or `status_503`. Never the provider's text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/reason`.
+            public var reason: Swift.String?
+            /// The latest sign-in's ID, as its start returned it, or `null` if none was started.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/id`.
+            public var id: Swift.String?
+            /// When the latest sign-in started, in UTC, or `null` if none was started.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/started_at`.
+            public var startedAt: Foundation.Date?
+            /// When the latest sign-in ends if the owner's browser doesn't come back, in UTC, or `null` if none was started.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/expires_at`.
+            public var expiresAt: Foundation.Date?
+            /// When the owner's browser came back and ended the latest sign-in, in UTC, or `null` while it is pending, once it expired, or if none was started.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/ended_at`.
+            public var endedAt: Foundation.Date?
+            /// Creates a new `PluginConnectorSignInStatus`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin's name.
+            ///   - status: Where the latest sign-in stands: `none` if none was started, `pending` while it waits for the owner's browser, `signed_in` once Marfa stored the refresh token, `failed` once it ended any other way, and `expired` once ten minutes passed.
+            ///   - reason: Why the latest sign-in failed, or `null` unless `status` is `failed`: an RFC 6749 error such as `invalid_client` (a wrong client ID or secret) or `access_denied`, or a word of Marfa's such as `timeout` or `status_503`. Never the provider's text.
+            ///   - id: The latest sign-in's ID, as its start returned it, or `null` if none was started.
+            ///   - startedAt: When the latest sign-in started, in UTC, or `null` if none was started.
+            ///   - expiresAt: When the latest sign-in ends if the owner's browser doesn't come back, in UTC, or `null` if none was started.
+            ///   - endedAt: When the owner's browser came back and ended the latest sign-in, in UTC, or `null` while it is pending, once it expired, or if none was started.
+            public init(
+                plugin: Swift.String,
+                status: Components.Schemas.PluginConnectorSignInStatus.StatusPayload,
+                reason: Swift.String? = nil,
+                id: Swift.String? = nil,
+                startedAt: Foundation.Date? = nil,
+                expiresAt: Foundation.Date? = nil,
+                endedAt: Foundation.Date? = nil
+            ) {
+                self.plugin = plugin
+                self.status = status
+                self.reason = reason
+                self.id = id
+                self.startedAt = startedAt
+                self.expiresAt = expiresAt
+                self.endedAt = endedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case status
+                case reason
+                case id
+                case startedAt = "started_at"
+                case expiresAt = "expires_at"
+                case endedAt = "ended_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.status = try container.decode(
+                    Components.Schemas.PluginConnectorSignInStatus.StatusPayload.self,
+                    forKey: .status
+                )
+                self.reason = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .reason
+                )
+                self.id = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.startedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .startedAt
+                )
+                self.expiresAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                self.endedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .endedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "status",
+                    "reason",
+                    "id",
+                    "started_at",
+                    "expires_at",
+                    "ended_at"
                 ])
             }
         }
@@ -28412,10 +29770,841 @@ extension Components {
                 ])
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal`.
+        public struct ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case pluginNotFound = "plugin_not_found"
+                    case pluginConnectorNotFound = "plugin_connector_not_found"
+                    case connectorPreviewNotFound = "connector_preview_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal/error`.
+            public var error: Components.Schemas.ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload
+            /// Creates a new `ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorPreviewNotFoundOrPluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal`.
+        public struct ConnectorPausedOrInstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorPaused = "connector_paused"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorPausedOrInstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorPausedOrInstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorPausedOrInstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorPausedOrInstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPausedOrInstanceChangedRefusal/error`.
+            public var error: Components.Schemas.ConnectorPausedOrInstanceChangedRefusal._ErrorPayload
+            /// Creates a new `ConnectorPausedOrInstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorPausedOrInstanceChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal`.
+        public struct ConnectorPreviewsFullOrInstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorPreviewsFull = "connector_previews_full"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorPreviewsFullOrInstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorPreviewsFullOrInstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorPreviewsFullOrInstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorPreviewsFullOrInstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewsFullOrInstanceChangedRefusal/error`.
+            public var error: Components.Schemas.ConnectorPreviewsFullOrInstanceChangedRefusal._ErrorPayload
+            /// Creates a new `ConnectorPreviewsFullOrInstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorPreviewsFullOrInstanceChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal`.
+        public struct ConnectorPreviewAnsweredOrInstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorPreviewAnswered = "connector_preview_answered"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorPreviewAnsweredOrInstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorPreviewAnsweredOrInstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorPreviewAnsweredOrInstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorPreviewAnsweredOrInstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnsweredOrInstanceChangedRefusal/error`.
+            public var error: Components.Schemas.ConnectorPreviewAnsweredOrInstanceChangedRefusal._ErrorPayload
+            /// Creates a new `ConnectorPreviewAnsweredOrInstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorPreviewAnsweredOrInstanceChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// What the owner wants of a plugin's connector, which the connector reads each run.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorControl`.
+        public struct PluginConnectorControl: Codable, Hashable, Sendable {
+            /// The plugin whose connector this is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/plugin`.
+            public var plugin: Swift.String
+            /// The source the connector holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/source`.
+            public var source: Swift.String
+            /// The ID of the host the connector is assigned to, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/host`.
+            public var host: Swift.String?
+            /// The ID of the registration the connector's current key made, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/registration`.
+            public var registration: Swift.String?
+            /// `true` if the owner paused the connector. The connector stops itself; Marfa still takes its writes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/paused`.
+            public var paused: Swift.Bool
+            /// When the owner last asked the connector to run now, in UTC, until the connector reports a run that names this time as its `run_requested_at`. `null` if no run is waiting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/run_requested_at`.
+            public var runRequestedAt: Foundation.Date?
+            /// The version of the connector's mapping, `0` until one is saved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/mapping_version`.
+            public var mappingVersion: Swift.Int
+            /// How many rewrite requests wait on the connector.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/rewrites`.
+            public var rewrites: Swift.Int
+            /// How many mapping previews wait on the connector.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/previews`.
+            public var previews: Swift.Int
+            /// Creates a new `PluginConnectorControl`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin whose connector this is.
+            ///   - source: The source the connector holds.
+            ///   - host: The ID of the host the connector is assigned to, or `null`.
+            ///   - registration: The ID of the registration the connector's current key made, or `null`.
+            ///   - paused: `true` if the owner paused the connector. The connector stops itself; Marfa still takes its writes.
+            ///   - runRequestedAt: When the owner last asked the connector to run now, in UTC, until the connector reports a run that names this time as its `run_requested_at`. `null` if no run is waiting.
+            ///   - mappingVersion: The version of the connector's mapping, `0` until one is saved.
+            ///   - rewrites: How many rewrite requests wait on the connector.
+            ///   - previews: How many mapping previews wait on the connector.
+            public init(
+                plugin: Swift.String,
+                source: Swift.String,
+                host: Swift.String? = nil,
+                registration: Swift.String? = nil,
+                paused: Swift.Bool,
+                runRequestedAt: Foundation.Date? = nil,
+                mappingVersion: Swift.Int,
+                rewrites: Swift.Int,
+                previews: Swift.Int
+            ) {
+                self.plugin = plugin
+                self.source = source
+                self.host = host
+                self.registration = registration
+                self.paused = paused
+                self.runRequestedAt = runRequestedAt
+                self.mappingVersion = mappingVersion
+                self.rewrites = rewrites
+                self.previews = previews
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case source
+                case host
+                case registration
+                case paused
+                case runRequestedAt = "run_requested_at"
+                case mappingVersion = "mapping_version"
+                case rewrites
+                case previews
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.source = try container.decode(
+                    Swift.String.self,
+                    forKey: .source
+                )
+                self.host = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .host
+                )
+                self.registration = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .registration
+                )
+                self.paused = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .paused
+                )
+                self.runRequestedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .runRequestedAt
+                )
+                self.mappingVersion = try container.decode(
+                    Swift.Int.self,
+                    forKey: .mappingVersion
+                )
+                self.rewrites = try container.decode(
+                    Swift.Int.self,
+                    forKey: .rewrites
+                )
+                self.previews = try container.decode(
+                    Swift.Int.self,
+                    forKey: .previews
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "source",
+                    "host",
+                    "registration",
+                    "paused",
+                    "run_requested_at",
+                    "mapping_version",
+                    "rewrites",
+                    "previews"
+                ])
+            }
+        }
+        /// A mapping preview is how one kind of a connector would land, which the connector renders on one of its items.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreview`.
+        public struct ConnectorPreview: Codable, Hashable, Sendable {
+            /// Unique identifier for the mapping preview.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/id`.
+            public var id: Swift.String
+            /// The kind of the connector the preview renders.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/kind`.
+            public var kind: Swift.String
+            /// The ID of the item the connector renders the preview from, or `null` to let the connector choose a recent one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/item_id`.
+            public var itemId: Swift.String?
+            /// The draft of the kind's mapping to render with, or `null` for the mapping in force.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/mapping`.
+            public var mapping: Components.Schemas.MarfaNullableConnectorMappingKind
+            /// `pending` until the connector answers, then `ready` with `result` or `failed` with `error`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/status`.
+            @frozen public enum StatusPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case pending = "pending"
+                case ready = "ready"
+                case failed = "failed"
+            }
+            /// `pending` until the connector answers, then `ready` with `result` or `failed` with `error`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/status`.
+            public var status: Components.Schemas.ConnectorPreview.StatusPayload
+            /// The fields the connector rendered, as it sent them, once `status` is `ready`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/result`.
+            public struct ResultPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ResultPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The fields the connector rendered, as it sent them, once `status` is `ready`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/result`.
+            public var result: Components.Schemas.ConnectorPreview.ResultPayload?
+            /// Why the connector could not render the preview, once `status` is `failed`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/error`.
+            public var error: Swift.String?
+            /// When the preview was asked for, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/created_at`.
+            public var createdAt: Foundation.Date
+            /// When Marfa stops returning the preview, in UTC: 10 minutes after `created_at`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/expires_at`.
+            public var expiresAt: Foundation.Date
+            /// When the connector answered, in UTC, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreview/answered_at`.
+            public var answeredAt: Foundation.Date?
+            /// Creates a new `ConnectorPreview`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the mapping preview.
+            ///   - kind: The kind of the connector the preview renders.
+            ///   - itemId: The ID of the item the connector renders the preview from, or `null` to let the connector choose a recent one.
+            ///   - mapping: The draft of the kind's mapping to render with, or `null` for the mapping in force.
+            ///   - status: `pending` until the connector answers, then `ready` with `result` or `failed` with `error`.
+            ///   - result: The fields the connector rendered, as it sent them, once `status` is `ready`.
+            ///   - error: Why the connector could not render the preview, once `status` is `failed`.
+            ///   - createdAt: When the preview was asked for, in UTC.
+            ///   - expiresAt: When Marfa stops returning the preview, in UTC: 10 minutes after `created_at`.
+            ///   - answeredAt: When the connector answered, in UTC, or `null`.
+            public init(
+                id: Swift.String,
+                kind: Swift.String,
+                itemId: Swift.String? = nil,
+                mapping: Components.Schemas.MarfaNullableConnectorMappingKind,
+                status: Components.Schemas.ConnectorPreview.StatusPayload,
+                result: Components.Schemas.ConnectorPreview.ResultPayload? = nil,
+                error: Swift.String? = nil,
+                createdAt: Foundation.Date,
+                expiresAt: Foundation.Date,
+                answeredAt: Foundation.Date? = nil
+            ) {
+                self.id = id
+                self.kind = kind
+                self.itemId = itemId
+                self.mapping = mapping
+                self.status = status
+                self.result = result
+                self.error = error
+                self.createdAt = createdAt
+                self.expiresAt = expiresAt
+                self.answeredAt = answeredAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case kind
+                case itemId = "item_id"
+                case mapping
+                case status
+                case result
+                case error
+                case createdAt = "created_at"
+                case expiresAt = "expires_at"
+                case answeredAt = "answered_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.kind = try container.decode(
+                    Swift.String.self,
+                    forKey: .kind
+                )
+                self.itemId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .itemId
+                )
+                self.mapping = try container.decode(
+                    Components.Schemas.MarfaNullableConnectorMappingKind.self,
+                    forKey: .mapping
+                )
+                self.status = try container.decode(
+                    Components.Schemas.ConnectorPreview.StatusPayload.self,
+                    forKey: .status
+                )
+                self.result = try container.decodeIfPresent(
+                    Components.Schemas.ConnectorPreview.ResultPayload.self,
+                    forKey: .result
+                )
+                self.error = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .error
+                )
+                self.createdAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .createdAt
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                self.answeredAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .answeredAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "kind",
+                    "item_id",
+                    "mapping",
+                    "status",
+                    "result",
+                    "error",
+                    "created_at",
+                    "expires_at",
+                    "answered_at"
+                ])
+            }
+        }
+        /// A plugin connector's mapping previews.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewPage`.
+        public struct ConnectorPreviewPage: Codable, Hashable, Sendable {
+            /// The previews that have not expired, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewPage/data`.
+            public var data: [Components.Schemas.ConnectorPreview]
+            /// Always `null`: a plugin holds at most 20 previews, all returned in one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewPage/next_cursor`.
+            public var nextCursor: Components.Schemas.MarfaNull
+            /// Creates a new `ConnectorPreviewPage`.
+            ///
+            /// - Parameters:
+            ///   - data: The previews that have not expired, oldest first.
+            ///   - nextCursor: Always `null`: a plugin holds at most 20 previews, all returned in one page.
+            public init(
+                data: [Components.Schemas.ConnectorPreview],
+                nextCursor: Components.Schemas.MarfaNull
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.data = try container.decode(
+                    [Components.Schemas.ConnectorPreview].self,
+                    forKey: .data
+                )
+                self.nextCursor = try container.decode(
+                    Components.Schemas.MarfaNull.self,
+                    forKey: .nextCursor
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "data",
+                    "next_cursor"
+                ])
+            }
+        }
+        /// What a mapping preview renders.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest`.
+        public struct ConnectorPreviewRequest: Codable, Hashable, Sendable {
+            /// The kind of the connector to preview.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/kind`.
+            public var kind: Swift.String
+            /// The ID of an item the connector brought to render the preview from. Leave it out to let the connector choose a recent one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/item_id`.
+            public var itemId: Swift.String?
+            /// A draft of the kind's mapping, checked as a save checks it; a member you leave out takes its default. Leave it out to preview the mapping in force.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/mapping`.
+            public struct MappingPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/mapping/value1`.
+                public var value1: Components.Schemas.ConnectorMappingKind
+                /// Creates a new `MappingPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.ConnectorMappingKind) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// A draft of the kind's mapping, checked as a save checks it; a member you leave out takes its default. Leave it out to preview the mapping in force.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/mapping`.
+            public var mapping: Components.Schemas.ConnectorPreviewRequest.MappingPayload?
+            /// Creates a new `ConnectorPreviewRequest`.
+            ///
+            /// - Parameters:
+            ///   - kind: The kind of the connector to preview.
+            ///   - itemId: The ID of an item the connector brought to render the preview from. Leave it out to let the connector choose a recent one.
+            ///   - mapping: A draft of the kind's mapping, checked as a save checks it; a member you leave out takes its default. Leave it out to preview the mapping in force.
+            public init(
+                kind: Swift.String,
+                itemId: Swift.String? = nil,
+                mapping: Components.Schemas.ConnectorPreviewRequest.MappingPayload? = nil
+            ) {
+                self.kind = kind
+                self.itemId = itemId
+                self.mapping = mapping
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case itemId = "item_id"
+                case mapping
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.kind = try container.decode(
+                    Swift.String.self,
+                    forKey: .kind
+                )
+                self.itemId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .itemId
+                )
+                self.mapping = try container.decodeIfPresent(
+                    Components.Schemas.ConnectorPreviewRequest.MappingPayload.self,
+                    forKey: .mapping
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "kind",
+                    "item_id",
+                    "mapping"
+                ])
+            }
+        }
+        /// The connector's answer to a mapping preview: `result` or `error`, not both.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer`.
+        public struct ConnectorPreviewAnswer: Codable, Hashable, Sendable {
+            /// The fields the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer/result`.
+            public struct ResultPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `ResultPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// The fields the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer/result`.
+            public var result: Components.Schemas.ConnectorPreviewAnswer.ResultPayload?
+            /// Why the connector could not render the preview. Send this or `result`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorPreviewAnswer/error`.
+            public var error: Swift.String?
+            /// Creates a new `ConnectorPreviewAnswer`.
+            ///
+            /// - Parameters:
+            ///   - result: The fields the connector rendered, at most 65,536 bytes written as JSON. Send this or `error`.
+            ///   - error: Why the connector could not render the preview. Send this or `result`.
+            public init(
+                result: Components.Schemas.ConnectorPreviewAnswer.ResultPayload? = nil,
+                error: Swift.String? = nil
+            ) {
+                self.result = result
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case result
+                case error
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.result = try container.decodeIfPresent(
+                    Components.Schemas.ConnectorPreviewAnswer.ResultPayload.self,
+                    forKey: .result
+                )
+                self.error = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .error
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "result",
+                    "error"
+                ])
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/MarfaNull`.
         public typealias MarfaNull = MarfaNullValue
         /// - Remark: Generated from `#/components/schemas/MarfaInline00404e686415370f`.
         public typealias MarfaInline00404e686415370f = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline4f410cd74c87d8dd`.
+        public typealias MarfaInline4f410cd74c87d8dd = Foundation.Date
         /// - Remark: Generated from `#/components/schemas/MarfaInline52ba84a4bbf396ba`.
         public typealias MarfaInline52ba84a4bbf396ba = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInline81a5f2b70bdd834c`.
@@ -28578,8 +30767,6 @@ extension Components {
                 ])
             }
         }
-        /// - Remark: Generated from `#/components/schemas/MarfaInline4f410cd74c87d8dd`.
-        public typealias MarfaInline4f410cd74c87d8dd = Foundation.Date
         /// - Remark: Generated from `#/components/schemas/MarfaInline0d3ac1e9e006c011`.
         public typealias MarfaInline0d3ac1e9e006c011 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline010b1dec865519f0`.
@@ -28730,6 +30917,8 @@ extension Components {
         public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableViewGroup`.
         public typealias MarfaNullableViewGroup = MarfaNullable<Components.Schemas.ViewGroup>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline4f410cd74c87d8dd`.
+        public typealias MarfaNullableMarfaInline4f410cd74c87d8dd = MarfaNullable<Components.Schemas.MarfaInline4f410cd74c87d8dd>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline52ba84a4bbf396ba`.
         public typealias MarfaNullableMarfaInline52ba84a4bbf396ba = MarfaNullable<Components.Schemas.MarfaInline52ba84a4bbf396ba>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableEnforcementOverride`.
@@ -28784,8 +30973,6 @@ extension Components {
         public typealias MarfaNullableMarfaInlinecddf8275afa15408 = MarfaNullable<Components.Schemas.MarfaInlinecddf8275afa15408>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinefdf0831745ef621f`.
         public typealias MarfaNullableMarfaInlinefdf0831745ef621f = MarfaNullable<Components.Schemas.MarfaInlinefdf0831745ef621f>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline4f410cd74c87d8dd`.
-        public typealias MarfaNullableMarfaInline4f410cd74c87d8dd = MarfaNullable<Components.Schemas.MarfaInline4f410cd74c87d8dd>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline0d3ac1e9e006c011`.
         public typealias MarfaNullableMarfaInline0d3ac1e9e006c011 = MarfaNullable<Components.Schemas.MarfaInline0d3ac1e9e006c011>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline010b1dec865519f0`.
@@ -28812,5 +30999,7 @@ extension Components {
         public typealias MarfaNullablePluginConnector = MarfaNullable<Components.Schemas.PluginConnector>
         /// - Remark: Generated from `#/components/schemas/MarfaNullablePluginInstaller`.
         public typealias MarfaNullablePluginInstaller = MarfaNullable<Components.Schemas.PluginInstaller>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorMappingKind`.
+        public typealias MarfaNullableConnectorMappingKind = MarfaNullable<Components.Schemas.ConnectorMappingKind>
     }
 }
