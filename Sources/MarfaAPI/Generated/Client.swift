@@ -7412,7 +7412,7 @@ public struct Client: ClientProtocol {
     }
     /// Revoke an app grant
     ///
-    /// Revokes the app's tokens and consent. Requires `grants.manage`.
+    /// Revokes the app's tokens and consent. Its keys stay unless `revoke_keys` is `true`, and its data stays unless `remove_data` is `true`. Requires `grants.manage`.
     ///
     /// - Remark: HTTP `DELETE /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
@@ -7438,6 +7438,13 @@ public struct Client: ClientProtocol {
                     explode: true,
                     name: "revoke_keys",
                     value: input.query.revokeKeys
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "remove_data",
+                    value: input.query.removeData
                 )
                 converter.setAcceptHeader(
                     in: &request.headerFields,
@@ -7642,6 +7649,183 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.AppVendor.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List an app's data
+    ///
+    /// Returns each type under an `app.<vendor>` namespace, registered or held by an item, with its items counted by state, and a page of those items in every state. Requires the browser session or `grants.manage`; a key also needs read on those types.
+    ///
+    /// - Remark: HTTP `GET /app-vendors/{vendor}/data`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/data/get(listAppVendorData)`.
+    public func listAppVendorData(_ input: Operations.ListAppVendorData.Input) async throws -> Operations.ListAppVendorData.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListAppVendorData.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/app-vendors/{}/data",
+                    parameters: [
+                        input.path.vendor
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "limit",
+                    value: input.query.limit
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "cursor",
+                    value: input.query.cursor
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListAppVendorData.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListAppVendorData.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.AppVendorDataPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Delete an app's data
+    ///
+    /// Deletes for good up to 1,000 items under an `app.<vendor>` namespace, in every state, and its registered types once none is left. Needs `items.purge` and the browser session or `grants.manage`; a key also needs write on its types and `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /app-vendors/{vendor}/data`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/data/delete(deleteAppVendorData)`.
+    public func deleteAppVendorData(_ input: Operations.DeleteAppVendorData.Input) async throws -> Operations.DeleteAppVendorData.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DeleteAppVendorData.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/app-vendors/{}/data",
+                    parameters: [
+                        input.path.vendor
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.DeleteAppVendorData.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DeleteAppVendorData.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.AppVendorDataRemoval.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -8216,7 +8400,7 @@ public struct Client: ClientProtocol {
     }
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`. Requires `sign_ins.manage`.
+    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`, and its data unless `remove_data` is `true`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
@@ -8242,6 +8426,13 @@ public struct Client: ClientProtocol {
                     explode: true,
                     name: "revoke_keys",
                     value: input.query.revokeKeys
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "remove_data",
+                    value: input.query.removeData
                 )
                 try converter.setHeaderFieldAsURI(
                     in: &request.headerFields,

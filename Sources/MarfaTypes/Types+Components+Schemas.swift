@@ -18154,6 +18154,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/scopes`.
             public var scopes: [Swift.String]
+            /// Each `app.<vendor>` namespace the app holds. `GET /app-vendors/{vendor}/data` lists what it keeps there.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppGrant/vendors`.
+            public var vendors: [Swift.String]
             /// The grant's status.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/status`.
@@ -18175,6 +18179,7 @@ extension Components {
             ///   - clientName: The app's registered name, or null if unavailable.
             ///   - origins: Approved web origins, empty for a native app.
             ///   - scopes: The access the owner approved for the app.
+            ///   - vendors: Each `app.<vendor>` namespace the app holds. `GET /app-vendors/{vendor}/data` lists what it keeps there.
             ///   - status: The grant's status.
             ///   - grantedAt: When the owner last approved the app, in UTC.
             ///   - lastUsedAt: When the app last used its access, in UTC, or null if never used.
@@ -18185,6 +18190,7 @@ extension Components {
                 clientName: Swift.String? = nil,
                 origins: [Swift.String],
                 scopes: [Swift.String],
+                vendors: [Swift.String],
                 status: Swift.String,
                 grantedAt: Swift.String,
                 lastUsedAt: Swift.String? = nil
@@ -18195,6 +18201,7 @@ extension Components {
                 self.clientName = clientName
                 self.origins = origins
                 self.scopes = scopes
+                self.vendors = vendors
                 self.status = status
                 self.grantedAt = grantedAt
                 self.lastUsedAt = lastUsedAt
@@ -18206,6 +18213,7 @@ extension Components {
                 case clientName = "client_name"
                 case origins
                 case scopes
+                case vendors
                 case status
                 case grantedAt = "granted_at"
                 case lastUsedAt = "last_used_at"
@@ -26344,6 +26352,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendor/client_id`.
             public var clientId: Swift.String?
+            /// The name the app that holds the namespace registered, or `null` while the owner holds it or the app registered none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendor/client_name`.
+            public var clientName: Swift.String?
             /// When the namespace was first held, or when it was given to the app that holds it.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendor/claimed_at`.
@@ -26353,19 +26365,23 @@ extension Components {
             /// - Parameters:
             ///   - vendor: The namespace, as `app.<vendor>`.
             ///   - clientId: The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it because no one app is known to have made its types.
+            ///   - clientName: The name the app that holds the namespace registered, or `null` while the owner holds it or the app registered none.
             ///   - claimedAt: When the namespace was first held, or when it was given to the app that holds it.
             public init(
                 vendor: Swift.String,
                 clientId: Swift.String? = nil,
+                clientName: Swift.String? = nil,
                 claimedAt: Foundation.Date
             ) {
                 self.vendor = vendor
                 self.clientId = clientId
+                self.clientName = clientName
                 self.claimedAt = claimedAt
             }
             public enum CodingKeys: String, CodingKey {
                 case vendor
                 case clientId = "client_id"
+                case clientName = "client_name"
                 case claimedAt = "claimed_at"
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -26378,6 +26394,10 @@ extension Components {
                     Swift.String.self,
                     forKey: .clientId
                 )
+                self.clientName = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .clientName
+                )
                 self.claimedAt = try container.decode(
                     Foundation.Date.self,
                     forKey: .claimedAt
@@ -26385,6 +26405,7 @@ extension Components {
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "vendor",
                     "client_id",
+                    "client_name",
                     "claimed_at"
                 ])
             }
@@ -30687,6 +30708,513 @@ extension Components {
                     "properties",
                     "title",
                     "source_item"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal`.
+        public struct InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case instanceChanged = "instance_changed"
+                    case typeHasSubtypes = "type_has_subtypes"
+                    case typeInUse = "type_in_use"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error/code`.
+                public var code: Components.Schemas.InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error/details`.
+                public var details: Components.Schemas.InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal/error`.
+            public var error: Components.Schemas.InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal._ErrorPayload
+            /// Creates a new `InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.InstanceChangedOrTypeHasSubtypesOrTypeInUseRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal`.
+        public struct BulkCapExceededOrValidationErrorRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case bulkCapExceeded = "bulk_cap_exceeded"
+                    case validationError = "validation_error"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error/code`.
+                public var code: Components.Schemas.BulkCapExceededOrValidationErrorRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error/details`.
+                public var details: Components.Schemas.BulkCapExceededOrValidationErrorRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.BulkCapExceededOrValidationErrorRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.BulkCapExceededOrValidationErrorRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BulkCapExceededOrValidationErrorRefusal/error`.
+            public var error: Components.Schemas.BulkCapExceededOrValidationErrorRefusal._ErrorPayload
+            /// Creates a new `BulkCapExceededOrValidationErrorRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.BulkCapExceededOrValidationErrorRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// A type registered under an `app.<vendor>` namespace, with how many items of it stand in each state.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppVendorDataType`.
+        public struct AppVendorDataType: Codable, Hashable, Sendable {
+            /// The type's identifier.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataType/type`.
+            public var _type: Swift.String
+            /// How many of its items are active.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataType/active`.
+            public var active: Swift.Int
+            /// How many of its items are archived.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataType/archived`.
+            public var archived: Swift.Int
+            /// How many of its items are in the trash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataType/trashed`.
+            public var trashed: Swift.Int
+            /// Creates a new `AppVendorDataType`.
+            ///
+            /// - Parameters:
+            ///   - _type: The type's identifier.
+            ///   - active: How many of its items are active.
+            ///   - archived: How many of its items are archived.
+            ///   - trashed: How many of its items are in the trash.
+            public init(
+                _type: Swift.String,
+                active: Swift.Int,
+                archived: Swift.Int,
+                trashed: Swift.Int
+            ) {
+                self._type = _type
+                self.active = active
+                self.archived = archived
+                self.trashed = trashed
+            }
+            public enum CodingKeys: String, CodingKey {
+                case _type = "type"
+                case active
+                case archived
+                case trashed
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self._type = try container.decode(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.active = try container.decode(
+                    Swift.Int.self,
+                    forKey: .active
+                )
+                self.archived = try container.decode(
+                    Swift.Int.self,
+                    forKey: .archived
+                )
+                self.trashed = try container.decode(
+                    Swift.Int.self,
+                    forKey: .trashed
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "type",
+                    "active",
+                    "archived",
+                    "trashed"
+                ])
+            }
+        }
+        /// An item of a type under an `app.<vendor>` namespace, in any state.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppVendorDataItem`.
+        public struct AppVendorDataItem: Codable, Hashable, Sendable {
+            /// Unique identifier for the item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/id`.
+            public var id: Swift.String
+            /// The item's type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/type`.
+            public var _type: Swift.String
+            /// The item's version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/version`.
+            public var version: Swift.Int
+            /// The item's title, or a name Marfa gives an item without one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/name`.
+            public var name: Swift.String
+            /// The source that wrote the item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/source`.
+            public var source: Swift.String
+            /// The item's state: `active`, `archived`, or `trashed` while it is in the trash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/state`.
+            @frozen public enum StatePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case active = "active"
+                case archived = "archived"
+                case trashed = "trashed"
+            }
+            /// The item's state: `active`, `archived`, or `trashed` while it is in the trash.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/state`.
+            public var state: Components.Schemas.AppVendorDataItem.StatePayload
+            /// When the item was created, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/created_at`.
+            public var createdAt: Foundation.Date
+            /// Creates a new `AppVendorDataItem`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the item.
+            ///   - _type: The item's type.
+            ///   - version: The item's version.
+            ///   - name: The item's title, or a name Marfa gives an item without one.
+            ///   - source: The source that wrote the item.
+            ///   - state: The item's state: `active`, `archived`, or `trashed` while it is in the trash.
+            ///   - createdAt: When the item was created, in UTC.
+            public init(
+                id: Swift.String,
+                _type: Swift.String,
+                version: Swift.Int,
+                name: Swift.String,
+                source: Swift.String,
+                state: Components.Schemas.AppVendorDataItem.StatePayload,
+                createdAt: Foundation.Date
+            ) {
+                self.id = id
+                self._type = _type
+                self.version = version
+                self.name = name
+                self.source = source
+                self.state = state
+                self.createdAt = createdAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case _type = "type"
+                case version
+                case name
+                case source
+                case state
+                case createdAt = "created_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self._type = try container.decode(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.version = try container.decode(
+                    Swift.Int.self,
+                    forKey: .version
+                )
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.source = try container.decode(
+                    Swift.String.self,
+                    forKey: .source
+                )
+                self.state = try container.decode(
+                    Components.Schemas.AppVendorDataItem.StatePayload.self,
+                    forKey: .state
+                )
+                self.createdAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .createdAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "type",
+                    "version",
+                    "name",
+                    "source",
+                    "state",
+                    "created_at"
+                ])
+            }
+        }
+        /// What an app keeps under one `app.<vendor>` namespace: its types with counts, and a page of its items in every state.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppVendorDataPage`.
+        public struct AppVendorDataPage: Codable, Hashable, Sendable {
+            /// The namespace, as `app.<vendor>`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/vendor`.
+            public var vendor: Swift.String
+            /// The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/client_id`.
+            public var clientId: Swift.String?
+            /// Every type registered under the namespace, by identifier, each in every page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/types`.
+            public var types: [Components.Schemas.AppVendorDataType]
+            /// A page of the namespace's items, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/data`.
+            public var data: [Components.Schemas.AppVendorDataItem]
+            /// Send as `cursor` for the next page, or `null` on the last page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/next_cursor`.
+            public var nextCursor: Swift.String?
+            /// Creates a new `AppVendorDataPage`.
+            ///
+            /// - Parameters:
+            ///   - vendor: The namespace, as `app.<vendor>`.
+            ///   - clientId: The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it.
+            ///   - types: Every type registered under the namespace, by identifier, each in every page.
+            ///   - data: A page of the namespace's items, oldest first.
+            ///   - nextCursor: Send as `cursor` for the next page, or `null` on the last page.
+            public init(
+                vendor: Swift.String,
+                clientId: Swift.String? = nil,
+                types: [Components.Schemas.AppVendorDataType],
+                data: [Components.Schemas.AppVendorDataItem],
+                nextCursor: Swift.String? = nil
+            ) {
+                self.vendor = vendor
+                self.clientId = clientId
+                self.types = types
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case vendor
+                case clientId = "client_id"
+                case types
+                case data
+                case nextCursor = "next_cursor"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.vendor = try container.decode(
+                    Swift.String.self,
+                    forKey: .vendor
+                )
+                self.clientId = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .clientId
+                )
+                self.types = try container.decode(
+                    [Components.Schemas.AppVendorDataType].self,
+                    forKey: .types
+                )
+                self.data = try container.decode(
+                    [Components.Schemas.AppVendorDataItem].self,
+                    forKey: .data
+                )
+                self.nextCursor = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .nextCursor
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "vendor",
+                    "client_id",
+                    "types",
+                    "data",
+                    "next_cursor"
+                ])
+            }
+        }
+        /// What one removal of an `app.<vendor>` namespace's data deleted, and how many of its items are left.
+        ///
+        /// - Remark: Generated from `#/components/schemas/AppVendorDataRemoval`.
+        public struct AppVendorDataRemoval: Codable, Hashable, Sendable {
+            /// The namespace, as `app.<vendor>`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataRemoval/vendor`.
+            public var vendor: Swift.String
+            /// How many items this call deleted, at most 1,000.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataRemoval/removed_items`.
+            public var removedItems: Swift.Int
+            /// How many types this call deleted: every type under the namespace, in the call that leaves no item.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataRemoval/removed_types`.
+            public var removedTypes: Swift.Int
+            /// How many items of the namespace are left. Call again until it is `0`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataRemoval/remaining_items`.
+            public var remainingItems: Swift.Int
+            /// Creates a new `AppVendorDataRemoval`.
+            ///
+            /// - Parameters:
+            ///   - vendor: The namespace, as `app.<vendor>`.
+            ///   - removedItems: How many items this call deleted, at most 1,000.
+            ///   - removedTypes: How many types this call deleted: every type under the namespace, in the call that leaves no item.
+            ///   - remainingItems: How many items of the namespace are left. Call again until it is `0`.
+            public init(
+                vendor: Swift.String,
+                removedItems: Swift.Int,
+                removedTypes: Swift.Int,
+                remainingItems: Swift.Int
+            ) {
+                self.vendor = vendor
+                self.removedItems = removedItems
+                self.removedTypes = removedTypes
+                self.remainingItems = remainingItems
+            }
+            public enum CodingKeys: String, CodingKey {
+                case vendor
+                case removedItems = "removed_items"
+                case removedTypes = "removed_types"
+                case remainingItems = "remaining_items"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.vendor = try container.decode(
+                    Swift.String.self,
+                    forKey: .vendor
+                )
+                self.removedItems = try container.decode(
+                    Swift.Int.self,
+                    forKey: .removedItems
+                )
+                self.removedTypes = try container.decode(
+                    Swift.Int.self,
+                    forKey: .removedTypes
+                )
+                self.remainingItems = try container.decode(
+                    Swift.Int.self,
+                    forKey: .remainingItems
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "vendor",
+                    "removed_items",
+                    "removed_types",
+                    "remaining_items"
                 ])
             }
         }

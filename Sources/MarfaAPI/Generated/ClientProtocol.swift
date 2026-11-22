@@ -595,7 +595,7 @@ public protocol ClientProtocol: Sendable {
     func narrowAppGrant(_ input: Operations.NarrowAppGrant.Input) async throws -> Operations.NarrowAppGrant.Output
     /// Revoke an app grant
     ///
-    /// Revokes the app's tokens and consent. Requires `grants.manage`.
+    /// Revokes the app's tokens and consent. Its keys stay unless `revoke_keys` is `true`, and its data stays unless `remove_data` is `true`. Requires `grants.manage`.
     ///
     /// - Remark: HTTP `DELETE /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
@@ -614,6 +614,20 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `PUT /app-vendors/{vendor}`.
     /// - Remark: Generated from `#/paths//app-vendors/{vendor}/put(giveAppVendor)`.
     func giveAppVendor(_ input: Operations.GiveAppVendor.Input) async throws -> Operations.GiveAppVendor.Output
+    /// List an app's data
+    ///
+    /// Returns each type under an `app.<vendor>` namespace, registered or held by an item, with its items counted by state, and a page of those items in every state. Requires the browser session or `grants.manage`; a key also needs read on those types.
+    ///
+    /// - Remark: HTTP `GET /app-vendors/{vendor}/data`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/data/get(listAppVendorData)`.
+    func listAppVendorData(_ input: Operations.ListAppVendorData.Input) async throws -> Operations.ListAppVendorData.Output
+    /// Delete an app's data
+    ///
+    /// Deletes for good up to 1,000 items under an `app.<vendor>` namespace, in every state, and its registered types once none is left. Needs `items.purge` and the browser session or `grants.manage`; a key also needs write on its types and `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /app-vendors/{vendor}/data`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/data/delete(deleteAppVendorData)`.
+    func deleteAppVendorData(_ input: Operations.DeleteAppVendorData.Input) async throws -> Operations.DeleteAppVendorData.Output
     /// Get the owner's profile
     ///
     /// Returns the owner's profile fields that your credential can read: `name`, `username`, `email` and `avatar`, each with its own read permission. A field you can't read is left out, so a credential that can read none gets an empty object.
@@ -658,7 +672,7 @@ public protocol ClientProtocol: Sendable {
     func renameSignIn(_ input: Operations.RenameSignIn.Input) async throws -> Operations.RenameSignIn.Output
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`. Requires `sign_ins.manage`.
+    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`, and its data unless `remove_data` is `true`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
@@ -2076,7 +2090,7 @@ extension ClientProtocol {
     }
     /// Revoke an app grant
     ///
-    /// Revokes the app's tokens and consent. Requires `grants.manage`.
+    /// Revokes the app's tokens and consent. Its keys stay unless `revoke_keys` is `true`, and its data stays unless `remove_data` is `true`. Requires `grants.manage`.
     ///
     /// - Remark: HTTP `DELETE /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
@@ -2115,6 +2129,38 @@ extension ClientProtocol {
             path: path,
             headers: headers,
             body: body
+        ))
+    }
+    /// List an app's data
+    ///
+    /// Returns each type under an `app.<vendor>` namespace, registered or held by an item, with its items counted by state, and a page of those items in every state. Requires the browser session or `grants.manage`; a key also needs read on those types.
+    ///
+    /// - Remark: HTTP `GET /app-vendors/{vendor}/data`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/data/get(listAppVendorData)`.
+    public func listAppVendorData(
+        path: Operations.ListAppVendorData.Input.Path,
+        query: Operations.ListAppVendorData.Input.Query = .init(),
+        headers: Operations.ListAppVendorData.Input.Headers = .init()
+    ) async throws -> Operations.ListAppVendorData.Output {
+        try await listAppVendorData(Operations.ListAppVendorData.Input(
+            path: path,
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Delete an app's data
+    ///
+    /// Deletes for good up to 1,000 items under an `app.<vendor>` namespace, in every state, and its registered types once none is left. Needs `items.purge` and the browser session or `grants.manage`; a key also needs write on its types and `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /app-vendors/{vendor}/data`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/data/delete(deleteAppVendorData)`.
+    public func deleteAppVendorData(
+        path: Operations.DeleteAppVendorData.Input.Path,
+        headers: Operations.DeleteAppVendorData.Input.Headers = .init()
+    ) async throws -> Operations.DeleteAppVendorData.Output {
+        try await deleteAppVendorData(Operations.DeleteAppVendorData.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// Get the owner's profile
@@ -2193,7 +2239,7 @@ extension ClientProtocol {
     }
     /// End a sign-in
     ///
-    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`. Requires `sign_ins.manage`.
+    /// Ends a sign-in at once: it can't refresh or make another request, even when it is your own. An app's keys stay unless `revoke_keys` is `true`, and its data unless `remove_data` is `true`. Requires `sign_ins.manage`.
     ///
     /// - Remark: HTTP `DELETE /owner/sign-ins/{id}`.
     /// - Remark: Generated from `#/paths//owner/sign-ins/{id}/delete(endSignIn)`.
