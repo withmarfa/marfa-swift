@@ -186,13 +186,11 @@ extension InMemoryCore {
                 throw Refuse.validation(
                     "validation_error", "group.\(name): Too big: expected array to have <=1000 items")
             }
-            if let bucket = Properties.string(group, "bucket"), Self.dateBuckets.contains(bucket), !isDate(by) {
+            if Properties.value(group, "bucket") != nil && !isDate(by) {
                 throw Refuse.validation("validation_error", "group.bucket: \(by) is not a date field")
             }
         }
     }
-
-    private static let dateBuckets: Set<String> = ["day", "week", "month", "year"]
 
     private static func isDate(_ field: String) -> Bool {
         dateFields.contains(field) || field.hasPrefix("properties.")
@@ -394,8 +392,8 @@ extension InMemoryCore {
             let by = group.flatMap { Properties.string($0, "by") }
             let bucket = group.flatMap { Properties.string($0, "bucket") }
             if let bucket {
-                guard Self.dateBuckets.contains(bucket) else {
-                    throw FakeCopyError.unsupported(call: "items.groups(inView:) by the bucket \"\(bucket)\"")
+                guard ["day", "week", "month", "year"].contains(bucket) else {
+                    throw Refuse.invalid("unknown date bucket")
                 }
                 guard let by, Self.isDate(by) else { throw Refuse.invalid("a date bucket requires a date field") }
             }
