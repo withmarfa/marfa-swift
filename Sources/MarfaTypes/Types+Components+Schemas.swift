@@ -7272,21 +7272,29 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Extension/document`.
             public var document: Components.Schemas.Extension.DocumentPayload?
+            /// The namespace's revision: the same for the same document, and another once the document changes. Send it as `read_revision` to write only over what you read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Extension/revision`.
+            public var revision: Swift.String
             /// Creates a new `Extension`.
             ///
             /// - Parameters:
             ///   - namespace: The extension namespace.
             ///   - document: The data the item holds in the namespace, or `null` if it holds none there.
+            ///   - revision: The namespace's revision: the same for the same document, and another once the document changes. Send it as `read_revision` to write only over what you read.
             public init(
                 namespace: Swift.String,
-                document: Components.Schemas.Extension.DocumentPayload? = nil
+                document: Components.Schemas.Extension.DocumentPayload? = nil,
+                revision: Swift.String
             ) {
                 self.namespace = namespace
                 self.document = document
+                self.revision = revision
             }
             public enum CodingKeys: String, CodingKey {
                 case namespace
                 case document
+                case revision
             }
         }
         /// An item's extension namespaces that you can read.
@@ -7306,6 +7314,35 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case data
+            }
+        }
+        /// A guarded extension write's answer when the namespace changed since you read it: the refusal and the namespace now.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ExtensionVersionConflict`.
+        public struct ExtensionVersionConflict: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ExtensionVersionConflict/error`.
+            public var error: Components.Schemas.VersionConflictError
+            /// The namespace as it stands now, with its revision.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ExtensionVersionConflict/current`.
+            public var current: Components.Schemas.Extension
+            /// Creates a new `ExtensionVersionConflict`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            ///   - current: The namespace as it stands now, with its revision.
+            public init(
+                error: Components.Schemas.VersionConflictError,
+                current: Components.Schemas.Extension
+            ) {
+                self.error = error
+                self.current = current
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+                case current
             }
         }
         /// An error response.
@@ -11775,7 +11812,7 @@ extension Components {
                 case truncated
             }
         }
-        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key, changes one without widening it, and grants any source a key may claim; `items.purge` lists and empties the trash and purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`, which holds the stored settings; secret settings are never read back; `audit.read` reads the audit log; `grants.manage` lists, narrows and revokes other apps' access; `instance.read` reads health, what needs attention, metrics, housekeeping, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, cancels bulk jobs, updates the server and confirms the clock; `connectors.manage` administers connector registrations and their endpoints, and clears their retained state; `blobs.manage` manages every blob; `backups.manage` lists, takes and adopts backups and restores a backup or an archive; and `sign_ins.manage` lists, renames and ends sign-ins, manages the owner's passkeys and changes the owner's password.
+        /// A permission a credential can hold, for an operation the type, edge, extension, metadata and profile maps don't cover. `schema.write` replaces and deletes types and edge types; `keys.mint` mints keys and lists, changes and revokes those within the caller's reach; `keys.manage` lists and revokes every key, changes one without widening it, and grants any source a key may claim; `items.purge` lists and empties the trash and purges trashed items; `webhooks.manage` manages webhooks; `config.manage` reads and replaces `/config`, which holds the stored settings; secret settings are never read back; `audit.read` reads the audit log; `grants.manage` lists, narrows and revokes other apps' access; `instance.read` reads health, what needs attention, metrics, housekeeping, blob storage reports and every bulk job's status; `instance.maintain` runs housekeeping, cancels bulk jobs, updates the server and confirms the clock; `connectors.manage` administers connector registrations and their endpoints, clears their retained state, and manages connector hosts and which host runs each plugin's connector; `connectors.host` is held only by a connector host's own key, which a redeemed link gives, and reaches only that host's doors; `blobs.manage` manages every blob; `backups.manage` lists, takes and adopts backups and restores a backup or an archive; and `sign_ins.manage` lists, renames and ends sign-ins, manages the owner's passkeys and changes the owner's password.
         ///
         /// - Remark: Generated from `#/components/schemas/Permission`.
         @frozen public enum Permission: String, Codable, Hashable, Sendable, CaseIterable {
@@ -11788,6 +11825,7 @@ extension Components {
             case grants_manage = "grants.manage"
             case instance_read = "instance.read"
             case instance_maintain = "instance.maintain"
+            case connectors_host = "connectors.host"
             case connectors_manage = "connectors.manage"
             case blobs_manage = "blobs.manage"
             case backups_manage = "backups.manage"
@@ -24010,27 +24048,27 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PluginBundle/edge_types`.
             public var edgeTypes: Components.Schemas.PluginBundle.EdgeTypesPayload
-            /// The plugin's connector. Marfa keeps it with the install record as it is.
+            /// The plugin's connector, which Marfa checks and records when it installs the plugin.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginBundle/connector`.
             public struct ConnectorPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// - Remark: Generated from `#/components/schemas/PluginBundle/connector/value1`.
+                public var value1: Components.Schemas.PluginConnector
                 /// Creates a new `ConnectorPayload`.
                 ///
                 /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                    self.additionalProperties = additionalProperties
+                ///   - value1:
+                public init(value1: Components.Schemas.PluginConnector) {
+                    self.value1 = value1
                 }
                 public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    self.value1 = try .init(from: decoder)
                 }
                 public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
+                    try self.value1.encode(to: encoder)
                 }
             }
-            /// The plugin's connector. Marfa keeps it with the install record as it is.
+            /// The plugin's connector, which Marfa checks and records when it installs the plugin.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginBundle/connector`.
             public var connector: Components.Schemas.PluginBundle.ConnectorPayload?
@@ -24047,7 +24085,7 @@ extension Components {
             ///   - version: The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
             ///   - types: The type definitions the plugin installs, each as `POST /types` takes it, with its `guidance`.
             ///   - edgeTypes: The edge types the plugin installs, each as `POST /edge-types` takes it.
-            ///   - connector: The plugin's connector. Marfa keeps it with the install record as it is.
+            ///   - connector: The plugin's connector, which Marfa checks and records when it installs the plugin.
             public init(
                 format: Components.Schemas.PluginBundle.FormatPayload,
                 name: Swift.String,
@@ -24190,27 +24228,11 @@ extension Components {
             /// The installed version's connector, as its bundle gave it, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/Plugin/connector`.
-            public struct ConnectorPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                /// Creates a new `ConnectorPayload`.
-                ///
-                /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                    self.additionalProperties = additionalProperties
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
-                }
-            }
-            /// The installed version's connector, as its bundle gave it, or `null`.
+            public var connector: Components.Schemas.MarfaNullablePluginConnector
+            /// The ID of the connector host the plugin's connector is assigned to, or `null`.
             ///
-            /// - Remark: Generated from `#/components/schemas/Plugin/connector`.
-            public var connector: Components.Schemas.Plugin.ConnectorPayload?
+            /// - Remark: Generated from `#/components/schemas/Plugin/connector_host`.
+            public var connectorHost: Swift.String?
             /// The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
             ///
             /// - Remark: Generated from `#/components/schemas/Plugin/fingerprint`.
@@ -24240,6 +24262,7 @@ extension Components {
             ///   - types: The IDs of the types the plugin installed, at any version.
             ///   - edgeTypes: The IDs of the edge types any installed version of the plugin brought that the instance still holds.
             ///   - connector: The installed version's connector, as its bundle gave it, or `null`.
+            ///   - connectorHost: The ID of the connector host the plugin's connector is assigned to, or `null`.
             ///   - fingerprint: The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
             ///   - installedAt: When the plugin was first installed.
             ///   - installedBy: The sign-in that first installed the plugin, or `null` when it is not known.
@@ -24254,7 +24277,8 @@ extension Components {
                 version: Swift.String,
                 types: [Swift.String],
                 edgeTypes: [Swift.String],
-                connector: Components.Schemas.Plugin.ConnectorPayload? = nil,
+                connector: Components.Schemas.MarfaNullablePluginConnector,
+                connectorHost: Swift.String? = nil,
                 fingerprint: Swift.String,
                 installedAt: Foundation.Date,
                 installedBy: Components.Schemas.MarfaNullablePluginInstaller,
@@ -24270,6 +24294,7 @@ extension Components {
                 self.types = types
                 self.edgeTypes = edgeTypes
                 self.connector = connector
+                self.connectorHost = connectorHost
                 self.fingerprint = fingerprint
                 self.installedAt = installedAt
                 self.installedBy = installedBy
@@ -24286,6 +24311,7 @@ extension Components {
                 case types
                 case edgeTypes = "edge_types"
                 case connector
+                case connectorHost = "connector_host"
                 case fingerprint
                 case installedAt = "installed_at"
                 case installedBy = "installed_by"
@@ -24329,9 +24355,13 @@ extension Components {
                     [Swift.String].self,
                     forKey: .edgeTypes
                 )
-                self.connector = try container.decodeIfPresent(
-                    Components.Schemas.Plugin.ConnectorPayload.self,
+                self.connector = try container.decode(
+                    Components.Schemas.MarfaNullablePluginConnector.self,
                     forKey: .connector
+                )
+                self.connectorHost = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .connectorHost
                 )
                 self.fingerprint = try container.decode(
                     Swift.String.self,
@@ -24360,6 +24390,7 @@ extension Components {
                     "types",
                     "edge_types",
                     "connector",
+                    "connector_host",
                     "fingerprint",
                     "installed_at",
                     "installed_by",
@@ -24410,27 +24441,11 @@ extension Components {
             /// The installed version's connector, as its bundle gave it, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginInstalled/connector`.
-            public struct ConnectorPayload: Codable, Hashable, Sendable {
-                /// A container of undocumented properties.
-                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
-                /// Creates a new `ConnectorPayload`.
-                ///
-                /// - Parameters:
-                ///   - additionalProperties: A container of undocumented properties.
-                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
-                    self.additionalProperties = additionalProperties
-                }
-                public init(from decoder: any Swift.Decoder) throws {
-                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
-                }
-                public func encode(to encoder: any Swift.Encoder) throws {
-                    try encoder.encodeAdditionalProperties(additionalProperties)
-                }
-            }
-            /// The installed version's connector, as its bundle gave it, or `null`.
+            public var connector: Components.Schemas.MarfaNullablePluginConnector
+            /// The ID of the connector host the plugin's connector is assigned to, or `null`.
             ///
-            /// - Remark: Generated from `#/components/schemas/PluginInstalled/connector`.
-            public var connector: Components.Schemas.PluginInstalled.ConnectorPayload?
+            /// - Remark: Generated from `#/components/schemas/PluginInstalled/connector_host`.
+            public var connectorHost: Swift.String?
             /// The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginInstalled/fingerprint`.
@@ -24472,6 +24487,7 @@ extension Components {
             ///   - types: The IDs of the types the plugin installed, at any version.
             ///   - edgeTypes: The IDs of the edge types any installed version of the plugin brought that the instance still holds.
             ///   - connector: The installed version's connector, as its bundle gave it, or `null`.
+            ///   - connectorHost: The ID of the connector host the plugin's connector is assigned to, or `null`.
             ///   - fingerprint: The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
             ///   - installedAt: When the plugin was first installed.
             ///   - installedBy: The sign-in that first installed the plugin, or `null` when it is not known.
@@ -24487,7 +24503,8 @@ extension Components {
                 version: Swift.String,
                 types: [Swift.String],
                 edgeTypes: [Swift.String],
-                connector: Components.Schemas.PluginInstalled.ConnectorPayload? = nil,
+                connector: Components.Schemas.MarfaNullablePluginConnector,
+                connectorHost: Swift.String? = nil,
                 fingerprint: Swift.String,
                 installedAt: Foundation.Date,
                 installedBy: Components.Schemas.MarfaNullablePluginInstaller,
@@ -24504,6 +24521,7 @@ extension Components {
                 self.types = types
                 self.edgeTypes = edgeTypes
                 self.connector = connector
+                self.connectorHost = connectorHost
                 self.fingerprint = fingerprint
                 self.installedAt = installedAt
                 self.installedBy = installedBy
@@ -24521,6 +24539,7 @@ extension Components {
                 case types
                 case edgeTypes = "edge_types"
                 case connector
+                case connectorHost = "connector_host"
                 case fingerprint
                 case installedAt = "installed_at"
                 case installedBy = "installed_by"
@@ -24565,9 +24584,13 @@ extension Components {
                     [Swift.String].self,
                     forKey: .edgeTypes
                 )
-                self.connector = try container.decodeIfPresent(
-                    Components.Schemas.PluginInstalled.ConnectorPayload.self,
+                self.connector = try container.decode(
+                    Components.Schemas.MarfaNullablePluginConnector.self,
                     forKey: .connector
+                )
+                self.connectorHost = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .connectorHost
                 )
                 self.fingerprint = try container.decode(
                     Swift.String.self,
@@ -24600,6 +24623,7 @@ extension Components {
                     "types",
                     "edge_types",
                     "connector",
+                    "connector_host",
                     "fingerprint",
                     "installed_at",
                     "installed_by",
@@ -24624,21 +24648,86 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/version`.
                 public var version: Swift.String
+                /// What Marfa removed of the plugin's connector, or `null` for a plugin with no connector.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector`.
+                public struct ConnectorPayload: Codable, Hashable, Sendable {
+                    /// The source the connector held.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector/source`.
+                    public var source: Swift.String
+                    /// The ID of the connector's key Marfa revoked, or `null` if none stood.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector/key_id`.
+                    public var keyId: Swift.String?
+                    /// The IDs of the connector registrations under the source that Marfa deleted.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector/registrations`.
+                    public var registrations: [Swift.String]
+                    /// Creates a new `ConnectorPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - source: The source the connector held.
+                    ///   - keyId: The ID of the connector's key Marfa revoked, or `null` if none stood.
+                    ///   - registrations: The IDs of the connector registrations under the source that Marfa deleted.
+                    public init(
+                        source: Swift.String,
+                        keyId: Swift.String? = nil,
+                        registrations: [Swift.String]
+                    ) {
+                        self.source = source
+                        self.keyId = keyId
+                        self.registrations = registrations
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case source
+                        case keyId = "key_id"
+                        case registrations
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.source = try container.decode(
+                            Swift.String.self,
+                            forKey: .source
+                        )
+                        self.keyId = try container.decodeIfPresent(
+                            Swift.String.self,
+                            forKey: .keyId
+                        )
+                        self.registrations = try container.decode(
+                            [Swift.String].self,
+                            forKey: .registrations
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "source",
+                            "key_id",
+                            "registrations"
+                        ])
+                    }
+                }
+                /// What Marfa removed of the plugin's connector, or `null` for a plugin with no connector.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector`.
+                public var connector: Components.Schemas.PluginRemoved.RemovedPayload.ConnectorPayload?
                 /// Creates a new `RemovedPayload`.
                 ///
                 /// - Parameters:
                 ///   - name: The plugin's name: lowercase words and numbers joined by hyphens.
                 ///   - version: The plugin's version. `0.0.0` is a bundle built from a source folder with no version.
+                ///   - connector: What Marfa removed of the plugin's connector, or `null` for a plugin with no connector.
                 public init(
                     name: Swift.String,
-                    version: Swift.String
+                    version: Swift.String,
+                    connector: Components.Schemas.PluginRemoved.RemovedPayload.ConnectorPayload? = nil
                 ) {
                     self.name = name
                     self.version = version
+                    self.connector = connector
                 }
                 public enum CodingKeys: String, CodingKey {
                     case name
                     case version
+                    case connector
                 }
                 public init(from decoder: any Swift.Decoder) throws {
                     let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -24650,9 +24739,14 @@ extension Components {
                         Swift.String.self,
                         forKey: .version
                     )
+                    self.connector = try container.decodeIfPresent(
+                        Components.Schemas.PluginRemoved.RemovedPayload.ConnectorPayload.self,
+                        forKey: .connector
+                    )
                     try decoder.ensureNoAdditionalProperties(knownKeys: [
                         "name",
-                        "version"
+                        "version",
+                        "connector"
                     ])
                 }
             }
@@ -24672,21 +24766,86 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/edge_types`.
                 public var edgeTypes: [Swift.String]
+                /// What stays of the plugin's connector with its source, or `null` for a plugin with no connector.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/connector`.
+                public struct ConnectorPayload: Codable, Hashable, Sendable {
+                    /// The source the connector held.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/connector/source`.
+                    public var source: Swift.String
+                    /// `true` if the source keeps a state document, for the plugin's connector when it is installed again.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/connector/state`.
+                    public var state: Swift.Bool
+                    /// How many agreements the source keeps.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/connector/agreements`.
+                    public var agreements: Swift.Int
+                    /// Creates a new `ConnectorPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - source: The source the connector held.
+                    ///   - state: `true` if the source keeps a state document, for the plugin's connector when it is installed again.
+                    ///   - agreements: How many agreements the source keeps.
+                    public init(
+                        source: Swift.String,
+                        state: Swift.Bool,
+                        agreements: Swift.Int
+                    ) {
+                        self.source = source
+                        self.state = state
+                        self.agreements = agreements
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case source
+                        case state
+                        case agreements
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.source = try container.decode(
+                            Swift.String.self,
+                            forKey: .source
+                        )
+                        self.state = try container.decode(
+                            Swift.Bool.self,
+                            forKey: .state
+                        )
+                        self.agreements = try container.decode(
+                            Swift.Int.self,
+                            forKey: .agreements
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "source",
+                            "state",
+                            "agreements"
+                        ])
+                    }
+                }
+                /// What stays of the plugin's connector with its source, or `null` for a plugin with no connector.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginRemoved/kept/connector`.
+                public var connector: Components.Schemas.PluginRemoved.KeptPayload.ConnectorPayload?
                 /// Creates a new `KeptPayload`.
                 ///
                 /// - Parameters:
                 ///   - types: The types the plugin installed that the instance still holds, which stay with their items and provenance.
                 ///   - edgeTypes: The edge types any installed version of the plugin brought that the instance still holds, which stay with their edges.
+                ///   - connector: What stays of the plugin's connector with its source, or `null` for a plugin with no connector.
                 public init(
                     types: [Swift.String],
-                    edgeTypes: [Swift.String]
+                    edgeTypes: [Swift.String],
+                    connector: Components.Schemas.PluginRemoved.KeptPayload.ConnectorPayload? = nil
                 ) {
                     self.types = types
                     self.edgeTypes = edgeTypes
+                    self.connector = connector
                 }
                 public enum CodingKeys: String, CodingKey {
                     case types
                     case edgeTypes = "edge_types"
+                    case connector
                 }
                 public init(from decoder: any Swift.Decoder) throws {
                     let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -24698,9 +24857,14 @@ extension Components {
                         [Swift.String].self,
                         forKey: .edgeTypes
                     )
+                    self.connector = try container.decodeIfPresent(
+                        Components.Schemas.PluginRemoved.KeptPayload.ConnectorPayload.self,
+                        forKey: .connector
+                    )
                     try decoder.ensureNoAdditionalProperties(knownKeys: [
                         "types",
-                        "edge_types"
+                        "edge_types",
+                        "connector"
                     ])
                 }
             }
@@ -25008,6 +25172,7 @@ extension Components {
                     case typeExists = "type_exists"
                     case pluginChildConflict = "plugin_child_conflict"
                     case pluginNarrows = "plugin_narrows"
+                    case connectorSourceHeld = "connector_source_held"
                     case pluginNeedsNewerServer = "plugin_needs_newer_server"
                     case pluginVersionOlder = "plugin_version_older"
                     case instanceChanged = "instance_changed"
@@ -25268,6 +25433,2982 @@ extension Components {
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "data",
                     "next_cursor"
+                ])
+            }
+        }
+        /// A kind of record a connector brings, written as one of the plugin's own types.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorKind`.
+        public struct PluginConnectorKind: Codable, Hashable, Sendable {
+            /// The kind's name, unique within the connector: lowercase letters, digits and underscores.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorKind/name`.
+            public var name: Swift.String
+            /// The ID of the type the connector writes this kind as, one of the bundle's own types.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorKind/type`.
+            public var _type: Swift.String
+            /// Which way the kind moves: `in` from the service into Marfa, `out` from Marfa to the service, or `both`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorKind/direction`.
+            @frozen public enum DirectionPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case _in = "in"
+                case out = "out"
+                case both = "both"
+            }
+            /// Which way the kind moves: `in` from the service into Marfa, `out` from Marfa to the service, or `both`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorKind/direction`.
+            public var direction: Components.Schemas.PluginConnectorKind.DirectionPayload
+            /// How the owner's mapping starts for this kind, until they change it. It may set only `tier`, `status_overrides` and `fields`, on the kind's own type, and holds what a save of the mapping would take.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorKind/default_mapping`.
+            public struct DefaultMappingPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                /// Creates a new `DefaultMappingPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// How the owner's mapping starts for this kind, until they change it. It may set only `tier`, `status_overrides` and `fields`, on the kind's own type, and holds what a save of the mapping would take.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorKind/default_mapping`.
+            public var defaultMapping: Components.Schemas.PluginConnectorKind.DefaultMappingPayload?
+            /// Creates a new `PluginConnectorKind`.
+            ///
+            /// - Parameters:
+            ///   - name: The kind's name, unique within the connector: lowercase letters, digits and underscores.
+            ///   - _type: The ID of the type the connector writes this kind as, one of the bundle's own types.
+            ///   - direction: Which way the kind moves: `in` from the service into Marfa, `out` from Marfa to the service, or `both`.
+            ///   - defaultMapping: How the owner's mapping starts for this kind, until they change it. It may set only `tier`, `status_overrides` and `fields`, on the kind's own type, and holds what a save of the mapping would take.
+            public init(
+                name: Swift.String,
+                _type: Swift.String,
+                direction: Components.Schemas.PluginConnectorKind.DirectionPayload,
+                defaultMapping: Components.Schemas.PluginConnectorKind.DefaultMappingPayload? = nil
+            ) {
+                self.name = name
+                self._type = _type
+                self.direction = direction
+                self.defaultMapping = defaultMapping
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case _type = "type"
+                case direction
+                case defaultMapping = "default_mapping"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self._type = try container.decode(
+                    Swift.String.self,
+                    forKey: ._type
+                )
+                self.direction = try container.decode(
+                    Components.Schemas.PluginConnectorKind.DirectionPayload.self,
+                    forKey: .direction
+                )
+                self.defaultMapping = try container.decodeIfPresent(
+                    Components.Schemas.PluginConnectorKind.DefaultMappingPayload.self,
+                    forKey: .defaultMapping
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "type",
+                    "direction",
+                    "default_mapping"
+                ])
+            }
+        }
+        /// A setting a connector reads as it runs.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting`.
+        public struct PluginConnectorSetting: Codable, Hashable, Sendable {
+            /// The setting's name, unique within the connector: lowercase letters, digits and underscores.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/name`.
+            public var name: Swift.String
+            /// The name people see for the setting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/label`.
+            public var label: Swift.String
+            /// What the setting holds: `text`, a `number`, `true` or `false` for `boolean`, or one of its `choices` for `choice`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case text = "text"
+                case number = "number"
+                case boolean = "boolean"
+                case choice = "choice"
+            }
+            /// What the setting holds: `text`, a `number`, `true` or `false` for `boolean`, or one of its `choices` for `choice`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/kind`.
+            public var kind: Components.Schemas.PluginConnectorSetting.KindPayload
+            /// `true` if the setting holds a secret, which is `text` and has no `default`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/secret`.
+            public var secret: Swift.Bool?
+            /// The value the setting starts with, of its `kind`. A secret setting has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/default`.
+            public var _default: OpenAPIRuntime.OpenAPIValueContainer?
+            /// `true` if the connector needs the setting set to run.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/required`.
+            public var required: Swift.Bool
+            /// The values a `choice` setting takes. Present only for a `choice` setting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSetting/choices`.
+            public var choices: [Swift.String]?
+            /// Creates a new `PluginConnectorSetting`.
+            ///
+            /// - Parameters:
+            ///   - name: The setting's name, unique within the connector: lowercase letters, digits and underscores.
+            ///   - label: The name people see for the setting.
+            ///   - kind: What the setting holds: `text`, a `number`, `true` or `false` for `boolean`, or one of its `choices` for `choice`.
+            ///   - secret: `true` if the setting holds a secret, which is `text` and has no `default`.
+            ///   - _default: The value the setting starts with, of its `kind`. A secret setting has none.
+            ///   - required: `true` if the connector needs the setting set to run.
+            ///   - choices: The values a `choice` setting takes. Present only for a `choice` setting.
+            public init(
+                name: Swift.String,
+                label: Swift.String,
+                kind: Components.Schemas.PluginConnectorSetting.KindPayload,
+                secret: Swift.Bool? = nil,
+                _default: OpenAPIRuntime.OpenAPIValueContainer? = nil,
+                required: Swift.Bool,
+                choices: [Swift.String]? = nil
+            ) {
+                self.name = name
+                self.label = label
+                self.kind = kind
+                self.secret = secret
+                self._default = _default
+                self.required = required
+                self.choices = choices
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case label
+                case kind
+                case secret
+                case _default = "default"
+                case required
+                case choices
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.label = try container.decode(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.kind = try container.decode(
+                    Components.Schemas.PluginConnectorSetting.KindPayload.self,
+                    forKey: .kind
+                )
+                self.secret = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .secret
+                )
+                self._default = try container.decodeIfPresent(
+                    OpenAPIRuntime.OpenAPIValueContainer.self,
+                    forKey: ._default
+                )
+                self.required = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                self.choices = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .choices
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "label",
+                    "kind",
+                    "secret",
+                    "default",
+                    "required",
+                    "choices"
+                ])
+            }
+        }
+        /// How a connector signs in to its service, each part naming one of its settings.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn`.
+        public struct PluginConnectorSignIn: Codable, Hashable, Sendable {
+            /// How the connector signs in to its service: `oauth2`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case oauth2 = "oauth2"
+            }
+            /// How the connector signs in to its service: `oauth2`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/kind`.
+            public var kind: Components.Schemas.PluginConnectorSignIn.KindPayload
+            /// The service the connector signs in to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/provider`.
+            @frozen public enum ProviderPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case google = "google"
+            }
+            /// The service the connector signs in to.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/provider`.
+            public var provider: Components.Schemas.PluginConnectorSignIn.ProviderPayload
+            /// The scopes the sign-in asks the service for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/scopes`.
+            public var scopes: [Swift.String]
+            /// The name of the setting that holds the OAuth client ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/client_id_setting`.
+            public var clientIdSetting: Swift.String
+            /// The name of the secret setting that holds the OAuth client secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/client_secret_setting`.
+            public var clientSecretSetting: Swift.String
+            /// The name of the secret setting that holds the token the sign-in gets.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSignIn/token_setting`.
+            public var tokenSetting: Swift.String
+            /// Creates a new `PluginConnectorSignIn`.
+            ///
+            /// - Parameters:
+            ///   - kind: How the connector signs in to its service: `oauth2`.
+            ///   - provider: The service the connector signs in to.
+            ///   - scopes: The scopes the sign-in asks the service for.
+            ///   - clientIdSetting: The name of the setting that holds the OAuth client ID.
+            ///   - clientSecretSetting: The name of the secret setting that holds the OAuth client secret.
+            ///   - tokenSetting: The name of the secret setting that holds the token the sign-in gets.
+            public init(
+                kind: Components.Schemas.PluginConnectorSignIn.KindPayload,
+                provider: Components.Schemas.PluginConnectorSignIn.ProviderPayload,
+                scopes: [Swift.String],
+                clientIdSetting: Swift.String,
+                clientSecretSetting: Swift.String,
+                tokenSetting: Swift.String
+            ) {
+                self.kind = kind
+                self.provider = provider
+                self.scopes = scopes
+                self.clientIdSetting = clientIdSetting
+                self.clientSecretSetting = clientSecretSetting
+                self.tokenSetting = tokenSetting
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case provider
+                case scopes
+                case clientIdSetting = "client_id_setting"
+                case clientSecretSetting = "client_secret_setting"
+                case tokenSetting = "token_setting"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.kind = try container.decode(
+                    Components.Schemas.PluginConnectorSignIn.KindPayload.self,
+                    forKey: .kind
+                )
+                self.provider = try container.decode(
+                    Components.Schemas.PluginConnectorSignIn.ProviderPayload.self,
+                    forKey: .provider
+                )
+                self.scopes = try container.decode(
+                    [Swift.String].self,
+                    forKey: .scopes
+                )
+                self.clientIdSetting = try container.decode(
+                    Swift.String.self,
+                    forKey: .clientIdSetting
+                )
+                self.clientSecretSetting = try container.decode(
+                    Swift.String.self,
+                    forKey: .clientSecretSetting
+                )
+                self.tokenSetting = try container.decode(
+                    Swift.String.self,
+                    forKey: .tokenSetting
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "kind",
+                    "provider",
+                    "scopes",
+                    "client_id_setting",
+                    "client_secret_setting",
+                    "token_setting"
+                ])
+            }
+        }
+        /// Where a connector runs.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorRuns`.
+        public struct PluginConnectorRuns: Codable, Hashable, Sendable {
+            /// Where the connector runs: `host`, a connector host the owner links.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorRuns/on`.
+            @frozen public enum OnPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case host = "host"
+            }
+            /// Where the connector runs: `host`, a connector host the owner links.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorRuns/on`.
+            public var on: Components.Schemas.PluginConnectorRuns.OnPayload
+            /// Creates a new `PluginConnectorRuns`.
+            ///
+            /// - Parameters:
+            ///   - on: Where the connector runs: `host`, a connector host the owner links.
+            public init(on: Components.Schemas.PluginConnectorRuns.OnPayload) {
+                self.on = on
+            }
+            public enum CodingKeys: String, CodingKey {
+                case on
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.on = try container.decode(
+                    Components.Schemas.PluginConnectorRuns.OnPayload.self,
+                    forKey: .on
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "on"
+                ])
+            }
+        }
+        /// A plugin's connector: the source it writes under, the kinds it brings, the settings it reads, its sign-in and where it runs.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnector`.
+        public struct PluginConnector: Codable, Hashable, Sendable {
+            /// The source the connector writes under, which its key holds. No space at either end, not `.` or `..`, and not starting with `oauth:`, `restored:` or `connector-host:`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/source`.
+            public var source: Swift.String
+            /// The name people see for the source.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/source_name`.
+            public var sourceName: Swift.String
+            /// The icon the source is shown by, an Iconify icon ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/source_mark`.
+            public var sourceMark: Swift.String?
+            /// The kinds of record the connector brings.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/kinds`.
+            public var kinds: [Components.Schemas.PluginConnectorKind]
+            /// The settings the connector reads as it runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/settings`.
+            public var settings: [Components.Schemas.PluginConnectorSetting]?
+            /// How the connector signs in to its service. Present only for a connector that signs in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/sign_in`.
+            public struct SignInPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/PluginConnector/sign_in/value1`.
+                public var value1: Components.Schemas.PluginConnectorSignIn
+                /// Creates a new `SignInPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.PluginConnectorSignIn) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// How the connector signs in to its service. Present only for a connector that signs in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/sign_in`.
+            public var signIn: Components.Schemas.PluginConnector.SignInPayload?
+            /// Where the connector runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/runs`.
+            public struct RunsPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/PluginConnector/runs/value1`.
+                public var value1: Components.Schemas.PluginConnectorRuns
+                /// Creates a new `RunsPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.PluginConnectorRuns) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// Where the connector runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/runs`.
+            public var runs: Components.Schemas.PluginConnector.RunsPayload
+            /// Creates a new `PluginConnector`.
+            ///
+            /// - Parameters:
+            ///   - source: The source the connector writes under, which its key holds. No space at either end, not `.` or `..`, and not starting with `oauth:`, `restored:` or `connector-host:`.
+            ///   - sourceName: The name people see for the source.
+            ///   - sourceMark: The icon the source is shown by, an Iconify icon ID.
+            ///   - kinds: The kinds of record the connector brings.
+            ///   - settings: The settings the connector reads as it runs.
+            ///   - signIn: How the connector signs in to its service. Present only for a connector that signs in.
+            ///   - runs: Where the connector runs.
+            public init(
+                source: Swift.String,
+                sourceName: Swift.String,
+                sourceMark: Swift.String? = nil,
+                kinds: [Components.Schemas.PluginConnectorKind],
+                settings: [Components.Schemas.PluginConnectorSetting]? = nil,
+                signIn: Components.Schemas.PluginConnector.SignInPayload? = nil,
+                runs: Components.Schemas.PluginConnector.RunsPayload
+            ) {
+                self.source = source
+                self.sourceName = sourceName
+                self.sourceMark = sourceMark
+                self.kinds = kinds
+                self.settings = settings
+                self.signIn = signIn
+                self.runs = runs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case source
+                case sourceName = "source_name"
+                case sourceMark = "source_mark"
+                case kinds
+                case settings
+                case signIn = "sign_in"
+                case runs
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.source = try container.decode(
+                    Swift.String.self,
+                    forKey: .source
+                )
+                self.sourceName = try container.decode(
+                    Swift.String.self,
+                    forKey: .sourceName
+                )
+                self.sourceMark = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .sourceMark
+                )
+                self.kinds = try container.decode(
+                    [Components.Schemas.PluginConnectorKind].self,
+                    forKey: .kinds
+                )
+                self.settings = try container.decodeIfPresent(
+                    [Components.Schemas.PluginConnectorSetting].self,
+                    forKey: .settings
+                )
+                self.signIn = try container.decodeIfPresent(
+                    Components.Schemas.PluginConnector.SignInPayload.self,
+                    forKey: .signIn
+                )
+                self.runs = try container.decode(
+                    Components.Schemas.PluginConnector.RunsPayload.self,
+                    forKey: .runs
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "source",
+                    "source_name",
+                    "source_mark",
+                    "kinds",
+                    "settings",
+                    "sign_in",
+                    "runs"
+                ])
+            }
+        }
+        /// A connector host is one machine that runs connectors, linked to the instance once.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHost`.
+        public struct ConnectorHost: Codable, Hashable, Sendable {
+            /// Unique identifier for the connector host.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/id`.
+            public var id: Swift.String
+            /// The name people see for the host, such as the machine's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/name`.
+            public var name: Swift.String
+            /// When the host was made, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/created_at`.
+            public var createdAt: Foundation.Date
+            /// When the host or its link last changed, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/updated_at`.
+            public var updatedAt: Foundation.Date
+            /// When the host's key last read `GET /connector-hosts/self`, in UTC, or `null` if it never has.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/last_seen_at`.
+            public var lastSeenAt: Foundation.Date?
+            /// `true` if the host holds a live key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/linked`.
+            public var linked: Swift.Bool
+            /// When the host's unredeemed one-time link ends, in UTC, or `null` if none stands.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/link_expires_at`.
+            public var linkExpiresAt: Foundation.Date?
+            /// A connector assigned to the host.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/ConnectorsPayload`.
+            public struct ConnectorsPayloadPayload: Codable, Hashable, Sendable {
+                /// The name of the plugin whose connector is assigned to the host.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHost/ConnectorsPayload/plugin`.
+                public var plugin: Swift.String
+                /// The plugin's installed version.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHost/ConnectorsPayload/version`.
+                public var version: Swift.String
+                /// `true` if the host minted a key for the connector that still stands.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHost/ConnectorsPayload/key_minted`.
+                public var keyMinted: Swift.Bool
+                /// Creates a new `ConnectorsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - plugin: The name of the plugin whose connector is assigned to the host.
+                ///   - version: The plugin's installed version.
+                ///   - keyMinted: `true` if the host minted a key for the connector that still stands.
+                public init(
+                    plugin: Swift.String,
+                    version: Swift.String,
+                    keyMinted: Swift.Bool
+                ) {
+                    self.plugin = plugin
+                    self.version = version
+                    self.keyMinted = keyMinted
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case plugin
+                    case version
+                    case keyMinted = "key_minted"
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.plugin = try container.decode(
+                        Swift.String.self,
+                        forKey: .plugin
+                    )
+                    self.version = try container.decode(
+                        Swift.String.self,
+                        forKey: .version
+                    )
+                    self.keyMinted = try container.decode(
+                        Swift.Bool.self,
+                        forKey: .keyMinted
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "plugin",
+                        "version",
+                        "key_minted"
+                    ])
+                }
+            }
+            /// The connectors assigned to the host, by plugin name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/connectors`.
+            public typealias ConnectorsPayload = [Components.Schemas.ConnectorHost.ConnectorsPayloadPayload]
+            /// The connectors assigned to the host, by plugin name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHost/connectors`.
+            public var connectors: Components.Schemas.ConnectorHost.ConnectorsPayload
+            /// Creates a new `ConnectorHost`.
+            ///
+            /// - Parameters:
+            ///   - id: Unique identifier for the connector host.
+            ///   - name: The name people see for the host, such as the machine's.
+            ///   - createdAt: When the host was made, in UTC.
+            ///   - updatedAt: When the host or its link last changed, in UTC.
+            ///   - lastSeenAt: When the host's key last read `GET /connector-hosts/self`, in UTC, or `null` if it never has.
+            ///   - linked: `true` if the host holds a live key.
+            ///   - linkExpiresAt: When the host's unredeemed one-time link ends, in UTC, or `null` if none stands.
+            ///   - connectors: The connectors assigned to the host, by plugin name.
+            public init(
+                id: Swift.String,
+                name: Swift.String,
+                createdAt: Foundation.Date,
+                updatedAt: Foundation.Date,
+                lastSeenAt: Foundation.Date? = nil,
+                linked: Swift.Bool,
+                linkExpiresAt: Foundation.Date? = nil,
+                connectors: Components.Schemas.ConnectorHost.ConnectorsPayload
+            ) {
+                self.id = id
+                self.name = name
+                self.createdAt = createdAt
+                self.updatedAt = updatedAt
+                self.lastSeenAt = lastSeenAt
+                self.linked = linked
+                self.linkExpiresAt = linkExpiresAt
+                self.connectors = connectors
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case createdAt = "created_at"
+                case updatedAt = "updated_at"
+                case lastSeenAt = "last_seen_at"
+                case linked
+                case linkExpiresAt = "link_expires_at"
+                case connectors
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.createdAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .createdAt
+                )
+                self.updatedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .updatedAt
+                )
+                self.lastSeenAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .lastSeenAt
+                )
+                self.linked = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .linked
+                )
+                self.linkExpiresAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
+                    forKey: .linkExpiresAt
+                )
+                self.connectors = try container.decode(
+                    Components.Schemas.ConnectorHost.ConnectorsPayload.self,
+                    forKey: .connectors
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "name",
+                    "created_at",
+                    "updated_at",
+                    "last_seen_at",
+                    "linked",
+                    "link_expires_at",
+                    "connectors"
+                ])
+            }
+        }
+        /// Every connector host.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHostPage`.
+        public struct ConnectorHostPage: Codable, Hashable, Sendable {
+            /// Every connector host, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostPage/data`.
+            public var data: [Components.Schemas.ConnectorHost]
+            /// Always `null`: every host is on one page.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostPage/next_cursor`.
+            public var nextCursor: Components.Schemas.MarfaNull
+            /// Creates a new `ConnectorHostPage`.
+            ///
+            /// - Parameters:
+            ///   - data: Every connector host, oldest first.
+            ///   - nextCursor: Always `null`: every host is on one page.
+            public init(
+                data: [Components.Schemas.ConnectorHost],
+                nextCursor: Components.Schemas.MarfaNull
+            ) {
+                self.data = data
+                self.nextCursor = nextCursor
+            }
+            public enum CodingKeys: String, CodingKey {
+                case data
+                case nextCursor = "next_cursor"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.data = try container.decode(
+                    [Components.Schemas.ConnectorHost].self,
+                    forKey: .data
+                )
+                self.nextCursor = try container.decode(
+                    Components.Schemas.MarfaNull.self,
+                    forKey: .nextCursor
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "data",
+                    "next_cursor"
+                ])
+            }
+        }
+        /// A connector host and a one-time link that gives it its own key.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHostLink`.
+        public struct ConnectorHostLink: Codable, Hashable, Sendable {
+            /// The connector host the link is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostLink/host`.
+            public struct HostPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostLink/host/value1`.
+                public var value1: Components.Schemas.ConnectorHost
+                /// Creates a new `HostPayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.ConnectorHost) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// The connector host the link is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostLink/host`.
+            public var host: Components.Schemas.ConnectorHostLink.HostPayload
+            /// The one-time link: the instance's sign-in address, `/connect#` and the code. Give it to the host program once.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostLink/link`.
+            public var link: Swift.String
+            /// The link's code, which `POST /connector-hosts/redeem` takes once within 15 minutes. Marfa doesn't show it again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostLink/code`.
+            public var code: Swift.String
+            /// When the link ends, in UTC.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostLink/expires_at`.
+            public var expiresAt: Foundation.Date
+            /// Creates a new `ConnectorHostLink`.
+            ///
+            /// - Parameters:
+            ///   - host: The connector host the link is for.
+            ///   - link: The one-time link: the instance's sign-in address, `/connect#` and the code. Give it to the host program once.
+            ///   - code: The link's code, which `POST /connector-hosts/redeem` takes once within 15 minutes. Marfa doesn't show it again.
+            ///   - expiresAt: When the link ends, in UTC.
+            public init(
+                host: Components.Schemas.ConnectorHostLink.HostPayload,
+                link: Swift.String,
+                code: Swift.String,
+                expiresAt: Foundation.Date
+            ) {
+                self.host = host
+                self.link = link
+                self.code = code
+                self.expiresAt = expiresAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case host
+                case link
+                case code
+                case expiresAt = "expires_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.host = try container.decode(
+                    Components.Schemas.ConnectorHostLink.HostPayload.self,
+                    forKey: .host
+                )
+                self.link = try container.decode(
+                    Swift.String.self,
+                    forKey: .link
+                )
+                self.code = try container.decode(
+                    Swift.String.self,
+                    forKey: .code
+                )
+                self.expiresAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .expiresAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "host",
+                    "link",
+                    "code",
+                    "expires_at"
+                ])
+            }
+        }
+        /// The key a redeemed link gives its connector host.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed`.
+        public struct ConnectorHostRedeemed: Codable, Hashable, Sendable {
+            /// The host the link was made for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed/host`.
+            public struct HostPayload: Codable, Hashable, Sendable {
+                /// The ID of the connector host.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed/host/id`.
+                public var id: Swift.String
+                /// The host's name.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed/host/name`.
+                public var name: Swift.String
+                /// Creates a new `HostPayload`.
+                ///
+                /// - Parameters:
+                ///   - id: The ID of the connector host.
+                ///   - name: The host's name.
+                public init(
+                    id: Swift.String,
+                    name: Swift.String
+                ) {
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case name
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.id = try container.decode(
+                        Swift.String.self,
+                        forKey: .id
+                    )
+                    self.name = try container.decode(
+                        Swift.String.self,
+                        forKey: .name
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "id",
+                        "name"
+                    ])
+                }
+            }
+            /// The host the link was made for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed/host`.
+            public var host: Components.Schemas.ConnectorHostRedeemed.HostPayload
+            /// The host's own key, which reaches only `GET /connector-hosts/self` and `POST /connector-hosts/self/connectors/{plugin}/key`. Marfa doesn't show it again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed/key`.
+            public var key: Swift.String
+            /// The ID of the host's key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRedeemed/key_id`.
+            public var keyId: Swift.String
+            /// Creates a new `ConnectorHostRedeemed`.
+            ///
+            /// - Parameters:
+            ///   - host: The host the link was made for.
+            ///   - key: The host's own key, which reaches only `GET /connector-hosts/self` and `POST /connector-hosts/self/connectors/{plugin}/key`. Marfa doesn't show it again.
+            ///   - keyId: The ID of the host's key.
+            public init(
+                host: Components.Schemas.ConnectorHostRedeemed.HostPayload,
+                key: Swift.String,
+                keyId: Swift.String
+            ) {
+                self.host = host
+                self.key = key
+                self.keyId = keyId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case host
+                case key
+                case keyId = "key_id"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.host = try container.decode(
+                    Components.Schemas.ConnectorHostRedeemed.HostPayload.self,
+                    forKey: .host
+                )
+                self.key = try container.decode(
+                    Swift.String.self,
+                    forKey: .key
+                )
+                self.keyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .keyId
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "host",
+                    "key",
+                    "key_id"
+                ])
+            }
+        }
+        /// What a connector host runs, as its own key reads it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf`.
+        public struct ConnectorHostSelf: Codable, Hashable, Sendable {
+            /// The ID of the host.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/id`.
+            public var id: Swift.String
+            /// The host's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/name`.
+            public var name: Swift.String
+            /// A connector the host runs.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload`.
+            public struct ConnectorsPayloadPayload: Codable, Hashable, Sendable {
+                /// The name of the plugin whose connector is assigned to the host.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/plugin`.
+                public var plugin: Swift.String
+                /// The plugin's installed version.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/version`.
+                public var version: Swift.String
+                /// The SHA-256 of the installed bundle, which the host checks the bundle it runs against.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/fingerprint`.
+                public var fingerprint: Swift.String
+                /// The connector section of the installed bundle.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/connector`.
+                public struct ConnectorPayload: Codable, Hashable, Sendable {
+                    /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/connector/value1`.
+                    public var value1: Components.Schemas.PluginConnector
+                    /// Creates a new `ConnectorPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - value1:
+                    public init(value1: Components.Schemas.PluginConnector) {
+                        self.value1 = value1
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        self.value1 = try .init(from: decoder)
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try self.value1.encode(to: encoder)
+                    }
+                }
+                /// The connector section of the installed bundle.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/connector`.
+                public var connector: Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload.ConnectorPayload
+                /// The ID of the registration the connector's current key made, or `null`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/registration_id`.
+                public var registrationId: Swift.String?
+                /// `true` if the host minted a key for the connector that still stands.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/key_minted`.
+                public var keyMinted: Swift.Bool
+                /// Creates a new `ConnectorsPayloadPayload`.
+                ///
+                /// - Parameters:
+                ///   - plugin: The name of the plugin whose connector is assigned to the host.
+                ///   - version: The plugin's installed version.
+                ///   - fingerprint: The SHA-256 of the installed bundle, which the host checks the bundle it runs against.
+                ///   - connector: The connector section of the installed bundle.
+                ///   - registrationId: The ID of the registration the connector's current key made, or `null`.
+                ///   - keyMinted: `true` if the host minted a key for the connector that still stands.
+                public init(
+                    plugin: Swift.String,
+                    version: Swift.String,
+                    fingerprint: Swift.String,
+                    connector: Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload.ConnectorPayload,
+                    registrationId: Swift.String? = nil,
+                    keyMinted: Swift.Bool
+                ) {
+                    self.plugin = plugin
+                    self.version = version
+                    self.fingerprint = fingerprint
+                    self.connector = connector
+                    self.registrationId = registrationId
+                    self.keyMinted = keyMinted
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case plugin
+                    case version
+                    case fingerprint
+                    case connector
+                    case registrationId = "registration_id"
+                    case keyMinted = "key_minted"
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.plugin = try container.decode(
+                        Swift.String.self,
+                        forKey: .plugin
+                    )
+                    self.version = try container.decode(
+                        Swift.String.self,
+                        forKey: .version
+                    )
+                    self.fingerprint = try container.decode(
+                        Swift.String.self,
+                        forKey: .fingerprint
+                    )
+                    self.connector = try container.decode(
+                        Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload.ConnectorPayload.self,
+                        forKey: .connector
+                    )
+                    self.registrationId = try container.decodeIfPresent(
+                        Swift.String.self,
+                        forKey: .registrationId
+                    )
+                    self.keyMinted = try container.decode(
+                        Swift.Bool.self,
+                        forKey: .keyMinted
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "plugin",
+                        "version",
+                        "fingerprint",
+                        "connector",
+                        "registration_id",
+                        "key_minted"
+                    ])
+                }
+            }
+            /// The connectors assigned to the host, by plugin name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/connectors`.
+            public typealias ConnectorsPayload = [Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload]
+            /// The connectors assigned to the host, by plugin name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/connectors`.
+            public var connectors: Components.Schemas.ConnectorHostSelf.ConnectorsPayload
+            /// Creates a new `ConnectorHostSelf`.
+            ///
+            /// - Parameters:
+            ///   - id: The ID of the host.
+            ///   - name: The host's name.
+            ///   - connectors: The connectors assigned to the host, by plugin name.
+            public init(
+                id: Swift.String,
+                name: Swift.String,
+                connectors: Components.Schemas.ConnectorHostSelf.ConnectorsPayload
+            ) {
+                self.id = id
+                self.name = name
+                self.connectors = connectors
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case name
+                case connectors
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.id = try container.decode(
+                    Swift.String.self,
+                    forKey: .id
+                )
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.connectors = try container.decode(
+                    Components.Schemas.ConnectorHostSelf.ConnectorsPayload.self,
+                    forKey: .connectors
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "id",
+                    "name",
+                    "connectors"
+                ])
+            }
+        }
+        /// What removing a connector host removed.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved`.
+        public struct ConnectorHostRemoved: Codable, Hashable, Sendable {
+            /// The host Marfa removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved/removed`.
+            public struct RemovedPayload: Codable, Hashable, Sendable {
+                /// The ID of the host Marfa removed.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved/removed/id`.
+                public var id: Swift.String
+                /// The host's name.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved/removed/name`.
+                public var name: Swift.String
+                /// Creates a new `RemovedPayload`.
+                ///
+                /// - Parameters:
+                ///   - id: The ID of the host Marfa removed.
+                ///   - name: The host's name.
+                public init(
+                    id: Swift.String,
+                    name: Swift.String
+                ) {
+                    self.id = id
+                    self.name = name
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case id
+                    case name
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.id = try container.decode(
+                        Swift.String.self,
+                        forKey: .id
+                    )
+                    self.name = try container.decode(
+                        Swift.String.self,
+                        forKey: .name
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "id",
+                        "name"
+                    ])
+                }
+            }
+            /// The host Marfa removed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved/removed`.
+            public var removed: Components.Schemas.ConnectorHostRemoved.RemovedPayload
+            /// How many keys Marfa revoked: the host's own and each connector key it minted.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved/revoked_keys`.
+            public var revokedKeys: Swift.Int
+            /// The plugins whose connectors were assigned to the host and now are to none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostRemoved/unassigned`.
+            public var unassigned: [Swift.String]
+            /// Creates a new `ConnectorHostRemoved`.
+            ///
+            /// - Parameters:
+            ///   - removed: The host Marfa removed.
+            ///   - revokedKeys: How many keys Marfa revoked: the host's own and each connector key it minted.
+            ///   - unassigned: The plugins whose connectors were assigned to the host and now are to none.
+            public init(
+                removed: Components.Schemas.ConnectorHostRemoved.RemovedPayload,
+                revokedKeys: Swift.Int,
+                unassigned: [Swift.String]
+            ) {
+                self.removed = removed
+                self.revokedKeys = revokedKeys
+                self.unassigned = unassigned
+            }
+            public enum CodingKeys: String, CodingKey {
+                case removed
+                case revokedKeys = "revoked_keys"
+                case unassigned
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.removed = try container.decode(
+                    Components.Schemas.ConnectorHostRemoved.RemovedPayload.self,
+                    forKey: .removed
+                )
+                self.revokedKeys = try container.decode(
+                    Swift.Int.self,
+                    forKey: .revokedKeys
+                )
+                self.unassigned = try container.decode(
+                    [Swift.String].self,
+                    forKey: .unassigned
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "removed",
+                    "revoked_keys",
+                    "unassigned"
+                ])
+            }
+        }
+        /// A key a connector host minted for a connector it runs.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorKeyMinted`.
+        public struct ConnectorKeyMinted: Codable, Hashable, Sendable {
+            /// The plugin whose connector the key is for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorKeyMinted/plugin`.
+            public var plugin: Swift.String
+            /// The connector's own key, which registers with `POST /connectors`. Marfa doesn't show it again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorKeyMinted/key`.
+            public var key: Swift.String
+            /// The ID of the connector's key.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorKeyMinted/key_id`.
+            public var keyId: Swift.String
+            /// The source the key holds, the connector's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorKeyMinted/source`.
+            public var source: Swift.String
+            /// Creates a new `ConnectorKeyMinted`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin whose connector the key is for.
+            ///   - key: The connector's own key, which registers with `POST /connectors`. Marfa doesn't show it again.
+            ///   - keyId: The ID of the connector's key.
+            ///   - source: The source the key holds, the connector's.
+            public init(
+                plugin: Swift.String,
+                key: Swift.String,
+                keyId: Swift.String,
+                source: Swift.String
+            ) {
+                self.plugin = plugin
+                self.key = key
+                self.keyId = keyId
+                self.source = source
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case key
+                case keyId = "key_id"
+                case source
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.key = try container.decode(
+                    Swift.String.self,
+                    forKey: .key
+                )
+                self.keyId = try container.decode(
+                    Swift.String.self,
+                    forKey: .keyId
+                )
+                self.source = try container.decode(
+                    Swift.String.self,
+                    forKey: .source
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "key",
+                    "key_id",
+                    "source"
+                ])
+            }
+        }
+        /// A plugin's connector and the host it is assigned to.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned`.
+        public struct PluginConnectorAssigned: Codable, Hashable, Sendable {
+            /// The plugin whose connector Marfa assigned.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned/plugin`.
+            public var plugin: Swift.String
+            /// The source the connector holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned/source`.
+            public var source: Swift.String
+            /// The ID of the host the connector is assigned to, or `null`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned/host`.
+            public var host: Swift.String?
+            /// `true` if that host minted a key for the connector that still stands.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned/key_minted`.
+            public var keyMinted: Swift.Bool
+            /// Creates a new `PluginConnectorAssigned`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin whose connector Marfa assigned.
+            ///   - source: The source the connector holds.
+            ///   - host: The ID of the host the connector is assigned to, or `null`.
+            ///   - keyMinted: `true` if that host minted a key for the connector that still stands.
+            public init(
+                plugin: Swift.String,
+                source: Swift.String,
+                host: Swift.String? = nil,
+                keyMinted: Swift.Bool
+            ) {
+                self.plugin = plugin
+                self.source = source
+                self.host = host
+                self.keyMinted = keyMinted
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case source
+                case host
+                case keyMinted = "key_minted"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.source = try container.decode(
+                    Swift.String.self,
+                    forKey: .source
+                )
+                self.host = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .host
+                )
+                self.keyMinted = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .keyMinted
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "source",
+                    "host",
+                    "key_minted"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal`.
+        public struct ConnectorHostNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorHostNotFound = "connector_host_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorHostNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorHostNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorHostNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorHostNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorHostNotFoundRefusal/error`.
+            public var error: Components.Schemas.ConnectorHostNotFoundRefusal._ErrorPayload
+            /// Creates a new `ConnectorHostNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorHostNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal`.
+        public struct ConnectorLinkNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorLinkNotFound = "connector_link_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorLinkNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorLinkNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorLinkNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorLinkNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorLinkNotFoundRefusal/error`.
+            public var error: Components.Schemas.ConnectorLinkNotFoundRefusal._ErrorPayload
+            /// Creates a new `ConnectorLinkNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorLinkNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal`.
+        public struct PluginConnectorNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case pluginNotFound = "plugin_not_found"
+                    case connectorNotFound = "connector_not_found"
+                    case connectorHostNotFound = "connector_host_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.PluginConnectorNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.PluginConnectorNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PluginConnectorNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PluginConnectorNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundRefusal/error`.
+            public var error: Components.Schemas.PluginConnectorNotFoundRefusal._ErrorPayload
+            /// Creates a new `PluginConnectorNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PluginConnectorNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal`.
+        public struct ConnectorSourceHeldRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorSourceHeld = "connector_source_held"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorSourceHeldRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorSourceHeldRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorSourceHeldRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorSourceHeldRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSourceHeldRefusal/error`.
+            public var error: Components.Schemas.ConnectorSourceHeldRefusal._ErrorPayload
+            /// Creates a new `ConnectorSourceHeldRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorSourceHeldRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// A secret setting of a plugin's connector to set again.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorSecretToSet`.
+        public struct ConnectorSecretToSet: Codable, Hashable, Sendable {
+            /// The plugin whose connector declares the setting.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSecretToSet/plugin`.
+            public var plugin: Swift.String
+            /// The secret setting's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorSecretToSet/name`.
+            public var name: Swift.String
+            /// Creates a new `ConnectorSecretToSet`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin whose connector declares the setting.
+            ///   - name: The secret setting's name.
+            public init(
+                plugin: Swift.String,
+                name: Swift.String
+            ) {
+                self.plugin = plugin
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case name
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "name"
+                ])
+            }
+        }
+        /// The settings of a plugin's connector.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorSettings`.
+        public struct PluginConnectorSettings: Codable, Hashable, Sendable {
+            /// The plugin's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettings/plugin`.
+            public var plugin: Swift.String
+            /// Each setting the plugin's connector declares, in its order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettings/settings`.
+            public var settings: [Components.Schemas.PluginConnectorSettingValue]
+            /// The name of each required setting with no value Marfa can read and no default. The connector can't run until each is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettings/missing`.
+            public var missing: [Swift.String]
+            /// Creates a new `PluginConnectorSettings`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin's name.
+            ///   - settings: Each setting the plugin's connector declares, in its order.
+            ///   - missing: The name of each required setting with no value Marfa can read and no default. The connector can't run until each is set.
+            public init(
+                plugin: Swift.String,
+                settings: [Components.Schemas.PluginConnectorSettingValue],
+                missing: [Swift.String]
+            ) {
+                self.plugin = plugin
+                self.settings = settings
+                self.missing = missing
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case settings
+                case missing
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.settings = try container.decode(
+                    [Components.Schemas.PluginConnectorSettingValue].self,
+                    forKey: .settings
+                )
+                self.missing = try container.decode(
+                    [Swift.String].self,
+                    forKey: .missing
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "settings",
+                    "missing"
+                ])
+            }
+        }
+        /// A setting as the connector reads it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting`.
+        public struct ConnectorOwnSetting: Codable, Hashable, Sendable {
+            /// The setting's name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/name`.
+            public var name: Swift.String
+            /// What the setting holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case text = "text"
+                case number = "number"
+                case boolean = "boolean"
+                case choice = "choice"
+            }
+            /// What the setting holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/kind`.
+            public var kind: Components.Schemas.ConnectorOwnSetting.KindPayload
+            /// `true` if the setting holds a secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/secret`.
+            public var secret: Swift.Bool
+            /// `true` if the connector needs a value to run.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/required`.
+            public var required: Swift.Bool
+            /// The value set, a secret's included, or for a setting that isn't secret its default while none is set. `null` while no value is set and for a secret Marfa can't read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/value`.
+            public var value: OpenAPIRuntime.OpenAPIValueContainer
+            /// `true` if a value Marfa can read is set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/set`.
+            public var set: Swift.Bool
+            /// `true` if a secret holds a value Marfa can't read. Treat it as unset; the owner sets it again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSetting/unreadable`.
+            public var unreadable: Swift.Bool
+            /// Creates a new `ConnectorOwnSetting`.
+            ///
+            /// - Parameters:
+            ///   - name: The setting's name.
+            ///   - kind: What the setting holds.
+            ///   - secret: `true` if the setting holds a secret.
+            ///   - required: `true` if the connector needs a value to run.
+            ///   - value: The value set, a secret's included, or for a setting that isn't secret its default while none is set. `null` while no value is set and for a secret Marfa can't read.
+            ///   - set: `true` if a value Marfa can read is set.
+            ///   - unreadable: `true` if a secret holds a value Marfa can't read. Treat it as unset; the owner sets it again.
+            public init(
+                name: Swift.String,
+                kind: Components.Schemas.ConnectorOwnSetting.KindPayload,
+                secret: Swift.Bool,
+                required: Swift.Bool,
+                value: OpenAPIRuntime.OpenAPIValueContainer,
+                set: Swift.Bool,
+                unreadable: Swift.Bool
+            ) {
+                self.name = name
+                self.kind = kind
+                self.secret = secret
+                self.required = required
+                self.value = value
+                self.set = set
+                self.unreadable = unreadable
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case kind
+                case secret
+                case required
+                case value
+                case set
+                case unreadable
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.kind = try container.decode(
+                    Components.Schemas.ConnectorOwnSetting.KindPayload.self,
+                    forKey: .kind
+                )
+                self.secret = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .secret
+                )
+                self.required = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                self.value = try container.decode(
+                    OpenAPIRuntime.OpenAPIValueContainer.self,
+                    forKey: .value
+                )
+                self.set = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .set
+                )
+                self.unreadable = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .unreadable
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "kind",
+                    "secret",
+                    "required",
+                    "value",
+                    "set",
+                    "unreadable"
+                ])
+            }
+        }
+        /// The settings of a plugin's connector, its secrets included, as its own key reads them.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorOwnSettings`.
+        public struct ConnectorOwnSettings: Codable, Hashable, Sendable {
+            /// The plugin whose connector this is.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSettings/plugin`.
+            public var plugin: Swift.String
+            /// Each setting the connector declares, in its order.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSettings/settings`.
+            public var settings: [Components.Schemas.ConnectorOwnSetting]
+            /// The name of each required setting with no value Marfa can read and no default. Tell the owner, and don't run without them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorOwnSettings/missing`.
+            public var missing: [Swift.String]
+            /// Creates a new `ConnectorOwnSettings`.
+            ///
+            /// - Parameters:
+            ///   - plugin: The plugin whose connector this is.
+            ///   - settings: Each setting the connector declares, in its order.
+            ///   - missing: The name of each required setting with no value Marfa can read and no default. Tell the owner, and don't run without them.
+            public init(
+                plugin: Swift.String,
+                settings: [Components.Schemas.ConnectorOwnSetting],
+                missing: [Swift.String]
+            ) {
+                self.plugin = plugin
+                self.settings = settings
+                self.missing = missing
+            }
+            public enum CodingKeys: String, CodingKey {
+                case plugin
+                case settings
+                case missing
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.plugin = try container.decode(
+                    Swift.String.self,
+                    forKey: .plugin
+                )
+                self.settings = try container.decode(
+                    [Components.Schemas.ConnectorOwnSetting].self,
+                    forKey: .settings
+                )
+                self.missing = try container.decode(
+                    [Swift.String].self,
+                    forKey: .missing
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "plugin",
+                    "settings",
+                    "missing"
+                ])
+            }
+        }
+        /// A setting of a plugin's connector, as you see it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue`.
+        public struct PluginConnectorSettingValue: Codable, Hashable, Sendable {
+            /// The setting's name, as the plugin's connector declares it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/name`.
+            public var name: Swift.String
+            /// The setting's name for a person to read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/label`.
+            public var label: Swift.String
+            /// What the setting holds: text, a number, `true` or `false`, or one of its `choices`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case text = "text"
+                case number = "number"
+                case boolean = "boolean"
+                case choice = "choice"
+            }
+            /// What the setting holds: text, a number, `true` or `false`, or one of its `choices`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/kind`.
+            public var kind: Components.Schemas.PluginConnectorSettingValue.KindPayload
+            /// The values a `choice` setting takes, or `null` for another kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/choices`.
+            public var choices: [Swift.String]?
+            /// `true` if the setting holds a secret, whose value Marfa never shows you.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/secret`.
+            public var secret: Swift.Bool
+            /// `true` if the connector needs a value to run.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/required`.
+            public var required: Swift.Bool
+            /// The value the connector reads while none is set, or `null`. Always `null` for a secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/default`.
+            public var _default: OpenAPIRuntime.OpenAPIValueContainer
+            /// The value set, or the `default` while none is set. Always `null` for a secret.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/value`.
+            public var value: OpenAPIRuntime.OpenAPIValueContainer
+            /// `true` if a value is set. For a secret, `true` only if Marfa can read the value set.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/set`.
+            public var set: Swift.Bool
+            /// `true` if a secret holds a value Marfa can't read, because the instance was restored or moved to another machine, or its settings key was lost. Set it again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorSettingValue/unreadable`.
+            public var unreadable: Swift.Bool
+            /// Creates a new `PluginConnectorSettingValue`.
+            ///
+            /// - Parameters:
+            ///   - name: The setting's name, as the plugin's connector declares it.
+            ///   - label: The setting's name for a person to read.
+            ///   - kind: What the setting holds: text, a number, `true` or `false`, or one of its `choices`.
+            ///   - choices: The values a `choice` setting takes, or `null` for another kind.
+            ///   - secret: `true` if the setting holds a secret, whose value Marfa never shows you.
+            ///   - required: `true` if the connector needs a value to run.
+            ///   - _default: The value the connector reads while none is set, or `null`. Always `null` for a secret.
+            ///   - value: The value set, or the `default` while none is set. Always `null` for a secret.
+            ///   - set: `true` if a value is set. For a secret, `true` only if Marfa can read the value set.
+            ///   - unreadable: `true` if a secret holds a value Marfa can't read, because the instance was restored or moved to another machine, or its settings key was lost. Set it again.
+            public init(
+                name: Swift.String,
+                label: Swift.String,
+                kind: Components.Schemas.PluginConnectorSettingValue.KindPayload,
+                choices: [Swift.String]? = nil,
+                secret: Swift.Bool,
+                required: Swift.Bool,
+                _default: OpenAPIRuntime.OpenAPIValueContainer,
+                value: OpenAPIRuntime.OpenAPIValueContainer,
+                set: Swift.Bool,
+                unreadable: Swift.Bool
+            ) {
+                self.name = name
+                self.label = label
+                self.kind = kind
+                self.choices = choices
+                self.secret = secret
+                self.required = required
+                self._default = _default
+                self.value = value
+                self.set = set
+                self.unreadable = unreadable
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case label
+                case kind
+                case choices
+                case secret
+                case required
+                case _default = "default"
+                case value
+                case set
+                case unreadable
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.name = try container.decode(
+                    Swift.String.self,
+                    forKey: .name
+                )
+                self.label = try container.decode(
+                    Swift.String.self,
+                    forKey: .label
+                )
+                self.kind = try container.decode(
+                    Components.Schemas.PluginConnectorSettingValue.KindPayload.self,
+                    forKey: .kind
+                )
+                self.choices = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .choices
+                )
+                self.secret = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .secret
+                )
+                self.required = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .required
+                )
+                self._default = try container.decode(
+                    OpenAPIRuntime.OpenAPIValueContainer.self,
+                    forKey: ._default
+                )
+                self.value = try container.decode(
+                    OpenAPIRuntime.OpenAPIValueContainer.self,
+                    forKey: .value
+                )
+                self.set = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .set
+                )
+                self.unreadable = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .unreadable
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "name",
+                    "label",
+                    "kind",
+                    "choices",
+                    "secret",
+                    "required",
+                    "default",
+                    "value",
+                    "set",
+                    "unreadable"
+                ])
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal`.
+        public struct PluginConnectorNotFoundOrPluginNotFoundRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case pluginNotFound = "plugin_not_found"
+                    case pluginConnectorNotFound = "plugin_connector_not_found"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error/code`.
+                public var code: Components.Schemas.PluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error/details`.
+                public var details: Components.Schemas.PluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.PluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.PluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorNotFoundOrPluginNotFoundRefusal/error`.
+            public var error: Components.Schemas.PluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload
+            /// Creates a new `PluginConnectorNotFoundOrPluginNotFoundRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.PluginConnectorNotFoundOrPluginNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal`.
+        public struct ConnectorMappingStaleOrInstanceChangedRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case connectorMappingStale = "connector_mapping_stale"
+                    case instanceChanged = "instance_changed"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error/code`.
+                public var code: Components.Schemas.ConnectorMappingStaleOrInstanceChangedRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()) {
+                        self.additionalProperties = additionalProperties
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error/details`.
+                public var details: Components.Schemas.ConnectorMappingStaleOrInstanceChangedRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.ConnectorMappingStaleOrInstanceChangedRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.ConnectorMappingStaleOrInstanceChangedRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingStaleOrInstanceChangedRefusal/error`.
+            public var error: Components.Schemas.ConnectorMappingStaleOrInstanceChangedRefusal._ErrorPayload
+            /// Creates a new `ConnectorMappingStaleOrInstanceChangedRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.ConnectorMappingStaleOrInstanceChangedRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// Where a field of the target type gets its value: exactly one of `from`, `fixed` or `template`.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorMappingField`.
+        @frozen public enum ConnectorMappingField: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case1`.
+            public struct Case1Payload: Codable, Hashable, Sendable {
+                /// A field of the kind's own type.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case1/from`.
+                public var from: Swift.String
+                /// Creates a new `Case1Payload`.
+                ///
+                /// - Parameters:
+                ///   - from: A field of the kind's own type.
+                public init(from: Swift.String) {
+                    self.from = from
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case from
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.from = try container.decode(
+                        Swift.String.self,
+                        forKey: .from
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "from"
+                    ])
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case1`.
+            case case1(Components.Schemas.ConnectorMappingField.Case1Payload)
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case2`.
+            public struct Case2Payload: Codable, Hashable, Sendable {
+                /// A value the target field takes.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case2/fixed`.
+                public var fixed: OpenAPIRuntime.OpenAPIValueContainer
+                /// Creates a new `Case2Payload`.
+                ///
+                /// - Parameters:
+                ///   - fixed: A value the target field takes.
+                public init(fixed: OpenAPIRuntime.OpenAPIValueContainer) {
+                    self.fixed = fixed
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case fixed
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.fixed = try container.decode(
+                        OpenAPIRuntime.OpenAPIValueContainer.self,
+                        forKey: .fixed
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "fixed"
+                    ])
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case2`.
+            case case2(Components.Schemas.ConnectorMappingField.Case2Payload)
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case3`.
+            public struct Case3Payload: Codable, Hashable, Sendable {
+                /// Jinja text the connector renders. Fills only a field of type `string`.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case3/template`.
+                public var template: Swift.String
+                /// Creates a new `Case3Payload`.
+                ///
+                /// - Parameters:
+                ///   - template: Jinja text the connector renders. Fills only a field of type `string`.
+                public init(template: Swift.String) {
+                    self.template = template
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case template
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    let container = try decoder.container(keyedBy: CodingKeys.self)
+                    self.template = try container.decode(
+                        Swift.String.self,
+                        forKey: .template
+                    )
+                    try decoder.ensureNoAdditionalProperties(knownKeys: [
+                        "template"
+                    ])
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingField/case3`.
+            case case3(Components.Schemas.ConnectorMappingField.Case3Payload)
+            public init(from decoder: any Swift.Decoder) throws {
+                var errors: [any Swift.Error] = []
+                do {
+                    self = .case1(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self = .case2(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                do {
+                    self = .case3(try .init(from: decoder))
+                    return
+                } catch {
+                    errors.append(error)
+                }
+                throw Swift.DecodingError.failedToDecodeOneOfSchema(
+                    type: Self.self,
+                    codingPath: decoder.codingPath,
+                    errors: errors
+                )
+            }
+            public func encode(to encoder: any Swift.Encoder) throws {
+                switch self {
+                case let .case1(value):
+                    try value.encode(to: encoder)
+                case let .case2(value):
+                    try value.encode(to: encoder)
+                case let .case3(value):
+                    try value.encode(to: encoder)
+                }
+            }
+        }
+        /// What one kind of the connector brings. An answer holds every member; a member a save leaves out takes its default.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind`.
+        public struct ConnectorMappingKind: Codable, Hashable, Sendable {
+            /// Whether the kind comes in.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/enabled`.
+            public var enabled: Swift.Bool?
+            /// The type the kind lands as.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/target_type`.
+            public var targetType: Swift.String?
+            /// The tier a new item of the kind takes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/tier`.
+            @frozen public enum TierPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case feed = "feed"
+                case library = "library"
+            }
+            /// The tier a new item of the kind takes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/tier`.
+            public var tier: Components.Schemas.ConnectorMappingKind.TierPayload?
+            /// A status word of the kind's own type mapped to one of the target type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/status_overrides`.
+            public struct StatusOverridesPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Swift.String]
+                /// Creates a new `StatusOverridesPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Swift.String] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// A status word of the kind's own type mapped to one of the target type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/status_overrides`.
+            public var statusOverrides: Components.Schemas.ConnectorMappingKind.StatusOverridesPayload?
+            /// Each field of the target type, by name, and where its value comes from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/fields`.
+            public struct FieldsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.ConnectorMappingField]
+                /// Creates a new `FieldsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.ConnectorMappingField] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Each field of the target type, by name, and where its value comes from.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind/fields`.
+            public var fields: Components.Schemas.ConnectorMappingKind.FieldsPayload?
+            /// Creates a new `ConnectorMappingKind`.
+            ///
+            /// - Parameters:
+            ///   - enabled: Whether the kind comes in.
+            ///   - targetType: The type the kind lands as.
+            ///   - tier: The tier a new item of the kind takes.
+            ///   - statusOverrides: A status word of the kind's own type mapped to one of the target type.
+            ///   - fields: Each field of the target type, by name, and where its value comes from.
+            public init(
+                enabled: Swift.Bool? = nil,
+                targetType: Swift.String? = nil,
+                tier: Components.Schemas.ConnectorMappingKind.TierPayload? = nil,
+                statusOverrides: Components.Schemas.ConnectorMappingKind.StatusOverridesPayload? = nil,
+                fields: Components.Schemas.ConnectorMappingKind.FieldsPayload? = nil
+            ) {
+                self.enabled = enabled
+                self.targetType = targetType
+                self.tier = tier
+                self.statusOverrides = statusOverrides
+                self.fields = fields
+            }
+            public enum CodingKeys: String, CodingKey {
+                case enabled
+                case targetType = "target_type"
+                case tier
+                case statusOverrides = "status_overrides"
+                case fields
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.enabled = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .enabled
+                )
+                self.targetType = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .targetType
+                )
+                self.tier = try container.decodeIfPresent(
+                    Components.Schemas.ConnectorMappingKind.TierPayload.self,
+                    forKey: .tier
+                )
+                self.statusOverrides = try container.decodeIfPresent(
+                    Components.Schemas.ConnectorMappingKind.StatusOverridesPayload.self,
+                    forKey: .statusOverrides
+                )
+                self.fields = try container.decodeIfPresent(
+                    Components.Schemas.ConnectorMappingKind.FieldsPayload.self,
+                    forKey: .fields
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "enabled",
+                    "target_type",
+                    "tier",
+                    "status_overrides",
+                    "fields"
+                ])
+            }
+        }
+        /// A plugin connector's mapping.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorMapping`.
+        public struct ConnectorMapping: Codable, Hashable, Sendable {
+            /// The mapping's version. `0` until a mapping is saved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMapping/version`.
+            public var version: Swift.Int
+            /// Each kind the plugin's connector brings, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMapping/kinds`.
+            public struct KindsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.ConnectorMappingKind]
+                /// Creates a new `KindsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.ConnectorMappingKind] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Each kind the plugin's connector brings, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMapping/kinds`.
+            public var kinds: Components.Schemas.ConnectorMapping.KindsPayload
+            /// Each rewrite the owner asked for that the connector has not cleared, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMapping/rewrites`.
+            public var rewrites: [Components.Schemas.ConnectorRewritePending]
+            /// Creates a new `ConnectorMapping`.
+            ///
+            /// - Parameters:
+            ///   - version: The mapping's version. `0` until a mapping is saved.
+            ///   - kinds: Each kind the plugin's connector brings, by name.
+            ///   - rewrites: Each rewrite the owner asked for that the connector has not cleared, oldest first.
+            public init(
+                version: Swift.Int,
+                kinds: Components.Schemas.ConnectorMapping.KindsPayload,
+                rewrites: [Components.Schemas.ConnectorRewritePending]
+            ) {
+                self.version = version
+                self.kinds = kinds
+                self.rewrites = rewrites
+            }
+            public enum CodingKeys: String, CodingKey {
+                case version
+                case kinds
+                case rewrites
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.version = try container.decode(
+                    Swift.Int.self,
+                    forKey: .version
+                )
+                self.kinds = try container.decode(
+                    Components.Schemas.ConnectorMapping.KindsPayload.self,
+                    forKey: .kinds
+                )
+                self.rewrites = try container.decode(
+                    [Components.Schemas.ConnectorRewritePending].self,
+                    forKey: .rewrites
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "version",
+                    "kinds",
+                    "rewrites"
+                ])
+            }
+        }
+        /// The mapping to store, replacing the one stored.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorMappingSave`.
+        public struct ConnectorMappingSave: Codable, Hashable, Sendable {
+            /// The `version` you read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingSave/version`.
+            public var version: Swift.Int
+            /// Each kind's entry, by name. A kind you leave out takes its default.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingSave/kinds`.
+            public struct KindsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.ConnectorMappingKind]
+                /// Creates a new `KindsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.ConnectorMappingKind] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Each kind's entry, by name. A kind you leave out takes its default.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorMappingSave/kinds`.
+            public var kinds: Components.Schemas.ConnectorMappingSave.KindsPayload
+            /// Creates a new `ConnectorMappingSave`.
+            ///
+            /// - Parameters:
+            ///   - version: The `version` you read.
+            ///   - kinds: Each kind's entry, by name. A kind you leave out takes its default.
+            public init(
+                version: Swift.Int,
+                kinds: Components.Schemas.ConnectorMappingSave.KindsPayload
+            ) {
+                self.version = version
+                self.kinds = kinds
+            }
+            public enum CodingKeys: String, CodingKey {
+                case version
+                case kinds
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.version = try container.decode(
+                    Swift.Int.self,
+                    forKey: .version
+                )
+                self.kinds = try container.decode(
+                    Components.Schemas.ConnectorMappingSave.KindsPayload.self,
+                    forKey: .kinds
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "version",
+                    "kinds"
+                ])
+            }
+        }
+        /// A rewrite of the connector's existing items.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorRewriteRequest`.
+        public struct ConnectorRewriteRequest: Codable, Hashable, Sendable {
+            /// Count the items without asking for the rewrite.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewriteRequest/dry_run`.
+            public var dryRun: Swift.Bool?
+            /// The kinds to rewrite. Without it, every enabled kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewriteRequest/kinds`.
+            public var kinds: [Swift.String]?
+            /// Creates a new `ConnectorRewriteRequest`.
+            ///
+            /// - Parameters:
+            ///   - dryRun: Count the items without asking for the rewrite.
+            ///   - kinds: The kinds to rewrite. Without it, every enabled kind.
+            public init(
+                dryRun: Swift.Bool? = nil,
+                kinds: [Swift.String]? = nil
+            ) {
+                self.dryRun = dryRun
+                self.kinds = kinds
+            }
+            public enum CodingKeys: String, CodingKey {
+                case dryRun = "dry_run"
+                case kinds
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.dryRun = try container.decodeIfPresent(
+                    Swift.Bool.self,
+                    forKey: .dryRun
+                )
+                self.kinds = try container.decodeIfPresent(
+                    [Swift.String].self,
+                    forKey: .kinds
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "dry_run",
+                    "kinds"
+                ])
+            }
+        }
+        /// How many items a rewrite touches.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorRewrite`.
+        public struct ConnectorRewrite: Codable, Hashable, Sendable {
+            /// Whether the rewrite was only counted.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/dry_run`.
+            public var dryRun: Swift.Bool
+            /// The stored request's number. Absent on a dry run, which stores none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/number`.
+            public var number: Swift.Int?
+            /// The mapping's version.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/version`.
+            public var version: Swift.Int
+            /// Each kind counted, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds`.
+            public struct KindsPayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds/additionalProperties`.
+                public struct AdditionalPropertiesPayload: Codable, Hashable, Sendable {
+                    /// The kind's target type.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds/additionalProperties/target_type`.
+                    public var targetType: Swift.String
+                    /// The items outside the bin of the target type under the connector's source.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds/additionalProperties/count`.
+                    public var count: Swift.Int
+                    /// Creates a new `AdditionalPropertiesPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - targetType: The kind's target type.
+                    ///   - count: The items outside the bin of the target type under the connector's source.
+                    public init(
+                        targetType: Swift.String,
+                        count: Swift.Int
+                    ) {
+                        self.targetType = targetType
+                        self.count = count
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case targetType = "target_type"
+                        case count
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.targetType = try container.decode(
+                            Swift.String.self,
+                            forKey: .targetType
+                        )
+                        self.count = try container.decode(
+                            Swift.Int.self,
+                            forKey: .count
+                        )
+                        try decoder.ensureNoAdditionalProperties(knownKeys: [
+                            "target_type",
+                            "count"
+                        ])
+                    }
+                }
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Components.Schemas.ConnectorRewrite.KindsPayload.AdditionalPropertiesPayload]
+                /// Creates a new `KindsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Components.Schemas.ConnectorRewrite.KindsPayload.AdditionalPropertiesPayload] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Each kind counted, by name.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds`.
+            public var kinds: Components.Schemas.ConnectorRewrite.KindsPayload
+            /// Creates a new `ConnectorRewrite`.
+            ///
+            /// - Parameters:
+            ///   - dryRun: Whether the rewrite was only counted.
+            ///   - number: The stored request's number. Absent on a dry run, which stores none.
+            ///   - version: The mapping's version.
+            ///   - kinds: Each kind counted, by name.
+            public init(
+                dryRun: Swift.Bool,
+                number: Swift.Int? = nil,
+                version: Swift.Int,
+                kinds: Components.Schemas.ConnectorRewrite.KindsPayload
+            ) {
+                self.dryRun = dryRun
+                self.number = number
+                self.version = version
+                self.kinds = kinds
+            }
+            public enum CodingKeys: String, CodingKey {
+                case dryRun = "dry_run"
+                case number
+                case version
+                case kinds
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.dryRun = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .dryRun
+                )
+                self.number = try container.decodeIfPresent(
+                    Swift.Int.self,
+                    forKey: .number
+                )
+                self.version = try container.decode(
+                    Swift.Int.self,
+                    forKey: .version
+                )
+                self.kinds = try container.decode(
+                    Components.Schemas.ConnectorRewrite.KindsPayload.self,
+                    forKey: .kinds
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "dry_run",
+                    "number",
+                    "version",
+                    "kinds"
+                ])
+            }
+        }
+        /// The rewrite the connector carried out.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorRewriteDone`.
+        public struct ConnectorRewriteDone: Codable, Hashable, Sendable {
+            /// The `number` of the rewrite carried out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewriteDone/number`.
+            public var number: Swift.Int
+            /// Creates a new `ConnectorRewriteDone`.
+            ///
+            /// - Parameters:
+            ///   - number: The `number` of the rewrite carried out.
+            public init(number: Swift.Int) {
+                self.number = number
+            }
+            public enum CodingKeys: String, CodingKey {
+                case number
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.number = try container.decode(
+                    Swift.Int.self,
+                    forKey: .number
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "number"
+                ])
+            }
+        }
+        /// The rewrite request is cleared.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorRewriteCleared`.
+        public struct ConnectorRewriteCleared: Codable, Hashable, Sendable {
+            /// The rewrites still waiting, oldest first.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewriteCleared/rewrites`.
+            public var rewrites: [Components.Schemas.ConnectorRewritePending]
+            /// Creates a new `ConnectorRewriteCleared`.
+            ///
+            /// - Parameters:
+            ///   - rewrites: The rewrites still waiting, oldest first.
+            public init(rewrites: [Components.Schemas.ConnectorRewritePending]) {
+                self.rewrites = rewrites
+            }
+            public enum CodingKeys: String, CodingKey {
+                case rewrites
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.rewrites = try container.decode(
+                    [Components.Schemas.ConnectorRewritePending].self,
+                    forKey: .rewrites
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "rewrites"
+                ])
+            }
+        }
+        /// A rewrite of existing items the owner asked for, until the connector clears it.
+        ///
+        /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending`.
+        public struct ConnectorRewritePending: Codable, Hashable, Sendable {
+            /// The request's number. Numbers rise and are never given again.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/number`.
+            public var number: Swift.Int
+            /// The mapping's version when the rewrite was asked for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/version`.
+            public var version: Swift.Int
+            /// The kinds to rewrite.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/kinds`.
+            public var kinds: [Swift.String]
+            /// When the rewrite was asked for.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/requested_at`.
+            public var requestedAt: Foundation.Date
+            /// Creates a new `ConnectorRewritePending`.
+            ///
+            /// - Parameters:
+            ///   - number: The request's number. Numbers rise and are never given again.
+            ///   - version: The mapping's version when the rewrite was asked for.
+            ///   - kinds: The kinds to rewrite.
+            ///   - requestedAt: When the rewrite was asked for.
+            public init(
+                number: Swift.Int,
+                version: Swift.Int,
+                kinds: [Swift.String],
+                requestedAt: Foundation.Date
+            ) {
+                self.number = number
+                self.version = version
+                self.kinds = kinds
+                self.requestedAt = requestedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case number
+                case version
+                case kinds
+                case requestedAt = "requested_at"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.number = try container.decode(
+                    Swift.Int.self,
+                    forKey: .number
+                )
+                self.version = try container.decode(
+                    Swift.Int.self,
+                    forKey: .version
+                )
+                self.kinds = try container.decode(
+                    [Swift.String].self,
+                    forKey: .kinds
+                )
+                self.requestedAt = try container.decode(
+                    Foundation.Date.self,
+                    forKey: .requestedAt
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "number",
+                    "version",
+                    "kinds",
+                    "requested_at"
                 ])
             }
         }
@@ -25667,6 +28808,8 @@ extension Components {
         public typealias MarfaNullableUpdateLatest = MarfaNullable<Components.Schemas.UpdateLatest>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateLast`.
         public typealias MarfaNullableUpdateLast = MarfaNullable<Components.Schemas.UpdateLast>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullablePluginConnector`.
+        public typealias MarfaNullablePluginConnector = MarfaNullable<Components.Schemas.PluginConnector>
         /// - Remark: Generated from `#/components/schemas/MarfaNullablePluginInstaller`.
         public typealias MarfaNullablePluginInstaller = MarfaNullable<Components.Schemas.PluginInstaller>
     }

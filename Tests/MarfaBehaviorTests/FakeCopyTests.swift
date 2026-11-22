@@ -417,6 +417,25 @@ struct FakeCopyBehavior {
         await copy.close()
     }
 
+    @Test func anExtensionWriteTheChooserBlocksAsAConflictKeepsItsValueInTheQueue() async throws {
+        let fake = Self.seeded()
+        let copy = fake.copy
+        fake.verdict = { write in
+            write.namespace == "acme.x" ? .blocked(reason: .conflictUnresolved) : .accepted
+        }
+        let written = try await copy.extensions.write(
+            "acme.x", ["pinned": true], on: Self.note.id, readRevision: "r1")
+        let deleted = try await copy.extensions.delete("acme.y", from: Self.note.id, readRevision: "r2")
+
+        _ = try await copy.queue.drain()
+
+        let queue = try await copy.queue.all()
+        #expect(queue.map(\.id) == [written.id, deleted.id])
+        #expect(queue[0].verdict == .blocked(reason: .conflictUnresolved) && queue[0].body == ["pinned": true])
+        #expect(queue[1].verdict == .accepted, "the witness: a write the chooser does not block is taken")
+        await copy.close()
+    }
+
     @Test func aWriteBehindABlockedOneWaitsAndAWithdrawRefusesIt() async throws {
         let fake = Self.seeded()
         let copy = fake.copy

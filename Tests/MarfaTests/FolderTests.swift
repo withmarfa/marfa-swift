@@ -365,13 +365,17 @@ extension LiveWorkingCopies {
 
         @Test func aFirstSyncStillWaitingIsCancelledByRemovingTheFolderAndTheFilesStay() async throws {
             let directory = FolderFixture.directory()
-            _ = try await folders.add(directory, following: try await FolderFixture.settings())
+            let settings = try await FolderFixture.settings()
+            _ = try await folders.add(directory, following: settings)
             try FolderFixture.note("Kept", in: directory)
             guard case .awaitingConfirmation = try await folders.sync(directory) else {
                 Issue.record("the first sync ran without being confirmed")
                 return
             }
-            try await folders.remove(directory)
+            let removal = try await folders.remove(directory)
+            #expect(removal.removed && removal.reason == nil && removal.folderId == settings)
+            #expect(removal.unsent == 0 && removal.files.isEmpty)
+            #expect(removal.directory.path(percentEncoded: false) == directory.path(percentEncoded: false))
             #expect(!FolderFixture.listed(directory, in: try await folders.list()))
             #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Kept.md").path()))
             #expect(FolderFixture.files(in: directory).filter { $0.hasPrefix(".marfa/") }.isEmpty)
@@ -396,7 +400,9 @@ extension LiveWorkingCopies {
             _ = try await folders.sync(directory)
             // The witness: the store is there before the folder is removed.
             #expect(FolderFixture.files(in: directory).contains(".marfa/core.sqlite"))
-            try await folders.remove(directory)
+            let removal = try await folders.remove(directory)
+            #expect(removal.removed && removal.reason == nil && removal.folderId != nil)
+            #expect(removal.unsent == 0 && removal.files.isEmpty)
             #expect(!FolderFixture.listed(directory, in: try await folders.list()))
             #expect(FileManager.default.fileExists(atPath: directory.appending(path: "Waiting.md").path()))
             #expect(FolderFixture.files(in: directory).filter { $0.hasPrefix(".marfa/") }.isEmpty)
@@ -409,7 +415,10 @@ extension LiveWorkingCopies {
             try FileManager.default.removeItem(at: directory)
             await #expect(throws: MarfaError.self) { try await folders.status(of: directory) }
             await #expect(throws: MarfaError.self) { try await folders.sync(directory) }
-            try await folders.remove(directory)
+            let removal = try await folders.remove(directory)
+            #expect(!removal.removed && removal.folderId == nil, "only its registry entry went")
+            #expect(try #require(removal.reason).isEmpty == false)
+            #expect(removal.unsent == 0 && removal.files.isEmpty)
             #expect(!FolderFixture.listed(directory, in: try await folders.list()))
         }
 
@@ -558,7 +567,7 @@ extension LiveWorkingCopies {
                 return events
             }
             try await started.wait()
-            try await bounded("the removal", within: 30) { try await folders.remove(directory) }
+            _ = try await bounded("the removal", within: 30) { try await folders.remove(directory) }
             let events = try await bounded("the watch to end", within: 60) { try await heard.value }
             #expect(events.contains { if case .handedOver = $0 { true } else { false } }, "\(events)")
             #expect(events.contains { if case .removed = $0 { true } else { false } }, "\(events)")

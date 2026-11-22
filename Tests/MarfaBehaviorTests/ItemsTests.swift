@@ -312,6 +312,38 @@ struct ItemsOffline {
     }
 
     @Test(arguments: CopyKind.allCases)
+    func anExtensionWriteAndDeleteTakeTheRevisionTheCallerReadAndQueueAsWithoutOne(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy)
+
+        let written = try await copy.extensions.write("acme.x", ["a": 1], on: id, readRevision: "r1")
+        let deleted = try await copy.extensions.delete("acme.x", from: id, readRevision: "r2")
+
+        #expect(written.kind == .writeExtension && written.namespace == "acme.x" && written.body == ["a": 1])
+        #expect(deleted.kind == .deleteExtension && deleted.namespace == "acme.x" && deleted.follows == written.id)
+        let extensions = try await copy.queue.all().filter { [.writeExtension, .deleteExtension].contains($0.kind) }
+        #expect(extensions.map(\.id) == [written.id, deleted.id])
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
+    func anEmptyRevisionIsRefusedForAnExtensionWriteAndDeleteAndQueuesNothing(kind: CopyKind) async throws {
+        let copy = try await kind.open()
+        let id = try await Self.note("A", in: copy)
+
+        await #expect {
+            _ = try await copy.extensions.write("acme.x", ["a": 1], on: id, readRevision: "")
+        } throws: { Self.invalid($0) }
+        await #expect {
+            _ = try await copy.extensions.delete("acme.x", from: id, readRevision: "")
+        } throws: { Self.invalid($0) }
+
+        let extensions = try await copy.queue.all().filter { [.writeExtension, .deleteExtension].contains($0.kind) }
+        #expect(extensions.isEmpty)
+        await copy.close()
+    }
+
+    @Test(arguments: CopyKind.allCases)
     func aListNarrowsByTypeTagsTierAndStateAndOrdersBySortWithLimitAndOffset(kind: CopyKind) async throws {
         let copy = try await kind.open(declaring: [["id": "app.notes.memo", "parent": "core.note"]])
         let first = try await Self.note("first", in: copy, tags: ["a"], at: "2026-01-01T00:00:00.000Z")

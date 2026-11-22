@@ -359,7 +359,8 @@ struct OwnerOperationsTests {
     @Test func permissionsAreAskedForByNameAndCheckedOnTheCredential() async throws {
         #expect(client.scopes == ["core.note:read", "backups.manage", "config.manage"])
         let named = Set(InstancePermission.allCases.map(\.rawValue))
-        #expect(named == Set(Components.Schemas.Permission.allCases.map(\.rawValue)))
+        // An app cannot ask for `connectors.host`: only a connector host's own key holds it.
+        #expect(named == Set(Components.Schemas.Permission.allCases.map(\.rawValue)).subtracting(["connectors.host"]))
         #expect(named.count == 14 && !named.contains("profile.username:write"))
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer()

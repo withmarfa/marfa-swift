@@ -216,7 +216,7 @@ public protocol APIProtocol: Sendable {
     func listTags(_ input: Operations.ListTags.Input) async throws -> Operations.ListTags.Output
     /// Get an extension namespace
     ///
-    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there.
+    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there, with the namespace's `revision`.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
@@ -377,11 +377,116 @@ public protocol APIProtocol: Sendable {
     func getPlugin(_ input: Operations.GetPlugin.Input) async throws -> Operations.GetPlugin.Output
     /// Remove a plugin
     ///
-    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance; delete a type with `DELETE /types/{id}`. Needs `schema.write`.
+    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance. A plugin with a connector loses its key and registrations; its source keeps its state and agreements.
     ///
     /// - Remark: HTTP `DELETE /plugins/{name}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
     func removePlugin(_ input: Operations.RemovePlugin.Input) async throws -> Operations.RemovePlugin.Output
+    /// Replace a connector's host
+    ///
+    /// Assigns a plugin's connector to a connector host, or to none. Moving it revokes the key its former host minted for it.
+    ///
+    /// - Remark: HTTP `PUT /plugins/{name}/connector`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/put(replacePluginConnectorHost)`.
+    func replacePluginConnectorHost(_ input: Operations.ReplacePluginConnectorHost.Input) async throws -> Operations.ReplacePluginConnectorHost.Output
+    /// Get a connector's settings
+    ///
+    /// Returns each setting a plugin's connector declares, with the value set or its default. A secret's value is never returned: `set` says whether one is set.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/settings`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/settings/get(getPluginConnectorSettings)`.
+    func getPluginConnectorSettings(_ input: Operations.GetPluginConnectorSettings.Input) async throws -> Operations.GetPluginConnectorSettings.Output
+    /// Update a connector's settings
+    ///
+    /// Sets each setting the body names, or removes its value for `null`, so the setting reads its default. Marfa seals a secret with the settings key beside the database and never returns it.
+    ///
+    /// - Remark: HTTP `PATCH /plugins/{name}/connector/settings`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/settings/patch(updatePluginConnectorSettings)`.
+    func updatePluginConnectorSettings(_ input: Operations.UpdatePluginConnectorSettings.Input) async throws -> Operations.UpdatePluginConnectorSettings.Output
+    /// Get a connector's mapping
+    ///
+    /// Returns the owner's mapping of each kind a plugin's connector brings. Until one is saved, each kind takes its default at `version` `0`. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/mapping`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/get(getConnectorMapping)`.
+    func getConnectorMapping(_ input: Operations.GetConnectorMapping.Input) async throws -> Operations.GetConnectorMapping.Output
+    /// Save a connector's mapping
+    ///
+    /// Replaces a plugin connector's mapping, judged against the types as they stand. Send the `version` you read. Saving changes no item: the connector applies the mapping to what it writes next. Needs `connectors.manage`.
+    ///
+    /// - Remark: HTTP `PUT /plugins/{name}/connector/mapping`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/put(saveConnectorMapping)`.
+    func saveConnectorMapping(_ input: Operations.SaveConnectorMapping.Input) async throws -> Operations.SaveConnectorMapping.Output
+    /// Rewrite a connector's items
+    ///
+    /// Counts the connector's items on each kind's target type. Without `dry_run`, also stores a numbered request to rewrite them, which the connector reads from the mapping's `rewrites` and clears. Needs `connectors.manage`.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/mapping/rewrite`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/rewrite/post(rewriteConnectorItems)`.
+    func rewriteConnectorItems(_ input: Operations.RewriteConnectorItems.Input) async throws -> Operations.RewriteConnectorItems.Output
+    /// Clear a connector's rewrite
+    ///
+    /// Clears the rewrite request whose `number` the connector carried out, and leaves any other waiting. Clearing a number no request holds answers the same. Only the connector's own key, or local authority, can do this.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/mapping/rewrite/done`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/rewrite/done/post(finishConnectorRewrite)`.
+    func finishConnectorRewrite(_ input: Operations.FinishConnectorRewrite.Input) async throws -> Operations.FinishConnectorRewrite.Output
+    /// List connector hosts
+    ///
+    /// Returns every connector host, oldest first, with the connectors assigned to each.
+    ///
+    /// - Remark: HTTP `GET /connector-hosts`.
+    /// - Remark: Generated from `#/paths//connector-hosts/get(listConnectorHosts)`.
+    func listConnectorHosts(_ input: Operations.ListConnectorHosts.Input) async throws -> Operations.ListConnectorHosts.Output
+    /// Create a connector host
+    ///
+    /// Creates a connector host and returns a one-time link that gives the host program its own key. The link works once, within 15 minutes.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts`.
+    /// - Remark: Generated from `#/paths//connector-hosts/post(createConnectorHost)`.
+    func createConnectorHost(_ input: Operations.CreateConnectorHost.Input) async throws -> Operations.CreateConnectorHost.Output
+    /// Get a connector host
+    ///
+    /// Returns a connector host, with the connectors assigned to it.
+    ///
+    /// - Remark: HTTP `GET /connector-hosts/{id}`.
+    /// - Remark: Generated from `#/paths//connector-hosts/{id}/get(getConnectorHost)`.
+    func getConnectorHost(_ input: Operations.GetConnectorHost.Input) async throws -> Operations.GetConnectorHost.Output
+    /// Delete a connector host
+    ///
+    /// Deletes a connector host and its link, revokes its key and every connector key it minted, and assigns its connectors to no host.
+    ///
+    /// - Remark: HTTP `DELETE /connector-hosts/{id}`.
+    /// - Remark: Generated from `#/paths//connector-hosts/{id}/delete(deleteConnectorHost)`.
+    func deleteConnectorHost(_ input: Operations.DeleteConnectorHost.Input) async throws -> Operations.DeleteConnectorHost.Output
+    /// Create a one-time link
+    ///
+    /// Creates a fresh one-time link for a connector host, to move it to a new machine. The link replaces any the host has not redeemed; redeeming it revokes the host's key.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts/{id}/link`.
+    /// - Remark: Generated from `#/paths//connector-hosts/{id}/link/post(createConnectorHostLink)`.
+    func createConnectorHostLink(_ input: Operations.CreateConnectorHostLink.Input) async throws -> Operations.CreateConnectorHostLink.Output
+    /// Redeem a one-time link
+    ///
+    /// Gives a connector host its own key, in exchange for the code of its one-time link. Send no credential. A host that held a key loses it.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts/redeem`.
+    /// - Remark: Generated from `#/paths//connector-hosts/redeem/post(redeemConnectorHostLink)`.
+    func redeemConnectorHostLink(_ input: Operations.RedeemConnectorHostLink.Input) async throws -> Operations.RedeemConnectorHostLink.Output
+    /// Get your connector host
+    ///
+    /// Returns the host whose key you are, with each connector assigned to it, and records that the host was seen. Only a connector host's own key reads it.
+    ///
+    /// - Remark: HTTP `GET /connector-hosts/self`.
+    /// - Remark: Generated from `#/paths//connector-hosts/self/get(getOwnConnectorHost)`.
+    func getOwnConnectorHost(_ input: Operations.GetOwnConnectorHost.Input) async throws -> Operations.GetOwnConnectorHost.Output
+    /// Create a connector key
+    ///
+    /// Creates the key of a connector assigned to your host, holding the connector's source and write on its kinds' types, and revokes the key your host minted for it before.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts/self/connectors/{plugin}/key`.
+    /// - Remark: Generated from `#/paths//connector-hosts/self/connectors/{plugin}/key/post(createConnectorKey)`.
+    func createConnectorKey(_ input: Operations.CreateConnectorKey.Input) async throws -> Operations.CreateConnectorKey.Output
     /// List types
     ///
     /// Returns every type on this instance: those Marfa ships and those registered through `POST /types`. Every credential reads the whole list, whatever its type map reaches.
@@ -711,6 +816,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /connectors/{id}/hold`.
     /// - Remark: Generated from `#/paths//connectors/{id}/hold/delete(releaseConnectorHold)`.
     func releaseConnectorHold(_ input: Operations.ReleaseConnectorHold.Input) async throws -> Operations.ReleaseConnectorHold.Output
+    /// Get a connector's own settings
+    ///
+    /// Returns each setting of the plugin's connector, every secret's value included. Only the key its connector host minted gets an answer, checked as Marfa answers. Read it at the start of each run.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/settings`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/settings/get(getConnectorSettings)`.
+    func getConnectorSettings(_ input: Operations.GetConnectorSettings.Input) async throws -> Operations.GetConnectorSettings.Output
     /// Get a connector's state
     ///
     /// Returns the state document of the connector's source. A later key with the same source reads the same document.
@@ -1133,7 +1245,7 @@ public protocol APIProtocol: Sendable {
     func exportArchive(_ input: Operations.ExportArchive.Input) async throws -> Operations.ExportArchive.Output
     /// Restore from an archive
     ///
-    /// Restores an archive atomically and returns write and skip counts. Marfa blocks other writes during the restore. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
+    /// Restores an archive atomically, blocking other writes, and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, `connectors.manage` to add a connector, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -1161,7 +1273,7 @@ public protocol APIProtocol: Sendable {
     func adoptBackupFolder(_ input: Operations.AdoptBackupFolder.Input) async throws -> Operations.AdoptBackupFolder.Output
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
+    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, `connectors.manage` to add a connector, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.
@@ -1627,7 +1739,7 @@ extension APIProtocol {
     }
     /// Get an extension namespace
     ///
-    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there.
+    /// Returns the document in one extension namespace on the item, or `document: null` if the item has none there, with the namespace's `revision`.
     ///
     /// - Remark: HTTP `GET /items/{id}/extensions/{namespace}`.
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/get(getItemExtension)`.
@@ -1648,11 +1760,13 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/put(replaceItemExtension)`.
     public func replaceItemExtension(
         path: Operations.ReplaceItemExtension.Input.Path,
+        query: Operations.ReplaceItemExtension.Input.Query = .init(),
         headers: Operations.ReplaceItemExtension.Input.Headers = .init(),
         body: Operations.ReplaceItemExtension.Input.Body
     ) async throws -> Operations.ReplaceItemExtension.Output {
         try await replaceItemExtension(Operations.ReplaceItemExtension.Input(
             path: path,
+            query: query,
             headers: headers,
             body: body
         ))
@@ -1665,10 +1779,12 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//items/{id}/extensions/{namespace}/delete(deleteItemExtension)`.
     public func deleteItemExtension(
         path: Operations.DeleteItemExtension.Input.Path,
+        query: Operations.DeleteItemExtension.Input.Query = .init(),
         headers: Operations.DeleteItemExtension.Input.Headers = .init()
     ) async throws -> Operations.DeleteItemExtension.Output {
         try await deleteItemExtension(Operations.DeleteItemExtension.Input(
             path: path,
+            query: query,
             headers: headers
         ))
     }
@@ -1986,7 +2102,7 @@ extension APIProtocol {
     }
     /// Remove a plugin
     ///
-    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance; delete a type with `DELETE /types/{id}`. Needs `schema.write`.
+    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance. A plugin with a connector loses its key and registrations; its source keeps its state and agreements.
     ///
     /// - Remark: HTTP `DELETE /plugins/{name}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
@@ -1995,6 +2111,229 @@ extension APIProtocol {
         headers: Operations.RemovePlugin.Input.Headers = .init()
     ) async throws -> Operations.RemovePlugin.Output {
         try await removePlugin(Operations.RemovePlugin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Replace a connector's host
+    ///
+    /// Assigns a plugin's connector to a connector host, or to none. Moving it revokes the key its former host minted for it.
+    ///
+    /// - Remark: HTTP `PUT /plugins/{name}/connector`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/put(replacePluginConnectorHost)`.
+    public func replacePluginConnectorHost(
+        path: Operations.ReplacePluginConnectorHost.Input.Path,
+        headers: Operations.ReplacePluginConnectorHost.Input.Headers = .init(),
+        body: Operations.ReplacePluginConnectorHost.Input.Body
+    ) async throws -> Operations.ReplacePluginConnectorHost.Output {
+        try await replacePluginConnectorHost(Operations.ReplacePluginConnectorHost.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a connector's settings
+    ///
+    /// Returns each setting a plugin's connector declares, with the value set or its default. A secret's value is never returned: `set` says whether one is set.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/settings`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/settings/get(getPluginConnectorSettings)`.
+    public func getPluginConnectorSettings(
+        path: Operations.GetPluginConnectorSettings.Input.Path,
+        headers: Operations.GetPluginConnectorSettings.Input.Headers = .init()
+    ) async throws -> Operations.GetPluginConnectorSettings.Output {
+        try await getPluginConnectorSettings(Operations.GetPluginConnectorSettings.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Update a connector's settings
+    ///
+    /// Sets each setting the body names, or removes its value for `null`, so the setting reads its default. Marfa seals a secret with the settings key beside the database and never returns it.
+    ///
+    /// - Remark: HTTP `PATCH /plugins/{name}/connector/settings`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/settings/patch(updatePluginConnectorSettings)`.
+    public func updatePluginConnectorSettings(
+        path: Operations.UpdatePluginConnectorSettings.Input.Path,
+        headers: Operations.UpdatePluginConnectorSettings.Input.Headers = .init(),
+        body: Operations.UpdatePluginConnectorSettings.Input.Body
+    ) async throws -> Operations.UpdatePluginConnectorSettings.Output {
+        try await updatePluginConnectorSettings(Operations.UpdatePluginConnectorSettings.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a connector's mapping
+    ///
+    /// Returns the owner's mapping of each kind a plugin's connector brings. Until one is saved, each kind takes its default at `version` `0`. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/mapping`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/get(getConnectorMapping)`.
+    public func getConnectorMapping(
+        path: Operations.GetConnectorMapping.Input.Path,
+        headers: Operations.GetConnectorMapping.Input.Headers = .init()
+    ) async throws -> Operations.GetConnectorMapping.Output {
+        try await getConnectorMapping(Operations.GetConnectorMapping.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Save a connector's mapping
+    ///
+    /// Replaces a plugin connector's mapping, judged against the types as they stand. Send the `version` you read. Saving changes no item: the connector applies the mapping to what it writes next. Needs `connectors.manage`.
+    ///
+    /// - Remark: HTTP `PUT /plugins/{name}/connector/mapping`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/put(saveConnectorMapping)`.
+    public func saveConnectorMapping(
+        path: Operations.SaveConnectorMapping.Input.Path,
+        headers: Operations.SaveConnectorMapping.Input.Headers = .init(),
+        body: Operations.SaveConnectorMapping.Input.Body
+    ) async throws -> Operations.SaveConnectorMapping.Output {
+        try await saveConnectorMapping(Operations.SaveConnectorMapping.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Rewrite a connector's items
+    ///
+    /// Counts the connector's items on each kind's target type. Without `dry_run`, also stores a numbered request to rewrite them, which the connector reads from the mapping's `rewrites` and clears. Needs `connectors.manage`.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/mapping/rewrite`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/rewrite/post(rewriteConnectorItems)`.
+    public func rewriteConnectorItems(
+        path: Operations.RewriteConnectorItems.Input.Path,
+        headers: Operations.RewriteConnectorItems.Input.Headers = .init(),
+        body: Operations.RewriteConnectorItems.Input.Body
+    ) async throws -> Operations.RewriteConnectorItems.Output {
+        try await rewriteConnectorItems(Operations.RewriteConnectorItems.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Clear a connector's rewrite
+    ///
+    /// Clears the rewrite request whose `number` the connector carried out, and leaves any other waiting. Clearing a number no request holds answers the same. Only the connector's own key, or local authority, can do this.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/mapping/rewrite/done`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/mapping/rewrite/done/post(finishConnectorRewrite)`.
+    public func finishConnectorRewrite(
+        path: Operations.FinishConnectorRewrite.Input.Path,
+        headers: Operations.FinishConnectorRewrite.Input.Headers = .init(),
+        body: Operations.FinishConnectorRewrite.Input.Body
+    ) async throws -> Operations.FinishConnectorRewrite.Output {
+        try await finishConnectorRewrite(Operations.FinishConnectorRewrite.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// List connector hosts
+    ///
+    /// Returns every connector host, oldest first, with the connectors assigned to each.
+    ///
+    /// - Remark: HTTP `GET /connector-hosts`.
+    /// - Remark: Generated from `#/paths//connector-hosts/get(listConnectorHosts)`.
+    public func listConnectorHosts(headers: Operations.ListConnectorHosts.Input.Headers = .init()) async throws -> Operations.ListConnectorHosts.Output {
+        try await listConnectorHosts(Operations.ListConnectorHosts.Input(headers: headers))
+    }
+    /// Create a connector host
+    ///
+    /// Creates a connector host and returns a one-time link that gives the host program its own key. The link works once, within 15 minutes.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts`.
+    /// - Remark: Generated from `#/paths//connector-hosts/post(createConnectorHost)`.
+    public func createConnectorHost(
+        headers: Operations.CreateConnectorHost.Input.Headers = .init(),
+        body: Operations.CreateConnectorHost.Input.Body
+    ) async throws -> Operations.CreateConnectorHost.Output {
+        try await createConnectorHost(Operations.CreateConnectorHost.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a connector host
+    ///
+    /// Returns a connector host, with the connectors assigned to it.
+    ///
+    /// - Remark: HTTP `GET /connector-hosts/{id}`.
+    /// - Remark: Generated from `#/paths//connector-hosts/{id}/get(getConnectorHost)`.
+    public func getConnectorHost(
+        path: Operations.GetConnectorHost.Input.Path,
+        headers: Operations.GetConnectorHost.Input.Headers = .init()
+    ) async throws -> Operations.GetConnectorHost.Output {
+        try await getConnectorHost(Operations.GetConnectorHost.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Delete a connector host
+    ///
+    /// Deletes a connector host and its link, revokes its key and every connector key it minted, and assigns its connectors to no host.
+    ///
+    /// - Remark: HTTP `DELETE /connector-hosts/{id}`.
+    /// - Remark: Generated from `#/paths//connector-hosts/{id}/delete(deleteConnectorHost)`.
+    public func deleteConnectorHost(
+        path: Operations.DeleteConnectorHost.Input.Path,
+        headers: Operations.DeleteConnectorHost.Input.Headers = .init()
+    ) async throws -> Operations.DeleteConnectorHost.Output {
+        try await deleteConnectorHost(Operations.DeleteConnectorHost.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Create a one-time link
+    ///
+    /// Creates a fresh one-time link for a connector host, to move it to a new machine. The link replaces any the host has not redeemed; redeeming it revokes the host's key.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts/{id}/link`.
+    /// - Remark: Generated from `#/paths//connector-hosts/{id}/link/post(createConnectorHostLink)`.
+    public func createConnectorHostLink(
+        path: Operations.CreateConnectorHostLink.Input.Path,
+        headers: Operations.CreateConnectorHostLink.Input.Headers = .init()
+    ) async throws -> Operations.CreateConnectorHostLink.Output {
+        try await createConnectorHostLink(Operations.CreateConnectorHostLink.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Redeem a one-time link
+    ///
+    /// Gives a connector host its own key, in exchange for the code of its one-time link. Send no credential. A host that held a key loses it.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts/redeem`.
+    /// - Remark: Generated from `#/paths//connector-hosts/redeem/post(redeemConnectorHostLink)`.
+    public func redeemConnectorHostLink(
+        headers: Operations.RedeemConnectorHostLink.Input.Headers = .init(),
+        body: Operations.RedeemConnectorHostLink.Input.Body
+    ) async throws -> Operations.RedeemConnectorHostLink.Output {
+        try await redeemConnectorHostLink(Operations.RedeemConnectorHostLink.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get your connector host
+    ///
+    /// Returns the host whose key you are, with each connector assigned to it, and records that the host was seen. Only a connector host's own key reads it.
+    ///
+    /// - Remark: HTTP `GET /connector-hosts/self`.
+    /// - Remark: Generated from `#/paths//connector-hosts/self/get(getOwnConnectorHost)`.
+    public func getOwnConnectorHost(headers: Operations.GetOwnConnectorHost.Input.Headers = .init()) async throws -> Operations.GetOwnConnectorHost.Output {
+        try await getOwnConnectorHost(Operations.GetOwnConnectorHost.Input(headers: headers))
+    }
+    /// Create a connector key
+    ///
+    /// Creates the key of a connector assigned to your host, holding the connector's source and write on its kinds' types, and revokes the key your host minted for it before.
+    ///
+    /// - Remark: HTTP `POST /connector-hosts/self/connectors/{plugin}/key`.
+    /// - Remark: Generated from `#/paths//connector-hosts/self/connectors/{plugin}/key/post(createConnectorKey)`.
+    public func createConnectorKey(
+        path: Operations.CreateConnectorKey.Input.Path,
+        headers: Operations.CreateConnectorKey.Input.Headers = .init()
+    ) async throws -> Operations.CreateConnectorKey.Output {
+        try await createConnectorKey(Operations.CreateConnectorKey.Input(
             path: path,
             headers: headers
         ))
@@ -2693,6 +3032,21 @@ extension APIProtocol {
         try await releaseConnectorHold(Operations.ReleaseConnectorHold.Input(
             path: path,
             query: query,
+            headers: headers
+        ))
+    }
+    /// Get a connector's own settings
+    ///
+    /// Returns each setting of the plugin's connector, every secret's value included. Only the key its connector host minted gets an answer, checked as Marfa answers. Read it at the start of each run.
+    ///
+    /// - Remark: HTTP `GET /connectors/{id}/settings`.
+    /// - Remark: Generated from `#/paths//connectors/{id}/settings/get(getConnectorSettings)`.
+    public func getConnectorSettings(
+        path: Operations.GetConnectorSettings.Input.Path,
+        headers: Operations.GetConnectorSettings.Input.Headers = .init()
+    ) async throws -> Operations.GetConnectorSettings.Output {
+        try await getConnectorSettings(Operations.GetConnectorSettings.Input(
+            path: path,
             headers: headers
         ))
     }
@@ -3502,7 +3856,7 @@ extension APIProtocol {
     }
     /// Restore from an archive
     ///
-    /// Restores an archive atomically and returns write and skip counts. Marfa blocks other writes during the restore. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
+    /// Restores an archive atomically, blocking other writes, and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, `connectors.manage` to add a connector, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /restore`.
     /// - Remark: Generated from `#/paths//restore/post(restoreArchive)`.
@@ -3544,7 +3898,7 @@ extension APIProtocol {
     }
     /// Restore a backup
     ///
-    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, and `schema.write` to register a type with guidance.
+    /// Restores a backup from the backup folder or object store and returns write and skip counts. Requires `backups.manage`, `config.manage` to add settings, `connectors.manage` to add a connector, and `schema.write` to register a type with guidance.
     ///
     /// - Remark: HTTP `POST /backups/{instance_id}/{name}/restore`.
     /// - Remark: Generated from `#/paths//backups/{instance_id}/{name}/restore/post(restoreBackup)`.

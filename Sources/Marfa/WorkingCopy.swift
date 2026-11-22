@@ -1048,15 +1048,30 @@ public struct Extensions: Sendable {
     let holder: CoreHolder
     let feed: Feed
 
-    public func write(_ namespace: String, _ body: JSONObject, on id: String) async throws -> QueuedWrite {
+    /// Queues one write that replaces the namespace's data whole.
+    ///
+    /// The copy holds no extension namespaces, so only you know what you read. Pass `readRevision`, the `revision`
+    /// a read of the namespace answered, including the one it answers for a namespace the item does not hold, to
+    /// write only over what you read: the server then refuses the write if the namespace changed since, and the drain blocks it
+    /// `conflict_unresolved` with your value kept in the queue. With none, the write replaces the namespace as it
+    /// stands. A released write is sent with none.
+    ///
+    /// Throws `MarfaError.invalid` for an empty `readRevision`.
+    public func write(
+        _ namespace: String, _ body: JSONObject, on id: String, readRevision: String? = nil
+    ) async throws -> QueuedWrite {
         try await queued(holder, feed) { core in
-            try core.writeExtension(id: id, namespace: namespace, body: body.core)
+            try core.writeExtension(id: id, namespace: namespace, body: body.core, readRevision: readRevision)
         }
     }
 
-    public func delete(_ namespace: String, from id: String) async throws -> QueuedWrite {
+    /// Queues one write that removes the namespace, guarded by `readRevision` as ``write(_:_:on:readRevision:)``
+    /// is.
+    public func delete(_ namespace: String, from id: String, readRevision: String? = nil) async throws
+        -> QueuedWrite
+    {
         try await queued(holder, feed) { core in
-            try core.deleteExtension(id: id, namespace: namespace)
+            try core.deleteExtension(id: id, namespace: namespace, readRevision: readRevision)
         }
     }
 }

@@ -120,12 +120,16 @@ public struct Folders: Sendable {
     ///
     /// On a folder whose first sync waits, it cancels that sync.
     ///
-    /// Throws `MarfaError.invalid` while writes wait to be sent; sync first. A folder whose directory is gone is
+    /// Throws `MarfaError.invalid` while writes wait to be sent; sync first, except where another Marfa instance
+    /// answers at the folder's server, which none of those writes can reach: the answer then names each file that
+    /// holds a change the folder could not send (``FolderRemoval/files``). A folder whose directory is gone is
     /// only taken off the registry. It also throws `invalid` for a path that passes through a symbolic link,
     /// unless it is the path the registry lists, which `list()` gives and the error names.
-    public func remove(_ directory: URL) async throws {
+    ///
+    /// Show the person every file in the answer: a deleted file and a moved one are in no file of the folder.
+    public func remove(_ directory: URL) async throws -> FolderRemoval {
         let dir = directory.path(percentEncoded: false)
-        try await run { folders in try folders.remove(dir: dir) }
+        return FolderRemoval(try await run { folders in try folders.remove(dir: dir) })
     }
 
     /// Starts keeping the folder in step while the app runs, as `marfa folders watch` does.
@@ -357,6 +361,77 @@ public struct AddedFolder: Sendable, Hashable {
         self.init(
             directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder,
             storage: core.storage.map(StorageCause.init))
+    }
+}
+
+/// What ``Folders/remove(_:)`` did.
+public struct FolderRemoval: Sendable, Hashable {
+    /// The directory, with symbolic links resolved as far as it exists.
+    public let directory: URL
+    /// Whether the folder's state went.
+    ///
+    /// Where it is `false`, only the folder's entry on the registry did, and ``reason`` says why nothing was
+    /// deleted.
+    public let removed: Bool
+    /// Why nothing was deleted, where ``removed`` is `false`.
+    public let reason: String?
+    /// The id of the `system.folder` item the folder followed, where its state went: what
+    /// ``Folders/add(_:following:)`` takes to follow that folder again.
+    public let folderId: String?
+    /// How many writes waited unsent, because another Marfa instance answers at the folder's server.
+    public let unsent: UInt64
+    /// The files that hold changes the folder could not send.
+    public let files: [UnsentFile]
+
+    init(_ core: MarfaCore.FolderRemoval) {
+        directory = URL(filePath: core.dir, directoryHint: .isDirectory)
+        removed = core.removed
+        reason = core.reason
+        folderId = core.folder
+        unsent = core.unsent
+        files = core.files.map(UnsentFile.init)
+    }
+}
+
+/// A file whose change the folder's server never received.
+public struct UnsentFile: Sendable, Hashable {
+    /// How the file differs from what the server last received.
+    public let change: UnsentChange
+    /// Its path in the directory.
+    ///
+    /// It is `nil` for a deleted file whose path the copy holds no record of.
+    public let path: String?
+    /// Where a moved file was before it moved.
+    public let from: String?
+    /// The id of its item, where it has one.
+    public let itemId: String?
+
+    init(_ core: MarfaCore.UnsentFile) {
+        change = UnsentChange(core.change)
+        path = core.path
+        from = core.from
+        itemId = core.item
+    }
+}
+
+/// How a file differs from what the folder's server last received.
+public enum UnsentChange: Sendable, Hashable {
+    /// Its changes stay in the file.
+    case changed
+    /// The server never received the file, and it stays in the directory.
+    case new
+    /// The file moved from ``UnsentFile/from``, which no file records.
+    case moved
+    /// The file is gone from the directory, which no file records.
+    case deleted
+
+    init(_ core: MarfaCore.UnsentChange) {
+        switch core {
+        case .changed: self = .changed
+        case .new: self = .new
+        case .moved: self = .moved
+        case .deleted: self = .deleted
+        }
     }
 }
 
