@@ -180,8 +180,8 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
 @Test func everyNamedPermissionDecodes() throws {
     let names = [
         "schema.write", "keys.mint", "items.purge", "webhooks.manage", "config.manage", "audit.read", "grants.manage",
-        "instance.read", "instance.maintain", "connectors.manage", "blobs.manage", "backups.manage", "sign_ins.manage",
-        "keys.manage",
+        "instance.read", "instance.maintain", "connectors.manage", "connectors.host", "blobs.manage", "backups.manage",
+        "sign_ins.manage", "keys.manage",
     ]
     let decoded = try JSONDecoder().decode([Components.Schemas.Permission].self, from: JSONEncoder().encode(names))
     #expect(decoded.map(\.rawValue) == names)

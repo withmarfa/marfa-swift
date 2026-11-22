@@ -550,7 +550,10 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     public var description: String { "Credential(\(server.absoluteString))" }
 }
 
-/// One of the instance's fourteen permissions, by the name the server gives it.
+/// One of the fourteen instance permissions an app can ask for, by the name the server gives it.
+///
+/// The server's `connectors.host` is not here: only a connector host's own key holds it, and a sign-in that asks for it
+/// is refused.
 ///
 /// A permission opens the operations it names and no item; what an app reads and writes is the type, edge and
 /// profile scopes it asks for. Ask for permissions in ``Authorization/Client/init(name:redirect:scopes:permissions:)``.

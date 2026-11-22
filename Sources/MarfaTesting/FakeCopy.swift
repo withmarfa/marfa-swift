@@ -91,6 +91,9 @@ import Synchronization
 ///   taken, as the real copy does, and it is refused unsent only where the
 ///   real copy refuses one: a delete of an item it holds at version 0 with no
 ///   create unanswered.
+/// - An extension write or delete takes the `readRevision` the caller read and keeps it as the core does, but holds no
+///   namespace to compare it to: only the verdict chooser, which stands for the server, can block such a write as a
+///   conflict. An empty `readRevision` throws `invalid`, as the core does.
 /// - It knows only the types it was given and the ones the app declares, not
 ///   Marfa's built-in catalog. `edges.create`, `edges.check`,
 ///   `items.create(edges:)`, `edges.update` moving an end and `items.update` changing an item's type refuse as the

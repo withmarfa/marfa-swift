@@ -1059,7 +1059,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     func deleteEdge(id: String) throws  -> QueuedWrite
     
-    func deleteExtension(id: String, namespace: String) throws  -> QueuedWrite
+    /**
+     * Removes one extension namespace, guarded by `read_revision` as a
+     * write is.
+     */
+    func deleteExtension(id: String, namespace: String, readRevision: String?) throws  -> QueuedWrite
     
     /**
      * Moves an item to the bin locally and queues the delete.
@@ -1401,9 +1405,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func withdraw(id: String) throws  -> [String]
     
     /**
-     * Writes one extension namespace, as its own write.
+     * Writes one extension namespace, as its own write. `read_revision`
+     * is the namespace's `revision` as a read answered it; the server
+     * then refuses the write if the namespace changed since.
      */
-    func writeExtension(id: String, namespace: String, body: JsonObject) throws  -> QueuedWrite
+    func writeExtension(id: String, namespace: String, body: JsonObject, readRevision: String?) throws  -> QueuedWrite
     
     /**
      * Counts from the copy where possible. On `NotAnswerable`, call `servedCounts(ids:counted:)`.
@@ -1891,12 +1897,17 @@ open func deleteEdge(id: String)throws  -> QueuedWrite  {
 })
 }
     
-open func deleteExtension(id: String, namespace: String)throws  -> QueuedWrite  {
+    /**
+     * Removes one extension namespace, guarded by `read_revision` as a
+     * write is.
+     */
+open func deleteExtension(id: String, namespace: String, readRevision: String? = nil)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_delete_extension(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
-        FfiConverterString.lower(namespace),$0
+        FfiConverterString.lower(namespace),
+        FfiConverterOptionString.lower(readRevision),$0
     )
 })
 }
@@ -2587,15 +2598,18 @@ open func withdraw(id: String)throws  -> [String]  {
 }
     
     /**
-     * Writes one extension namespace, as its own write.
+     * Writes one extension namespace, as its own write. `read_revision`
+     * is the namespace's `revision` as a read answered it; the server
+     * then refuses the write if the namespace changed since.
      */
-open func writeExtension(id: String, namespace: String, body: JsonObject)throws  -> QueuedWrite  {
+open func writeExtension(id: String, namespace: String, body: JsonObject, readRevision: String? = nil)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_write_extension(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
         FfiConverterString.lower(namespace),
-        FfiConverterTypeJsonObject_lower(body),$0
+        FfiConverterTypeJsonObject_lower(body),
+        FfiConverterOptionString.lower(readRevision),$0
     )
 })
 }
@@ -3620,7 +3634,10 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
-     * still waiting to be confirmed, which this cancels. Follows no symbolic
+     * still waiting to be confirmed, which this cancels, and except where
+     * another Marfa instance answers at the folder's server, which none of
+     * them can reach; the answer then names each file holding a change the
+     * folder could not send. Follows no symbolic
      * link, and takes a path through one only where it is the path the
      * registry lists. Where that path is
      * gone, passes through a link, or holds state the registry does not
@@ -3628,7 +3645,7 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * registry. Asks a watch that holds the folder to let it go, as `add`
      * does; that watch then ends with `Removed` or `Unlisted`.
      */
-    func remove(dir: String) throws 
+    func remove(dir: String) throws  -> FolderRemoval
     
     /**
      * Cancels a paused large removal: files gone from the disk are written
@@ -3831,7 +3848,10 @@ open func pause(dir: String)throws  -> Bool  {
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
      * its files stay. Refused while writes wait, except for a first sync
-     * still waiting to be confirmed, which this cancels. Follows no symbolic
+     * still waiting to be confirmed, which this cancels, and except where
+     * another Marfa instance answers at the folder's server, which none of
+     * them can reach; the answer then names each file holding a change the
+     * folder could not send. Follows no symbolic
      * link, and takes a path through one only where it is the path the
      * registry lists. Where that path is
      * gone, passes through a link, or holds state the registry does not
@@ -3839,12 +3859,13 @@ open func pause(dir: String)throws  -> Bool  {
      * registry. Asks a watch that holds the folder to let it go, as `add`
      * does; that watch then ends with `Removed` or `Unlisted`.
      */
-open func remove(dir: String)throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+open func remove(dir: String)throws  -> FolderRemoval  {
+    return try  FfiConverterTypeFolderRemoval_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_remove(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
     )
-}
+})
 }
     
     /**
@@ -7335,6 +7356,119 @@ public func FfiConverterTypeFolderQuery_lift(_ buf: RustBuffer) throws -> Folder
 #endif
 public func FfiConverterTypeFolderQuery_lower(_ value: FolderQuery) -> RustBuffer {
     return FfiConverterTypeFolderQuery.lower(value)
+}
+
+
+/**
+ * What `Folders.remove` did.
+ */
+public struct FolderRemoval: Equatable, Hashable {
+    /**
+     * The directory, resolved as far as it exists.
+     */
+    public var dir: String
+    /**
+     * The folder's state went; where false, only its registry entry did.
+     */
+    public var removed: Bool
+    /**
+     * Why nothing was deleted, where `removed` is false.
+     */
+    public var reason: String?
+    /**
+     * The id of the `system.folder` it followed, where its state went: what
+     * `Folders.add` takes to follow that folder again.
+     */
+    public var folder: String?
+    /**
+     * Writes that waited unsent, because another Marfa instance answers at
+     * the folder's server.
+     */
+    public var unsent: UInt64
+    /**
+     * The files that hold changes the folder could not send.
+     */
+    public var files: [UnsentFile]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The directory, resolved as far as it exists.
+         */dir: String, 
+        /**
+         * The folder's state went; where false, only its registry entry did.
+         */removed: Bool, 
+        /**
+         * Why nothing was deleted, where `removed` is false.
+         */reason: String?, 
+        /**
+         * The id of the `system.folder` it followed, where its state went: what
+         * `Folders.add` takes to follow that folder again.
+         */folder: String?, 
+        /**
+         * Writes that waited unsent, because another Marfa instance answers at
+         * the folder's server.
+         */unsent: UInt64, 
+        /**
+         * The files that hold changes the folder could not send.
+         */files: [UnsentFile]) {
+        self.dir = dir
+        self.removed = removed
+        self.reason = reason
+        self.folder = folder
+        self.unsent = unsent
+        self.files = files
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderRemoval: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderRemoval: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderRemoval {
+        return
+            try FolderRemoval(
+                dir: FfiConverterString.read(from: &buf), 
+                removed: FfiConverterBool.read(from: &buf), 
+                reason: FfiConverterOptionString.read(from: &buf), 
+                folder: FfiConverterOptionString.read(from: &buf), 
+                unsent: FfiConverterUInt64.read(from: &buf), 
+                files: FfiConverterSequenceTypeUnsentFile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderRemoval, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterBool.write(value.removed, into: &buf)
+        FfiConverterOptionString.write(value.reason, into: &buf)
+        FfiConverterOptionString.write(value.folder, into: &buf)
+        FfiConverterUInt64.write(value.unsent, into: &buf)
+        FfiConverterSequenceTypeUnsentFile.write(value.files, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderRemoval_lift(_ buf: RustBuffer) throws -> FolderRemoval {
+    return try FfiConverterTypeFolderRemoval.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderRemoval_lower(_ value: FolderRemoval) -> RustBuffer {
+    return FfiConverterTypeFolderRemoval.lower(value)
 }
 
 
@@ -12193,6 +12327,91 @@ public func FfiConverterTypeUnregisteredType_lower(_ value: UnregisteredType) ->
 
 
 /**
+ * A file whose change the folder's server never received.
+ */
+public struct UnsentFile: Equatable, Hashable {
+    public var change: UnsentChange
+    /**
+     * Its path in the directory; `None` for a deleted file whose path the
+     * copy holds no record of.
+     */
+    public var path: String?
+    /**
+     * Where a moved file was before it moved.
+     */
+    public var from: String?
+    /**
+     * Its item, where it has one.
+     */
+    public var item: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(change: UnsentChange, 
+        /**
+         * Its path in the directory; `None` for a deleted file whose path the
+         * copy holds no record of.
+         */path: String?, 
+        /**
+         * Where a moved file was before it moved.
+         */from: String?, 
+        /**
+         * Its item, where it has one.
+         */item: String?) {
+        self.change = change
+        self.path = path
+        self.from = from
+        self.item = item
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnsentFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnsentFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnsentFile {
+        return
+            try UnsentFile(
+                change: FfiConverterTypeUnsentChange.read(from: &buf), 
+                path: FfiConverterOptionString.read(from: &buf), 
+                from: FfiConverterOptionString.read(from: &buf), 
+                item: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnsentFile, into buf: inout [UInt8]) {
+        FfiConverterTypeUnsentChange.write(value.change, into: &buf)
+        FfiConverterOptionString.write(value.path, into: &buf)
+        FfiConverterOptionString.write(value.from, into: &buf)
+        FfiConverterOptionString.write(value.item, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentFile_lift(_ buf: RustBuffer) throws -> UnsentFile {
+    return try FfiConverterTypeUnsentFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentFile_lower(_ value: UnsentFile) -> RustBuffer {
+    return FfiConverterTypeUnsentFile.lower(value)
+}
+
+
+/**
  * An unsent write with the kind and verdict recorded by the store's build.
  */
 public struct UnsentWrite: Equatable, Hashable {
@@ -16848,6 +17067,102 @@ public func FfiConverterTypeTier_lower(_ value: Tier) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * How a file differs from what the folder's server last received.
+ */
+
+public enum UnsentChange: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * Its changes stay in the file.
+     */
+    case changed
+    /**
+     * A file the server never received; it stays in the directory.
+     */
+    case new
+    /**
+     * Moved from `from`, which no file records.
+     */
+    case moved
+    /**
+     * Gone from the directory, which no file records.
+     */
+    case deleted
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension UnsentChange: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnsentChange: FfiConverterRustBuffer {
+    typealias SwiftType = UnsentChange
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnsentChange {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .changed
+        
+        case 2: return .new
+        
+        case 3: return .moved
+        
+        case 4: return .deleted
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: UnsentChange, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .changed:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .new:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .moved:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .deleted:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentChange_lift(_ buf: RustBuffer) throws -> UnsentChange {
+    return try FfiConverterTypeUnsentChange.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnsentChange_lower(_ value: UnsentChange) -> RustBuffer {
+    return FfiConverterTypeUnsentChange.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * What the server made of a write: one of six, and absent while the write
  * is unanswered.
  */
@@ -19050,6 +19365,31 @@ fileprivate struct FfiConverterSequenceTypeUnregisteredType: FfiConverterRustBuf
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeUnsentFile: FfiConverterRustBuffer {
+    typealias SwiftType = [UnsentFile]
+
+    public static func write(_ value: [UnsentFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeUnsentFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UnsentFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UnsentFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeUnsentFile.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeUnsentWrite: FfiConverterRustBuffer {
     typealias SwiftType = [UnsentWrite]
 
@@ -19533,7 +19873,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_delete_edge() != 50291) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_delete_extension() != 2704) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_delete_extension() != 36871) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_delete_item() != 27931) {
@@ -19680,7 +20020,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_withdraw() != 47489) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 53405) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_write_extension() != 11730) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_counts() != 27637) {
@@ -19806,7 +20146,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_pause() != 37864) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 10975) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 58181) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 57957) {
