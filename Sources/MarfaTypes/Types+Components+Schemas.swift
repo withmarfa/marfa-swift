@@ -11840,10 +11840,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewType/id`.
             public var id: Swift.String
-            /// What the type holds, cut at 100 characters. Absent when the type has none.
+            /// What the type holds, cut at 200 characters. Absent when the type has none.
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewType/description`.
             public var description: Swift.String?
+            /// The parent type's identifier. Absent when the type has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/OverviewType/parent`.
+            public var parent: Swift.String?
             /// How many active items of the type you can read.
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewType/count`.
@@ -11852,20 +11856,24 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: The type's identifier.
-            ///   - description: What the type holds, cut at 100 characters. Absent when the type has none.
+            ///   - description: What the type holds, cut at 200 characters. Absent when the type has none.
+            ///   - parent: The parent type's identifier. Absent when the type has none.
             ///   - count: How many active items of the type you can read.
             public init(
                 id: Swift.String,
                 description: Swift.String? = nil,
+                parent: Swift.String? = nil,
                 count: Swift.Int
             ) {
                 self.id = id
                 self.description = description
+                self.parent = parent
                 self.count = count
             }
             public enum CodingKeys: String, CodingKey {
                 case id
                 case description
+                case parent
                 case count
             }
         }
@@ -11877,7 +11885,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/id`.
             public var id: Swift.String
-            /// What the edge type means, cut at 100 characters. Absent when it has none.
+            /// What the edge type means, cut at 200 characters. Absent when it has none.
             ///
             /// - Remark: Generated from `#/components/schemas/OverviewEdgeType/description`.
             public var description: Swift.String?
@@ -11889,7 +11897,7 @@ extension Components {
             ///
             /// - Parameters:
             ///   - id: The edge type's identifier.
-            ///   - description: What the edge type means, cut at 100 characters. Absent when it has none.
+            ///   - description: What the edge type means, cut at 200 characters. Absent when it has none.
             ///   - access: `write` where your edge permissions cover writing edges of the type, otherwise `read`. Creating an edge also needs write access to the type of the item it points from.
             public init(
                 id: Swift.String,
