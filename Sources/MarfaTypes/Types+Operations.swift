@@ -70533,7 +70533,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `validation_error`: the body isn't an object, names a setting the connector doesn't declare, or gives a value that doesn't fit its setting: text of 1 to 4096 characters, a secret's with no white space at either end, a number, `true` or `false`, or one of its `choices`. `details.errors` names each setting, never a secret's value, and nothing is stored.
+            /// - `validation_error`: the body isn't an object, names a setting the connector doesn't declare, or gives a value that doesn't fit its setting: text of 1 to 65,536 characters, a secret's with no white space at either end, a number, `true` or `false`, or one of its `choices`. `details.errors` names each setting, never a secret's value, and nothing is stored.
             ///
             /// - Remark: Generated from `#/paths//plugins/{name}/connector/settings/patch(updatePluginConnectorSettings)/responses/400`.
             ///
@@ -85058,7 +85058,7 @@ public enum Operations {
     }
     /// Answer a mapping preview
     ///
-    /// Keeps the connector's answer to a pending preview as it sends it: the rendered fields as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
+    /// Keeps the connector's answer to a pending preview as it sends it: the rendered item as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
     ///
     /// - Remark: HTTP `POST /plugins/{name}/connector/previews/{id}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)`.
@@ -85279,7 +85279,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `validation_error`: the body holds neither or both of `result` and `error`, a `result` that is not an object or is over 65,536 bytes, an `error` that is not 1 to 500 characters, or another member. `details.errors` names each.
+            /// `validation_error`: the body holds neither or both of `result` and `error`, a `result` that is over 65,536 bytes or isn't an item of the kind's target type with `properties`, an optional `title` and an optional `source_item`, an `error` that is not 1 to 500 characters, or another member. `details.errors` names each.
             ///
             /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)/responses/400`.
             ///

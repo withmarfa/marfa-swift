@@ -496,7 +496,7 @@ public protocol APIProtocol: Sendable {
     func getMappingPreview(_ input: Operations.GetMappingPreview.Input) async throws -> Operations.GetMappingPreview.Output
     /// Answer a mapping preview
     ///
-    /// Keeps the connector's answer to a pending preview as it sends it: the rendered fields as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
+    /// Keeps the connector's answer to a pending preview as it sends it: the rendered item as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
     ///
     /// - Remark: HTTP `POST /plugins/{name}/connector/previews/{id}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)`.
@@ -2464,7 +2464,7 @@ extension APIProtocol {
     }
     /// Answer a mapping preview
     ///
-    /// Keeps the connector's answer to a pending preview as it sends it: the rendered fields as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
+    /// Keeps the connector's answer to a pending preview as it sends it: the rendered item as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
     ///
     /// - Remark: HTTP `POST /plugins/{name}/connector/previews/{id}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)`.
