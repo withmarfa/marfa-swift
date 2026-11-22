@@ -14,7 +14,7 @@ import Testing
         #expect(again.settings == read.settings)
     }
 
-    private static func sorted(_ object: JSONObject) throws -> String {
+    static func sorted(_ object: JSONObject) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return String(decoding: try encoder.encode(object), as: UTF8.self)

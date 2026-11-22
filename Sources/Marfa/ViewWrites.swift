@@ -80,13 +80,7 @@ extension ViewSort {
 extension ViewGrouping {
     fileprivate var json: JSONObject {
         var object: JSONObject = ["by": .string(by)]
-        switch bucket {
-        case .day: object["bucket"] = "day"
-        case .week: object["bucket"] = "week"
-        case .month: object["bucket"] = "month"
-        case .year: object["bucket"] = "year"
-        case nil: break
-        }
+        if let bucket { object["bucket"] = .string(bucket.rawValue) }
         if !order.isEmpty { object["order"] = .array(order) }
         if !hidden.isEmpty { object["hidden"] = .array(hidden) }
         return object

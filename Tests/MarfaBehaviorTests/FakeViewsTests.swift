@@ -245,6 +245,24 @@ struct FakeViews {
         #expect(london.map(\.key.string) == ["2026-08-31"] && london.map(\.count) == [4])
     }
 
+    @Test func aSeededViewWithABucketThePinnedCoreDoesNotKnowIsListedAndRefusedWhenGrouped() async throws {
+        let unknown = SavedView(
+            id: "01a1500d-78bd-73f0-8c55-2a4160c5ff92", version: 1, state: .active,
+            settings: ViewSettings(
+                title: "Fortnightly", query: ViewQuery(types: ["core.note"]),
+                group: ViewGrouping(by: "created_at", bucket: ViewGrouping.Bucket(rawValue: "fortnight"))))
+        let plain = SavedView(
+            id: "01a1500d-78bd-73f0-8c55-2a4160c5ff93", version: 1, state: .active,
+            settings: ViewSettings(title: "Plain", query: ViewQuery(types: ["core.note"])))
+        let copy = Self.fake(views: [unknown, plain]).copy
+
+        let listed = try await copy.items.views().map(\.id).sorted()
+        #expect(listed == [unknown.id, plain.id], "one unknown bucket hides none")
+        #expect(try await copy.items.view(unknown.id) == unknown)
+        #expect(try await copy.items.groups(inView: plain.id).count == 1, "the same call on a plain view answers")
+        await #expect(throws: Marfa.MarfaError.self) { try await copy.items.groups(inView: unknown.id) }
+    }
+
     @Test func aSeededViewIsServedAndARevokedOneIsNotEvaluated() async throws {
         let seeded = SavedView(
             id: "01a1500d-78bd-73f0-8c55-2a4160c5ff90", version: 5, state: .active,
