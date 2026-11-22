@@ -1913,6 +1913,85 @@ public struct Client: ClientProtocol {
             }
         )
     }
+    /// Get a connector's state
+    ///
+    /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/get(getPluginConnector)`.
+    public func getPluginConnector(_ input: Operations.GetPluginConnector.Input) async throws -> Operations.GetPluginConnector.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetPluginConnector.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetPluginConnector.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetPluginConnector.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PluginConnectorControl.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
     /// Replace a connector's host
     ///
     /// Assigns a plugin's connector to a connector host, or to none. Moving it revokes the key its former host minted for it.
@@ -2512,6 +2591,783 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.ConnectorRewriteCleared.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get a connector's sign-in
+    ///
+    /// Returns the status of the latest sign-in started for a plugin's connector, so you can tell when the owner's browser finished it.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/sign-in`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/sign-in/get(getPluginConnectorSignIn)`.
+    public func getPluginConnectorSignIn(_ input: Operations.GetPluginConnectorSignIn.Input) async throws -> Operations.GetPluginConnectorSignIn.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetPluginConnectorSignIn.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/sign-in",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetPluginConnectorSignIn.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetPluginConnectorSignIn.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PluginConnectorSignInStatus.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Start a connector's sign-in
+    ///
+    /// Starts a sign-in to the provider a plugin's connector declares, and returns the address to open in the owner's browser. The provider sends the browser back to Marfa, which seals the refresh token into the connector's token setting.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/sign-in`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/sign-in/post(startPluginConnectorSignIn)`.
+    public func startPluginConnectorSignIn(_ input: Operations.StartPluginConnectorSignIn.Input) async throws -> Operations.StartPluginConnectorSignIn.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.StartPluginConnectorSignIn.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/sign-in",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 201:
+                    let headers: Operations.StartPluginConnectorSignIn.Output.Created.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.StartPluginConnectorSignIn.Output.Created.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PluginConnectorSignInStart.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .created(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Pause a connector
+    ///
+    /// Stores that the owner paused the plugin's connector, and drops a run asked for. The connector stops itself; Marfa still takes its writes, so a run under way finishes.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/pause`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/pause/post(pausePluginConnector)`.
+    public func pausePluginConnector(_ input: Operations.PausePluginConnector.Input) async throws -> Operations.PausePluginConnector.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.PausePluginConnector.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/pause",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.PausePluginConnector.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.PausePluginConnector.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PluginConnectorControl.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Resume a connector
+    ///
+    /// Stores that the owner resumed the plugin's connector, so it runs again.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/resume`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/resume/post(resumePluginConnector)`.
+    public func resumePluginConnector(_ input: Operations.ResumePluginConnector.Input) async throws -> Operations.ResumePluginConnector.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ResumePluginConnector.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/resume",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ResumePluginConnector.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ResumePluginConnector.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PluginConnectorControl.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Run a connector now
+    ///
+    /// Stores the time you asked the plugin's connector to run, which it reads and follows. A run the connector reports naming that time as its `run_requested_at` clears it.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/run`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/run/post(runPluginConnector)`.
+    public func runPluginConnector(_ input: Operations.RunPluginConnector.Input) async throws -> Operations.RunPluginConnector.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.RunPluginConnector.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/run",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.RunPluginConnector.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.RunPluginConnector.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.PluginConnectorControl.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// List mapping previews
+    ///
+    /// Returns the plugin's mapping previews that have not expired, oldest first. The connector lists the pending ones to find work. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/previews`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/get(listMappingPreviews)`.
+    public func listMappingPreviews(_ input: Operations.ListMappingPreviews.Input) async throws -> Operations.ListMappingPreviews.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.ListMappingPreviews.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/previews",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "status",
+                    value: input.query.status
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.ListMappingPreviews.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.ListMappingPreviews.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConnectorPreviewPage.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Create a mapping preview
+    ///
+    /// Asks the plugin's connector to render one kind on one of its items, and returns the preview pending until the connector answers. A plugin holds at most 20 previews, so Marfa removes the oldest answered one to make room.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/previews`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/post(createMappingPreview)`.
+    public func createMappingPreview(_ input: Operations.CreateMappingPreview.Input) async throws -> Operations.CreateMappingPreview.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.CreateMappingPreview.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/previews",
+                    parameters: [
+                        input.path.name
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 201:
+                    let headers: Operations.CreateMappingPreview.Output.Created.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.CreateMappingPreview.Output.Created.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConnectorPreview.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .created(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get a mapping preview
+    ///
+    /// Returns a mapping preview: pending, or ready with the fields the connector rendered, or failed with its reason. Needs `connectors.manage`, or the connector's own key.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}/connector/previews/{id}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/get(getMappingPreview)`.
+    public func getMappingPreview(_ input: Operations.GetMappingPreview.Input) async throws -> Operations.GetMappingPreview.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetMappingPreview.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/previews/{}",
+                    parameters: [
+                        input.path.name,
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetMappingPreview.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetMappingPreview.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConnectorPreview.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Answer a mapping preview
+    ///
+    /// Keeps the connector's answer to a pending preview as it sends it: the rendered fields as `result`, or `error`. Marfa never renders a field itself. Only the connector's own key, or local authority, can do this.
+    ///
+    /// - Remark: HTTP `POST /plugins/{name}/connector/previews/{id}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/connector/previews/{id}/post(answerMappingPreview)`.
+    public func answerMappingPreview(_ input: Operations.AnswerMappingPreview.Input) async throws -> Operations.AnswerMappingPreview.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.AnswerMappingPreview.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/plugins/{}/connector/previews/{}",
+                    parameters: [
+                        input.path.name,
+                        input.path.id
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.AnswerMappingPreview.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.AnswerMappingPreview.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ConnectorPreview.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
@@ -8346,6 +9202,263 @@ public struct Client: ClientProtocol {
                     case "application/json":
                         body = try await converter.getResponseBodyAsJSON(
                             Components.Schemas.AddressCheck.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Get the link to Marfa Cloud
+    ///
+    /// Returns this instance's link to Marfa Cloud: whether it is linking, linked or failed, and where the sign-in address stands. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `GET /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/get(getCloudLink)`.
+    public func getCloudLink(_ input: Operations.GetCloudLink.Input) async throws -> Operations.GetCloudLink.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.GetCloudLink.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/cloud/link",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .get
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.GetCloudLink.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.GetCloudLink.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.CloudLink.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Start a link to Marfa Cloud
+    ///
+    /// Starts linking this instance to Marfa Cloud and returns the link, with the code to approve it on Marfa Cloud. Once linked, the sign-in address moves to the Marfa Cloud address unless you keep it. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `POST /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/post(startCloudLink)`.
+    public func startCloudLink(_ input: Operations.StartCloudLink.Input) async throws -> Operations.StartCloudLink.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.StartCloudLink.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/cloud/link",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .post
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 201:
+                    let headers: Operations.StartCloudLink.Output.Created.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.StartCloudLink.Output.Created.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.CloudLink.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .created(.init(
+                        headers: headers,
+                        body: body
+                    ))
+                default:
+                    return .undocumented(
+                        statusCode: response.status.code,
+                        .init(
+                            headerFields: response.headerFields,
+                            body: responseBody
+                        )
+                    )
+                }
+            }
+        )
+    }
+    /// Unlink from Marfa Cloud
+    ///
+    /// Ends the link to Marfa Cloud, or cancels one that is linking, and tells Marfa Cloud. If the sign-in address is the Marfa Cloud address, it moves back to the one before. Requires `config.manage`.
+    ///
+    /// - Remark: HTTP `DELETE /cloud/link`.
+    /// - Remark: Generated from `#/paths//cloud/link/delete(unlinkCloud)`.
+    public func unlinkCloud(_ input: Operations.UnlinkCloud.Input) async throws -> Operations.UnlinkCloud.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.UnlinkCloud.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/cloud/link",
+                    parameters: []
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "confirm_sign_in_address_change",
+                    value: input.query.confirmSignInAddressChange
+                )
+                try converter.setHeaderFieldAsURI(
+                    in: &request.headerFields,
+                    name: "X-Marfa-Instance-Id",
+                    value: input.headers.xMarfaInstanceId
+                )
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let headers: Operations.UnlinkCloud.Output.Ok.Headers = .init(
+                        xMarfaContract: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Marfa-Contract",
+                            as: Components.Headers.XMarfaContract.self
+                        ),
+                        xRequestID: try converter.getOptionalHeaderFieldAsURI(
+                            in: response.headerFields,
+                            name: "X-Request-ID",
+                            as: Components.Headers.XRequestID.self
+                        )
+                    )
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.UnlinkCloud.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.CloudUnlinked.self,
                             from: responseBody,
                             transforming: { value in
                                 .json(value)
