@@ -13,7 +13,7 @@ public import struct Foundation.Date
 public protocol APIProtocol: Sendable {
     /// List items
     ///
-    /// Returns a page of the items you can read that match the filters. System items are left out unless you ask for them with `include=system`. Use `include` to add edges, metadata or extensions to each item.
+    /// Returns a page of the items you can read that match the filters. Hidden items (`system.*` and `app.*`) are left out unless you ask for them with `include=hidden`. Use `include` to add edges, metadata or extensions to each item.
     ///
     /// - Remark: HTTP `GET /items`.
     /// - Remark: Generated from `#/paths//items/get(listItems)`.
@@ -97,7 +97,7 @@ public protocol APIProtocol: Sendable {
     func lookupItems(_ input: Operations.LookupItems.Input) async throws -> Operations.LookupItems.Output
     /// Find items by title
     ///
-    /// Finds the active and archived items titled by each of up to 200 names, matched without regard to case, Unicode form or the white space around a name. `system.*` items and items you can't read are left out.
+    /// Finds the active and archived items titled by each of up to 200 names, matched without regard to case, Unicode form or the white space around a name. `system.*` and `app.*` items and items you can't read are left out.
     ///
     /// - Remark: HTTP `POST /items/titles`.
     /// - Remark: Generated from `#/paths//items/titles/post(findItemsByTitle)`.
@@ -132,7 +132,7 @@ public protocol APIProtocol: Sendable {
     func getItemStats(_ input: Operations.GetItemStats.Input) async throws -> Operations.GetItemStats.Output
     /// List item summaries
     ///
-    /// Returns item names, types, versions, sources and creation times, newest first, of the types you can read. Trashed and system items are excluded.
+    /// Returns item names, types, versions, sources and creation times, newest first, of the types you can read. Trashed and hidden items (`system.*` and `app.*`) are excluded.
     ///
     /// - Remark: HTTP `GET /items/summaries`.
     /// - Remark: Generated from `#/paths//items/summaries/get(listItemSummaries)`.
@@ -354,6 +354,34 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /search`.
     /// - Remark: Generated from `#/paths//search/get(searchItems)`.
     func searchItems(_ input: Operations.SearchItems.Input) async throws -> Operations.SearchItems.Output
+    /// List plugins
+    ///
+    /// Returns every installed plugin, by name, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/get(listPlugins)`.
+    func listPlugins(_ input: Operations.ListPlugins.Input) async throws -> Operations.ListPlugins.Output
+    /// Install a plugin
+    ///
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    ///
+    /// - Remark: HTTP `POST /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
+    func installPlugin(_ input: Operations.InstallPlugin.Input) async throws -> Operations.InstallPlugin.Output
+    /// Get a plugin
+    ///
+    /// Returns an installed plugin, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/get(getPlugin)`.
+    func getPlugin(_ input: Operations.GetPlugin.Input) async throws -> Operations.GetPlugin.Output
+    /// Remove a plugin
+    ///
+    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance; delete a type with `DELETE /types/{id}`. Needs `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
+    func removePlugin(_ input: Operations.RemovePlugin.Input) async throws -> Operations.RemovePlugin.Output
     /// List types
     ///
     /// Returns every type on this instance: those Marfa ships and those registered through `POST /types`. Every credential reads the whole list, whatever its type map reaches.
@@ -363,7 +391,7 @@ public protocol APIProtocol: Sendable {
     func listTypes(_ input: Operations.ListTypes.Input) async throws -> Operations.ListTypes.Output
     /// Register a type
     ///
-    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields.
+    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields. The first type under an `app.<vendor>` namespace gives that namespace to the app that registered it.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -851,6 +879,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
     func revokeAppGrant(_ input: Operations.RevokeAppGrant.Input) async throws -> Operations.RevokeAppGrant.Output
+    /// List app vendors
+    ///
+    /// Returns each `app.<vendor>` namespace and who holds it, in one page: the app that registered its first type, or the owner until they give it to an app. Requires the owner's browser session or `grants.manage`.
+    ///
+    /// - Remark: HTTP `GET /app-vendors`.
+    /// - Remark: Generated from `#/paths//app-vendors/get(listAppVendors)`.
+    func listAppVendors(_ input: Operations.ListAppVendors.Input) async throws -> Operations.ListAppVendors.Output
+    /// Give a vendor to an app
+    ///
+    /// Gives an `app.<vendor>` namespace to the app you name by client ID, which then registers types under it and reaches its items. Use it when an app's client ID changes. Requires the owner's browser session, or `grants.manage` on a key the owner made.
+    ///
+    /// - Remark: HTTP `PUT /app-vendors/{vendor}`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/put(giveAppVendor)`.
+    func giveAppVendor(_ input: Operations.GiveAppVendor.Input) async throws -> Operations.GiveAppVendor.Output
     /// Authorize an app
     ///
     /// Starts an authorization with PKCE (RFC 6749 and RFC 7636) and redirects the browser: to sign in, to the consent screen, or to the app's redirect URI with a `code` or an `error`, and the `iss` of the issuer.
@@ -1130,7 +1172,7 @@ public protocol APIProtocol: Sendable {
 extension APIProtocol {
     /// List items
     ///
-    /// Returns a page of the items you can read that match the filters. System items are left out unless you ask for them with `include=system`. Use `include` to add edges, metadata or extensions to each item.
+    /// Returns a page of the items you can read that match the filters. Hidden items (`system.*` and `app.*`) are left out unless you ask for them with `include=hidden`. Use `include` to add edges, metadata or extensions to each item.
     ///
     /// - Remark: HTTP `GET /items`.
     /// - Remark: Generated from `#/paths//items/get(listItems)`.
@@ -1328,7 +1370,7 @@ extension APIProtocol {
     }
     /// Find items by title
     ///
-    /// Finds the active and archived items titled by each of up to 200 names, matched without regard to case, Unicode form or the white space around a name. `system.*` items and items you can't read are left out.
+    /// Finds the active and archived items titled by each of up to 200 names, matched without regard to case, Unicode form or the white space around a name. `system.*` and `app.*` items and items you can't read are left out.
     ///
     /// - Remark: HTTP `POST /items/titles`.
     /// - Remark: Generated from `#/paths//items/titles/post(findItemsByTitle)`.
@@ -1403,7 +1445,7 @@ extension APIProtocol {
     }
     /// List item summaries
     ///
-    /// Returns item names, types, versions, sources and creation times, newest first, of the types you can read. Trashed and system items are excluded.
+    /// Returns item names, types, versions, sources and creation times, newest first, of the types you can read. Trashed and hidden items (`system.*` and `app.*`) are excluded.
     ///
     /// - Remark: HTTP `GET /items/summaries`.
     /// - Remark: Generated from `#/paths//items/summaries/get(listItemSummaries)`.
@@ -1903,6 +1945,60 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// List plugins
+    ///
+    /// Returns every installed plugin, by name, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/get(listPlugins)`.
+    public func listPlugins(headers: Operations.ListPlugins.Input.Headers = .init()) async throws -> Operations.ListPlugins.Output {
+        try await listPlugins(Operations.ListPlugins.Input(headers: headers))
+    }
+    /// Install a plugin
+    ///
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    ///
+    /// - Remark: HTTP `POST /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
+    public func installPlugin(
+        headers: Operations.InstallPlugin.Input.Headers = .init(),
+        body: Operations.InstallPlugin.Input.Body
+    ) async throws -> Operations.InstallPlugin.Output {
+        try await installPlugin(Operations.InstallPlugin.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a plugin
+    ///
+    /// Returns an installed plugin, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/get(getPlugin)`.
+    public func getPlugin(
+        path: Operations.GetPlugin.Input.Path,
+        headers: Operations.GetPlugin.Input.Headers = .init()
+    ) async throws -> Operations.GetPlugin.Output {
+        try await getPlugin(Operations.GetPlugin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Remove a plugin
+    ///
+    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance; delete a type with `DELETE /types/{id}`. Needs `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
+    public func removePlugin(
+        path: Operations.RemovePlugin.Input.Path,
+        headers: Operations.RemovePlugin.Input.Headers = .init()
+    ) async throws -> Operations.RemovePlugin.Output {
+        try await removePlugin(Operations.RemovePlugin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// List types
     ///
     /// Returns every type on this instance: those Marfa ships and those registered through `POST /types`. Every credential reads the whole list, whatever its type map reaches.
@@ -1914,7 +2010,7 @@ extension APIProtocol {
     }
     /// Register a type
     ///
-    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields.
+    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields. The first type under an `app.<vendor>` namespace gives that namespace to the app that registered it.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -2956,6 +3052,32 @@ extension APIProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// List app vendors
+    ///
+    /// Returns each `app.<vendor>` namespace and who holds it, in one page: the app that registered its first type, or the owner until they give it to an app. Requires the owner's browser session or `grants.manage`.
+    ///
+    /// - Remark: HTTP `GET /app-vendors`.
+    /// - Remark: Generated from `#/paths//app-vendors/get(listAppVendors)`.
+    public func listAppVendors(headers: Operations.ListAppVendors.Input.Headers = .init()) async throws -> Operations.ListAppVendors.Output {
+        try await listAppVendors(Operations.ListAppVendors.Input(headers: headers))
+    }
+    /// Give a vendor to an app
+    ///
+    /// Gives an `app.<vendor>` namespace to the app you name by client ID, which then registers types under it and reaches its items. Use it when an app's client ID changes. Requires the owner's browser session, or `grants.manage` on a key the owner made.
+    ///
+    /// - Remark: HTTP `PUT /app-vendors/{vendor}`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/put(giveAppVendor)`.
+    public func giveAppVendor(
+        path: Operations.GiveAppVendor.Input.Path,
+        headers: Operations.GiveAppVendor.Input.Headers = .init(),
+        body: Operations.GiveAppVendor.Input.Body
+    ) async throws -> Operations.GiveAppVendor.Output {
+        try await giveAppVendor(Operations.GiveAppVendor.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Authorize an app

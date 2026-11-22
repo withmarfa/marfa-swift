@@ -124,6 +124,34 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `POST /items/{id}/tables/{table}/batches/{batch}/undo`.
     /// - Remark: Generated from `#/paths//items/{id}/tables/{table}/batches/{batch}/undo/post(undoTableBatch)`.
     func undoTableBatch(_ input: Operations.UndoTableBatch.Input) async throws -> Operations.UndoTableBatch.Output
+    /// List plugins
+    ///
+    /// Returns every installed plugin, by name, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/get(listPlugins)`.
+    func listPlugins(_ input: Operations.ListPlugins.Input) async throws -> Operations.ListPlugins.Output
+    /// Install a plugin
+    ///
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    ///
+    /// - Remark: HTTP `POST /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
+    func installPlugin(_ input: Operations.InstallPlugin.Input) async throws -> Operations.InstallPlugin.Output
+    /// Get a plugin
+    ///
+    /// Returns an installed plugin, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/get(getPlugin)`.
+    func getPlugin(_ input: Operations.GetPlugin.Input) async throws -> Operations.GetPlugin.Output
+    /// Remove a plugin
+    ///
+    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance; delete a type with `DELETE /types/{id}`. Needs `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
+    func removePlugin(_ input: Operations.RemovePlugin.Input) async throws -> Operations.RemovePlugin.Output
     /// List types
     ///
     /// Returns every type on this instance: those Marfa ships and those registered through `POST /types`. Every credential reads the whole list, whatever its type map reaches.
@@ -133,7 +161,7 @@ public protocol ClientProtocol: Sendable {
     func listTypes(_ input: Operations.ListTypes.Input) async throws -> Operations.ListTypes.Output
     /// Register a type
     ///
-    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields.
+    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields. The first type under an `app.<vendor>` namespace gives that namespace to the app that registered it.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -404,6 +432,20 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `DELETE /grants/{id}`.
     /// - Remark: Generated from `#/paths//grants/{id}/delete(revokeAppGrant)`.
     func revokeAppGrant(_ input: Operations.RevokeAppGrant.Input) async throws -> Operations.RevokeAppGrant.Output
+    /// List app vendors
+    ///
+    /// Returns each `app.<vendor>` namespace and who holds it, in one page: the app that registered its first type, or the owner until they give it to an app. Requires the owner's browser session or `grants.manage`.
+    ///
+    /// - Remark: HTTP `GET /app-vendors`.
+    /// - Remark: Generated from `#/paths//app-vendors/get(listAppVendors)`.
+    func listAppVendors(_ input: Operations.ListAppVendors.Input) async throws -> Operations.ListAppVendors.Output
+    /// Give a vendor to an app
+    ///
+    /// Gives an `app.<vendor>` namespace to the app you name by client ID, which then registers types under it and reaches its items. Use it when an app's client ID changes. Requires the owner's browser session, or `grants.manage` on a key the owner made.
+    ///
+    /// - Remark: HTTP `PUT /app-vendors/{vendor}`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/put(giveAppVendor)`.
+    func giveAppVendor(_ input: Operations.GiveAppVendor.Input) async throws -> Operations.GiveAppVendor.Output
     /// Get the owner's profile
     ///
     /// Returns the owner's profile fields that your credential can read: `name`, `username`, `email` and `avatar`, each with its own read permission. A field you can't read is left out, so a credential that can read none gets an empty object.
@@ -874,6 +916,60 @@ extension ClientProtocol {
             headers: headers
         ))
     }
+    /// List plugins
+    ///
+    /// Returns every installed plugin, by name, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/get(listPlugins)`.
+    public func listPlugins(headers: Operations.ListPlugins.Input.Headers = .init()) async throws -> Operations.ListPlugins.Output {
+        try await listPlugins(Operations.ListPlugins.Input(headers: headers))
+    }
+    /// Install a plugin
+    ///
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    ///
+    /// - Remark: HTTP `POST /plugins`.
+    /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
+    public func installPlugin(
+        headers: Operations.InstallPlugin.Input.Headers = .init(),
+        body: Operations.InstallPlugin.Input.Body
+    ) async throws -> Operations.InstallPlugin.Output {
+        try await installPlugin(Operations.InstallPlugin.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Get a plugin
+    ///
+    /// Returns an installed plugin, with the types it installed.
+    ///
+    /// - Remark: HTTP `GET /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/get(getPlugin)`.
+    public func getPlugin(
+        path: Operations.GetPlugin.Input.Path,
+        headers: Operations.GetPlugin.Input.Headers = .init()
+    ) async throws -> Operations.GetPlugin.Output {
+        try await getPlugin(Operations.GetPlugin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Remove a plugin
+    ///
+    /// Removes a plugin's install record. Its types and edge types stay, with their items, edges and provenance; delete a type with `DELETE /types/{id}`. Needs `schema.write`.
+    ///
+    /// - Remark: HTTP `DELETE /plugins/{name}`.
+    /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
+    public func removePlugin(
+        path: Operations.RemovePlugin.Input.Path,
+        headers: Operations.RemovePlugin.Input.Headers = .init()
+    ) async throws -> Operations.RemovePlugin.Output {
+        try await removePlugin(Operations.RemovePlugin.Input(
+            path: path,
+            headers: headers
+        ))
+    }
     /// List types
     ///
     /// Returns every type on this instance: those Marfa ships and those registered through `POST /types`. Every credential reads the whole list, whatever its type map reaches.
@@ -885,7 +981,7 @@ extension ClientProtocol {
     }
     /// Register a type
     ///
-    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields.
+    /// Registers a type under the `app.*`, `user.*` or `<publisher>.*` namespace and returns it. Name a `parent` to inherit its fields. The first type under an `app.<vendor>` namespace gives that namespace to the app that registered it.
     ///
     /// - Remark: HTTP `POST /types`.
     /// - Remark: Generated from `#/paths//types/post(registerType)`.
@@ -1438,6 +1534,32 @@ extension ClientProtocol {
             path: path,
             query: query,
             headers: headers
+        ))
+    }
+    /// List app vendors
+    ///
+    /// Returns each `app.<vendor>` namespace and who holds it, in one page: the app that registered its first type, or the owner until they give it to an app. Requires the owner's browser session or `grants.manage`.
+    ///
+    /// - Remark: HTTP `GET /app-vendors`.
+    /// - Remark: Generated from `#/paths//app-vendors/get(listAppVendors)`.
+    public func listAppVendors(headers: Operations.ListAppVendors.Input.Headers = .init()) async throws -> Operations.ListAppVendors.Output {
+        try await listAppVendors(Operations.ListAppVendors.Input(headers: headers))
+    }
+    /// Give a vendor to an app
+    ///
+    /// Gives an `app.<vendor>` namespace to the app you name by client ID, which then registers types under it and reaches its items. Use it when an app's client ID changes. Requires the owner's browser session, or `grants.manage` on a key the owner made.
+    ///
+    /// - Remark: HTTP `PUT /app-vendors/{vendor}`.
+    /// - Remark: Generated from `#/paths//app-vendors/{vendor}/put(giveAppVendor)`.
+    public func giveAppVendor(
+        path: Operations.GiveAppVendor.Input.Path,
+        headers: Operations.GiveAppVendor.Input.Headers = .init(),
+        body: Operations.GiveAppVendor.Input.Body
+    ) async throws -> Operations.GiveAppVendor.Output {
+        try await giveAppVendor(Operations.GiveAppVendor.Input(
+            path: path,
+            headers: headers,
+            body: body
         ))
     }
     /// Get the owner's profile

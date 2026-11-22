@@ -1045,8 +1045,9 @@ public protocol CoreProtocol: AnyObject, Sendable {
      * `fields` and whatever else a type carries. A copy that has never
      * reached a server checks what it queues against them and the types
      * Marfa ships, and a hydration registers the ones the instance lacks,
-     * where the key may. The call is the app's whole set and replaces every
-     * earlier declaration. A set that names one id twice throws `Invalid`.
+     * where the key may. An app declares only types under `app.`. The call
+     * is the app's whole set and replaces every earlier declaration. A set
+     * that names a type outside `app.`, or one id twice, throws `Invalid`.
      */
     func declareTypes(types: [JsonObject]) throws 
     
@@ -1159,9 +1160,10 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     /**
      * Replaces the local copy with the declared types at `tier`, one tier or
-     * `all` for both. `["*"]` alone is every type but `system.*`, hydrated in
+     * `all` for both. `["*"]` alone is every type but the hidden ones (`system.*`
+     * and `app.*`), hydrated in
      * one pass with no need to read the catalog and name its types first;
-     * beside `system.*` types it adds them, and beside any other type it is
+     * beside hidden types it adds them, and beside any other type it is
      * refused `invalid`.
      */
     func hydrate(types: [String], tier: SliceTier, stop: Stop?) throws  -> HydrateReport
@@ -1169,7 +1171,7 @@ public protocol CoreProtocol: AnyObject, Sendable {
     /**
      * A hydration that also holds every edge of `edge_types` the key reads,
      * whichever ends the copy holds. `types` reads as in `hydrate`, so
-     * `["*"]` alone is every type but `system.*`.
+     * `["*"]` alone is every type but the hidden ones.
      *
      * With `in_place_only`, it fills only a copy whose cursor aged out, and
      * only in place: where the instance, the key's reach or the slice has
@@ -1856,8 +1858,9 @@ open func dataVersion()throws  -> Int64  {
      * `fields` and whatever else a type carries. A copy that has never
      * reached a server checks what it queues against them and the types
      * Marfa ships, and a hydration registers the ones the instance lacks,
-     * where the key may. The call is the app's whole set and replaces every
-     * earlier declaration. A set that names one id twice throws `Invalid`.
+     * where the key may. An app declares only types under `app.`. The call
+     * is the app's whole set and replaces every earlier declaration. A set
+     * that names a type outside `app.`, or one id twice, throws `Invalid`.
      */
 open func declareTypes(types: [JsonObject])throws   {try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_declare_types(
@@ -2107,9 +2110,10 @@ open func heldHandle() -> Handle  {
     
     /**
      * Replaces the local copy with the declared types at `tier`, one tier or
-     * `all` for both. `["*"]` alone is every type but `system.*`, hydrated in
+     * `all` for both. `["*"]` alone is every type but the hidden ones (`system.*`
+     * and `app.*`), hydrated in
      * one pass with no need to read the catalog and name its types first;
-     * beside `system.*` types it adds them, and beside any other type it is
+     * beside hidden types it adds them, and beside any other type it is
      * refused `invalid`.
      */
 open func hydrate(types: [String], tier: SliceTier, stop: Stop?)throws  -> HydrateReport  {
@@ -2126,7 +2130,7 @@ open func hydrate(types: [String], tier: SliceTier, stop: Stop?)throws  -> Hydra
     /**
      * A hydration that also holds every edge of `edge_types` the key reads,
      * whichever ends the copy holds. `types` reads as in `hydrate`, so
-     * `["*"]` alone is every type but `system.*`.
+     * `["*"]` alone is every type but the hidden ones.
      *
      * With `in_place_only`, it fills only a copy whose cursor aged out, and
      * only in place: where the instance, the key's reach or the slice has
@@ -7240,7 +7244,7 @@ public func FfiConverterTypeFolderPull_lower(_ value: FolderPull) -> RustBuffer 
  */
 public struct FolderQuery: Equatable, Hashable {
     /**
-     * Each with its subtypes; empty holds every type but `system.*`.
+     * Each with its subtypes; empty holds every type but the hidden ones (`system.*` and `app.*`).
      */
     public var types: [String]
     /**
@@ -7264,7 +7268,7 @@ public struct FolderQuery: Equatable, Hashable {
     // declare one manually.
     public init(
         /**
-         * Each with its subtypes; empty holds every type but `system.*`.
+         * Each with its subtypes; empty holds every type but the hidden ones (`system.*` and `app.*`).
          */types: [String] = [], 
         /**
          * `None` holds the library tier.
@@ -19520,7 +19524,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_data_version() != 13314) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 6605) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_declare_types() != 17123) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_declared_types() != 51849) {
@@ -19580,10 +19584,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_held_handle() != 31292) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 41773) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate() != 48007) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 40233) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hydrate_with() != 20993) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_item_displays() != 34912) {
