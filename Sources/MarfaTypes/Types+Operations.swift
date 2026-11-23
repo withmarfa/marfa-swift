@@ -153577,7 +153577,7 @@ public enum Operations {
     }
     /// List connector agreements
     ///
-    /// Returns the agreements of the connector's source, the one written longest ago first. Items whose type you can't read are left out, so a page can be short with more to follow.
+    /// Returns the agreements of the connector's source, the one written longest ago first. Items you can't read are left out, so a page can be short with more to follow.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
@@ -154797,7 +154797,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/200/content/json/cleared`.
                         public var cleared: Swift.Int
-                        /// The IDs Marfa skipped, in the order named, `set` first. An ID is skipped if no stored item has it or its type is one you can't read. A trashed item counts as stored.
+                        /// The IDs Marfa skipped, in the order named, `set` first. An ID is skipped if no stored item has it or it names an item you can't read. A trashed item counts as stored.
                         ///
                         /// - Remark: Generated from `#/paths/connectors/{id}/agreements/POST/responses/200/content/json/skipped`.
                         public var skipped: [Swift.String]
@@ -154806,7 +154806,7 @@ public enum Operations {
                         /// - Parameters:
                         ///   - written: How many agreements Marfa wrote.
                         ///   - cleared: How many agreements Marfa removed.
-                        ///   - skipped: The IDs Marfa skipped, in the order named, `set` first. An ID is skipped if no stored item has it or its type is one you can't read. A trashed item counts as stored.
+                        ///   - skipped: The IDs Marfa skipped, in the order named, `set` first. An ID is skipped if no stored item has it or it names an item you can't read. A trashed item counts as stored.
                         public init(
                             written: Swift.Int,
                             cleared: Swift.Int,
@@ -156024,7 +156024,7 @@ public enum Operations {
     }
     /// Look up connector agreements
     ///
-    /// Looks up the agreements of the named items and returns those that exist, each item once, in the order you first named it. An item whose type you can't read is left out.
+    /// Looks up the agreements of the named items and returns those that exist, each item once, in the order you first named it. An item you can't read is left out.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements/lookup`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)`.
