@@ -14869,7 +14869,7 @@ extension Components {
             /// When this copy last finished a fully successful sync, as reported by the client, in UTC; null if none has completed.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusReport/last_success_at`.
-            public var lastSuccessAt: Swift.String?
+            public var lastSuccessAt: Components.Schemas.MarfaNullableMarfaInline8cd078ecde4bb386
             /// The distinct local files last observed waiting to upload.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusReport/pending_uploads`.
@@ -14904,7 +14904,7 @@ extension Components {
             public init(
                 folderStoreId: Swift.String,
                 sequence: Swift.Int,
-                lastSuccessAt: Swift.String? = nil,
+                lastSuccessAt: Components.Schemas.MarfaNullableMarfaInline8cd078ecde4bb386,
                 pendingUploads: Swift.Int,
                 pendingDownloads: Swift.Int,
                 pausedRemovals: Swift.Int,
@@ -14940,8 +14940,8 @@ extension Components {
                     Swift.Int.self,
                     forKey: .sequence
                 )
-                self.lastSuccessAt = try container.decodeIfPresent(
-                    Swift.String.self,
+                self.lastSuccessAt = try container.decode(
+                    Components.Schemas.MarfaNullableMarfaInline8cd078ecde4bb386.self,
                     forKey: .lastSuccessAt
                 )
                 self.pendingUploads = try container.decode(
@@ -31513,6 +31513,8 @@ extension Components {
         public typealias MarfaInline0d3ac1e9e006c011 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline010b1dec865519f0`.
         public typealias MarfaInline010b1dec865519f0 = Swift.String
+        /// - Remark: Generated from `#/components/schemas/MarfaInline8cd078ecde4bb386`.
+        public typealias MarfaInline8cd078ecde4bb386 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137`.
         public struct MarfaInlinef5e21acab2df7137: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137/value1`.
@@ -31727,6 +31729,8 @@ extension Components {
         public typealias MarfaNullableHousekeepingReport = MarfaNullable<Components.Schemas.HousekeepingReport>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorRun`.
         public typealias MarfaNullableConnectorRun = MarfaNullable<Components.Schemas.ConnectorRun>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline8cd078ecde4bb386`.
+        public typealias MarfaNullableMarfaInline8cd078ecde4bb386 = MarfaNullable<Components.Schemas.MarfaInline8cd078ecde4bb386>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef5e21acab2df7137`.
         public typealias MarfaNullableMarfaInlinef5e21acab2df7137 = MarfaNullable<Components.Schemas.MarfaInlinef5e21acab2df7137>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMetadata`.

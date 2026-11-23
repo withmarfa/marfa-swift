@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const nullName = "MarfaNull";
 const nullRef = `#/components/schemas/${nullName}`;
+const primitiveTypes = new Set(["string", "number", "integer", "boolean"]);
 
 export function prepare(document) {
   let usesNull = false;
@@ -68,7 +69,106 @@ export function prepare(document) {
     usesNull = true;
     return name;
   };
-  function schema(value, inUnion = false, optionalProperty = false, mapValue = false) {
+  // Swift omits a nil optional. A required primitive-or-null member encodes null only in a schema reached
+  // from a request body and from no response. A shared component keeps the response shape; a request that
+  // needs the null uses a copy.
+  const httpMethods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
+  const schemaRef = (value) =>
+    typeof value?.$ref === "string" && value.$ref.startsWith("#/components/schemas/")
+      ? value.$ref.slice("#/components/schemas/".length)
+      : null;
+  const skipWalk = (key) =>
+    ["example", "examples", "default", "enum", "const"].includes(key) || key.startsWith("x-");
+  const reachable = (root) => {
+    const found = new Set();
+    const visit = (value, seen) => {
+      if (!value || typeof value !== "object") return;
+      if (seen.has(value)) return;
+      seen.add(value);
+      if (Array.isArray(value)) {
+        for (const entry of value) visit(entry, seen);
+        return;
+      }
+      const name = schemaRef(value);
+      if (name && !found.has(name)) {
+        found.add(name);
+        visit(document.components?.schemas?.[name], seen);
+      }
+      for (const [key, child] of Object.entries(value)) {
+        if (key === "$ref" || skipWalk(key)) continue;
+        visit(child, seen);
+      }
+    };
+    visit(root, new Set());
+    return found;
+  };
+  const reachedFrom = (part) => {
+    const names = new Set();
+    for (const item of Object.values(document.paths ?? {})) {
+      for (const method of httpMethods) {
+        const operation = item?.[method];
+        if (!operation) continue;
+        const contents =
+          part === "request"
+            ? Object.values(operation.requestBody?.content ?? {})
+            : Object.values(operation.responses ?? {}).flatMap((response) =>
+                Object.values(response?.content ?? {}),
+              );
+        for (const content of contents) {
+          for (const name of reachable(content?.schema)) names.add(name);
+        }
+      }
+    }
+    return names;
+  };
+  const isRequiredNullablePrimitive = (schema) => {
+    const types = Array.isArray(schema?.type) ? schema.type : null;
+    if (!types || types.length !== 2 || !types.includes("null")) return false;
+    if (Array.isArray(schema.enum) && !schema.enum.includes(null)) return false;
+    if ("const" in schema) return false;
+    return primitiveTypes.has(types.find((type) => type !== "null"));
+  };
+  const requestReached = reachedFrom("request");
+  const responseReached = reachedFrom("response");
+  const requestOnly = new Set(
+    [...requestReached].filter((name) => !responseReached.has(name)),
+  );
+  const diverges = (schema, seen) => {
+    if (!schema || typeof schema !== "object") return false;
+    const name = schemaRef(schema);
+    if (name) {
+      if (requestOnly.has(name) || seen.has(name) || !responseReached.has(name)) return false;
+      seen.add(name);
+      return diverges(document.components?.schemas?.[name], seen);
+    }
+    if (Array.isArray(schema)) return schema.some((entry) => diverges(entry, seen));
+    const required = new Set(schema.required ?? []);
+    for (const [property, child] of Object.entries(schema.properties ?? {})) {
+      if (required.has(property) && isRequiredNullablePrimitive(child)) return true;
+      if (diverges(child, seen)) return true;
+    }
+    for (const [key, child] of Object.entries(schema)) {
+      if (key === "properties" || key === "required" || skipWalk(key)) continue;
+      if (diverges(child, seen)) return true;
+    }
+    return false;
+  };
+  const requestCopies = new Set(
+    [...requestReached].filter((name) => {
+      if (requestOnly.has(name)) return false;
+      return diverges(document.components?.schemas?.[name], new Set([name]));
+    }),
+  );
+  const requestCopyName = (name) => `MarfaRequest${name}`;
+  const requestRef = (ref) => {
+    const name = ref.startsWith("#/components/schemas/")
+      ? ref.slice("#/components/schemas/".length)
+      : null;
+    return name && requestCopies.has(name)
+      ? `#/components/schemas/${requestCopyName(name)}`
+      : ref;
+  };
+  function schema(value, inUnion = false, property = false, mapValue = false, encodeRequiredNull = false) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
     if (value.type === "null" && !inUnion) {
@@ -78,36 +178,47 @@ export function prepare(document) {
     }
     const result = {};
     for (const [key, child] of Object.entries(value)) {
-      if (schemaMaps.has(key)) {
+      if (key === "$ref" && encodeRequiredNull && typeof child === "string") {
+        result[key] = requestRef(child);
+      } else if (schemaMaps.has(key)) {
         result[key] = Object.fromEntries(
           Object.entries(child).map(([name, entry]) => [
             name,
             schema(
               entry,
               false,
-              key === "properties" && !value.required?.includes(name),
+              key === "properties"
+                ? value.required?.includes(name)
+                  ? "required"
+                  : "optional"
+                : false,
+              false,
+              encodeRequiredNull,
             ),
           ]),
         );
       } else if (schemaArrays.has(key)) {
         result[key] = child.map((member) =>
-          schema(member, key === "oneOf" || key === "anyOf"),
+          schema(member, key === "oneOf" || key === "anyOf", false, false, encodeRequiredNull),
         );
       } else {
         result[key] = schemaValues.has(key)
-          ? schema(child, false, false, key === "additionalProperties")
+          ? schema(child, false, false, key === "additionalProperties", encodeRequiredNull)
           : child;
       }
     }
+    const types = Array.isArray(result.type) ? result.type : null;
+    const otherType = types?.find((type) => type !== "null");
+    // An optional nullable property has three states; Swift Optional alone loses explicit null.
+    // A required nullable primitive in a request schema has two, so the wrapper stays required and null is written.
     if (
-      optionalProperty &&
-      Array.isArray(result.type) &&
-      result.type.length === 2 &&
-      result.type.includes("null") &&
+      types?.length === 2 &&
+      types.includes("null") &&
       (!Array.isArray(result.enum) || result.enum.includes(null)) &&
-      !("const" in result)
+      !("const" in result) &&
+      (property === "optional" ||
+        (property === "required" && encodeRequiredNull && primitiveTypes.has(otherType)))
     ) {
-      // An optional nullable property has three states; Swift Optional alone loses explicit null.
       const annotation = (key) =>
         ["description", "title", "example", "examples", "default", "deprecated", "readOnly", "writeOnly"].includes(key) ||
         key.startsWith("x-");
@@ -145,8 +256,10 @@ export function prepare(document) {
       // The generator skips, with a warning, a name one member requires and another member defines.
       const defines = (member, name) => {
         const target = member.$ref?.replace(/^#\/components\/schemas\//, "");
+        // A request copy's reference names a copy that is not in the original document yet.
         const properties = target
-          ? document.components?.schemas?.[target]?.properties
+          ? (document.components?.schemas?.[target]?.properties ??
+            document.components?.schemas?.[target.replace(/^MarfaRequest/, "")]?.properties)
           : member.properties;
         return properties !== undefined && name in properties;
       };
@@ -193,18 +306,16 @@ export function prepare(document) {
     }
     return result;
   }
-  function walk(value) {
-    if (Array.isArray(value)) return value.map(walk);
+  function walk(value, encodeRequiredNull = false) {
+    if (Array.isArray(value)) return value.map((entry) => walk(entry, encodeRequiredNull));
     if (!value || typeof value !== "object") return value;
     return Object.fromEntries(
       Object.entries(value).map(([key, child]) => {
-        if (key === "schema") return [key, schema(child)];
-        if (
-          ["example", "examples", "default", "enum", "const"].includes(key) ||
-          key.startsWith("x-")
-        )
-          return [key, child];
-        return [key, walk(child)];
+        if (key === "schema") return [key, schema(child, false, false, false, encodeRequiredNull)];
+        if (skipWalk(key)) return [key, child];
+        const nested =
+          key === "requestBody" ? true : key === "responses" ? false : encodeRequiredNull;
+        return [key, walk(child, nested)];
       }),
     );
   }
@@ -213,9 +324,21 @@ export function prepare(document) {
     result.components.schemas = Object.fromEntries(
       Object.entries(document.components.schemas).map(([name, value]) => [
         name,
-        schema(value),
+        schema(value, false, false, false, requestOnly.has(name)),
       ]),
     );
+    for (const name of [...requestCopies].sort()) {
+      const copy = requestCopyName(name);
+      if (copy in result.components.schemas)
+        throw new Error(`the API document already defines ${copy}`);
+      result.components.schemas[copy] = schema(
+        document.components.schemas[name],
+        false,
+        false,
+        false,
+        true,
+      );
+    }
   }
   if (usesNull) {
     result.components ??= {};

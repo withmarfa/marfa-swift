@@ -68015,12 +68015,12 @@ public enum Operations {
                     /// The ID of the connector host to run the connector, or `null` for none.
                     ///
                     /// - Remark: Generated from `#/paths/plugins/{name}/connector/PUT/requestBody/json/host`.
-                    public var host: Swift.String?
+                    public var host: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
                     ///   - host: The ID of the connector host to run the connector, or `null` for none.
-                    public init(host: Swift.String? = nil) {
+                    public init(host: Components.Schemas.MarfaNullableMarfaInline00404e686415370f) {
                         self.host = host
                     }
                     public enum CodingKeys: String, CodingKey {
@@ -68028,8 +68028,8 @@ public enum Operations {
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
-                        self.host = try container.decodeIfPresent(
-                            Swift.String.self,
+                        self.host = try container.decode(
+                            Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
                             forKey: .host
                         )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [

@@ -238,5 +238,36 @@ extension LiveWorkingCopies {
             try await Live.deleteView(view)
             try await api.delete(itemType: from)
         }
+
+        /// Assigning a connector, then sending `host: null`, leaves it on no host.
+        @Test func clearingAConnectorsHostLeavesItOnNoHost() async throws {
+            let api = Client(try #require(Live.server))
+            let part = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
+            let name = "host-\(part)"
+            let root = "host\(part)"
+            let bundle = Data(
+                """
+                {"format":1,"name":"\(name)","title":"Host clear","description":"A connector the live test assigns and clears.","mark":"lucide:rss","maker":"Tests","marfa":"0.0.1","version":"1.0.0","types":[{"id":"\(root).entry","description":"An entry.","fields":{"note":{"type":"string"}}}],"edge_types":[],"connector":{"source":"\(name)","source_name":"Example service","source_mark":"lucide:rss","kinds":[{"name":"entry","type":"\(root).entry","direction":"in"}],"runs":{"on":"host"}}}
+                """.utf8)
+            let decoded = try JSONDecoder().decode(Components.Schemas.PluginBundle.self, from: bundle)
+            let installed = try await api.installPlugin(body: .json(decoded)).created.body.json
+            #expect(installed.connectorHost == nil, "a new connector starts on no host")
+
+            let made = try await api.createConnectorHost(body: .json(.init(name: "Host \(part)"))).created.body.json
+            let hostID = made.host.value1.id
+            let assigned = try await api.replacePluginConnectorHost(
+                path: .init(name: name), body: .json(.init(host: .value(hostID)))
+            ).ok.body.json
+            #expect(assigned.host == hostID)
+            #expect(try await api.getPlugin(path: .init(name: name)).ok.body.json.connectorHost == hostID)
+
+            let cleared = try await api.replacePluginConnectorHost(
+                path: .init(name: name), body: .json(.init(host: .null))
+            ).ok.body.json
+            #expect(cleared.host == nil)
+            #expect(
+                try await api.getPlugin(path: .init(name: name)).ok.body.json.connectorHost == nil,
+                "clearing the host leaves the connector on no host")
+        }
     }
 }

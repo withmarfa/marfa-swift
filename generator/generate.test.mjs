@@ -159,6 +159,49 @@ test(
       const unions = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
       assert.match(unions, /actor: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
       assert.match(unions, /label: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
+      const body = {
+        type: "object",
+        properties: {
+          host: { type: ["string", "null"] },
+          note: { type: ["string", "null"] },
+        },
+        required: ["host"],
+      };
+      const input = document({ type: "string" });
+      input.components.schemas.HostRequest = body;
+      input.components.schemas.HostAnswer = structuredClone(body);
+      input.paths["/hosts"] = {
+        put: {
+          operationId: "replaceHost",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/HostRequest" } },
+            },
+          },
+          responses: {
+            200: {
+              description: "ok",
+              content: {
+                "application/json": { schema: { $ref: "#/components/schemas/HostAnswer" } },
+              },
+            },
+          },
+        },
+      };
+      writeFileSync(source, JSON.stringify(input));
+      generate(process.env.MARFA_GENERATOR_BIN, source, output);
+      const members = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
+      const block = (name) => {
+        const start = members.indexOf(`struct ${name}:`);
+        return members.slice(start, members.indexOf("public struct ", start + 1));
+      };
+      const request = block("HostRequest");
+      const answer = block("HostAnswer");
+      assert.match(request, /public var host: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}\n/);
+      assert.match(request, /public var note: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}\?\n/);
+      assert.match(answer, /public var host: Swift\.String\?\n/);
+      assert.match(answer, /public var note: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}\?\n/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -336,6 +379,134 @@ test("normalizes null-only properties, array items, and references without chang
   assert.equal(JSON.stringify(input), before);
 });
 
+test("a required nullable primitive encodes null in a request and stays optional in a response", () => {
+  const member = { type: ["string", "null"], description: "kept" };
+  const shape = {
+    type: "object",
+    properties: { host: member, note: member },
+    required: ["host"],
+  };
+  const input = document({ type: "string" });
+  input.components.schemas.HostRequest = structuredClone(shape);
+  input.components.schemas.Shared = structuredClone(shape);
+  input.components.schemas.Plain = {
+    type: "object",
+    properties: { id: { type: "string" } },
+    required: ["id"],
+  };
+  input.paths["/hosts"] = {
+    put: {
+      operationId: "replaceHost",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                inline: structuredClone(shape),
+                named: { $ref: "#/components/schemas/HostRequest" },
+                shared: { $ref: "#/components/schemas/Shared" },
+                plain: { $ref: "#/components/schemas/Plain" },
+              },
+              required: ["inline", "named", "shared", "plain"],
+            },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "ok",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  inline: structuredClone(shape),
+                  shared: { $ref: "#/components/schemas/Shared" },
+                  plain: { $ref: "#/components/schemas/Plain" },
+                },
+                required: ["inline", "shared", "plain"],
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+  const before = JSON.stringify(input);
+  const { document: output, nullable } = prepare(input);
+  const wrapped = (property) => {
+    assert.equal(property.description, "kept");
+    const name = property.$ref.split("/").at(-1);
+    const target = nullable.get(name).target;
+    assert.deepEqual(output.components.schemas[name], {
+      anyOf: [
+        { $ref: `#/components/schemas/${target}` },
+        { $ref: "#/components/schemas/MarfaNull" },
+      ],
+    });
+    assert.deepEqual(output.components.schemas[target], { type: "string" });
+    return name;
+  };
+  const request = output.paths["/hosts"].put.requestBody.content["application/json"].schema;
+  const response = output.paths["/hosts"].put.responses[200].content["application/json"].schema;
+  const requestFields = request.properties.inline.properties;
+  assert.deepEqual(request.properties.inline.required, ["host"]);
+  const host = wrapped(requestFields.host);
+  assert.equal(wrapped(requestFields.note), host);
+  const responseFields = response.properties.inline.properties;
+  assert.deepEqual(responseFields.host, member);
+  assert.equal(wrapped(responseFields.note), host);
+  const named = output.components.schemas.HostRequest;
+  assert.deepEqual(named.required, ["host"]);
+  assert.equal(wrapped(named.properties.host), host);
+  assert.equal(request.properties.named.$ref, "#/components/schemas/HostRequest");
+  const shared = output.components.schemas.Shared;
+  assert.deepEqual(shared.properties.host, member);
+  assert.equal(wrapped(shared.properties.note), host);
+  assert.equal(response.properties.shared.$ref, "#/components/schemas/Shared");
+  assert.equal(request.properties.shared.$ref, "#/components/schemas/MarfaRequestShared");
+  const copy = output.components.schemas.MarfaRequestShared;
+  assert.deepEqual(copy.required, ["host"]);
+  assert.equal(wrapped(copy.properties.host), host);
+  assert.equal(request.properties.plain.$ref, "#/components/schemas/Plain");
+  assert.equal(response.properties.plain.$ref, "#/components/schemas/Plain");
+  assert.equal(output.components.schemas.MarfaRequestPlain, undefined);
+  assert.equal(JSON.stringify(input), before);
+  const collision = structuredClone(input);
+  collision.components.schemas.MarfaRequestShared = { type: "string" };
+  assert.throws(() => prepare(collision), /already defines/);
+});
+
+test("a request copy's allOf keeps a requirement its copied reference defines", () => {
+  const input = document({ type: "string" });
+  input.components.schemas.Base = {
+    type: "object",
+    properties: { id: { type: "string" }, host: { type: ["string", "null"] } },
+    required: ["host"],
+  };
+  input.components.schemas.Shared = {
+    allOf: [
+      { $ref: "#/components/schemas/Base" },
+      { type: "object", properties: { note: { type: "string" } }, required: ["id", "note"] },
+    ],
+  };
+  const body = { content: { "application/json": { schema: { $ref: "#/components/schemas/Shared" } } } };
+  input.paths["/shared"] = {
+    put: {
+      operationId: "replaceShared",
+      requestBody: { required: true, ...body },
+      responses: { 200: { description: "ok", ...body } },
+    },
+  };
+  const { document: output } = prepare(input);
+  assert.deepEqual(output.components.schemas.Shared.allOf[1].required, ["note"]);
+  const copy = output.components.schemas.MarfaRequestShared;
+  assert.equal(copy.allOf[0].$ref, "#/components/schemas/MarfaRequestBase");
+  assert.deepEqual(copy.allOf[1].required, ["note"]);
+});
+
 test("optional nullable type arrays keep presence, constraints, and annotations", () => {
   const field = {
     type: ["string", "null"],
@@ -358,7 +529,9 @@ test("optional nullable type arrays keep presence, constraints, and annotations"
   const result = prepare(input);
   const fields = result.document.components.schemas.Fixture.properties;
   assert.ok(fields.optional.$ref);
+  // A required member is wrapped only in a request schema. This component is neither.
   assert.deepEqual(fields.required, field);
+  assert.deepEqual(result.document.components.schemas.Fixture.required, ["required"]);
   assert.equal(result.nullable.size, 2);
   const name = fields.optional.$ref.split("/").at(-1);
   const target = result.nullable.get(name).target;

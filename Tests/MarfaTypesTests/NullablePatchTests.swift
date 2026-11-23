@@ -48,3 +48,18 @@ func nullablePatchWebhookKeepsOmissionNullAndValue(wire: String) throws {
 func nullableRetentionKeepsOmissionNullAndValue(wire: String) throws {
     try expectPatchRoundTrip(Components.Schemas.RetentionPolicy.self, wire: wire)
 }
+
+@Test func aRequiredNullableHostEncodesNullAndRejectsOmission() throws {
+    typealias Body = Operations.ReplacePluginConnectorHost.Input.Body.JsonPayload
+    let encoder = JSONEncoder()
+    let cleared = try #require(JSONSerialization.jsonObject(with: encoder.encode(Body(host: .null))) as? [String: Any])
+    #expect(cleared["host"] is NSNull)
+    let assigned = try #require(
+        JSONSerialization.jsonObject(with: encoder.encode(Body(host: .value("h1")))) as? [String: Any])
+    #expect(assigned["host"] as? String == "h1")
+    let decoded = try JSONDecoder().decode(Body.self, from: Data(#"{"host":null}"#.utf8))
+    #expect(decoded.host == .null)
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(Body.self, from: Data("{}".utf8))
+    }
+}
