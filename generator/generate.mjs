@@ -256,8 +256,10 @@ export function prepare(document) {
       // The generator skips, with a warning, a name one member requires and another member defines.
       const defines = (member, name) => {
         const target = member.$ref?.replace(/^#\/components\/schemas\//, "");
+        // A request copy's reference names a copy that is not in the original document yet.
         const properties = target
-          ? document.components?.schemas?.[target]?.properties
+          ? (document.components?.schemas?.[target]?.properties ??
+            document.components?.schemas?.[target.replace(/^MarfaRequest/, "")]?.properties)
           : member.properties;
         return properties !== undefined && name in properties;
       };

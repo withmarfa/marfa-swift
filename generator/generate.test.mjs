@@ -479,6 +479,34 @@ test("a required nullable primitive encodes null in a request and stays optional
   assert.throws(() => prepare(collision), /already defines/);
 });
 
+test("a request copy's allOf keeps a requirement its copied reference defines", () => {
+  const input = document({ type: "string" });
+  input.components.schemas.Base = {
+    type: "object",
+    properties: { id: { type: "string" }, host: { type: ["string", "null"] } },
+    required: ["host"],
+  };
+  input.components.schemas.Shared = {
+    allOf: [
+      { $ref: "#/components/schemas/Base" },
+      { type: "object", properties: { note: { type: "string" } }, required: ["id", "note"] },
+    ],
+  };
+  const body = { content: { "application/json": { schema: { $ref: "#/components/schemas/Shared" } } } };
+  input.paths["/shared"] = {
+    put: {
+      operationId: "replaceShared",
+      requestBody: { required: true, ...body },
+      responses: { 200: { description: "ok", ...body } },
+    },
+  };
+  const { document: output } = prepare(input);
+  assert.deepEqual(output.components.schemas.Shared.allOf[1].required, ["note"]);
+  const copy = output.components.schemas.MarfaRequestShared;
+  assert.equal(copy.allOf[0].$ref, "#/components/schemas/MarfaRequestBase");
+  assert.deepEqual(copy.allOf[1].required, ["note"]);
+});
+
 test("optional nullable type arrays keep presence, constraints, and annotations", () => {
   const field = {
     type: ["string", "null"],
