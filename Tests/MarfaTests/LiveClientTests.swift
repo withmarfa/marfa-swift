@@ -251,22 +251,22 @@ extension LiveWorkingCopies {
                 """.utf8)
             let decoded = try JSONDecoder().decode(Components.Schemas.PluginBundle.self, from: bundle)
             let installed = try await api.installPlugin(body: .json(decoded)).created.body.json
-            #expect(installed.connectorHost == .null, "a new connector starts on no host")
+            #expect(installed.connectorHost == nil, "a new connector starts on no host")
 
             let made = try await api.createConnectorHost(body: .json(.init(name: "Host \(part)"))).created.body.json
             let hostID = made.host.value1.id
             let assigned = try await api.replacePluginConnectorHost(
                 path: .init(name: name), body: .json(.init(host: .value(hostID)))
             ).ok.body.json
-            #expect(assigned.host == .value(hostID))
-            #expect(try await api.getPlugin(path: .init(name: name)).ok.body.json.connectorHost == .value(hostID))
+            #expect(assigned.host == hostID)
+            #expect(try await api.getPlugin(path: .init(name: name)).ok.body.json.connectorHost == hostID)
 
             let cleared = try await api.replacePluginConnectorHost(
                 path: .init(name: name), body: .json(.init(host: .null))
             ).ok.body.json
-            #expect(cleared.host == .null)
+            #expect(cleared.host == nil)
             #expect(
-                try await api.getPlugin(path: .init(name: name)).ok.body.json.connectorHost == .null,
+                try await api.getPlugin(path: .init(name: name)).ok.body.json.connectorHost == nil,
                 "clearing the host leaves the connector on no host")
         }
     }

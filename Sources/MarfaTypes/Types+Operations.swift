@@ -27581,7 +27581,7 @@ public enum Operations {
                         /// The cursor for the next batch, or null when this traversal ended or stopped on an unknown outcome.
                         ///
                         /// - Remark: Generated from `#/paths/trash/empty/POST/responses/200/content/json/next_cursor`.
-                        public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                        public var nextCursor: Swift.String?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
@@ -27591,7 +27591,7 @@ public enum Operations {
                         public init(
                             purged: Swift.Int,
                             failures: Operations.EmptyTrash.Output.Ok.Body.JsonPayload.FailuresPayload,
-                            nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                            nextCursor: Swift.String? = nil
                         ) {
                             self.purged = purged
                             self.failures = failures
@@ -212646,19 +212646,19 @@ public enum Operations {
                             /// Memory the server process holds in RAM, in bytes. `null` if it can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/memory_rss_bytes`.
-                            public var memoryRssBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                            public var memoryRssBytes: Swift.Double?
                             /// The most memory the process has held in RAM, in bytes. `null` if it can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/memory_rss_peak_bytes`.
-                            public var memoryRssPeakBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                            public var memoryRssPeakBytes: Swift.Double?
                             /// CPU seconds the process has spent on its own work since it started. `null` if it can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/cpu_user_seconds`.
-                            public var cpuUserSeconds: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                            public var cpuUserSeconds: Swift.Double?
                             /// CPU seconds the process has spent in the operating system since it started. `null` if it can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process/cpu_system_seconds`.
-                            public var cpuSystemSeconds: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                            public var cpuSystemSeconds: Swift.Double?
                             /// Creates a new `ProcessPayload`.
                             ///
                             /// - Parameters:
@@ -212669,10 +212669,10 @@ public enum Operations {
                             ///   - cpuSystemSeconds: CPU seconds the process has spent in the operating system since it started. `null` if it can't be read.
                             public init(
                                 version: Swift.String,
-                                memoryRssBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                memoryRssPeakBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                cpuUserSeconds: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                cpuSystemSeconds: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                                memoryRssBytes: Swift.Double? = nil,
+                                memoryRssPeakBytes: Swift.Double? = nil,
+                                cpuUserSeconds: Swift.Double? = nil,
+                                cpuSystemSeconds: Swift.Double? = nil
                             ) {
                                 self.version = version
                                 self.memoryRssBytes = memoryRssBytes
@@ -212699,11 +212699,11 @@ public enum Operations {
                             /// Size of the database file, in bytes. `null` if it can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/database_bytes`.
-                            public var databaseBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                            public var databaseBytes: Swift.Double?
                             /// Size of the database's write-ahead log file, in bytes. 0 when there is none. `null` if it can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/wal_bytes`.
-                            public var walBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                            public var walBytes: Swift.Double?
                             /// Row counts of the largest tables, counted when the request is read. `null` if a count can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows`.
@@ -212711,19 +212711,19 @@ public enum Operations {
                                 /// Number of items.
                                 ///
                                 /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/items`.
-                                public var items: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                                public var items: Swift.Double?
                                 /// Number of stored item versions.
                                 ///
                                 /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/versions`.
-                                public var versions: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                                public var versions: Swift.Double?
                                 /// Number of event log entries.
                                 ///
                                 /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/event_log`.
-                                public var eventLog: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                                public var eventLog: Swift.Double?
                                 /// Number of audit log entries.
                                 ///
                                 /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows/audit_log`.
-                                public var auditLog: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                                public var auditLog: Swift.Double?
                                 /// Creates a new `RowsPayload`.
                                 ///
                                 /// - Parameters:
@@ -212732,10 +212732,10 @@ public enum Operations {
                                 ///   - eventLog: Number of event log entries.
                                 ///   - auditLog: Number of audit log entries.
                                 public init(
-                                    items: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                    versions: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                    eventLog: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                    auditLog: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+                                    items: Swift.Double? = nil,
+                                    versions: Swift.Double? = nil,
+                                    eventLog: Swift.Double? = nil,
+                                    auditLog: Swift.Double? = nil
                                 ) {
                                     self.items = items
                                     self.versions = versions
@@ -212760,8 +212760,8 @@ public enum Operations {
                             ///   - walBytes: Size of the database's write-ahead log file, in bytes. 0 when there is none. `null` if it can't be read.
                             ///   - rows: Row counts of the largest tables, counted when the request is read. `null` if a count can't be read.
                             public init(
-                                databaseBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
-                                walBytes: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
+                                databaseBytes: Swift.Double? = nil,
+                                walBytes: Swift.Double? = nil,
                                 rows: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload.RowsPayload
                             ) {
                                 self.databaseBytes = databaseBytes

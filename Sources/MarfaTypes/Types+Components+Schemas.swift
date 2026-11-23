@@ -751,7 +751,7 @@ extension Components {
             /// When the item went to the trash, in UTC, or when a `system.*` item was revoked. A later write to the item leaves it as it is, and a restore clears it. `null` for an item outside the trash, and for one an archive restored to the trash without a time.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/trashed_at`.
-            public var trashedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var trashedAt: Swift.String?
             /// Always `true` where present: the item went to the trash with another item, through a cascading edge such as `parent-of`. Present while it stays in the trash. Absent on an item trashed on its own.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/trashed_by_cascade`.
@@ -867,7 +867,7 @@ extension Components {
                 createdAt: Swift.String,
                 updatedAt: Swift.String,
                 lastActivityAt: Swift.String,
-                trashedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                trashedAt: Swift.String? = nil,
                 trashedByCascade: Swift.Bool? = nil,
                 trashedWith: Swift.String? = nil,
                 edges: Components.Schemas.Item.EdgesPayload? = nil,
@@ -930,7 +930,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgePage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `EdgePage`.
             ///
             /// - Parameters:
@@ -938,7 +938,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.Edge],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -1192,7 +1192,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/VersionPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `VersionPage`.
             ///
             /// - Parameters:
@@ -1200,7 +1200,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.Version],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -1265,7 +1265,7 @@ extension Components {
             /// The item's `source_id` at this version, or `null` if it had none.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/source_id`.
-            public var sourceId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var sourceId: Swift.String?
             /// The sign-in that wrote this version, named as it was then, even after it ends. Whoever can read the snapshot sees it, such as another app's name or a key's label. `null` if no sign-in wrote it, such as when Marfa reads a file's text.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/writer`.
@@ -1341,7 +1341,7 @@ extension Components {
                 _type: Swift.String,
                 tier: Components.Schemas.Tier,
                 occurredAt: Swift.String,
-                sourceId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                sourceId: Swift.String? = nil,
                 writer: Components.Schemas.Version.WriterPayload? = nil,
                 createdAt: Swift.String
             ) {
@@ -1527,7 +1527,7 @@ extension Components {
             /// The item's `source_id` at this version, or `null` if it had none.
             ///
             /// - Remark: Generated from `#/components/schemas/ConflictSnapshot/source_id`.
-            public var sourceId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var sourceId: Swift.String?
             /// The item's type identifier at this version.
             ///
             /// - Remark: Generated from `#/components/schemas/ConflictSnapshot/type`.
@@ -1548,7 +1548,7 @@ extension Components {
                 properties: Components.Schemas.ConflictSnapshot.PropertiesPayload,
                 tier: Components.Schemas.Tier,
                 occurredAt: Swift.String,
-                sourceId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                sourceId: Swift.String? = nil,
                 _type: Swift.String
             ) {
                 self.id = id
@@ -2582,7 +2582,7 @@ extension Components {
             /// `true` if the instance has an owner, `false` if it is waiting to be claimed with its setup code, and `null` if Marfa couldn't read its database to tell.
             ///
             /// - Remark: Generated from `#/components/schemas/Health/claimed`.
-            public var claimed: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754
+            public var claimed: Swift.Bool?
             /// Each component checked: reading and writing the database, free disk space and the blob store.
             ///
             /// - Remark: Generated from `#/components/schemas/Health/components`.
@@ -3009,11 +3009,11 @@ extension Components {
                     /// When the failed run finished, in UTC.
                     ///
                     /// - Remark: Generated from `#/components/schemas/Health/housekeeping/FailedPayload/at`.
-                    public var at: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                    public var at: Swift.String?
                     /// The error the run hit.
                     ///
                     /// - Remark: Generated from `#/components/schemas/Health/housekeeping/FailedPayload/error`.
-                    public var error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                    public var error: Swift.String?
                     /// Creates a new `FailedPayloadPayload`.
                     ///
                     /// - Parameters:
@@ -3022,8 +3022,8 @@ extension Components {
                     ///   - error: The error the run hit.
                     public init(
                         name: Swift.String,
-                        at: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                        error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                        at: Swift.String? = nil,
+                        error: Swift.String? = nil
                     ) {
                         self.name = name
                         self.at = at
@@ -3139,7 +3139,7 @@ extension Components {
             ///   - housekeeping: What needs attention in the background work. Present only for a caller that holds `instance.read`.
             public init(
                 status: Components.Schemas.Health.StatusPayload,
-                claimed: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754,
+                claimed: Swift.Bool? = nil,
                 components: Components.Schemas.Health.ComponentsPayload,
                 placement: Components.Schemas.Health.PlacementPayload? = nil,
                 version: Swift.String? = nil,
@@ -3221,11 +3221,11 @@ extension Components {
                 /// When automatic deletion becomes eligible under the effective policy, or null when disabled or the date is unknown. The sweep may delete it later.
                 ///
                 /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/eligible_for_deletion_at`.
-                public var eligibleForDeletionAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                public var eligibleForDeletionAt: Swift.String?
                 /// When the item entered the trash, or null if not recorded.
                 ///
                 /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_at`.
-                public var trashedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                public var trashedAt: Swift.String?
                 /// The sign-in that moved the item to the trash, captured at that time, or null if not recorded.
                 ///
                 /// - Remark: Generated from `#/components/schemas/TrashSummary/value2/trashed_by`.
@@ -3283,8 +3283,8 @@ extension Components {
                 ///   - trashedAt: When the item entered the trash, or null if not recorded.
                 ///   - trashedBy: The sign-in that moved the item to the trash, captured at that time, or null if not recorded.
                 public init(
-                    eligibleForDeletionAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                    trashedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                    eligibleForDeletionAt: Swift.String? = nil,
+                    trashedAt: Swift.String? = nil,
                     trashedBy: Components.Schemas.TrashSummary.Value2Payload.TrashedByPayload? = nil
                 ) {
                     self.eligibleForDeletionAt = eligibleForDeletionAt
@@ -3392,7 +3392,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/TrashSummaryPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `TrashSummaryPage`.
             ///
             /// - Parameters:
@@ -3400,7 +3400,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.TrashSummary],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -3880,7 +3880,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummaryPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ItemSummaryPage`.
             ///
             /// - Parameters:
@@ -3888,7 +3888,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.ItemSummary],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -4625,7 +4625,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ItemPage`.
             ///
             /// - Parameters:
@@ -4633,7 +4633,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.ItemListRow],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -8543,7 +8543,7 @@ extension Components {
             /// Always `null`: Marfa returns every edge type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/EdgeTypePage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `EdgeTypePage`.
             ///
             /// - Parameters:
@@ -8551,7 +8551,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every edge type in one page.
             public init(
                 data: [Components.Schemas.EdgeType],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -8654,7 +8654,7 @@ extension Components {
             /// Always `null`: Marfa returns every type in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `TypeDefinitionPage`.
             ///
             /// - Parameters:
@@ -8662,7 +8662,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every type in one page.
             public init(
                 data: [Components.Schemas.ListedType],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -11212,7 +11212,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/SearchResultPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `SearchResultPage`.
             ///
             /// - Parameters:
@@ -11220,7 +11220,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.SearchResult],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -11331,7 +11331,7 @@ extension Components {
             /// Always `null`: Marfa returns every occurrence in the window in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// The window you asked for, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/OccurrencePage/window`.
@@ -11453,7 +11453,7 @@ extension Components {
             ///   - expansionIncomplete: `true` when a series didn't finish expanding, so `data` may be missing occurrences; `scan.series_unexpanded` counts them. If a series has too many in the window, narrow the window; else narrow by `type` or fix the rules. Absent otherwise.
             public init(
                 data: [Components.Schemas.Occurrence],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                nextCursor: Swift.String? = nil,
                 window: Components.Schemas.OccurrencePage.WindowPayload,
                 scan: Components.Schemas.OccurrencePage.ScanPayload,
                 seriesErrors: Components.Schemas.OccurrencePage.SeriesErrorsPayload? = nil,
@@ -11542,7 +11542,7 @@ extension Components {
             /// Always `null`: Marfa returns every tag in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/TagCountPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `TagCountPage`.
             ///
             /// - Parameters:
@@ -11550,7 +11550,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every tag in one page.
             public init(
                 data: [Components.Schemas.TagCount],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -12148,7 +12148,7 @@ extension Components {
             /// Always `null`: Marfa returns every orphan in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobOrphanPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `BlobOrphanPage`.
             ///
             /// - Parameters:
@@ -12156,7 +12156,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every orphan in one page.
             public init(
                 data: [Components.Schemas.BlobOrphan],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -12222,7 +12222,7 @@ extension Components {
             /// Always `null`: Marfa returns every store in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStorePage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// The fewest live copies Marfa keeps of each blob. `DELETE /blobs/{hash}/copies/{store}` won't delete a copy that would leave fewer.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStorePage/min_copies`.
@@ -12235,7 +12235,7 @@ extension Components {
             ///   - minCopies: The fewest live copies Marfa keeps of each blob. `DELETE /blobs/{hash}/copies/{store}` won't delete a copy that would leave fewer.
             public init(
                 data: [Components.Schemas.BlobStore],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                nextCursor: Swift.String? = nil,
                 minCopies: Swift.Int
             ) {
                 self.data = data
@@ -12279,11 +12279,11 @@ extension Components {
             /// When the instance's configuration stopped naming the store, in UTC, or `null` while it names it.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/detached_at`.
-            public var detachedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var detachedAt: Swift.String?
             /// Why the attached object store cannot be used while the address rules refuse the requests to it because `allow_private_addresses` is `false`, the same text as `backups.store_error` in `GET /health`, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobStore/error`.
-            public var error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var error: Swift.String?
             /// Creates a new `BlobStore`.
             ///
             /// - Parameters:
@@ -12298,8 +12298,8 @@ extension Components {
                 kind: Components.Schemas.BlobStore.KindPayload,
                 locator: Swift.String,
                 attachedAt: Swift.String,
-                detachedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                detachedAt: Swift.String? = nil,
+                error: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
@@ -12492,7 +12492,7 @@ extension Components {
             /// Always `null`: Marfa returns every copy in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobCopyPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `BlobCopyPage`.
             ///
             /// - Parameters:
@@ -12500,7 +12500,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every copy in one page.
             public init(
                 data: [Components.Schemas.BlobCopy],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -12541,7 +12541,7 @@ extension Components {
             /// When a check last found the copy present and intact, in UTC, or `null` if none has.
             ///
             /// - Remark: Generated from `#/components/schemas/BlobCopy/verified_at`.
-            public var verifiedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var verifiedAt: Swift.String?
             /// Creates a new `BlobCopy`.
             ///
             /// - Parameters:
@@ -12555,7 +12555,7 @@ extension Components {
                 kind: Components.Schemas.BlobCopy.KindPayload,
                 detached: Swift.Bool,
                 recordedAt: Swift.String,
-                verifiedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                verifiedAt: Swift.String? = nil
             ) {
                 self.storeId = storeId
                 self.kind = kind
@@ -12829,7 +12829,7 @@ extension Components {
             /// Always `null`: Marfa returns every housekeeping job in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJobPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `HousekeepingJobPage`.
             ///
             /// - Parameters:
@@ -12837,7 +12837,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every housekeeping job in one page.
             public init(
                 data: [Components.Schemas.HousekeepingJob],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -12866,15 +12866,15 @@ extension Components {
             /// When the current run started, in UTC, or `null` if the job isn't running.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/running_since`.
-            public var runningSince: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var runningSince: Swift.String?
             /// When the latest run started, in UTC, or `null` if the job has never run.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_started_at`.
-            public var lastStartedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastStartedAt: Swift.String?
             /// When the last run finished, in UTC, or `null` if none has finished.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_finished_at`.
-            public var lastFinishedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastFinishedAt: Swift.String?
             /// How the last run ended, or `null` if none has finished.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_outcome`.
@@ -12882,7 +12882,7 @@ extension Components {
             /// The error the last run hit, or `null` if it had none.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_error`.
-            public var lastError: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastError: Swift.String?
             /// What the last run reported, or `null` if it reported nothing.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingJob/last_result`.
@@ -12903,11 +12903,11 @@ extension Components {
                 name: Swift.String,
                 intervalSeconds: Swift.Int,
                 nextRunAt: Swift.String,
-                runningSince: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                lastStartedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                lastFinishedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                runningSince: Swift.String? = nil,
+                lastStartedAt: Swift.String? = nil,
+                lastFinishedAt: Swift.String? = nil,
                 lastOutcome: Components.Schemas.MarfaNullableHousekeepingOutcome,
-                lastError: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                lastError: Swift.String? = nil,
                 lastResult: Components.Schemas.MarfaNullableHousekeepingReport
             ) {
                 self.name = name
@@ -12971,7 +12971,7 @@ extension Components {
             /// The error the run hit, or `null` if it had none.
             ///
             /// - Remark: Generated from `#/components/schemas/HousekeepingRun/error`.
-            public var error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var error: Swift.String?
             /// Creates a new `HousekeepingRun`.
             ///
             /// - Parameters:
@@ -12987,7 +12987,7 @@ extension Components {
                 finishedAt: Swift.String,
                 outcome: Components.Schemas.HousekeepingOutcome,
                 result: Components.Schemas.MarfaNullableHousekeepingReport,
-                error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                error: Swift.String? = nil
             ) {
                 self.name = name
                 self.startedAt = startedAt
@@ -13192,7 +13192,7 @@ extension Components {
             /// What the connector does; `null` if none was given.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/description`.
-            public var description: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var description: Swift.String?
             /// When the connector first registered.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/registered_at`.
@@ -13204,7 +13204,7 @@ extension Components {
             /// When the connector last sent a heartbeat; `null` if never.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/last_heartbeat_at`.
-            public var lastHeartbeatAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastHeartbeatAt: Swift.String?
             /// The types whose items the connector holds read only, putting back any edit made in Marfa. `[]` if it declared none.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/read_only_types`.
@@ -13220,7 +13220,7 @@ extension Components {
             /// When the hold on the connector lapses; `null` if no process holds it or its hold has lapsed.
             ///
             /// - Remark: Generated from `#/components/schemas/Connector/hold_expires_at`.
-            public var holdExpiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var holdExpiresAt: Swift.String?
             /// Creates a new `Connector`.
             ///
             /// - Parameters:
@@ -13241,14 +13241,14 @@ extension Components {
                 keyId: Swift.String,
                 source: Swift.String,
                 name: Swift.String,
-                description: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                description: Swift.String? = nil,
                 registeredAt: Swift.String,
                 updatedAt: Swift.String,
-                lastHeartbeatAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                lastHeartbeatAt: Swift.String? = nil,
                 readOnlyTypes: [Swift.String],
                 lastRun: Components.Schemas.MarfaNullableConnectorRun,
                 problems: Components.Schemas.ConnectorProblems,
-                holdExpiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                holdExpiresAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.keyId = keyId
@@ -13312,11 +13312,11 @@ extension Components {
             /// A short summary of the run; `null` if none was reported.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorRun/summary`.
-            public var summary: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var summary: Swift.String?
             /// The error the run reported; `null` if none was reported.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorRun/error`.
-            public var error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var error: Swift.String?
             /// When Marfa recorded the run.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorRun/reported_at`.
@@ -13338,8 +13338,8 @@ extension Components {
                 outcome: Components.Schemas.ConnectorRun.OutcomePayload,
                 startedAt: Swift.String,
                 finishedAt: Swift.String,
-                summary: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                summary: Swift.String? = nil,
+                error: Swift.String? = nil,
                 reportedAt: Swift.String
             ) {
                 self.id = id
@@ -13373,7 +13373,7 @@ extension Components {
             /// Always `null`: Marfa returns every connector you can read in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ConnectorPage`.
             ///
             /// - Parameters:
@@ -13381,7 +13381,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every connector you can read in one page.
             public init(
                 data: [Components.Schemas.Connector],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -13484,7 +13484,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorRunPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ConnectorRunPage`.
             ///
             /// - Parameters:
@@ -13492,7 +13492,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.ConnectorRun],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -13517,11 +13517,11 @@ extension Components {
             /// A name for people to read; `null` if none was given.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpoint/label`.
-            public var label: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var label: Swift.String?
             /// The header whose value identifies a delivery, lowercased; `null` if none was set. A delivery that repeats a value is marked as a repeat in `duplicate_of`.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpoint/duplicate_header`.
-            public var duplicateHeader: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var duplicateHeader: Swift.String?
             /// The address a sender posts to, a path on this instance. It is in full only in the response that created the endpoint; after that it shows `/inbound/****` and its last four characters.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpoint/path`.
@@ -13533,7 +13533,7 @@ extension Components {
             /// When the endpoint was retired; `null` while it is live.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpoint/retired_at`.
-            public var retiredAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var retiredAt: Swift.String?
             /// Creates a new `InboundEndpoint`.
             ///
             /// - Parameters:
@@ -13547,11 +13547,11 @@ extension Components {
             public init(
                 id: Swift.String,
                 connectorId: Swift.String,
-                label: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                duplicateHeader: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                label: Swift.String? = nil,
+                duplicateHeader: Swift.String? = nil,
                 path: Swift.String,
                 createdAt: Swift.String,
-                retiredAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                retiredAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.connectorId = connectorId
@@ -13582,7 +13582,7 @@ extension Components {
             /// Always `null`: Marfa returns every inbound endpoint of the connector in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundEndpointPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `InboundEndpointPage`.
             ///
             /// - Parameters:
@@ -13590,7 +13590,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every inbound endpoint of the connector in one page.
             public init(
                 data: [Components.Schemas.InboundEndpoint],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -13694,7 +13694,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDeliveryPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `InboundDeliveryPage`.
             ///
             /// - Parameters:
@@ -13702,7 +13702,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.InboundDelivery],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -13759,7 +13759,16 @@ extension Components {
                 /// How the earlier delivery was handled; `null` if it is still pending.
                 ///
                 /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of/outcome`.
-                public var outcome: Components.Schemas.MarfaNullableMarfaInlineb529a0144d7e10cd
+                @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case processed = "processed"
+                    case duplicate = "duplicate"
+                    case rejected = "rejected"
+                    case _empty_ = ""
+                }
+                /// How the earlier delivery was handled; `null` if it is still pending.
+                ///
+                /// - Remark: Generated from `#/components/schemas/InboundDelivery/duplicate_of/outcome`.
+                public var outcome: Components.Schemas.InboundDelivery.DuplicateOfPayload.OutcomePayload?
                 /// Creates a new `DuplicateOfPayload`.
                 ///
                 /// - Parameters:
@@ -13767,7 +13776,7 @@ extension Components {
                 ///   - outcome: How the earlier delivery was handled; `null` if it is still pending.
                 public init(
                     id: Swift.String,
-                    outcome: Components.Schemas.MarfaNullableMarfaInlineb529a0144d7e10cd
+                    outcome: Components.Schemas.InboundDelivery.DuplicateOfPayload.OutcomePayload? = nil
                 ) {
                     self.id = id
                     self.outcome = outcome
@@ -13784,11 +13793,20 @@ extension Components {
             /// When the delivery was marked handled; `null` while pending.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDelivery/handled_at`.
-            public var handledAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var handledAt: Swift.String?
             /// How the connector handled the delivery: `processed`, `duplicate` or `rejected`; `null` while pending.
             ///
             /// - Remark: Generated from `#/components/schemas/InboundDelivery/outcome`.
-            public var outcome: Components.Schemas.MarfaNullableMarfaInlineb529a0144d7e10cd
+            @frozen public enum OutcomePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case processed = "processed"
+                case duplicate = "duplicate"
+                case rejected = "rejected"
+                case _empty_ = ""
+            }
+            /// How the connector handled the delivery: `processed`, `duplicate` or `rejected`; `null` while pending.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InboundDelivery/outcome`.
+            public var outcome: Components.Schemas.InboundDelivery.OutcomePayload?
             /// Creates a new `InboundDelivery`.
             ///
             /// - Parameters:
@@ -13813,8 +13831,8 @@ extension Components {
                 size: Swift.Int,
                 sha256: Swift.String,
                 duplicateOf: Components.Schemas.InboundDelivery.DuplicateOfPayload? = nil,
-                handledAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                outcome: Components.Schemas.MarfaNullableMarfaInlineb529a0144d7e10cd
+                handledAt: Swift.String? = nil,
+                outcome: Components.Schemas.InboundDelivery.OutcomePayload? = nil
             ) {
                 self.id = id
                 self.endpointId = endpointId
@@ -14042,7 +14060,7 @@ extension Components {
             /// When it was last written; `null` if it never was.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorState/updated_at`.
-            public var updatedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var updatedAt: Swift.String?
             /// Creates a new `ConnectorState`.
             ///
             /// - Parameters:
@@ -14052,7 +14070,7 @@ extension Components {
             public init(
                 problems: Components.Schemas.ConnectorProblems,
                 state: Components.Schemas.ConnectorState.StatePayload,
-                updatedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                updatedAt: Swift.String? = nil
             ) {
                 self.problems = problems
                 self.state = state
@@ -14140,7 +14158,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorAgreementPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ConnectorAgreementPage`.
             ///
             /// - Parameters:
@@ -14148,7 +14166,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.ConnectorAgreement],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -14169,7 +14187,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderSummaryPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `FolderSummaryPage`.
             ///
             /// - Parameters:
@@ -14177,7 +14195,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.FolderSummary],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -15211,7 +15229,7 @@ extension Components {
             /// When this copy last finished a fully successful sync, as reported by the client, in UTC; null if none has completed.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/last_success_at`.
-            public var lastSuccessAt: Components.Schemas.MarfaNullableMarfaInline8cd078ecde4bb386
+            public var lastSuccessAt: Swift.String?
             /// The distinct local files last observed waiting to upload.
             ///
             /// - Remark: Generated from `#/components/schemas/FolderStatusCopy/pending_uploads`.
@@ -15256,7 +15274,7 @@ extension Components {
             public init(
                 folderStoreId: Swift.String,
                 sequence: Swift.Int,
-                lastSuccessAt: Components.Schemas.MarfaNullableMarfaInline8cd078ecde4bb386,
+                lastSuccessAt: Swift.String? = nil,
                 pendingUploads: Swift.Int,
                 pendingDownloads: Swift.Int,
                 pausedRemovals: Swift.Int,
@@ -15392,7 +15410,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewItemPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ViewItemPage`.
             ///
             /// - Parameters:
@@ -15400,7 +15418,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.Item],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -15643,11 +15661,11 @@ extension Components {
             /// When the key stops working, in UTC, or `null` if it doesn't expire.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/expires_at`.
-            public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var expiresAt: Swift.String?
             /// When the key's use was last recorded, in UTC, or `null` if none is recorded. Marfa records usage asynchronously at most once an hour; a busy or unavailable store can delay or drop a record.
             ///
             /// - Remark: Generated from `#/components/schemas/KeyResponse/last_used_at`.
-            public var lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastUsedAt: Swift.String?
             /// Creates a new `KeyResponse`.
             ///
             /// - Parameters:
@@ -15684,8 +15702,8 @@ extension Components {
                 profilePermissions: Components.Schemas.StoredProfilePermissions,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
-                expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                expiresAt: Swift.String? = nil,
+                lastUsedAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.key = key
@@ -15744,7 +15762,7 @@ extension Components {
             /// Always `null`: Marfa returns every key you can reach in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKeyPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `ApiKeyPage`.
             ///
             /// - Parameters:
@@ -15752,7 +15770,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every key you can reach in one page.
             public init(
                 data: [Components.Schemas.ApiKey],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -15905,11 +15923,11 @@ extension Components {
             /// When the key stops working, in UTC, or `null` if it doesn't expire.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/expires_at`.
-            public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var expiresAt: Swift.String?
             /// When the key's use was last recorded, in UTC, or `null` if none is recorded. Marfa records usage asynchronously at most once an hour; a busy or unavailable store can delay or drop a record.
             ///
             /// - Remark: Generated from `#/components/schemas/ApiKey/last_used_at`.
-            public var lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastUsedAt: Swift.String?
             /// Creates a new `ApiKey`.
             ///
             /// - Parameters:
@@ -15944,8 +15962,8 @@ extension Components {
                 profilePermissions: Components.Schemas.StoredProfilePermissions,
                 enforcementOverride: Components.Schemas.EnforcementOverride? = nil,
                 createdAt: Swift.String,
-                expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                expiresAt: Swift.String? = nil,
+                lastUsedAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.label = label
@@ -16076,7 +16094,7 @@ extension Components {
             /// Always `null`: Marfa returns every source in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/SourcePage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `SourcePage`.
             ///
             /// - Parameters:
@@ -16084,7 +16102,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every source in one page.
             public init(
                 data: [Components.Schemas.Source],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -17066,7 +17084,7 @@ extension Components {
             /// The owner's email address, or `null` when none is set. It plays no part in signing in.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/email`.
-            public var email: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var email: Swift.String?
             /// Display name of the owner.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/name`.
@@ -17074,7 +17092,7 @@ extension Components {
             /// The address of the owner's avatar on this instance, or `null` when none is set. Fetch it with `GET /profile/avatar`.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/avatar`.
-            public var avatar: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var avatar: Swift.String?
             /// When the owner was created, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/Owner/created_at`.
@@ -17091,9 +17109,9 @@ extension Components {
             public init(
                 id: Swift.String,
                 username: Swift.String,
-                email: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                email: Swift.String? = nil,
                 name: Swift.String,
-                avatar: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                avatar: Swift.String? = nil,
                 createdAt: Swift.String
             ) {
                 self.id = id
@@ -17205,7 +17223,7 @@ extension Components {
             /// Always `null`: Marfa returns every sign-in in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/SignInPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `SignInPage`.
             ///
             /// - Parameters:
@@ -17213,7 +17231,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every sign-in in one page.
             public init(
                 data: [Components.Schemas.SignIn],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -17254,23 +17272,23 @@ extension Components {
             /// When a recorded use occurred, in UTC, or `null` if none is recorded. Uses are recorded at most once a minute for browsers and once an hour for apps or keys. Failed recording leaves the previous value.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/last_used_at`.
-            public var lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastUsedAt: Swift.String?
             /// When the sign-in ends unless used again, in UTC. For an app, the inactivity boundary. `null` for disabled app inactivity retirement or a key without an expiry.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/expires_at`.
-            public var expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var expiresAt: Swift.String?
             /// The IP address a browser signed in from, or `null` for an app, a key, or a browser whose address Marfa could not tell.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/client_ip`.
-            public var clientIp: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var clientIp: Swift.String?
             /// The `User-Agent` a browser sent when it signed in, or `null` for an app, a key, or a browser that sent none.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/user_agent`.
-            public var userAgent: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var userAgent: Swift.String?
             /// For a key an app minted, the ID of that app's sign-in while the app is signed in. `null` for a browser, an app, an owner's key (`owner_key`), any other key, and a key whose app has ended.
             ///
             /// - Remark: Generated from `#/components/schemas/SignIn/minted_by`.
-            public var mintedBy: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var mintedBy: Swift.String?
             /// Creates a new `SignIn`.
             ///
             /// - Parameters:
@@ -17288,11 +17306,11 @@ extension Components {
                 kind: Components.Schemas.SignIn.KindPayload,
                 name: Swift.String,
                 createdAt: Swift.String,
-                lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                expiresAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                clientIp: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                userAgent: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                mintedBy: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                lastUsedAt: Swift.String? = nil,
+                expiresAt: Swift.String? = nil,
+                clientIp: Swift.String? = nil,
+                userAgent: Swift.String? = nil,
+                mintedBy: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
@@ -17708,7 +17726,7 @@ extension Components {
             /// The owner's name for the passkey, or `null` when unnamed.
             ///
             /// - Remark: Generated from `#/components/schemas/OwnerPasskey/name`.
-            public var name: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var name: Swift.String?
             /// When the passkey was registered, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/OwnerPasskey/created_at`.
@@ -17716,7 +17734,7 @@ extension Components {
             /// When the passkey last signed the owner in, in UTC, to the second, or `null` if no use is recorded.
             ///
             /// - Remark: Generated from `#/components/schemas/OwnerPasskey/last_used_at`.
-            public var lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastUsedAt: Swift.String?
             /// Creates a new `OwnerPasskey`.
             ///
             /// - Parameters:
@@ -17726,9 +17744,9 @@ extension Components {
             ///   - lastUsedAt: When the passkey last signed the owner in, in UTC, to the second, or `null` if no use is recorded.
             public init(
                 id: Swift.String,
-                name: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                name: Swift.String? = nil,
                 createdAt: Swift.String,
-                lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                lastUsedAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.name = name
@@ -18082,7 +18100,7 @@ extension Components {
             /// Always null: every grant is returned in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrantPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `AppGrantPage`.
             ///
             /// - Parameters:
@@ -18090,7 +18108,7 @@ extension Components {
             ///   - nextCursor: Always null: every grant is returned in one page.
             public init(
                 data: [Components.Schemas.AppGrant],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -18127,7 +18145,7 @@ extension Components {
             /// The app's registered name, or null if unavailable.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/client_name`.
-            public var clientName: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var clientName: Swift.String?
             /// Approved web origins, empty for a native app.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/origins`.
@@ -18151,7 +18169,7 @@ extension Components {
             /// When the app last used its access, in UTC, or null if never used.
             ///
             /// - Remark: Generated from `#/components/schemas/AppGrant/last_used_at`.
-            public var lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastUsedAt: Swift.String?
             /// Creates a new `AppGrant`.
             ///
             /// - Parameters:
@@ -18169,13 +18187,13 @@ extension Components {
                 id: Swift.String,
                 kind: Components.Schemas.AppGrant.KindPayload,
                 clientId: Swift.String,
-                clientName: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                clientName: Swift.String? = nil,
                 origins: [Swift.String],
                 scopes: [Swift.String],
                 vendors: [Swift.String],
                 status: Swift.String,
                 grantedAt: Swift.String,
-                lastUsedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                lastUsedAt: Swift.String? = nil
             ) {
                 self.id = id
                 self.kind = kind
@@ -18568,7 +18586,7 @@ extension Components {
             /// The type, with its subtypes, or the pattern whose item events Marfa sends. `null` when Marfa sends item events of every type. Edge events aren't filtered.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/type_filter`.
-            public var typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var typeFilter: Swift.String?
             /// The key Marfa signs each delivery with. Only `POST /webhooks` returns it whole; other responses show `****` and its last four characters.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/secret`.
@@ -18600,7 +18618,7 @@ extension Components {
                 id: Swift.String,
                 url: Swift.String,
                 events: [Swift.String],
-                typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                typeFilter: Swift.String? = nil,
                 secret: Swift.String,
                 active: Swift.Bool,
                 createdAt: Swift.String,
@@ -18637,7 +18655,7 @@ extension Components {
             /// Always `null`: Marfa returns every webhook you can inspect in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `WebhookPage`.
             ///
             /// - Parameters:
@@ -18645,7 +18663,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every webhook you can inspect in one page.
             public init(
                 data: [Components.Schemas.WebhookRead],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -18685,7 +18703,7 @@ extension Components {
                     /// The maker's current name, or null if it is no longer available.
                     ///
                     /// - Remark: Generated from `#/components/schemas/WebhookRead/value2/maker/name`.
-                    public var name: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                    public var name: Swift.String?
                     /// Creates a new `MakerPayload`.
                     ///
                     /// - Parameters:
@@ -18695,7 +18713,7 @@ extension Components {
                     public init(
                         kind: Components.Schemas.WebhookRead.Value2Payload.MakerPayload.KindPayload,
                         id: Swift.String,
-                        name: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                        name: Swift.String? = nil
                     ) {
                         self.kind = kind
                         self.id = id
@@ -18838,7 +18856,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDeliveryPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `WebhookDeliveryPage`.
             ///
             /// - Parameters:
@@ -18846,7 +18864,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.WebhookDelivery],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -18888,7 +18906,7 @@ extension Components {
             /// The HTTP status the receiver answered on the latest recorded attempt, or `null` if that attempt got no answer or no attempt has run.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/status_code`.
-            public var statusCode: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408
+            public var statusCode: Swift.Double?
             /// How many attempts have recorded an outcome, across every redelivery. A send whose outcome was lost, such as during a restart, isn't counted, so the receiver may have seen more.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/attempt`.
@@ -18900,7 +18918,7 @@ extension Components {
             /// Why the latest attempt failed, or why Marfa settled the delivery unsent. `null` after a success or before the first attempt.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/error`.
-            public var error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var error: Swift.String?
             /// When Marfa queued the delivery, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/WebhookDelivery/created_at`.
@@ -18922,10 +18940,10 @@ extension Components {
                 status: Components.Schemas.WebhookDelivery.StatusPayload,
                 webhookId: Swift.String,
                 eventType: Swift.String,
-                statusCode: Components.Schemas.MarfaNullableMarfaInlinecddf8275afa15408,
+                statusCode: Swift.Double? = nil,
                 attempt: Swift.Double,
                 succeeded: Swift.Bool,
-                error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                error: Swift.String? = nil,
                 createdAt: Swift.String
             ) {
                 self.id = id
@@ -18961,7 +18979,7 @@ extension Components {
             /// Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntryPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `AuditEntryPage`.
             ///
             /// - Parameters:
@@ -18969,7 +18987,7 @@ extension Components {
             ///   - nextCursor: Pass as `cursor` for the next page; `null` on the last. A page can be short, or empty, with a cursor still to follow, so a walk stops on `null` and never on a short page.
             public init(
                 data: [Components.Schemas.AuditEntry],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -18998,7 +19016,7 @@ extension Components {
             /// The ID of the credential that acted, or `null` if the entry names none, as for Marfa's own housekeeping.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/key_id`.
-            public var keyId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var keyId: Swift.String?
             /// What happened, such as `key.create` or `owner.claimed`.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/action`.
@@ -19010,11 +19028,11 @@ extension Components {
             /// The ID of the resource acted on, or `null` if there is none.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/resource_id`.
-            public var resourceId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var resourceId: Swift.String?
             /// The IP address of the request that acted, or `null` if the entry records none.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/client_ip`.
-            public var clientIp: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var clientIp: Swift.String?
             /// More about the action. What it holds depends on `action`.
             ///
             /// - Remark: Generated from `#/components/schemas/AuditEntry/details`.
@@ -19055,11 +19073,11 @@ extension Components {
                 actor: Components.Schemas.MarfaNullableMarfaInlinef5e21acab2df7137,
                 id: Swift.String,
                 createdAt: Swift.String,
-                keyId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                keyId: Swift.String? = nil,
                 action: Swift.String,
                 resourceType: Swift.String,
-                resourceId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                clientIp: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                resourceId: Swift.String? = nil,
+                clientIp: Swift.String? = nil,
                 details: Components.Schemas.AuditEntry.DetailsPayload
             ) {
                 self.actor = actor
@@ -19929,7 +19947,7 @@ extension Components {
             /// A position you can resume from without receiving again what the catch-up covered. `null` only on a copy stream, when Marfa couldn't read the log in time and had nothing to replay.
             ///
             /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/cursor`.
-            public var cursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var cursor: Swift.String?
             /// Only on a copy stream: the instance's ID, as `GET /` returns it.
             ///
             /// - Remark: Generated from `#/components/schemas/StreamLiveFrame/instance_id`.
@@ -19947,7 +19965,7 @@ extension Components {
             ///   - reach: Only on a copy stream: the reach to send as `X-Marfa-Reach`, to resume or to read the working copy's data.
             public init(
                 eventType: Components.Schemas.StreamLiveFrame.EventTypePayload,
-                cursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                cursor: Swift.String? = nil,
                 instanceId: Swift.String? = nil,
                 reach: Swift.String? = nil
             ) {
@@ -19992,7 +20010,7 @@ extension Components {
             /// The ID of the last event the stream sent, or `null` if it sent none.
             ///
             /// - Remark: Generated from `#/components/schemas/StreamIncompleteFrame/cursor`.
-            public var cursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var cursor: Swift.String?
             /// Creates a new `StreamIncompleteFrame`.
             ///
             /// - Parameters:
@@ -20002,7 +20020,7 @@ extension Components {
             public init(
                 eventType: Components.Schemas.StreamIncompleteFrame.EventTypePayload,
                 reason: Components.Schemas.StreamIncompleteFrame.ReasonPayload,
-                cursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                cursor: Swift.String? = nil
             ) {
                 self.eventType = eventType
                 self.reason = reason
@@ -20882,7 +20900,7 @@ extension Components {
             /// How many sessions, passkeys or apps it affects, or `null` for an address that is dropped.
             ///
             /// - Remark: Generated from `#/components/schemas/AddressConsequence/count`.
-            public var count: Components.Schemas.MarfaNullableMarfaInline2a1379ebe9f4b632
+            public var count: Swift.Int?
             /// Creates a new `AddressConsequence`.
             ///
             /// - Parameters:
@@ -20892,7 +20910,7 @@ extension Components {
             public init(
                 code: Components.Schemas.AddressConsequence.CodePayload,
                 sentence: Swift.String,
-                count: Components.Schemas.MarfaNullableMarfaInline2a1379ebe9f4b632
+                count: Swift.Int? = nil
             ) {
                 self.code = code
                 self.sentence = sentence
@@ -20935,7 +20953,7 @@ extension Components {
                 /// `true` if the new sign-in address answered `GET /` as this instance, `false` if it didn't, and `null` if Marfa didn't ask it.
                 ///
                 /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check/passed`.
-                public var passed: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754
+                public var passed: Swift.Bool?
                 /// Why it didn't pass: `unreachable`, nothing answered; `timed_out`, no answer in 5 seconds; `not_this_instance`, something else answered; `needs_recent_sign_in`, the address isn't public and you couldn't make the move. Present if `passed` isn't `true`.
                 ///
                 /// - Remark: Generated from `#/components/schemas/AddressCheck/sign_in_address_check/reason`.
@@ -20955,7 +20973,7 @@ extension Components {
                 ///   - passed: `true` if the new sign-in address answered `GET /` as this instance, `false` if it didn't, and `null` if Marfa didn't ask it.
                 ///   - reason: Why it didn't pass: `unreachable`, nothing answered; `timed_out`, no answer in 5 seconds; `not_this_instance`, something else answered; `needs_recent_sign_in`, the address isn't public and you couldn't make the move. Present if `passed` isn't `true`.
                 public init(
-                    passed: Components.Schemas.MarfaNullableMarfaInline7cb541e84f226754,
+                    passed: Swift.Bool? = nil,
                     reason: Components.Schemas.AddressCheck.SignInAddressCheckPayload.ReasonPayload? = nil
                 ) {
                     self.passed = passed
@@ -21718,7 +21736,7 @@ extension Components {
             /// Pass this as `cursor` to get the next page, or `null` when there are no more.
             ///
             /// - Remark: Generated from `#/components/schemas/TableRowPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `TableRowPage`.
             ///
             /// - Parameters:
@@ -21726,7 +21744,7 @@ extension Components {
             ///   - nextCursor: Pass this as `cursor` to get the next page, or `null` when there are no more.
             public init(
                 data: [Components.Schemas.TableRow],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -21759,11 +21777,11 @@ extension Components {
             /// The ID of the last batch that changed a row of the table, or `null` if none has.
             ///
             /// - Remark: Generated from `#/components/schemas/TableSummary/last_batch`.
-            public var lastBatch: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var lastBatch: Swift.String?
             /// When a row of the table last changed, in UTC, or `null` if none has.
             ///
             /// - Remark: Generated from `#/components/schemas/TableSummary/changed_at`.
-            public var changedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var changedAt: Swift.String?
             /// Creates a new `TableSummary`.
             ///
             /// - Parameters:
@@ -21778,8 +21796,8 @@ extension Components {
                 label: Swift.String,
                 rowCount: Swift.Int,
                 bytes: Swift.Int,
-                lastBatch: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                changedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                lastBatch: Swift.String? = nil,
+                changedAt: Swift.String? = nil
             ) {
                 self.name = name
                 self.label = label
@@ -21918,7 +21936,7 @@ extension Components {
             /// The ID of the batch, or `null` when it changed no row.
             ///
             /// - Remark: Generated from `#/components/schemas/RowBatchResult/batch`.
-            public var batch: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var batch: Swift.String?
             /// The time of the batch, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the batch changed no row. An item that held a later `last_activity_at` keeps it.
             ///
             /// - Remark: Generated from `#/components/schemas/RowBatchResult/last_activity_at`.
@@ -21978,7 +21996,7 @@ extension Components {
             ///   - lastActivityAt: The time of the batch, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the batch changed no row. An item that held a later `last_activity_at` keeps it.
             ///   - results: One entry per operation, in the order you sent them.
             public init(
-                batch: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                batch: Swift.String? = nil,
                 lastActivityAt: Swift.String,
                 results: Components.Schemas.RowBatchResult.ResultsPayload
             ) {
@@ -22750,7 +22768,7 @@ extension Components {
             /// The ID of the batch this one undid, or `null` when it's not an undo.
             ///
             /// - Remark: Generated from `#/components/schemas/RowBatchEntry/undoes`.
-            public var undoes: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var undoes: Swift.String?
             /// Creates a new `RowBatchEntry`.
             ///
             /// - Parameters:
@@ -22762,7 +22780,7 @@ extension Components {
                 id: Swift.String,
                 at: Swift.String,
                 rows: Swift.Int,
-                undoes: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                undoes: Swift.String? = nil
             ) {
                 self.id = id
                 self.at = at
@@ -22787,7 +22805,7 @@ extension Components {
             /// Pass this as `cursor` to get the next page. `null` when there are no more.
             ///
             /// - Remark: Generated from `#/components/schemas/RowBatchPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `RowBatchPage`.
             ///
             /// - Parameters:
@@ -22795,7 +22813,7 @@ extension Components {
             ///   - nextCursor: Pass this as `cursor` to get the next page. `null` when there are no more.
             public init(
                 data: [Components.Schemas.RowBatchEntry],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -22812,7 +22830,7 @@ extension Components {
             /// The ID of the undo's own batch, or `null` when every row already stood as it was before the undone batch. Undo this batch to redo the one it undid.
             ///
             /// - Remark: Generated from `#/components/schemas/RowUndoResult/batch`.
-            public var batch: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var batch: Swift.String?
             /// The ID of the batch you undid.
             ///
             /// - Remark: Generated from `#/components/schemas/RowUndoResult/undoes`.
@@ -22875,7 +22893,7 @@ extension Components {
             ///   - lastActivityAt: The time of the undo, in UTC, which each row it changed took as its `updated_at`, or the item's own `last_activity_at` when the undo changed no row. An item that held a later `last_activity_at` keeps it.
             ///   - results: One entry per row the undone batch changed, by ID.
             public init(
-                batch: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                batch: Swift.String? = nil,
                 undoes: Swift.String,
                 lastActivityAt: Swift.String,
                 results: Components.Schemas.RowUndoResult.ResultsPayload
@@ -22948,7 +22966,15 @@ extension Components {
             /// Where this instance takes its backups: `folder` for a backup folder, `bucket` for an object store, or `null` when it has no backup destination.
             ///
             /// - Remark: Generated from `#/components/schemas/PreviousInstance/destination`.
-            public var destination: Components.Schemas.MarfaNullableMarfaInline56fd98fe6e2a9c1c
+            @frozen public enum DestinationPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case folder = "folder"
+                case bucket = "bucket"
+                case _empty_ = ""
+            }
+            /// Where this instance takes its backups: `folder` for a backup folder, `bucket` for an object store, or `null` when it has no backup destination.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PreviousInstance/destination`.
+            public var destination: Components.Schemas.PreviousInstance.DestinationPayload?
             /// Its `backups/<id>`, `backup-parts/<id>` and `files/<id>` folders in a backup folder, or only `<prefix>/backups/<id>` and `<prefix>/backup-parts/<id>` in a bucket. Empty with none. Delete only once that instance no longer runs.
             ///
             /// - Remark: Generated from `#/components/schemas/PreviousInstance/kept_by_previous_instance`.
@@ -22966,7 +22992,7 @@ extension Components {
             ///   - message: A sentence naming that instance and what it keeps, and saying to delete it only once that instance no longer runs and nothing else restores from it.
             public init(
                 instanceId: Swift.String,
-                destination: Components.Schemas.MarfaNullableMarfaInline56fd98fe6e2a9c1c,
+                destination: Components.Schemas.PreviousInstance.DestinationPayload? = nil,
                 keptByPreviousInstance: [Swift.String],
                 message: Swift.String
             ) {
@@ -23301,7 +23327,7 @@ extension Components {
             /// When the check failed, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateCheckError/at`.
-            public var at: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var at: Swift.String?
             /// Why the check found no release, in words for a person.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateCheckError/message`.
@@ -23312,7 +23338,7 @@ extension Components {
             ///   - at: When the check failed, in UTC.
             ///   - message: Why the check found no release, in words for a person.
             public init(
-                at: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                at: Swift.String? = nil,
                 message: Swift.String
             ) {
                 self.at = at
@@ -23345,7 +23371,7 @@ extension Components {
             /// The release being moved to, or `null` when `state` is `idle`.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateProgress/release`.
-            public var release: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var release: Swift.String?
             /// Creates a new `UpdateProgress`.
             ///
             /// - Parameters:
@@ -23353,7 +23379,7 @@ extension Components {
             ///   - release: The release being moved to, or `null` when `state` is `idle`.
             public init(
                 state: Components.Schemas.UpdateProgress.StatePayload,
-                release: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                release: Swift.String? = nil
             ) {
                 self.state = state
                 self.release = release
@@ -23390,7 +23416,7 @@ extension Components {
             /// Why the update did not succeed, in words for a person, or `null` when it did.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateLast/reason`.
-            public var reason: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var reason: Swift.String?
             /// Creates a new `UpdateLast`.
             ///
             /// - Parameters:
@@ -23402,7 +23428,7 @@ extension Components {
                 outcome: Components.Schemas.UpdateLast.OutcomePayload,
                 release: Swift.String,
                 finishedAt: Swift.String,
-                reason: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                reason: Swift.String? = nil
             ) {
                 self.outcome = outcome
                 self.release = release
@@ -23431,7 +23457,7 @@ extension Components {
             /// When a check last found the newest release, in UTC, or `null` if none has.
             ///
             /// - Remark: Generated from `#/components/schemas/Update/checked_at`.
-            public var checkedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var checkedAt: Swift.String?
             /// Why the latest check failed, or `null` if it did not. A failed check keeps `latest` as it was.
             ///
             /// - Remark: Generated from `#/components/schemas/Update/check_error`.
@@ -23458,7 +23484,7 @@ extension Components {
             /// What to do on the host to move to `latest`, in plain words, when `available` is `true` and `method` is `manual`; otherwise `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/Update/step`.
-            public var step: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var step: Swift.String?
             /// The update under way, if any.
             ///
             /// - Remark: Generated from `#/components/schemas/Update/progress`.
@@ -23483,12 +23509,12 @@ extension Components {
             public init(
                 release: Swift.String,
                 checkEnabled: Swift.Bool,
-                checkedAt: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                checkedAt: Swift.String? = nil,
                 checkError: Components.Schemas.MarfaNullableUpdateCheckError,
                 latest: Components.Schemas.MarfaNullableUpdateLatest,
                 available: Swift.Bool,
                 method: Components.Schemas.Update.MethodPayload,
-                step: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                step: Swift.String? = nil,
                 progress: Components.Schemas.UpdateProgress,
                 last: Components.Schemas.MarfaNullableUpdateLast
             ) {
@@ -25211,7 +25237,7 @@ extension Components {
             /// The ID of the connector host the plugin's connector is assigned to, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/Plugin/connector_host`.
-            public var connectorHost: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var connectorHost: Swift.String?
             /// The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
             ///
             /// - Remark: Generated from `#/components/schemas/Plugin/fingerprint`.
@@ -25257,7 +25283,7 @@ extension Components {
                 types: [Swift.String],
                 edgeTypes: [Swift.String],
                 connector: Components.Schemas.MarfaNullablePluginConnector,
-                connectorHost: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                connectorHost: Swift.String? = nil,
                 fingerprint: Swift.String,
                 installedAt: Foundation.Date,
                 installedBy: Components.Schemas.MarfaNullablePluginInstaller,
@@ -25338,8 +25364,8 @@ extension Components {
                     Components.Schemas.MarfaNullablePluginConnector.self,
                     forKey: .connector
                 )
-                self.connectorHost = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.connectorHost = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .connectorHost
                 )
                 self.fingerprint = try container.decode(
@@ -25424,7 +25450,7 @@ extension Components {
             /// The ID of the connector host the plugin's connector is assigned to, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginInstalled/connector_host`.
-            public var connectorHost: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var connectorHost: Swift.String?
             /// The SHA-256 of the bundle's bytes as the install that wrote this version received them, in lowercase hexadecimal.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginInstalled/fingerprint`.
@@ -25483,7 +25509,7 @@ extension Components {
                 types: [Swift.String],
                 edgeTypes: [Swift.String],
                 connector: Components.Schemas.MarfaNullablePluginConnector,
-                connectorHost: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                connectorHost: Swift.String? = nil,
                 fingerprint: Swift.String,
                 installedAt: Foundation.Date,
                 installedBy: Components.Schemas.MarfaNullablePluginInstaller,
@@ -25567,8 +25593,8 @@ extension Components {
                     Components.Schemas.MarfaNullablePluginConnector.self,
                     forKey: .connector
                 )
-                self.connectorHost = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.connectorHost = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .connectorHost
                 )
                 self.fingerprint = try container.decode(
@@ -25638,7 +25664,7 @@ extension Components {
                     /// The ID of the connector's key Marfa revoked, or `null` if none stood.
                     ///
                     /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector/key_id`.
-                    public var keyId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                    public var keyId: Swift.String?
                     /// The IDs of the connector registrations under the source that Marfa deleted.
                     ///
                     /// - Remark: Generated from `#/components/schemas/PluginRemoved/removed/connector/registrations`.
@@ -25651,7 +25677,7 @@ extension Components {
                     ///   - registrations: The IDs of the connector registrations under the source that Marfa deleted.
                     public init(
                         source: Swift.String,
-                        keyId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                        keyId: Swift.String? = nil,
                         registrations: [Swift.String]
                     ) {
                         self.source = source
@@ -25669,8 +25695,8 @@ extension Components {
                             Swift.String.self,
                             forKey: .source
                         )
-                        self.keyId = try container.decode(
-                            Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                        self.keyId = try container.decodeIfPresent(
+                            Swift.String.self,
                             forKey: .keyId
                         )
                         self.registrations = try container.decode(
@@ -26281,7 +26307,7 @@ extension Components {
             /// Always `null`: Marfa returns every installed plugin in one page.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `PluginPage`.
             ///
             /// - Parameters:
@@ -26289,7 +26315,7 @@ extension Components {
             ///   - nextCursor: Always `null`: Marfa returns every installed plugin in one page.
             public init(
                 data: [Components.Schemas.Plugin],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.data = data
                 self.nextCursor = nextCursor
@@ -26304,8 +26330,8 @@ extension Components {
                     [Components.Schemas.Plugin].self,
                     forKey: .data
                 )
-                self.nextCursor = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.nextCursor = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .nextCursor
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -26325,11 +26351,11 @@ extension Components {
             /// The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it because no one app is known to have made its types.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendor/client_id`.
-            public var clientId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var clientId: Swift.String?
             /// The name the app that holds the namespace registered, or `null` while the owner holds it or the app registered none.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendor/client_name`.
-            public var clientName: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var clientName: Swift.String?
             /// When the namespace was first held, or when it was given to the app that holds it.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendor/claimed_at`.
@@ -26343,8 +26369,8 @@ extension Components {
             ///   - claimedAt: When the namespace was first held, or when it was given to the app that holds it.
             public init(
                 vendor: Swift.String,
-                clientId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                clientName: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                clientId: Swift.String? = nil,
+                clientName: Swift.String? = nil,
                 claimedAt: Foundation.Date
             ) {
                 self.vendor = vendor
@@ -26364,12 +26390,12 @@ extension Components {
                     Swift.String.self,
                     forKey: .vendor
                 )
-                self.clientId = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.clientId = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .clientId
                 )
-                self.clientName = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.clientName = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .clientName
                 )
                 self.claimedAt = try container.decode(
@@ -27062,7 +27088,7 @@ extension Components {
             /// When the host's key last read `GET /connector-hosts/self`, in UTC, or `null` if it never has.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorHost/last_seen_at`.
-            public var lastSeenAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var lastSeenAt: Foundation.Date?
             /// `true` if the host holds a live key.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorHost/linked`.
@@ -27070,7 +27096,7 @@ extension Components {
             /// When the host's unredeemed one-time link ends, in UTC, or `null` if none stands.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorHost/link_expires_at`.
-            public var linkExpiresAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var linkExpiresAt: Foundation.Date?
             /// A connector assigned to the host.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorHost/ConnectorsPayload`.
@@ -27152,9 +27178,9 @@ extension Components {
                 name: Swift.String,
                 createdAt: Foundation.Date,
                 updatedAt: Foundation.Date,
-                lastSeenAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd,
+                lastSeenAt: Foundation.Date? = nil,
                 linked: Swift.Bool,
-                linkExpiresAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd,
+                linkExpiresAt: Foundation.Date? = nil,
                 connectors: Components.Schemas.ConnectorHost.ConnectorsPayload
             ) {
                 self.id = id
@@ -27194,16 +27220,16 @@ extension Components {
                     Foundation.Date.self,
                     forKey: .updatedAt
                 )
-                self.lastSeenAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.lastSeenAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .lastSeenAt
                 )
                 self.linked = try container.decode(
                     Swift.Bool.self,
                     forKey: .linked
                 )
-                self.linkExpiresAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.linkExpiresAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .linkExpiresAt
                 )
                 self.connectors = try container.decode(
@@ -27512,7 +27538,7 @@ extension Components {
                 /// The ID of the registration the connector's current key made, or `null`.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/registration_id`.
-                public var registrationId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                public var registrationId: Swift.String?
                 /// `true` if the host minted a key for the connector that still stands.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/key_minted`.
@@ -27524,7 +27550,7 @@ extension Components {
                 /// When the owner asked the connector to run now, in UTC, or `null` if no run is waiting.
                 ///
                 /// - Remark: Generated from `#/components/schemas/ConnectorHostSelf/ConnectorsPayload/run_requested_at`.
-                public var runRequestedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+                public var runRequestedAt: Foundation.Date?
                 /// Creates a new `ConnectorsPayloadPayload`.
                 ///
                 /// - Parameters:
@@ -27541,10 +27567,10 @@ extension Components {
                     version: Swift.String,
                     fingerprint: Swift.String,
                     connector: Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload.ConnectorPayload,
-                    registrationId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                    registrationId: Swift.String? = nil,
                     keyMinted: Swift.Bool,
                     paused: Swift.Bool,
-                    runRequestedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+                    runRequestedAt: Foundation.Date? = nil
                 ) {
                     self.plugin = plugin
                     self.version = version
@@ -27583,8 +27609,8 @@ extension Components {
                         Components.Schemas.ConnectorHostSelf.ConnectorsPayloadPayload.ConnectorPayload.self,
                         forKey: .connector
                     )
-                    self.registrationId = try container.decode(
-                        Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                    self.registrationId = try container.decodeIfPresent(
+                        Swift.String.self,
                         forKey: .registrationId
                     )
                     self.keyMinted = try container.decode(
@@ -27595,8 +27621,8 @@ extension Components {
                         Swift.Bool.self,
                         forKey: .paused
                     )
-                    self.runRequestedAt = try container.decode(
-                        Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                    self.runRequestedAt = try container.decodeIfPresent(
+                        Foundation.Date.self,
                         forKey: .runRequestedAt
                     )
                     try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -27846,7 +27872,7 @@ extension Components {
             /// The ID of the host the connector is assigned to, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned/host`.
-            public var host: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var host: Swift.String?
             /// `true` if that host minted a key for the connector that still stands.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorAssigned/key_minted`.
@@ -27861,7 +27887,7 @@ extension Components {
             public init(
                 plugin: Swift.String,
                 source: Swift.String,
-                host: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                host: Swift.String? = nil,
                 keyMinted: Swift.Bool
             ) {
                 self.plugin = plugin
@@ -27885,8 +27911,8 @@ extension Components {
                     Swift.String.self,
                     forKey: .source
                 )
-                self.host = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.host = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .host
                 )
                 self.keyMinted = try container.decode(
@@ -28524,23 +28550,23 @@ extension Components {
             /// Why the latest sign-in failed, or `null` unless `status` is `failed`: an RFC 6749 error such as `invalid_client` (a wrong client ID or secret) or `access_denied`, or a word of Marfa's such as `timeout` or `status_503`. Never the provider's text.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/reason`.
-            public var reason: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var reason: Swift.String?
             /// The latest sign-in's ID, as its start returned it, or `null` if none was started.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/id`.
-            public var id: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var id: Swift.String?
             /// When the latest sign-in started, in UTC, or `null` if none was started.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/started_at`.
-            public var startedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var startedAt: Foundation.Date?
             /// When the latest sign-in ends if the owner's browser doesn't come back, in UTC, or `null` if none was started.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/expires_at`.
-            public var expiresAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var expiresAt: Foundation.Date?
             /// When the owner's browser came back and ended the latest sign-in, in UTC, or `null` while it is pending, once it expired, or if none was started.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorSignInStatus/ended_at`.
-            public var endedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var endedAt: Foundation.Date?
             /// Creates a new `PluginConnectorSignInStatus`.
             ///
             /// - Parameters:
@@ -28554,11 +28580,11 @@ extension Components {
             public init(
                 plugin: Swift.String,
                 status: Components.Schemas.PluginConnectorSignInStatus.StatusPayload,
-                reason: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                id: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                startedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd,
-                expiresAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd,
-                endedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+                reason: Swift.String? = nil,
+                id: Swift.String? = nil,
+                startedAt: Foundation.Date? = nil,
+                expiresAt: Foundation.Date? = nil,
+                endedAt: Foundation.Date? = nil
             ) {
                 self.plugin = plugin
                 self.status = status
@@ -28587,24 +28613,24 @@ extension Components {
                     Components.Schemas.PluginConnectorSignInStatus.StatusPayload.self,
                     forKey: .status
                 )
-                self.reason = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.reason = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .reason
                 )
-                self.id = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.id = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .id
                 )
-                self.startedAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.startedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .startedAt
                 )
-                self.expiresAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.expiresAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .expiresAt
                 )
-                self.endedAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.endedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .endedAt
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -30257,11 +30283,11 @@ extension Components {
             /// The ID of the host the connector is assigned to, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/host`.
-            public var host: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var host: Swift.String?
             /// The ID of the registration the connector's current key made, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/registration`.
-            public var registration: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var registration: Swift.String?
             /// `true` if the owner paused the connector. The connector stops itself; Marfa still takes its writes.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/paused`.
@@ -30269,7 +30295,7 @@ extension Components {
             /// When the owner last asked the connector to run now, in UTC, until the connector reports a run that names this time as its `run_requested_at`. `null` if no run is waiting.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/run_requested_at`.
-            public var runRequestedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var runRequestedAt: Foundation.Date?
             /// The version of the connector's mapping, `0` until one is saved.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnectorControl/mapping_version`.
@@ -30297,10 +30323,10 @@ extension Components {
             public init(
                 plugin: Swift.String,
                 source: Swift.String,
-                host: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
-                registration: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                host: Swift.String? = nil,
+                registration: Swift.String? = nil,
                 paused: Swift.Bool,
-                runRequestedAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd,
+                runRequestedAt: Foundation.Date? = nil,
                 mappingVersion: Swift.Int,
                 rewrites: Swift.Int,
                 previews: Swift.Int
@@ -30336,20 +30362,20 @@ extension Components {
                     Swift.String.self,
                     forKey: .source
                 )
-                self.host = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.host = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .host
                 )
-                self.registration = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.registration = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .registration
                 )
                 self.paused = try container.decode(
                     Swift.Bool.self,
                     forKey: .paused
                 )
-                self.runRequestedAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.runRequestedAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .runRequestedAt
                 )
                 self.mappingVersion = try container.decode(
@@ -30392,7 +30418,7 @@ extension Components {
             /// The ID of the item the connector renders the preview from, or `null` to let the connector choose a recent one.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/item_id`.
-            public var itemId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var itemId: Swift.String?
             /// The draft of the kind's mapping to render with, or `null` for the mapping in force.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/mapping`.
@@ -30416,7 +30442,7 @@ extension Components {
             /// Why the connector could not render the preview, once `status` is `failed`.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/error`.
-            public var error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var error: Swift.String?
             /// When the preview was asked for, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/created_at`.
@@ -30428,7 +30454,7 @@ extension Components {
             /// When the connector answered, in UTC, or `null`.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreview/answered_at`.
-            public var answeredAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+            public var answeredAt: Foundation.Date?
             /// Creates a new `ConnectorPreview`.
             ///
             /// - Parameters:
@@ -30445,14 +30471,14 @@ extension Components {
             public init(
                 id: Swift.String,
                 kind: Swift.String,
-                itemId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                itemId: Swift.String? = nil,
                 mapping: Components.Schemas.MarfaNullableConnectorMappingKind,
                 status: Components.Schemas.ConnectorPreview.StatusPayload,
                 result: Components.Schemas.MarfaNullableConnectorPreviewResult,
-                error: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                error: Swift.String? = nil,
                 createdAt: Foundation.Date,
                 expiresAt: Foundation.Date,
-                answeredAt: Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd
+                answeredAt: Foundation.Date? = nil
             ) {
                 self.id = id
                 self.kind = kind
@@ -30487,8 +30513,8 @@ extension Components {
                     Swift.String.self,
                     forKey: .kind
                 )
-                self.itemId = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.itemId = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .itemId
                 )
                 self.mapping = try container.decode(
@@ -30503,8 +30529,8 @@ extension Components {
                     Components.Schemas.MarfaNullableConnectorPreviewResult.self,
                     forKey: .result
                 )
-                self.error = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.error = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .error
                 )
                 self.createdAt = try container.decode(
@@ -30515,8 +30541,8 @@ extension Components {
                     Foundation.Date.self,
                     forKey: .expiresAt
                 )
-                self.answeredAt = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline4f410cd74c87d8dd.self,
+                self.answeredAt = try container.decodeIfPresent(
+                    Foundation.Date.self,
                     forKey: .answeredAt
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -31173,7 +31199,7 @@ extension Components {
             /// The OAuth client ID of the app that holds the namespace, or `null` while the owner holds it.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/client_id`.
-            public var clientId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var clientId: Swift.String?
             /// Every type registered under the namespace, by identifier, each in every page.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/types`.
@@ -31185,7 +31211,7 @@ extension Components {
             /// Send as `cursor` for the next page, or `null` on the last page.
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendorDataPage/next_cursor`.
-            public var nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+            public var nextCursor: Swift.String?
             /// Creates a new `AppVendorDataPage`.
             ///
             /// - Parameters:
@@ -31196,10 +31222,10 @@ extension Components {
             ///   - nextCursor: Send as `cursor` for the next page, or `null` on the last page.
             public init(
                 vendor: Swift.String,
-                clientId: Components.Schemas.MarfaNullableMarfaInline00404e686415370f,
+                clientId: Swift.String? = nil,
                 types: [Components.Schemas.AppVendorDataType],
                 data: [Components.Schemas.AppVendorDataItem],
-                nextCursor: Components.Schemas.MarfaNullableMarfaInline00404e686415370f
+                nextCursor: Swift.String? = nil
             ) {
                 self.vendor = vendor
                 self.clientId = clientId
@@ -31220,8 +31246,8 @@ extension Components {
                     Swift.String.self,
                     forKey: .vendor
                 )
-                self.clientId = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.clientId = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .clientId
                 )
                 self.types = try container.decode(
@@ -31232,8 +31258,8 @@ extension Components {
                     [Components.Schemas.AppVendorDataItem].self,
                     forKey: .data
                 )
-                self.nextCursor = try container.decode(
-                    Components.Schemas.MarfaNullableMarfaInline00404e686415370f.self,
+                self.nextCursor = try container.decodeIfPresent(
+                    Swift.String.self,
                     forKey: .nextCursor
                 )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
@@ -31487,12 +31513,6 @@ extension Components {
         public typealias MarfaInline0d3ac1e9e006c011 = Swift.Int
         /// - Remark: Generated from `#/components/schemas/MarfaInline010b1dec865519f0`.
         public typealias MarfaInline010b1dec865519f0 = Swift.String
-        /// - Remark: Generated from `#/components/schemas/MarfaInlineb529a0144d7e10cd`.
-        @frozen public enum MarfaInlineb529a0144d7e10cd: String, Codable, Hashable, Sendable, CaseIterable {
-            case processed = "processed"
-            case duplicate = "duplicate"
-            case rejected = "rejected"
-        }
         /// - Remark: Generated from `#/components/schemas/MarfaInline8cd078ecde4bb386`.
         public typealias MarfaInline8cd078ecde4bb386 = Swift.String
         /// - Remark: Generated from `#/components/schemas/MarfaInlinef5e21acab2df7137`.
@@ -31637,13 +31657,6 @@ extension Components {
                 try self.value2?.encode(to: encoder)
             }
         }
-        /// - Remark: Generated from `#/components/schemas/MarfaInline2a1379ebe9f4b632`.
-        public typealias MarfaInline2a1379ebe9f4b632 = Swift.Int
-        /// - Remark: Generated from `#/components/schemas/MarfaInline56fd98fe6e2a9c1c`.
-        @frozen public enum MarfaInline56fd98fe6e2a9c1c: String, Codable, Hashable, Sendable, CaseIterable {
-            case folder = "folder"
-            case bucket = "bucket"
-        }
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline00404e686415370f`.
         public typealias MarfaNullableMarfaInline00404e686415370f = MarfaNullable<Components.Schemas.MarfaInline00404e686415370f>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableViewGroup`.
@@ -31716,18 +31729,12 @@ extension Components {
         public typealias MarfaNullableHousekeepingReport = MarfaNullable<Components.Schemas.HousekeepingReport>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorRun`.
         public typealias MarfaNullableConnectorRun = MarfaNullable<Components.Schemas.ConnectorRun>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlineb529a0144d7e10cd`.
-        public typealias MarfaNullableMarfaInlineb529a0144d7e10cd = MarfaNullable<Components.Schemas.MarfaInlineb529a0144d7e10cd>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline8cd078ecde4bb386`.
         public typealias MarfaNullableMarfaInline8cd078ecde4bb386 = MarfaNullable<Components.Schemas.MarfaInline8cd078ecde4bb386>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinef5e21acab2df7137`.
         public typealias MarfaNullableMarfaInlinef5e21acab2df7137 = MarfaNullable<Components.Schemas.MarfaInlinef5e21acab2df7137>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMetadata`.
         public typealias MarfaNullableMetadata = MarfaNullable<Components.Schemas.Metadata>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline2a1379ebe9f4b632`.
-        public typealias MarfaNullableMarfaInline2a1379ebe9f4b632 = MarfaNullable<Components.Schemas.MarfaInline2a1379ebe9f4b632>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline56fd98fe6e2a9c1c`.
-        public typealias MarfaNullableMarfaInline56fd98fe6e2a9c1c = MarfaNullable<Components.Schemas.MarfaInline56fd98fe6e2a9c1c>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateCheckError`.
         public typealias MarfaNullableUpdateCheckError = MarfaNullable<Components.Schemas.UpdateCheckError>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableUpdateLatest`.

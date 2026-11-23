@@ -4,7 +4,7 @@ import Testing
 
 @Test func aPageOfItemsReadsEachRow() throws {
     let item =
-        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","last_activity_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1,"trashed_at":null}"#
+        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","last_activity_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1}"#
     let page = try JSONDecoder().decode(
         Components.Schemas.ItemPage.self, from: Data(#"{"data":[\#(item)],"next_cursor":null}"#.utf8))
     guard case .Item(let row)? = page.data.first else {
@@ -13,15 +13,10 @@ import Testing
     }
     #expect(row.id == "i1")
     #expect(row.schemaVersion == 1)
-    #expect(row.trashedAt == .null)
-    #expect(page.nextCursor == .null)
+    #expect(page.nextCursor == nil)
     let next = try JSONDecoder().decode(
         Components.Schemas.ItemPage.self, from: Data(#"{"data":[],"next_cursor":"c1"}"#.utf8))
-    #expect(next.nextCursor == .value("c1"))
-    #expect(throws: DecodingError.self) {
-        let omitted = item.replacing(#","trashed_at":null"#, with: "")
-        try JSONDecoder().decode(Components.Schemas.Item.self, from: Data(omitted.utf8))
-    }
+    #expect(next.nextCursor == "c1")
 }
 
 private let live: (url: URL, key: String)? = {
@@ -170,7 +165,7 @@ func nullableWireFieldsRoundTripThroughTheServer() async throws {
 
 @Test func ordinaryKeyWireTypesHaveNoPrivilegedFlag() throws {
     let body = Data(
-        #"{"id":"k1","key":"marfa_k1_fixture","label":"Fixture","source":"wire-fixture","sources":[],"permissions":[],"default_tier":"library","type_permissions":{},"extension_permissions":{},"edge_permissions":{},"metadata_permissions":{},"profile_permissions":{},"created_at":"2026-10-08T00:00:00Z","expires_at":null,"last_used_at":null}"#
+        #"{"id":"k1","key":"marfa_k1_fixture","label":"Fixture","source":"wire-fixture","sources":[],"permissions":[],"default_tier":"library","type_permissions":{},"extension_permissions":{},"edge_permissions":{},"metadata_permissions":{},"profile_permissions":{},"created_at":"2026-10-08T00:00:00Z","last_used_at":null}"#
             .utf8)
     let decoder = JSONDecoder()
     let created = try decoder.decode(Components.Schemas.KeyResponse.self, from: body)

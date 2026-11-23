@@ -44,8 +44,8 @@ extension Client {
     /// A page of what an app keeps under the namespace `vendor`: each type registered under it, or held by an item,
     /// with its items counted by state, and a page of its items in every state, the trash included, oldest first.
     ///
-    /// `vendor` is the namespace as `app.<vendor>`. Send the page's `nextCursor` value as `cursor` for the next page;
-    /// it is `.null` on the last. Needs `grants.manage`, or the owner's browser session. An app's own sign-in reads only the
+    /// `vendor` is the namespace as `app.<vendor>`. Send the page's `nextCursor` as `cursor` for the next page; it is
+    /// `nil` on the last. Needs `grants.manage`, or the owner's browser session. An app's own sign-in reads only the
     /// namespaces its app holds. Throws ``MarfaError/notFound(code:message:server:)`` for a namespace no app or owner
     /// holds, and ``MarfaError/validation(code:message:details:server:)`` for a name that is not an `app.<vendor>`
     /// namespace.
