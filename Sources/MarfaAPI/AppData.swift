@@ -32,8 +32,8 @@ public struct AppDataRemoval: Sendable {
     public let remainingItems: Int
     /// Why the deletion stopped while items were left, or `nil` where it did not stop early.
     ///
-    /// The call that failed may still have deleted a page at the server, so the counts above are a lower bound, and
-    /// listing the namespace's data shows what is left.
+    /// The call that failed may still have deleted a page at the server, so ``removedItems`` and ``removedTypes`` are
+    /// a lower bound and ``remainingItems`` may be more than is left. Listing the namespace's data shows what is left.
     public let stoppedBy: MarfaError?
 
     /// Whether the server answered that nothing of the namespace is left.
@@ -65,7 +65,8 @@ extension Client {
     /// outside it stay; an edge from one of them to a deleted item goes.
     ///
     /// The server deletes up to 1,000 items a call, and the types in the call that leaves none, so this sends the
-    /// call again until the server answers that nothing is left. Throws when the first call fails, such as
+    /// call again until the server answers that nothing is left, or answers that it deleted nothing while items are
+    /// left, which stops the deletion with ``AppDataRemoval/stoppedBy`` set. Throws when the first call fails, such as
     /// ``MarfaError/forbidden(code:message:server:)`` naming `items.purge`, `grants.manage` or `schema.write` as the
     /// `required_scope`, or `type_in_use` while a folder, view, webhook or table column outside the namespace names
     /// one of its types. A failure after a call the server answered, cancellation included, is not thrown: it comes
