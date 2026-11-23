@@ -23,8 +23,25 @@ extension Client {
     init(_ server: Server, through base: URLSession?, timeout: Duration) {
         let connection = Connection(base: base ?? server.signInSession, timeout: timeout)
         self.init(
-            serverURL: server.url,
+            serverURL: server.url, configuration: Configuration(dateTranscoder: ServerDates()),
             transport: URLSessionTransport(configuration: .init(session: connection.session)),
             middlewares: [Access(server: server, connection: connection)])
+    }
+}
+
+/// Reads a date with or without fractional seconds, since the server writes milliseconds where it keeps them, and
+/// writes a whole second without them.
+struct ServerDates: DateTranscoder {
+    private static let whole = Date.ISO8601FormatStyle()
+    private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+
+    func encode(_ date: Date) throws -> String {
+        date.timeIntervalSince1970.rounded(.down) == date.timeIntervalSince1970
+            ? Self.whole.format(date) : Self.fractional.format(date)
+    }
+
+    func decode(_ text: String) throws -> Date {
+        if let date = try? Self.fractional.parse(text) { return date }
+        return try Self.whole.parse(text)
     }
 }
