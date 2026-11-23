@@ -63553,7 +63553,7 @@ public enum Operations {
     }
     /// Install a plugin
     ///
-    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`.
     ///
     /// - Remark: HTTP `POST /plugins`.
     /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
@@ -63867,20 +63867,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/plugins/POST/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///
+                    /// - Remark: Generated from `#/paths/plugins/POST/responses/401/headers/WWW-Authenticate`.
+                    public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        wwwAuthenticate: Components.Headers.WWWAuthenticate? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xErrorCode = xErrorCode
+                        self.wwwAuthenticate = wwwAuthenticate
                     }
                 }
                 /// Received HTTP response headers
@@ -63888,12 +63895,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/plugins/POST/responses/401/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/plugins/POST/responses/401/content/application\/json`.
-                    case json(Components.Schemas.UnauthorizedRefusal)
+                    case json(Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.UnauthorizedRefusal {
+                    public var json: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -63917,7 +63924,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            /// - `insufficient_user_authentication`: you are an app adding, changing or removing a type's guidance, and your owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//plugins/post(installPlugin)/responses/401`.
             ///
@@ -64005,9 +64013,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: no `schema.write`, no `connectors.manage` for a `connector` (`details.required_scope`), a type under `core`, `system`, `marfa`, `app` or `user` (`details.namespace`), or app guidance.
-            /// - `type_not_permitted`: no write on a type of the bundle, or on a parent outside it that isn't shipped or under `common`.
-            /// - `edge_type_not_permitted`: no write on an edge type name of the bundle.
+            /// - `forbidden`: no `schema.write`, no `connectors.manage` for a `connector` (`details.required_scope`), a type under `core`, `system`, `marfa`, `app` or `user` (`details.namespace`), or guidance from an app-made key.
+            /// - `type_not_permitted`: no write on a bundle type, or a parent outside it that isn't shipped or under `common`.
+            /// - `edge_type_not_permitted`: no write on a bundle edge type.
             ///
             /// - Remark: Generated from `#/paths//plugins/post(installPlugin)/responses/403`.
             ///
@@ -96097,20 +96105,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/types/POST/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/POST/responses/401/headers/WWW-Authenticate`.
+                    public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        wwwAuthenticate: Components.Headers.WWWAuthenticate? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xErrorCode = xErrorCode
+                        self.wwwAuthenticate = wwwAuthenticate
                     }
                 }
                 /// Received HTTP response headers
@@ -96118,12 +96133,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/POST/responses/401/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/POST/responses/401/content/application\/json`.
-                    case json(Components.Schemas.UnauthorizedRefusal)
+                    case json(Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.UnauthorizedRefusal {
+                    public var json: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -96147,7 +96162,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            /// - `insufficient_user_authentication`: you are an app adding, changing or removing a type's guidance, and your owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/401`.
             ///
@@ -96235,7 +96251,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you lack `metadata.types:write`, guidance needs `schema.write`, the identifier is under `core.*`, `system.*`, `marfa.*` or `common.*` (install its plugin), or you are an app and another app or the owner holds its `app.<vendor>` namespace (`details.namespace`).
+            /// - `forbidden`: no `metadata.types:write`, guidance without `schema.write` or from an app-made key, the identifier is under `core.*`, `system.*`, `marfa.*` or `common.*` (install its plugin), or another app holds its `app.<vendor>` namespace (`details.namespace`).
             /// - `type_not_permitted`: your type map lacks write on the identifier or a non-platform `parent` (`details.grant` names it).
             ///
             /// - Remark: Generated from `#/paths//types/post(registerType)/responses/403`.
@@ -98296,20 +98312,27 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/401/headers/X-Error-Code`.
                     public var xErrorCode: Components.Headers.XErrorCode?
+                    /// The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
+                    ///
+                    /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/401/headers/WWW-Authenticate`.
+                    public var wwwAuthenticate: Components.Headers.WWWAuthenticate?
                     /// Creates a new `Headers`.
                     ///
                     /// - Parameters:
                     ///   - xMarfaContract: The contract version this server speaks, the same integer as the document's `info.version` and the root's `contract`. Sent on every response the application gives, refusals included, so a client can check the answer it is about to read. A client generated for another number cannot trust the body. A request refused by the HTTP layer before it reaches the application, such as one with a malformed host, is answered without it.
                     ///   - xRequestID: This request's identifier, the same one written to the server's request log. Echoes the caller's own `X-Request-ID` when it sends one matching `[A-Za-z0-9_-]{1,128}`, and is a generated UUIDv7 otherwise, so a client can either adopt the server's id or impose its own. Quote it when reporting a problem: it is the one value that finds the request again.
                     ///   - xErrorCode: The machine-readable error code, identical to `error.code` in the body and drawn from the same enum the response schema lists. Read it rather than matching on `error.message`, which is prose written for a person and may be reworded. Present on every error the server renders, including one served from an idempotency record.
+                    ///   - wwwAuthenticate: The step-up challenge of RFC 9470, sent with `insufficient_user_authentication`: `Bearer error="insufficient_user_authentication", max_age="900"`, where `max_age` is how many seconds old the owner's sign-in may be.
                     public init(
                         xMarfaContract: Components.Headers.XMarfaContract? = nil,
                         xRequestID: Components.Headers.XRequestID? = nil,
-                        xErrorCode: Components.Headers.XErrorCode? = nil
+                        xErrorCode: Components.Headers.XErrorCode? = nil,
+                        wwwAuthenticate: Components.Headers.WWWAuthenticate? = nil
                     ) {
                         self.xMarfaContract = xMarfaContract
                         self.xRequestID = xRequestID
                         self.xErrorCode = xErrorCode
+                        self.wwwAuthenticate = wwwAuthenticate
                     }
                 }
                 /// Received HTTP response headers
@@ -98317,12 +98340,12 @@ public enum Operations {
                 /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/401/content`.
                 @frozen public enum Body: Sendable, Hashable {
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/401/content/application\/json`.
-                    case json(Components.Schemas.UnauthorizedRefusal)
+                    case json(Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.UnauthorizedRefusal {
+                    public var json: Components.Schemas.InsufficientUserAuthenticationOrUnauthorizedRefusal {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -98346,7 +98369,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            /// - `unauthorized`: the request has no credential, or its credential is not valid. For a key that has expired, `details.expired_at` says when it expired.
+            /// - `insufficient_user_authentication`: you are an app adding, changing or removing a type's guidance, and your owner signed in more than fifteen minutes ago. Send them through `GET /oauth/authorize` with `max_age`.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)/responses/401`.
             ///
@@ -98434,7 +98458,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `forbidden`: you lack `schema.write` and `metadata.types:write`, or `details.changes` names changes needing `schema.write`.
+            /// - `forbidden`: you lack `schema.write` and `metadata.types:write`, or `details.changes` names changes needing `schema.write`, or guidance, which a key an app made can't change.
             /// - `core_type_immutable`: Marfa ships this type.
             /// - `type_not_permitted`: your type map lacks write on the type or a new non-platform `parent` (`details.grant` names it).
             ///
