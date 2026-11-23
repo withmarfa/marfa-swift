@@ -250,6 +250,20 @@ struct PluginReleaseTests {
             }
             #expect(!reason.contains("pw"))
         }
+        // A scheme written in capitals is still https, so the downgrade is refused by name, not by running out of
+        // redirects.
+        let shouting = "HTTPS" + scripted.origin.dropFirst("https".count)
+        for origin in [scripted.origin, shouting] {
+            let source = try PluginRelease(
+                address: origin, through: scripted.transport().session, timeout: .seconds(30))
+            scripted.answer { _ in .raw(302, Data(), headers: ["Location": "http://\(host)/plugins.json"]) }
+            let error = await failure { () async throws(PluginReleaseError) in try await source.index() }
+            guard case .unreachable(_, let reason)? = error else {
+                Issue.record("\(origin): \(String(describing: error))")
+                continue
+            }
+            #expect(reason == "a redirect from https to http is refused", "\(origin)")
+        }
         // The witness: a redirect to the same release is followed, with a relative address too.
         scripted.answer { request in
             request.path == "/plugins.json"

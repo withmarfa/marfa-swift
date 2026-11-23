@@ -350,7 +350,7 @@ public struct PluginRelease: Sendable {
                 guard let location, let next = URL(string: location, relativeTo: url)?.absoluteURL else {
                     throw unreachable("answered \(status) for \(file) without an address to go to")
                 }
-                if url.scheme == "https", next.scheme?.lowercased() == "http" {
+                if url.scheme?.lowercased() == "https", next.scheme?.lowercased() == "http" {
                     throw unreachable("a redirect from https to http is refused")
                 }
                 at = next.absoluteString
