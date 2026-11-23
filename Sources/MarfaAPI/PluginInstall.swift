@@ -7,8 +7,8 @@ public enum PluginInstallRefusal: Sendable, Hashable {
     /// The plugin needs a later Marfa release than the server runs: `marfa` is the oldest release the plugin works
     /// with, and `server` the release the server runs.
     case needsNewerServer(marfa: String, server: String)
-    /// The bundle's types carry guidance, or a later version would change or remove guidance, and only the owner
-    /// installs that. An app installs the same plugin without its guidance.
+    /// The install would add, change or remove a type's guidance, and the caller is a key an app made, which never
+    /// writes guidance. An app's own sign-in writes it once the owner signed in within the last fifteen minutes.
     case carriesGuidance
 }
 

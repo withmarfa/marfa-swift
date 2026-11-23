@@ -133,7 +133,7 @@ struct PluginInstallTests {
         }
     }
 
-    @Test func anInstallOfGuidanceByAnAppIsToldApartFromOtherForbiddenRefusals() async throws {
+    @Test func aGuidanceRefusalOfAKeyAnAppMadeIsToldApartFromOtherForbiddenRefusals() async throws {
         let scripted = ScriptedAuthServer { _ in refused(403, "forbidden", details: ["changes": ["guidance"]]) }
         try await withServer(scripted) { server in
             let error = await failure { try await server.install(pluginBundle: Self.bytes) }

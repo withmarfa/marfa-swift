@@ -6,7 +6,8 @@ import Testing
 @testable import Marfa
 
 /// Installing a plugin's bytes against a server of the test's own: the fingerprint the server records is the
-/// bundle's SHA-256, a plugin that needs a later Marfa is told apart, and an app's install of guidance is refused.
+/// bundle's SHA-256, a plugin that needs a later Marfa is told apart, an app just signed in installs guidance, and a
+/// key an app made is refused a change to guidance.
 @Suite(
     .serialized,
     .enabled(if: OwnServer.monorepo != nil, "set MARFA_MONOREPO to a marfa checkout whose server is built"),
@@ -80,10 +81,10 @@ struct LivePluginInstall {
             #expect(marfa == "99.0.0" && PluginVersion(server) != nil)
         }
 
-        try await appRefusedGuidance(own, keychain, part: String(part))
+        try await guidanceByAppAndItsKey(own, keychain, part: String(part))
     }
 
-    private static func appRefusedGuidance(_ own: OwnServer, _ keychain: Keychain, part: String) async throws {
+    private static func guidanceByAppAndItsKey(_ own: OwnServer, _ keychain: Keychain, part: String) async throws {
         let root = "guided\(part)"
         let title = Components.Schemas.FieldDefinition(_type: .string)
         let fields = Components.Schemas.TypeDefinitionInput.FieldsPayload(additionalProperties: ["title": title])
@@ -92,21 +93,32 @@ struct LivePluginInstall {
             server: own.url,
             client: Authorization.Client(
                 name: "plugin install live tests", redirect: URL(string: "com.withmarfa.marfa-swift.tests:/signed-in"),
-                scopes: ["\(root).*:write", "schema.write"]),
+                scopes: ["\(root).*:write", "schema.write", "keys.mint"]),
             keychain: keychain, service: service)
         let credential = try await authorization.signIn(browser: LiveSignIn.browserApproval(on: own))
         let app = try Server(url: own.url, credential: credential)
 
         let name = "guided-\(part)"
         let guided = bundle(name: name, type: "\(root).thing", guidance: "Installing writes this.")
+        let installed = try await app.install(pluginBundle: guided)
+        #expect(installed.outcome == .installed && installed.fingerprint == digest(guided))
+
+        let minted = try await Client(app).createKey(
+            body: .json(
+                .init(
+                    label: "plugin install live tests", source: "live-\(part)", permissions: [.schema_write],
+                    typePermissions: .init(additionalProperties: ["\(root).*": .write])))
+        ).created.body.json
+        let key = try Server(url: own.url, key: minted.key)
+
+        let plain = bundle(name: name, type: "\(root).thing", version: "1.0.1")
         do {
-            _ = try await app.install(pluginBundle: guided)
-            Issue.record("an app installed guidance")
+            _ = try await key.install(pluginBundle: plain)
+            Issue.record("a key an app made removed guidance")
         } catch {
             #expect(error.pluginInstallRefusal == .carriesGuidance, "\(error)")
         }
-        let plain = bundle(name: name, type: "\(root).thing")
-        let installed = try await app.install(pluginBundle: plain)
-        #expect(installed.outcome == .installed && installed.fingerprint == digest(plain))
+        let again = try await key.install(pluginBundle: guided)
+        #expect(again.outcome == .unchanged && again.fingerprint == digest(guided))
     }
 }
