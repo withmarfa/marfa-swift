@@ -26813,7 +26813,64 @@ extension Components {
                 ])
             }
         }
-        /// A plugin's connector: the source it writes under, the kinds it brings, the settings it reads, its sign-in and where it runs.
+        /// Where a connector's code is: the address of its code file, the file's SHA-256 and its size.
+        ///
+        /// - Remark: Generated from `#/components/schemas/PluginConnectorCode`.
+        public struct PluginConnectorCode: Codable, Hashable, Sendable {
+            /// The `https` address of the connector's code file, with no user name or password.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorCode/url`.
+            public var url: Swift.String
+            /// The SHA-256 of the code file, in lowercase hexadecimal. A connector host runs the file only when its digest matches.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorCode/sha256`.
+            public var sha256: Swift.String
+            /// The size of the code file, in bytes. A connector host stops a fetch that passes it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnectorCode/size`.
+            public var size: Swift.Int
+            /// Creates a new `PluginConnectorCode`.
+            ///
+            /// - Parameters:
+            ///   - url: The `https` address of the connector's code file, with no user name or password.
+            ///   - sha256: The SHA-256 of the code file, in lowercase hexadecimal. A connector host runs the file only when its digest matches.
+            ///   - size: The size of the code file, in bytes. A connector host stops a fetch that passes it.
+            public init(
+                url: Swift.String,
+                sha256: Swift.String,
+                size: Swift.Int
+            ) {
+                self.url = url
+                self.sha256 = sha256
+                self.size = size
+            }
+            public enum CodingKeys: String, CodingKey {
+                case url
+                case sha256
+                case size
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.url = try container.decode(
+                    Swift.String.self,
+                    forKey: .url
+                )
+                self.sha256 = try container.decode(
+                    Swift.String.self,
+                    forKey: .sha256
+                )
+                self.size = try container.decode(
+                    Swift.Int.self,
+                    forKey: .size
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "url",
+                    "sha256",
+                    "size"
+                ])
+            }
+        }
+        /// A plugin's connector: the source it writes under, the kinds it brings, the settings it reads, its sign-in, where it runs and where its code is.
         ///
         /// - Remark: Generated from `#/components/schemas/PluginConnector`.
         public struct PluginConnector: Codable, Hashable, Sendable {
@@ -26889,6 +26946,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PluginConnector/runs`.
             public var runs: Components.Schemas.PluginConnector.RunsPayload
+            /// Where the connector's code is, so a connector host can fetch and check it. A later version of the plugin may change it. Present only when the bundle gives it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/code`.
+            public struct CodePayload: Codable, Hashable, Sendable {
+                /// - Remark: Generated from `#/components/schemas/PluginConnector/code/value1`.
+                public var value1: Components.Schemas.PluginConnectorCode
+                /// Creates a new `CodePayload`.
+                ///
+                /// - Parameters:
+                ///   - value1:
+                public init(value1: Components.Schemas.PluginConnectorCode) {
+                    self.value1 = value1
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    self.value1 = try .init(from: decoder)
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try self.value1.encode(to: encoder)
+                }
+            }
+            /// Where the connector's code is, so a connector host can fetch and check it. A later version of the plugin may change it. Present only when the bundle gives it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PluginConnector/code`.
+            public var code: Components.Schemas.PluginConnector.CodePayload?
             /// Creates a new `PluginConnector`.
             ///
             /// - Parameters:
@@ -26900,6 +26981,7 @@ extension Components {
             ///   - settings: The settings the connector reads as it runs.
             ///   - signIn: How the connector signs in to its service. Present only for a connector that signs in.
             ///   - runs: Where the connector runs.
+            ///   - code: Where the connector's code is, so a connector host can fetch and check it. A later version of the plugin may change it. Present only when the bundle gives it.
             public init(
                 source: Swift.String,
                 sourceName: Swift.String,
@@ -26908,7 +26990,8 @@ extension Components {
                 edgeTypes: [Swift.String]? = nil,
                 settings: [Components.Schemas.PluginConnectorSetting]? = nil,
                 signIn: Components.Schemas.PluginConnector.SignInPayload? = nil,
-                runs: Components.Schemas.PluginConnector.RunsPayload
+                runs: Components.Schemas.PluginConnector.RunsPayload,
+                code: Components.Schemas.PluginConnector.CodePayload? = nil
             ) {
                 self.source = source
                 self.sourceName = sourceName
@@ -26918,6 +27001,7 @@ extension Components {
                 self.settings = settings
                 self.signIn = signIn
                 self.runs = runs
+                self.code = code
             }
             public enum CodingKeys: String, CodingKey {
                 case source
@@ -26928,6 +27012,7 @@ extension Components {
                 case settings
                 case signIn = "sign_in"
                 case runs
+                case code
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -26963,6 +27048,10 @@ extension Components {
                     Components.Schemas.PluginConnector.RunsPayload.self,
                     forKey: .runs
                 )
+                self.code = try container.decodeIfPresent(
+                    Components.Schemas.PluginConnector.CodePayload.self,
+                    forKey: .code
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "source",
                     "source_name",
@@ -26971,7 +27060,8 @@ extension Components {
                     "edge_types",
                     "settings",
                     "sign_in",
-                    "runs"
+                    "runs",
+                    "code"
                 ])
             }
         }
@@ -29237,7 +29327,7 @@ extension Components {
                 }
             }
         }
-        /// What one kind of the connector brings. An answer holds every member; a member a save leaves out takes its default.
+        /// What one kind of the connector brings. An answer holds every member; a member a save leaves out takes its default, except when `target_type` is not the kind's own type: `fields` left out are the fields both types declare, each `{ "from": <field> }`, and `status_overrides` left out are none.
         ///
         /// - Remark: Generated from `#/components/schemas/ConnectorMappingKind`.
         public struct ConnectorMappingKind: Codable, Hashable, Sendable {
@@ -30492,7 +30582,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/item_id`.
             public var itemId: Swift.String?
-            /// A draft of the kind's mapping, checked as a save checks it; a member you leave out takes its default. Leave it out to preview the mapping in force.
+            /// A draft of the kind's mapping, checked as a save checks it. A member you leave out takes the default a save gives it, as `ConnectorMappingKind` says, including when `target_type` is another type. Leave it out to preview the mapping in force.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/mapping`.
             public struct MappingPayload: Codable, Hashable, Sendable {
@@ -30512,7 +30602,7 @@ extension Components {
                     try self.value1.encode(to: encoder)
                 }
             }
-            /// A draft of the kind's mapping, checked as a save checks it; a member you leave out takes its default. Leave it out to preview the mapping in force.
+            /// A draft of the kind's mapping, checked as a save checks it. A member you leave out takes the default a save gives it, as `ConnectorMappingKind` says, including when `target_type` is another type. Leave it out to preview the mapping in force.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorPreviewRequest/mapping`.
             public var mapping: Components.Schemas.ConnectorPreviewRequest.MappingPayload?
@@ -30521,7 +30611,7 @@ extension Components {
             /// - Parameters:
             ///   - kind: The kind of the connector to preview.
             ///   - itemId: The ID of an item the connector brought to render the preview from. Leave it out to let the connector choose a recent one.
-            ///   - mapping: A draft of the kind's mapping, checked as a save checks it; a member you leave out takes its default. Leave it out to preview the mapping in force.
+            ///   - mapping: A draft of the kind's mapping, checked as a save checks it. A member you leave out takes the default a save gives it, as `ConnectorMappingKind` says, including when `target_type` is another type. Leave it out to preview the mapping in force.
             public init(
                 kind: Swift.String,
                 itemId: Swift.String? = nil,

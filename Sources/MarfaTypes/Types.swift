@@ -916,7 +916,7 @@ public protocol APIProtocol: Sendable {
     func deleteConnectorState(_ input: Operations.DeleteConnectorState.Input) async throws -> Operations.DeleteConnectorState.Output
     /// List connector agreements
     ///
-    /// Returns the agreements of the connector's source, the one written longest ago first. Items whose type you can't read are left out, so a page can be short with more to follow.
+    /// Returns the agreements of the connector's source, the one written longest ago first. Items you can't read are left out, so a page can be short with more to follow.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
@@ -930,7 +930,7 @@ public protocol APIProtocol: Sendable {
     func writeConnectorAgreements(_ input: Operations.WriteConnectorAgreements.Input) async throws -> Operations.WriteConnectorAgreements.Output
     /// Look up connector agreements
     ///
-    /// Looks up the agreements of the named items and returns those that exist, each item once, in the order you first named it. An item whose type you can't read is left out.
+    /// Looks up the agreements of the named items and returns those that exist, each item once, in the order you first named it. An item you can't read is left out.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements/lookup`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)`.
@@ -3362,7 +3362,7 @@ extension APIProtocol {
     }
     /// List connector agreements
     ///
-    /// Returns the agreements of the connector's source, the one written longest ago first. Items whose type you can't read are left out, so a page can be short with more to follow.
+    /// Returns the agreements of the connector's source, the one written longest ago first. Items you can't read are left out, so a page can be short with more to follow.
     ///
     /// - Remark: HTTP `GET /connectors/{id}/agreements`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/get(listConnectorAgreements)`.
@@ -3396,7 +3396,7 @@ extension APIProtocol {
     }
     /// Look up connector agreements
     ///
-    /// Looks up the agreements of the named items and returns those that exist, each item once, in the order you first named it. An item whose type you can't read is left out.
+    /// Looks up the agreements of the named items and returns those that exist, each item once, in the order you first named it. An item you can't read is left out.
     ///
     /// - Remark: HTTP `POST /connectors/{id}/agreements/lookup`.
     /// - Remark: Generated from `#/paths//connectors/{id}/agreements/lookup/post(lookupConnectorAgreements)`.
