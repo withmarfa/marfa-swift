@@ -49,7 +49,7 @@ private let versions = """
     {"data": [
       {"id": "v2", "item_id": "i1", "version": 2, "properties": {"title": "Second", "count": 3, "done": true},
        "type": "core.note", "tier": "feed", "occurred_at": "2026-10-27", "source_id": null,
-       "writer": {"kind": "app", "id": "g1", "name": "MAPP"}, "created_at": "2026-10-27T14:00:00.000Z"},
+       "writer": {"kind": "app", "id": "g1", "name": "Marfa"}, "created_at": "2026-10-27T14:00:00.000Z"},
       {"id": "v1", "item_id": "i1", "version": 1, "properties": {"title": "First"},
        "type": "core.note", "tier": "library", "occurred_at": "2026-10-27T09:30:00Z", "source_id": "s",
        "created_at": "2026-10-26T14:00:00.000Z"}
@@ -89,7 +89,7 @@ struct ServerCallsTests {
             #expect(first.properties["title"] == .string("Second"))
             #expect(first.properties["count"] == .integer(3))
             #expect(first.tier == .feed && page.snapshots[1].tier == .library)
-            #expect(first.writer == .init(kind: .app, id: "g1", name: "MAPP"))
+            #expect(first.writer == .init(kind: .app, id: "g1", name: "Marfa"))
             #expect(page.snapshots[1].writer == nil)
             #expect(first.occurredAt?.hasTime == false)
             #expect(page.snapshots[1].occurredAt?.hasTime == true)
@@ -149,7 +149,7 @@ struct ServerCallsTests {
     @Test func appsCanBuildTheValuesForPreviews() {
         let snapshot = ItemSnapshot(
             id: "v1", itemID: "i1", version: 1, type: "core.note", tier: .library, properties: ["title": "A"],
-            occurredAt: nil, sourceID: nil, writer: .init(kind: .app, id: "g1", name: "MAPP"),
+            occurredAt: nil, sourceID: nil, writer: .init(kind: .app, id: "g1", name: "Marfa"),
             createdAt: Date(timeIntervalSince1970: 0))
         let page = ItemSnapshotPage(snapshots: [snapshot], next: nil)
         #expect(page.snapshots == [snapshot])

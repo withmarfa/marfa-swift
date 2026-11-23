@@ -50,8 +50,24 @@ public struct KeychainKeyStore: KeyStore {
     /// The service the keys are kept under: the app's bundle identifier followed by `.marfa-key`.
     ///
     /// Naming it for the bundle identifier means a build with its own, such as a Debug build, never reads or
-    /// replaces the keys of the installed app. A process with no bundle identifier uses `com.withmarfa.marfa`.
-    public static var defaultService: String { "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.marfa").marfa-key" }
+    /// replaces the keys of the installed app. A process with no bundle identifier uses `so.marfa.swift.`
+    /// followed by its process name, so no program shares an app's keys.
+    public static var defaultService: String {
+        service(bundleIdentifier: Bundle.main.bundleIdentifier, processName: ProcessInfo.processInfo.processName)
+    }
+
+    /// The keychain service for `bundleIdentifier`, or for `processName` when the process has none.
+    ///
+    /// An empty bundle identifier counts as none.
+    static func service(bundleIdentifier: String?, processName: String) -> String {
+        let identity: String
+        if let bundleIdentifier, !bundleIdentifier.isEmpty {
+            identity = bundleIdentifier
+        } else {
+            identity = "so.marfa.swift.\(processName)"
+        }
+        return "\(identity).marfa-key"
+    }
 
     public let service: String
     private let keychain: Keychain
