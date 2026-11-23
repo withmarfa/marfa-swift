@@ -2,7 +2,7 @@
 
 The Swift SDK for Marfa, as the Swift package `Marfa`: Swift types, `async` calls, change streams and errors over `MarfaCore`, the Rust engine from `withmarfa/marfa` that every native client embeds. The core does the networking, storage and syncing.
 
-The package exposes every operation an app may be granted, owner tasks included. No app holds a power another app lacks, so an app built on this package can do everything MAPP does.
+The package exposes every operation an app may be granted, owner tasks included. No app holds a power another app lacks, so an app built on this package can do everything Marfa for Mac does.
 
 ## Layout and build
 

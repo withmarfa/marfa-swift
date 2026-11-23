@@ -81,8 +81,28 @@ struct KeychainKeyStoreBehavior {
         }
     }
 
-    @Test func theDefaultServiceIsNamedForTheBundle() {
-        #expect(KeychainKeyStore.defaultService == "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.marfa").marfa-key")
+    @Test func aBundleIdentifierNamesTheService() {
+        #expect(
+            KeychainKeyStore.service(bundleIdentifier: "com.example.tool", processName: "ignored")
+                == "com.example.tool.marfa-key")
+    }
+
+    /// With the Mac app's bundle identifier the service is the app's, and with none it is not.
+    @Test(arguments: [nil, ""] as [String?], ["marfa", "Marfa CLI", "so.marfa.swift"])
+    func aMissingBundleIdentifierUsesTheProcessName(bundleIdentifier: String?, processName: String) {
+        let appService = KeychainKeyStore.service(bundleIdentifier: "com.withmarfa.marfa", processName: processName)
+        #expect(appService == "com.withmarfa.marfa.marfa-key")
+        let service = KeychainKeyStore.service(bundleIdentifier: bundleIdentifier, processName: processName)
+        #expect(service == "so.marfa.swift.\(processName).marfa-key")
+        #expect(service != appService)
+    }
+
+    @Test func theDefaultServiceFollowsThisProcess() {
+        #expect(
+            KeychainKeyStore.defaultService
+                == KeychainKeyStore.service(
+                    bundleIdentifier: Bundle.main.bundleIdentifier,
+                    processName: ProcessInfo.processInfo.processName))
         #expect(KeychainKeyStore().service == KeychainKeyStore.defaultService)
     }
 
