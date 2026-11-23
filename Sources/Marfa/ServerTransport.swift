@@ -150,7 +150,7 @@ extension Server {
     /// ``MarfaError/network(message:)`` and the request is canceled. A renewal already under way finishes on its own,
     /// so the token it keeps is never lost. When the server asks the owner to confirm it is them, the owner's time at
     /// the sheet counts toward no limit, and the call sent again gets the whole limit.
-    func send(
+    package func send(
         _ method: String, _ path: String, query: [URLQueryItem] = [], headers: [String: String] = [:],
         body: Data? = nil, timeout: Duration, openWhenSignedOut: Bool = false,
         accepting: (@Sendable (_ status: UInt16, _ body: Data) -> Bool)? = nil
