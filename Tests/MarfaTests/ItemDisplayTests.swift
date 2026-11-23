@@ -14,11 +14,11 @@ struct ItemDisplays {
         _ = try await copy.edges.create(from: part, to: host, type: "comments-on")
         let items = try await copy.items.get([part]).rows
         #expect(
-            try await copy.items.displays(of: items) == [ItemDisplay(name: "Comment on Plan", preview: "LGTM Ship it")])
+            try await copy.items.displays(of: items) == [ItemDisplay(name: "Comment On Plan", preview: "LGTM Ship it")])
         #expect(
             try await copy.items.displays(for: [
                 ItemDisplayInput(type: items[0].type, properties: items[0].properties, id: part)
-            ]) == [ItemDisplay(name: "Comment on Plan", preview: "LGTM Ship it")])
+            ]) == [ItemDisplay(name: "Comment On Plan", preview: "LGTM Ship it")])
         #expect(
             try await copy.items.displays(for: [ItemDisplayInput(type: items[0].type, properties: items[0].properties)])
                 == [ItemDisplay(name: "LGTM", preview: "Ship it")])
