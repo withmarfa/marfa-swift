@@ -117,7 +117,7 @@ struct AppDataTests {
         #expect(answer.types.first?.trashed == 1)
         #expect(answer.data.first?.state == .trashed)
         #expect(answer.data.first?.createdAt == Date(timeIntervalSince1970: 1_793_491_200.5))
-        #expect(answer.nextCursor == "c2")
+        #expect(answer.nextCursor == .value("c2"))
         let sent = try #require(scripted.requests(to: dataPath).first)
         #expect(sent.method == "GET")
         let query = Set((sent.query ?? "").split(separator: "&").map(String.init))
@@ -155,7 +155,7 @@ struct AppDataTests {
         let grants = #"""
             {"data": [{"id": "grt_1", "kind": "app", "client_id": "client-1", "client_name": "Acme", "origins": [],
                        "scopes": [], "vendors": ["app.acme"], "status": "active",
-                       "granted_at": "2026-11-01T00:00:00Z", "last_used_at": null}]}
+                       "granted_at": "2026-11-01T00:00:00Z", "last_used_at": null}], "next_cursor": null}
             """#
         let vendors = #"""
             {"data": [{"vendor": "app.acme", "client_id": "client-1", "client_name": "Acme",
@@ -168,7 +168,7 @@ struct AppDataTests {
         let grantList = try await client(scripted).listAppGrants().ok.body.json.data
         #expect(grantList.first?.vendors == [vendor])
         let vendorList = try await client(scripted).listAppVendors().ok.body.json.data
-        #expect(vendorList.first?.clientName == "Acme")
+        #expect(vendorList.first?.clientName == .value("Acme"))
         // The server writes milliseconds; a date without them reads too.
         let claimed = try #require(vendorList.first?.claimedAt).timeIntervalSince1970
         #expect(abs(claimed - 1_793_491_200.822) < 0.0005)

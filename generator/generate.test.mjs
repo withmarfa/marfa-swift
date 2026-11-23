@@ -159,6 +159,18 @@ test(
       const unions = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
       assert.match(unions, /actor: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
       assert.match(unions, /label: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
+      writeFileSync(source, JSON.stringify(document({
+        type: "object",
+        properties: {
+          host: { type: ["string", "null"] },
+          note: { type: ["string", "null"] },
+        },
+        required: ["host"],
+      })));
+      generate(process.env.MARFA_GENERATOR_BIN, source, output);
+      const members = readFileSync(join(output, "Types+Components+Schemas.swift"), "utf8");
+      assert.match(members, /host: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}[^?]/);
+      assert.match(members, /note: Components\.Schemas\.MarfaNullableMarfaInline[0-9a-f]{16}\?/);
     } finally {
       rmSync(scratch, { recursive: true, force: true });
     }
@@ -336,6 +348,34 @@ test("normalizes null-only properties, array items, and references without chang
   assert.equal(JSON.stringify(input), before);
 });
 
+test("a required nullable primitive is sent as null and an optional one stays left out", () => {
+  const member = { type: ["string", "null"], description: "kept" };
+  const input = document({
+    type: "object",
+    properties: { host: member, note: member },
+    required: ["host"],
+  });
+  const before = JSON.stringify(input);
+  const { document: output, nullable } = prepare(input);
+  const schema = output.components.schemas.Fixture;
+  // The required name stays required, so the generator does not make the Swift property optional.
+  assert.deepEqual(schema.required, ["host"]);
+  const fields = schema.properties;
+  assert.equal(fields.host.description, "kept");
+  assert.equal(fields.note.description, "kept");
+  assert.equal(fields.host.$ref, fields.note.$ref);
+  const name = fields.host.$ref.split("/").at(-1);
+  const target = nullable.get(name).target;
+  assert.deepEqual(output.components.schemas[name], {
+    anyOf: [
+      { $ref: `#/components/schemas/${target}` },
+      { $ref: "#/components/schemas/MarfaNull" },
+    ],
+  });
+  assert.deepEqual(output.components.schemas[target], { type: "string" });
+  assert.equal(JSON.stringify(input), before);
+});
+
 test("optional nullable type arrays keep presence, constraints, and annotations", () => {
   const field = {
     type: ["string", "null"],
@@ -358,7 +398,9 @@ test("optional nullable type arrays keep presence, constraints, and annotations"
   const result = prepare(input);
   const fields = result.document.components.schemas.Fixture.properties;
   assert.ok(fields.optional.$ref);
-  assert.deepEqual(fields.required, field);
+  assert.equal(fields.required.$ref, fields.optional.$ref);
+  assert.equal(fields.required.description, field.description);
+  assert.deepEqual(result.document.components.schemas.Fixture.required, ["required"]);
   assert.equal(result.nullable.size, 2);
   const name = fields.optional.$ref.split("/").at(-1);
   const target = result.nullable.get(name).target;

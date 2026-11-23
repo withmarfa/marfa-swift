@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const nullName = "MarfaNull";
 const nullRef = `#/components/schemas/${nullName}`;
+const primitiveTypes = new Set(["string", "number", "integer", "boolean"]);
 
 export function prepare(document) {
   let usesNull = false;
@@ -68,7 +69,7 @@ export function prepare(document) {
     usesNull = true;
     return name;
   };
-  function schema(value, inUnion = false, optionalProperty = false, mapValue = false) {
+  function schema(value, inUnion = false, property = false, mapValue = false) {
     if (!value || typeof value !== "object" || Array.isArray(value))
       return value;
     if (value.type === "null" && !inUnion) {
@@ -85,7 +86,11 @@ export function prepare(document) {
             schema(
               entry,
               false,
-              key === "properties" && !value.required?.includes(name),
+              key === "properties"
+                ? value.required?.includes(name)
+                  ? "required"
+                  : "optional"
+                : false,
             ),
           ]),
         );
@@ -99,15 +104,18 @@ export function prepare(document) {
           : child;
       }
     }
+    const types = Array.isArray(result.type) ? result.type : null;
+    const otherType = types?.find((type) => type !== "null");
+    // An optional nullable property has three states; Swift Optional alone loses explicit null.
+    // A required nullable primitive has two, so the same wrapper stays required and null is written.
     if (
-      optionalProperty &&
-      Array.isArray(result.type) &&
-      result.type.length === 2 &&
-      result.type.includes("null") &&
+      types?.length === 2 &&
+      types.includes("null") &&
       (!Array.isArray(result.enum) || result.enum.includes(null)) &&
-      !("const" in result)
+      !("const" in result) &&
+      (property === "optional" ||
+        (property === "required" && primitiveTypes.has(otherType)))
     ) {
-      // An optional nullable property has three states; Swift Optional alone loses explicit null.
       const annotation = (key) =>
         ["description", "title", "example", "examples", "default", "deprecated", "readOnly", "writeOnly"].includes(key) ||
         key.startsWith("x-");

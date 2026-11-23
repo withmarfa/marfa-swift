@@ -44,10 +44,10 @@ struct LiveAppData {
 
         let owner = Client(own.server)
         let grant = try #require(
-            try await owner.listAppGrants().ok.body.json.data.first { $0.clientName == appName })
+            try await owner.listAppGrants().ok.body.json.data.first { $0.clientName == .value(appName) })
         #expect(grant.vendors == [vendor])
         let held = try await owner.listAppVendors().ok.body.json.data.first { $0.vendor == vendor }
-        #expect(held?.clientName == appName)
+        #expect(held?.clientName == .value(appName))
 
         var listed = 0
         var pages = 0
@@ -58,7 +58,7 @@ struct LiveAppData {
             #expect(page.types.first?.active == 1_050)
             listed += page.data.count
             pages += 1
-            cursor = page.nextCursor
+            cursor = page.nextCursor.value
         } while cursor != nil && pages < 10
         #expect(listed == 1_050)
         #expect(pages == 6)
