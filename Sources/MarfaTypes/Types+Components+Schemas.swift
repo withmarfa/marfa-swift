@@ -29668,7 +29668,7 @@ extension Components {
                     ///
                     /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds/additionalProperties/target_type`.
                     public var targetType: Swift.String
-                    /// The items outside the bin of the target type under the connector's source.
+                    /// The items outside the bin under the connector's source that the rewrite moves onto the target type: those on the kind's own type and on each type the kind was mapped onto before.
                     ///
                     /// - Remark: Generated from `#/components/schemas/ConnectorRewrite/kinds/additionalProperties/count`.
                     public var count: Swift.Int
@@ -29676,7 +29676,7 @@ extension Components {
                     ///
                     /// - Parameters:
                     ///   - targetType: The kind's target type.
-                    ///   - count: The items outside the bin of the target type under the connector's source.
+                    ///   - count: The items outside the bin under the connector's source that the rewrite moves onto the target type: those on the kind's own type and on each type the kind was mapped onto before.
                     public init(
                         targetType: Swift.String,
                         count: Swift.Int
@@ -29848,6 +29848,30 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/kinds`.
             public var kinds: [Swift.String]
+            /// Each kind's types that the rewrite moves its items from, by name: its own type and each type it was mapped onto before, other than its target.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/from`.
+            public struct FromPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: [Swift.String]]
+                /// Creates a new `FromPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: [Swift.String]] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Each kind's types that the rewrite moves its items from, by name: its own type and each type it was mapped onto before, other than its target.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/from`.
+            public var from: Components.Schemas.ConnectorRewritePending.FromPayload
             /// When the rewrite was asked for.
             ///
             /// - Remark: Generated from `#/components/schemas/ConnectorRewritePending/requested_at`.
@@ -29858,22 +29882,26 @@ extension Components {
             ///   - number: The request's number. Numbers rise and are never given again.
             ///   - version: The mapping's version when the rewrite was asked for.
             ///   - kinds: The kinds to rewrite.
+            ///   - from: Each kind's types that the rewrite moves its items from, by name: its own type and each type it was mapped onto before, other than its target.
             ///   - requestedAt: When the rewrite was asked for.
             public init(
                 number: Swift.Int,
                 version: Swift.Int,
                 kinds: [Swift.String],
+                from: Components.Schemas.ConnectorRewritePending.FromPayload,
                 requestedAt: Foundation.Date
             ) {
                 self.number = number
                 self.version = version
                 self.kinds = kinds
+                self.from = from
                 self.requestedAt = requestedAt
             }
             public enum CodingKeys: String, CodingKey {
                 case number
                 case version
                 case kinds
+                case from
                 case requestedAt = "requested_at"
             }
             public init(from decoder: any Swift.Decoder) throws {
@@ -29890,6 +29918,10 @@ extension Components {
                     [Swift.String].self,
                     forKey: .kinds
                 )
+                self.from = try container.decode(
+                    Components.Schemas.ConnectorRewritePending.FromPayload.self,
+                    forKey: .from
+                )
                 self.requestedAt = try container.decode(
                     Foundation.Date.self,
                     forKey: .requestedAt
@@ -29898,6 +29930,7 @@ extension Components {
                     "number",
                     "version",
                     "kinds",
+                    "from",
                     "requested_at"
                 ])
             }
