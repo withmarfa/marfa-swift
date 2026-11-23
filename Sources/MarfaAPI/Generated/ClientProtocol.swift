@@ -133,7 +133,7 @@ public protocol ClientProtocol: Sendable {
     func listPlugins(_ input: Operations.ListPlugins.Input) async throws -> Operations.ListPlugins.Output
     /// Install a plugin
     ///
-    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`.
     ///
     /// - Remark: HTTP `POST /plugins`.
     /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
@@ -1130,7 +1130,7 @@ extension ClientProtocol {
     }
     /// Install a plugin
     ///
-    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`. An app can't install guidance.
+    /// Installs a plugin's bundle in one write and records the plugin on each type. Needs `schema.write`, write on each type and edge type name, and `connectors.manage` for a `connector`.
     ///
     /// - Remark: HTTP `POST /plugins`.
     /// - Remark: Generated from `#/paths//plugins/post(installPlugin)`.
