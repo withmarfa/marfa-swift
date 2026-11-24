@@ -112,16 +112,16 @@ struct LiveSignIn {
             asked.setValue(cookie, forHTTPHeaderField: "Cookie")
             var landed = try await sentTo(asked, session, own)
             if landed.scheme != scheme {
-                let scopes =
-                    URLComponents(url: authorize, resolvingAgainstBaseURL: false)?.queryItems?
-                    .first { $0.name == "scope" }?.value?.split(separator: " ").map(String.init) ?? []
+                var page = URLRequest(url: landed)
+                page.setValue(cookie, forHTTPHeaderField: "Cookie")
+                let (html, shown) = try await session.data(for: page, delegate: NoRedirect())
+                try #require((shown as? HTTPURLResponse)?.statusCode == 200, "the consent screen was refused")
                 var form = URLComponents()
                 form.queryItems =
                     [
                         URLQueryItem(name: "decision", value: "approve"),
                         URLQueryItem(name: "authorization_request", value: landed.query()),
-                    ]
-                    + scopes.map { URLQueryItem(name: "scopes", value: $0) }
+                    ] + asDrawn(String(decoding: html, as: UTF8.self))
                 var decision = URLRequest(url: try #require(URL(string: "\(origin)/auth/consent")))
                 decision.httpMethod = "POST"
                 decision.setValue(cookie, forHTTPHeaderField: "Cookie")
@@ -226,19 +226,34 @@ struct LiveSignIn {
         defer { session.invalidateAndCancel() }
         let header = try await ownerCookie(own, session)
 
+        // The owner first confirms the code matches the device's, which opens the approval page to this
+        // browser session only.
+        var checked = URLComponents()
+        checked.queryItems = [URLQueryItem(name: "user_code", value: userCode)]
+        var check = URLRequest(url: try #require(URL(string: "\(origin)/auth/device/check")))
+        check.httpMethod = "POST"
+        check.setValue(header, forHTTPHeaderField: "Cookie")
+        check.setValue(origin, forHTTPHeaderField: "Origin")
+        check.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        check.httpBody = Data((checked.percentEncodedQuery ?? "").utf8)
+        let (_, confirmed) = try await session.data(for: check, delegate: NoRedirect())
+        let sent = (confirmed as? HTTPURLResponse)?.value(forHTTPHeaderField: "Location") ?? ""
+        try #require(
+            (confirmed as? HTTPURLResponse)?.statusCode == 302
+                && URL(string: sent, relativeTo: own.url)?.path() == "/auth/device/consent",
+            "the check of the device code was refused: \(sent)")
+
         var consent = URLComponents(string: "\(origin)/auth/device/consent")!
         consent.queryItems = [URLQueryItem(name: "user_code", value: userCode)]
         var page = URLRequest(url: try #require(consent.url))
         page.setValue(header, forHTTPHeaderField: "Cookie")
-        let (html, shown) = try await session.data(for: page)
+        let (html, shown) = try await session.data(for: page, delegate: NoRedirect())
         try #require((shown as? HTTPURLResponse)?.statusCode == 200, "the approval page was refused")
 
         var form = URLComponents()
         form.queryItems =
             [URLQueryItem(name: "user_code", value: userCode), URLQueryItem(name: "decision", value: "approve")]
-            + offered(String(decoding: html, as: UTF8.self), name: "scopes").map {
-                URLQueryItem(name: "scopes", value: $0)
-            }
+            + asDrawn(String(decoding: html, as: UTF8.self))
         var approval = URLRequest(url: try #require(URL(string: "\(origin)/auth/device/consent")))
         approval.httpMethod = "POST"
         approval.setValue(header, forHTTPHeaderField: "Cookie")
@@ -246,24 +261,38 @@ struct LiveSignIn {
         approval.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         approval.httpBody = Data(
             (form.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B").utf8)
-        let (_, approved) = try await session.data(for: approval)
+        let (_, approved) = try await session.data(for: approval, delegate: NoRedirect())
         try #require((approved as? HTTPURLResponse)?.statusCode == 200, "the approval was refused")
     }
 
-    /// The values the page offers under `name`: every input's value and every option of a select.
-    private static func offered(_ html: String, name: String) -> [String] {
-        var values: [String] = []
+    /// What an approval page's form posts when the owner changes nothing on it.
+    ///
+    /// That is each hidden field, and each pop-up at its selected option, or its first. The page starts every
+    /// choice at the most the request names, so this approves everything the app asked for.
+    private static func asDrawn(_ html: String) -> [URLQueryItem] {
+        let fields: Set = ["held", "scopes", "types", "admin", "powers"]
+        var posted: [URLQueryItem] = []
         let control = /<select\b[^>]*>[\s\S]*?<\/select>|<input\b[^>]*>/.ignoresCase()
         for match in html.matches(of: control) {
             let source = String(match.output)
-            guard source.contains("name=\"\(name)\"") else { continue }
-            let value = /value="([^"]*)"/
-            for found in source.matches(of: value) where !found.output.1.isEmpty {
-                let text = String(found.output.1)
-                if !values.contains(text) { values.append(text) }
+            let opening = source.prefix { $0 != ">" }
+            guard let name = opening.firstMatch(of: /name="([^"]*)"/).map({ String($0.output.1) }),
+                fields.contains(name), !opening.contains(" disabled")
+            else { continue }
+            let value: String?
+            if source.lowercased().hasPrefix("<select") {
+                let options = source.matches(of: /<option\b([^>]*)>/).map { String($0.output.1) }
+                let chosen = options.first { $0.contains(" selected") } ?? options.first
+                value = chosen?.firstMatch(of: /value="([^"]*)"/).map { String($0.output.1) }
+            } else {
+                guard opening.contains("type=\"hidden\"") else { continue }
+                value = opening.firstMatch(of: /value="([^"]*)"/).map { String($0.output.1) }
+            }
+            if let value, !value.isEmpty {
+                posted.append(URLQueryItem(name: name, value: value.replacingOccurrences(of: "&amp;", with: "&")))
             }
         }
-        return values
+        return posted
     }
 
     private static func revoke(_ token: String, hint: String, clientId: String, _ own: OwnServer) async throws {
