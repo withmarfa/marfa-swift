@@ -4,7 +4,7 @@ import Testing
 
 @Test func aPageOfItemsReadsEachRow() throws {
     let item =
-        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","last_activity_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1}"#
+        #"{"id":"i1","type":"core.note","state":"active","tier":"library","properties":{"title":"A note"},"created_at":"2026-09-24T00:00:00Z","updated_at":"2026-09-24T00:00:00Z","last_activity_at":"2026-09-24T00:00:00Z","occurred_at":"2026-09-24T00:00:00Z","version":1,"source":"s","read_only":false,"schema_version":1,"web_url":"https://marfa.example/i/i1","app_url":"marfa://instance-1/i1"}"#
     let page = try JSONDecoder().decode(
         Components.Schemas.ItemPage.self, from: Data(#"{"data":[\#(item)],"next_cursor":null}"#.utf8))
     guard case .Item(let row)? = page.data.first else {
