@@ -265,9 +265,10 @@ struct LiveSignIn {
         try #require((approved as? HTTPURLResponse)?.statusCode == 200, "the approval was refused")
     }
 
-    /// What an approval page's form posts when the owner changes nothing on it: each hidden field, and each
-    /// pop-up at its selected option, or its first. The page starts every choice at the most the request names,
-    /// so this approves everything the app asked for.
+    /// What an approval page's form posts when the owner changes nothing on it.
+    ///
+    /// That is each hidden field, and each pop-up at its selected option, or its first. The page starts every
+    /// choice at the most the request names, so this approves everything the app asked for.
     private static func asDrawn(_ html: String) -> [URLQueryItem] {
         let fields: Set = ["held", "scopes", "types", "admin", "powers"]
         var posted: [URLQueryItem] = []
