@@ -2361,11 +2361,11 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/ViewGroup`.
         public struct ViewGroup: Codable, Hashable, Sendable {
-            /// The field to group by: a field other than `last_activity_at`, which only a sort takes, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            /// The field to group by: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier` or `tags`), `properties.<name>`, `source`, `status_group`, `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/by`.
             public var by: Swift.String
-            /// For a date field, the span each group covers. Absent groups by the value.
+            /// For a date field, the span each group covers. For `tags`, a property or an edge type, `presence` groups by whether the item has a value, with the keys `false` and `true`. Absent groups by the value.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/bucket`.
             @frozen public enum BucketPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -2373,26 +2373,27 @@ extension Components {
                 case week = "week"
                 case month = "month"
                 case year = "year"
+                case presence = "presence"
             }
-            /// For a date field, the span each group covers. Absent groups by the value.
+            /// For a date field, the span each group covers. For `tags`, a property or an edge type, `presence` groups by whether the item has a value, with the keys `false` and `true`. Absent groups by the value.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/bucket`.
             public var bucket: Components.Schemas.ViewGroup.BucketPayload?
-            /// The values whose groups come first, in this order. Other groups follow.
+            /// The values whose groups come first, in this order. Other groups follow. With `status_group`, the four status group names or `null`. With `presence`, `true` or `false`.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/order`.
             public var order: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]?
-            /// The values whose groups the view leaves out.
+            /// The values whose groups the view leaves out. With `status_group`, the four status group names or `null`. With `presence`, `true` or `false`.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/hidden`.
             public var hidden: [Components.Schemas.MarfaNullableMarfaInlinefdf0831745ef621f]?
             /// Creates a new `ViewGroup`.
             ///
             /// - Parameters:
-            ///   - by: The field to group by: a field other than `last_activity_at`, which only a sort takes, or `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
-            ///   - bucket: For a date field, the span each group covers. Absent groups by the value.
-            ///   - order: The values whose groups come first, in this order. Other groups follow.
-            ///   - hidden: The values whose groups the view leaves out.
+            ///   - by: The field to group by: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier` or `tags`), `properties.<name>`, `source`, `status_group`, `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            ///   - bucket: For a date field, the span each group covers. For `tags`, a property or an edge type, `presence` groups by whether the item has a value, with the keys `false` and `true`. Absent groups by the value.
+            ///   - order: The values whose groups come first, in this order. Other groups follow. With `status_group`, the four status group names or `null`. With `presence`, `true` or `false`.
+            ///   - hidden: The values whose groups the view leaves out. With `status_group`, the four status group names or `null`. With `presence`, `true` or `false`.
             public init(
                 by: Swift.String,
                 bucket: Components.Schemas.ViewGroup.BucketPayload? = nil,
