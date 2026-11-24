@@ -109,7 +109,8 @@ struct AppDataTests {
             {"vendor": "app.acme", "client_id": "client-1",
              "types": [{"type": "app.acme.note", "active": 1, "archived": 0, "trashed": 1}],
              "data": [{"id": "itm_1", "type": "app.acme.note", "version": 1, "name": "One", "source": "acme",
-                       "state": "trashed", "created_at": "2026-11-01T00:00:00.5Z"}],
+                       "state": "trashed", "created_at": "2026-11-01T00:00:00.5Z",
+                       "web_url": "https://marfa.example/i/itm_1", "app_url": "marfa://instance-1/itm_1"}],
              "next_cursor": "c2"}
             """#
         scripted.answer { _ in .raw(200, Data(page.utf8), headers: jsonHeaders) }

@@ -724,6 +724,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/read_only`.
             public var readOnly: Swift.Bool
+            /// The item's page at this instance's sign-in address, then `/i/` and the item's ID. Marfa builds it when it answers the item, so it changes when the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/web_url`.
+            public var webUrl: Swift.String
+            /// The item's address for apps on one device: `marfa://`, the instance's ID, then the item's ID. It stays the same when the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/app_url`.
+            public var appUrl: Swift.String
             /// The latitude where the item was captured. Absent if the writer set none.
             ///
             /// - Remark: Generated from `#/components/schemas/Item/capture_latitude`.
@@ -839,6 +847,8 @@ extension Components {
             ///   - source: The source the item was written under: the writer's own, or one its key claims. It never changes.
             ///   - sourceId: The item's identifier at its source. With `source`, it is the item's natural key. Absent if the writer set none.
             ///   - readOnly: `true` if every connector with a live write key for the item's type that owns or claims its `source` lists the type in `read_only_types`, so it puts back an edit made in Marfa on its next run. Marfa doesn't refuse the edit.
+            ///   - webUrl: The item's page at this instance's sign-in address, then `/i/` and the item's ID. Marfa builds it when it answers the item, so it changes when the sign-in address moves.
+            ///   - appUrl: The item's address for apps on one device: `marfa://`, the instance's ID, then the item's ID. It stays the same when the sign-in address moves.
             ///   - captureLatitude: The latitude where the item was captured. Absent if the writer set none.
             ///   - captureLongitude: The longitude where the item was captured. Absent if the writer set none.
             ///   - occurredAt: When the item happened, in UTC. Defaults to when it was created.
@@ -861,6 +871,8 @@ extension Components {
                 source: Swift.String,
                 sourceId: Swift.String? = nil,
                 readOnly: Swift.Bool,
+                webUrl: Swift.String,
+                appUrl: Swift.String,
                 captureLatitude: Swift.Double? = nil,
                 captureLongitude: Swift.Double? = nil,
                 occurredAt: Swift.String,
@@ -883,6 +895,8 @@ extension Components {
                 self.source = source
                 self.sourceId = sourceId
                 self.readOnly = readOnly
+                self.webUrl = webUrl
+                self.appUrl = appUrl
                 self.captureLatitude = captureLatitude
                 self.captureLongitude = captureLongitude
                 self.occurredAt = occurredAt
@@ -906,6 +920,8 @@ extension Components {
                 case source
                 case sourceId = "source_id"
                 case readOnly = "read_only"
+                case webUrl = "web_url"
+                case appUrl = "app_url"
                 case captureLatitude = "capture_latitude"
                 case captureLongitude = "capture_longitude"
                 case occurredAt = "occurred_at"
@@ -3348,6 +3364,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemSummary/created_at`.
             public var createdAt: Swift.String
+            /// The item's page at this instance's sign-in address, then `/i/` and the item's ID. Marfa builds it when it answers the item, so it changes when the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/web_url`.
+            public var webUrl: Swift.String
+            /// The item's address for apps on one device: `marfa://`, the instance's ID, then the item's ID. It stays the same when the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemSummary/app_url`.
+            public var appUrl: Swift.String
             /// Creates a new `ItemSummary`.
             ///
             /// - Parameters:
@@ -3357,13 +3381,17 @@ extension Components {
             ///   - name: The item's plain-text name, derived from its type's display hints and fallback fields.
             ///   - source: The source that added the item.
             ///   - createdAt: When the item was created, in UTC.
+            ///   - webUrl: The item's page at this instance's sign-in address, then `/i/` and the item's ID. Marfa builds it when it answers the item, so it changes when the sign-in address moves.
+            ///   - appUrl: The item's address for apps on one device: `marfa://`, the instance's ID, then the item's ID. It stays the same when the sign-in address moves.
             public init(
                 id: Swift.String,
                 _type: Swift.String,
                 version: Swift.Int,
                 name: Swift.String,
                 source: Swift.String,
-                createdAt: Swift.String
+                createdAt: Swift.String,
+                webUrl: Swift.String,
+                appUrl: Swift.String
             ) {
                 self.id = id
                 self._type = _type
@@ -3371,6 +3399,8 @@ extension Components {
                 self.name = name
                 self.source = source
                 self.createdAt = createdAt
+                self.webUrl = webUrl
+                self.appUrl = appUrl
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -3379,6 +3409,8 @@ extension Components {
                 case name
                 case source
                 case createdAt = "created_at"
+                case webUrl = "web_url"
+                case appUrl = "app_url"
             }
         }
         /// A page of trashed item summaries.
@@ -31111,6 +31143,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/created_at`.
             public var createdAt: Foundation.Date
+            /// The item's page at this instance's sign-in address, then `/i/` and the item's ID. Marfa builds it when it answers the item, so it changes when the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/web_url`.
+            public var webUrl: Swift.String
+            /// The item's address for apps on one device: `marfa://`, the instance's ID, then the item's ID. It stays the same when the sign-in address moves.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AppVendorDataItem/app_url`.
+            public var appUrl: Swift.String
             /// Creates a new `AppVendorDataItem`.
             ///
             /// - Parameters:
@@ -31121,6 +31161,8 @@ extension Components {
             ///   - source: The source that wrote the item.
             ///   - state: The item's state: `active`, `archived`, or `trashed` while it is in the trash.
             ///   - createdAt: When the item was created, in UTC.
+            ///   - webUrl: The item's page at this instance's sign-in address, then `/i/` and the item's ID. Marfa builds it when it answers the item, so it changes when the sign-in address moves.
+            ///   - appUrl: The item's address for apps on one device: `marfa://`, the instance's ID, then the item's ID. It stays the same when the sign-in address moves.
             public init(
                 id: Swift.String,
                 _type: Swift.String,
@@ -31128,7 +31170,9 @@ extension Components {
                 name: Swift.String,
                 source: Swift.String,
                 state: Components.Schemas.AppVendorDataItem.StatePayload,
-                createdAt: Foundation.Date
+                createdAt: Foundation.Date,
+                webUrl: Swift.String,
+                appUrl: Swift.String
             ) {
                 self.id = id
                 self._type = _type
@@ -31137,6 +31181,8 @@ extension Components {
                 self.source = source
                 self.state = state
                 self.createdAt = createdAt
+                self.webUrl = webUrl
+                self.appUrl = appUrl
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -31146,6 +31192,8 @@ extension Components {
                 case source
                 case state
                 case createdAt = "created_at"
+                case webUrl = "web_url"
+                case appUrl = "app_url"
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -31177,6 +31225,14 @@ extension Components {
                     Foundation.Date.self,
                     forKey: .createdAt
                 )
+                self.webUrl = try container.decode(
+                    Swift.String.self,
+                    forKey: .webUrl
+                )
+                self.appUrl = try container.decode(
+                    Swift.String.self,
+                    forKey: .appUrl
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "id",
                     "type",
@@ -31184,7 +31240,9 @@ extension Components {
                     "name",
                     "source",
                     "state",
-                    "created_at"
+                    "created_at",
+                    "web_url",
+                    "app_url"
                 ])
             }
         }
