@@ -119,6 +119,12 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// The core has resolved them: a subtype holds the words of its ancestors first and its own after, so every word
     /// an item of this type can hold is here. Empty for a type with no status field.
     public let statusWords: [StatusWord]
+    /// How many whole days the type's feed items stay in the feed, counted from when each was created, or `nil`
+    /// where the type's feed items are kept.
+    ///
+    /// The core has resolved it, so a subtype that sets none holds its ancestors'. Once more days than this have
+    /// passed, Marfa moves a feed item to the bin. Library items never expire.
+    public let feedDays: Int?
 
     /// For an app's previews and tests.
     public init(
@@ -126,7 +132,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         version: Int64 = 0, fields: [TypeField] = [], tables: JSONObject = [:], titleField: String? = nil,
         bodyField: String? = nil,
         nameFromBody: Bool = true, icon: String? = nil,
-        linkField: String? = nil, roles: [String] = []
+        linkField: String? = nil, roles: [String] = [], feedDays: Int? = nil
     ) {
         // An empty label or plural names nothing, as the core reads one.
         let label = label.flatMap { $0.isEmpty ? nil : $0 }
@@ -146,6 +152,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.icon = icon
         self.linkField = linkField
         self.roles = roles
+        self.feedDays = feedDays
         let status = fields.first { $0.type == "status" }
         statusField = status?.name
         statusWords = status.map { StatusWord.words(in: $0.definition) } ?? []
@@ -157,7 +164,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
             parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
             tables: JSONObject(core.tables), titleField: core.titleField,
             bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField,
-            roles: core.roles)
+            roles: core.roles, feedDays: core.feedDays.map(Int.init))
     }
 }
 

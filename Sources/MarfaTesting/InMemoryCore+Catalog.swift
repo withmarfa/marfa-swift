@@ -152,6 +152,9 @@ enum Declaring {
         if Properties.value(definition, "tables") != nil {
             throw FakeCopyError.unsupported(call: "declareTypes with a table in \(id)")
         }
+        if Properties.value(definition, "retention_policy") != nil {
+            throw FakeCopyError.unsupported(call: "declareTypes with a retention policy in \(id)")
+        }
         var row = definition
         switch Properties.value(definition, "fields") {
         case nil:
@@ -298,7 +301,7 @@ enum Declaring {
             nameFromBody: hints.flatMap { Properties.bool($0, "name_from_body") } ?? inherited?.nameFromBody ?? true,
             icon: hints.flatMap { Properties.string($0, "icon") } ?? inherited?.icon,
             linkField: Properties.string(row, "link_field"), roles: Properties.strings(row, "roles"),
-            feedDays: nil)
+            feedDays: inherited?.feedDays)
     }
 }
 #endif

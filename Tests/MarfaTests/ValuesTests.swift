@@ -473,7 +473,7 @@ struct CatalogTypes {
             ],
             tables: JsonObject(members: []),
             titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-            linkField: "vendor_id", roles: ["container"], feedDays: nil)
+            linkField: "vendor_id", roles: ["container"], feedDays: 90)
         let type = Marfa.ItemType(core)
         #expect(
             type
@@ -489,7 +489,16 @@ struct CatalogTypes {
                             declaredBy: "user.recipe", definition: ["type": "string"]),
                     ],
                     titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-                    linkField: "vendor_id", roles: ["container"]))
+                    linkField: "vendor_id", roles: ["container"], feedDays: 90))
+        #expect(type.feedDays == 90)
+    }
+
+    @Test func anItemTypeWithNoFeedWindowArrivesWithNone() {
+        let core = MarfaCore.ItemType(
+            id: "user.recipe", label: nil, plural: "Recipes", description: nil, parent: nil, version: 1, fields: [],
+            tables: JsonObject(members: []), titleField: nil, bodyField: nil, nameFromBody: true, icon: nil,
+            linkField: nil, roles: [], feedDays: nil)
+        #expect(Marfa.ItemType(core).feedDays == nil)
     }
 
     @Test func anEdgeTypeArrivesWithItsReverseNameAndTheEndThatWritesIt() {

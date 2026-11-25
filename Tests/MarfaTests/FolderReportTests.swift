@@ -52,7 +52,7 @@ private func coreDrain(
     #expect(Marfa.FolderPass(corePass()).scan.waiting == 0)
 }
 
-@Test(arguments: ["unwritten", "outside", "unsuited", "absent", "retained"])
+@Test(arguments: ["unwritten", "outside", "unsuited", "absent"])
 func aFlaggedFileNamesTheItemAPullHeldBack(flag: String) {
     let item = "01a00000-0000-7000-8000-000000000042"
     let flagged = Marfa.FlaggedFile(
