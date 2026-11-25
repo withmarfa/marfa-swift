@@ -318,12 +318,19 @@ extension SavedView {
 
 extension Marfa.ItemType {
     fileprivate var held: MarfaCore.ItemType {
-        MarfaCore.ItemType(
+        let source: MarfaCore.TypeOrigin =
+            switch origin {
+            case .platform: .platform
+            case .registered: .registered
+            case .plugin: .plugin
+            case .unknown: .unknown
+            }
+        return MarfaCore.ItemType(
             id: id, label: label, plural: plural, description: description, parent: parent, version: version,
             fields: fields.map(\.held), tables: tables.core, titleField: titleField,
             bodyField: bodyField, nameFromBody: nameFromBody,
             icon: icon, linkField: linkField, roles: roles, feedDays: feedDays.map(Int64.init),
-            origin: .registered, plugin: nil)
+            origin: source, plugin: plugin.map { MarfaCore.TypePlugin(name: $0.name, version: $0.version) })
     }
 }
 
