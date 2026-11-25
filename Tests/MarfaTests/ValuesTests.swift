@@ -473,7 +473,7 @@ struct CatalogTypes {
             ],
             tables: JsonObject(members: []),
             titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-            linkField: "vendor_id", roles: ["container"], feedDays: 90)
+            linkField: "vendor_id", roles: ["container"], feedDays: 90, origin: .registered, plugin: nil)
         let type = Marfa.ItemType(core)
         #expect(
             type
@@ -497,7 +497,7 @@ struct CatalogTypes {
         let core = MarfaCore.ItemType(
             id: "user.recipe", label: nil, plural: "Recipes", description: nil, parent: nil, version: 1, fields: [],
             tables: JsonObject(members: []), titleField: nil, bodyField: nil, nameFromBody: true, icon: nil,
-            linkField: nil, roles: [], feedDays: nil)
+            linkField: nil, roles: [], feedDays: nil, origin: .registered, plugin: nil)
         #expect(Marfa.ItemType(core).feedDays == nil)
     }
 

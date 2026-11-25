@@ -255,8 +255,9 @@ extension InMemoryCore {
         }
     }
 
-    func transitionItem(id: String, state target: ItemState) throws -> QueuedWrite {
-        try state.withLock { state in
+    func transitionItem(id: String, state target: ItemState, from: ItemState?) throws -> QueuedWrite {
+        if from != nil { throw FakeCopyError.unsupported(call: "items.transition(from:)") }
+        return try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
             if target == .revoked {
                 if held.type.hasPrefix("system.") {
@@ -267,10 +268,13 @@ extension InMemoryCore {
                     "state: a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
                 )
             }
+            let body = JsonObject(members: [
+                JsonMember(key: "state", value: .string(target.name)),
+                JsonMember(key: "from", value: .string(held.state.name)),
+            ])
             let at = Minted.now()
             held.move(to: target, at: at)
             state.items[id] = held
-            let body = JsonObject(members: [JsonMember(key: "state", value: .string(target.name))])
             return state.append(
                 .transitionItem, item: id, body: body, dependsOn: state.pendingCreates(of: id),
                 effect: .state(target, at: at))

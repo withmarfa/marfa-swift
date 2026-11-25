@@ -264,7 +264,7 @@ struct ItemsOffline {
 
         let write = try await copy.items.transition(archived, to: .archived)
 
-        #expect(write.kind == .transitionItem && write.body == ["state": "archived"])
+        #expect(write.kind == .transitionItem && write.body == ["state": "archived", "from": "active"])
         #expect(try await copy.items.get(archived)?.state == .archived)
         #expect(try await copy.items.list().map(\.id) == [kept])
         #expect(try await copy.items.list(ListFilters(states: [.archived])).map(\.id) == [archived])

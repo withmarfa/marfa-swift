@@ -322,7 +322,8 @@ extension Marfa.ItemType {
             id: id, label: label, plural: plural, description: description, parent: parent, version: version,
             fields: fields.map(\.held), tables: tables.core, titleField: titleField,
             bodyField: bodyField, nameFromBody: nameFromBody,
-            icon: icon, linkField: linkField, roles: roles, feedDays: feedDays.map(Int64.init))
+            icon: icon, linkField: linkField, roles: roles, feedDays: feedDays.map(Int64.init),
+            origin: .registered, plugin: nil)
     }
 }
 
