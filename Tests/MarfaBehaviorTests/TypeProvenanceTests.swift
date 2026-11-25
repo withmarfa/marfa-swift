@@ -27,5 +27,15 @@ import Testing
         #expect(try await copy.catalog.itemType("reading.story").plugin == plugin)
         await copy.close()
     }
+
+    @Test func theFakeRefusesADeclarationThatSetsItsOwnProvenance() async throws {
+        let copy = WorkingCopy.fake().copy
+        await #expect(throws: FakeCopyError.unsupported(call: "declareTypes with provenance in app.readinglist.story"))
+        {
+            try await copy.declareTypes([["id": "app.readinglist.story", "provenance": ["origin": "platform"]]])
+        }
+        #expect(try await copy.declaredTypes().isEmpty)
+        await copy.close()
+    }
 }
 #endif
