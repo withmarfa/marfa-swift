@@ -15,7 +15,7 @@ private let client = Authorization.Client(
 struct SignInDiscoveryTransportTests {
     @Test(
         arguments: [
-            (URLError.Code.cannotFindHost, SignInError.discoveryTransport(reason: .dnsFailure)),
+            (URLError.Code.cannotFindHost, Optional.some(SignInError.discoveryTransport(reason: .dnsFailure))),
             (.dnsLookupFailed, .discoveryTransport(reason: .dnsFailure)),
             (.cannotConnectToHost, .discoveryTransport(reason: .connectionFailed)),
             (.timedOut, .discoveryTransport(reason: .connectionFailed)),
