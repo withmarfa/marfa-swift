@@ -149,6 +149,9 @@ enum Declaring {
         if let issue = textIssue(definition, id: id) {
             throw Refuse.invalid("\(id) declares text that does not hold: \(issue)")
         }
+        if Properties.value(definition, "tables") != nil {
+            throw FakeCopyError.unsupported(call: "declareTypes with a table in \(id)")
+        }
         var row = definition
         switch Properties.value(definition, "fields") {
         case nil:
@@ -289,7 +292,7 @@ enum Declaring {
             description: Properties.string(row, "description"),
             parent: parent, version: version,
             fields: fields.values.sorted { $0.name.utf8.lexicographicallyPrecedes($1.name.utf8) },
-            tables: JsonObject(members: []),
+            tables: inherited?.tables ?? JsonObject(members: []),
             titleField: hints.flatMap { Properties.string($0, "title_field") } ?? inherited?.titleField,
             bodyField: hints.flatMap { Properties.string($0, "body_field") } ?? inherited?.bodyField,
             nameFromBody: hints.flatMap { Properties.bool($0, "name_from_body") } ?? inherited?.nameFromBody ?? true,
