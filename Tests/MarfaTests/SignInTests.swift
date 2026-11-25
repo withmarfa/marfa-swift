@@ -15,16 +15,19 @@ private let client = Authorization.Client(
 struct SignInDiscoveryTransportTests {
     @Test(
         arguments: [
-            (URLError.Code.cannotFindHost, "The server name could not be resolved."),
-            (.dnsLookupFailed, "The server name could not be resolved."),
-            (.cannotConnectToHost, "The server could not be contacted."),
-            (.timedOut, "The server could not be contacted."),
-            (.serverCertificateUntrusted, "The server certificate could not be trusted."),
-            (.serverCertificateHasUnknownRoot, "The server certificate could not be trusted."),
-            (.serverCertificateHasBadDate, "The server certificate could not be trusted."),
-            (.serverCertificateNotYetValid, "The server certificate could not be trusted."),
+            (URLError.Code.cannotFindHost, SignInError.discoveryTransport(reason: .dnsFailure)),
+            (.dnsLookupFailed, .discoveryTransport(reason: .dnsFailure)),
+            (.cannotConnectToHost, .discoveryTransport(reason: .connectionFailed)),
+            (.timedOut, .discoveryTransport(reason: .connectionFailed)),
+            (.serverCertificateUntrusted, .discoveryTransport(reason: .untrustedCertificate)),
+            (.serverCertificateHasUnknownRoot, .discoveryTransport(reason: .untrustedCertificate)),
+            (.serverCertificateHasBadDate, .discoveryTransport(reason: .untrustedCertificate)),
+            (.serverCertificateNotYetValid, .discoveryTransport(reason: .untrustedCertificate)),
+            (.cancelled, .canceled),
+            (.unknown, nil),
+            (.secureConnectionFailed, nil),
         ], [false, true])
-    func classifiesDiscoveryFailure(failure: (URLError.Code, String), device: Bool) async throws {
+    func classifiesDiscoveryFailure(failure: (URLError.Code, SignInError?), device: Bool) async throws {
         let server = ScriptedAuthServer { _ in .failure(failure.0) }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let authorization = try Authorization(
@@ -37,8 +40,23 @@ struct SignInDiscoveryTransportTests {
                     _ = try await authorization.signIn { url, _ in url }
                 }
             } throws: { error in
-                (error as? SignInError)?.description == failure.1
+                if let expected = failure.1 { return (error as? SignInError) == expected }
+                guard case SignInError.unavailable = error else { return false }
+                return true
             }
+        }
+    }
+
+    @Test(arguments: [
+        ("http://marfa-sign-in.invalid", SignInError.DiscoveryTransportReason.dnsFailure),
+        ("http://127.0.0.1:1", .connectionFailed),
+    ])
+    func classifiesSystemURLSessionFailure(server: (String, SignInError.DiscoveryTransportReason)) async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForResource = 10
+        let transport = SignInTransport(session: URLSession(configuration: configuration))
+        await #expect(throws: SignInError.discoveryTransport(reason: server.1)) {
+            try await Discovery.read(server.0, transport)
         }
     }
 }

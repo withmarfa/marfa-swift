@@ -594,6 +594,24 @@ public enum InstancePermission: String, Sendable, Hashable, CaseIterable {
 ///
 /// None repeats a token.
 public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
+    /// Why the request for sign-in metadata failed.
+    public enum DiscoveryTransportReason: Sendable, Hashable, CustomStringConvertible {
+        /// The server name could not be resolved.
+        case dnsFailure
+        /// The connection failed or the request timed out.
+        case connectionFailed
+        /// The server certificate failed trust evaluation.
+        case untrustedCertificate
+
+        public var description: String {
+            switch self {
+            case .dnsFailure: "The server name could not be resolved."
+            case .connectionFailed: "The server could not be contacted."
+            case .untrustedCertificate: "The server certificate could not be trusted."
+            }
+        }
+    }
+
     /// The person closed the browser before deciding.
     case canceled
     /// The person declined to approve the app.
@@ -617,6 +635,8 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     case noRedirect
     /// The server refused, with the OAuth error `code`.
     case refused(code: String, message: String)
+    /// A recognized transport failure while reading the server's sign-in metadata.
+    case discoveryTransport(reason: DiscoveryTransportReason)
     /// The server could not be reached, or the browser could not open.
     case unavailable(message: String)
     /// Another process sharing the keychain, such as an app extension, held the sign-in too long, so the
@@ -639,6 +659,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .noRedirect: "The app names no redirect address for a browser sign-in."
         case .heldElsewhere: "Another process is using the sign-in."
         case .refused(let code, let message): "The server refused the sign-in (\(code)): \(message)"
+        case .discoveryTransport(let reason): reason.description
         case .unavailable(let message), .unreadable(let message): message
         }
     }
