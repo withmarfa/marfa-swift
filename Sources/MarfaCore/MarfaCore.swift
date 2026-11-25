@@ -6755,8 +6755,7 @@ public struct FlaggedFile: Equatable, Hashable {
     public var flag: String
     public var reason: String
     /**
-     * The item whose file a pull did not write, or could not let go to
-     * another folder.
+     * The item this flag refers to, when known.
      */
     public var item: String?
 
@@ -6764,8 +6763,7 @@ public struct FlaggedFile: Equatable, Hashable {
     // declare one manually.
     public init(path: String, flag: String, reason: String, 
         /**
-         * The item whose file a pull did not write, or could not let go to
-         * another folder.
+         * The item this flag refers to, when known.
          */item: String?) {
         self.path = path
         self.flag = flag

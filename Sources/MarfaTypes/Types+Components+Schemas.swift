@@ -14298,7 +14298,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/AttentionConcern`.
         public struct AttentionConcern: Codable, Hashable, Sendable {
-            /// health: degraded or down; job: last run failed; connector: failed, problems or quiet; folder: sync problems; key: expiring; backup: none, off or failing; setting: secret to set again; clock: ahead or behind; fault: met lately; unavailable: no answer.
+            /// health: degraded or down; job: run failed; connector: failing or quiet; folder: sync problems; key: expiring; webhook: failing a day; backup: none, off or failing; setting: secret to set; clock: ahead or behind; fault: recent; unavailable: no answer.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
             @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
@@ -14307,17 +14307,18 @@ extension Components {
                 case connector = "connector"
                 case folder = "folder"
                 case key = "key"
+                case webhook = "webhook"
                 case backup = "backup"
                 case setting = "setting"
                 case clock = "clock"
                 case fault = "fault"
                 case unavailable = "unavailable"
             }
-            /// health: degraded or down; job: last run failed; connector: failed, problems or quiet; folder: sync problems; key: expiring; backup: none, off or failing; setting: secret to set again; clock: ahead or behind; fault: met lately; unavailable: no answer.
+            /// health: degraded or down; job: run failed; connector: failing or quiet; folder: sync problems; key: expiring; webhook: failing a day; backup: none, off or failing; setting: secret to set; clock: ahead or behind; fault: recent; unavailable: no answer.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/kind`.
             public var kind: Components.Schemas.AttentionConcern.KindPayload
-            /// The component, job, connector, folder or key ID, the check that couldn't answer, a backup concern such as `store`, a secret setting's key, `clock_ahead` or `clock_behind`, or a fault's kind and place, such as `database:POST /items/{id}`, or `other`.
+            /// A component, job, connector, folder, key or webhook ID, a check that couldn't answer, a backup concern, like `store`, a secret setting's key, `clock_ahead` or `clock_behind`, a fault's kind and place, such as `database:POST /items/{id}`, or `other`.
             ///
             /// - Remark: Generated from `#/components/schemas/AttentionConcern/reference`.
             public var reference: Swift.String
@@ -14332,8 +14333,8 @@ extension Components {
             /// Creates a new `AttentionConcern`.
             ///
             /// - Parameters:
-            ///   - kind: health: degraded or down; job: last run failed; connector: failed, problems or quiet; folder: sync problems; key: expiring; backup: none, off or failing; setting: secret to set again; clock: ahead or behind; fault: met lately; unavailable: no answer.
-            ///   - reference: The component, job, connector, folder or key ID, the check that couldn't answer, a backup concern such as `store`, a secret setting's key, `clock_ahead` or `clock_behind`, or a fault's kind and place, such as `database:POST /items/{id}`, or `other`.
+            ///   - kind: health: degraded or down; job: run failed; connector: failing or quiet; folder: sync problems; key: expiring; webhook: failing a day; backup: none, off or failing; setting: secret to set; clock: ahead or behind; fault: recent; unavailable: no answer.
+            ///   - reference: A component, job, connector, folder, key or webhook ID, a check that couldn't answer, a backup concern, like `store`, a secret setting's key, `clock_ahead` or `clock_behind`, a fault's kind and place, such as `database:POST /items/{id}`, or `other`.
             ///   - title: A short name for the concern.
             ///   - description: What needs attention or remains unknown.
             public init(
@@ -16570,6 +16571,14 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_backlog_bytes`.
             public var inboundBacklogBytes: Swift.Int?
+            /// Maximum number of pending deliveries per webhook. Marfa records a new delivery as `canceled` if adding it would exceed this limit.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/webhook_backlog_deliveries`.
+            public var webhookBacklogDeliveries: Swift.Int?
+            /// Maximum total payload size in bytes for a webhook's pending deliveries. Marfa records a new delivery as `canceled` if adding its payload would exceed this total.
+            ///
+            /// - Remark: Generated from `#/components/schemas/InstanceConfig/webhook_backlog_bytes`.
+            public var webhookBacklogBytes: Swift.Int?
             /// The most deliveries one registration retains across its live and retired endpoints.
             ///
             /// - Remark: Generated from `#/components/schemas/InstanceConfig/inbound_retained_deliveries`.
@@ -16647,6 +16656,8 @@ extension Components {
             ///   - inboundInFlightBytes: The most bytes of inbound webhook deliveries Marfa holds in memory at once. One source holds at most half.
             ///   - inboundBacklogDeliveries: The unhandled deliveries one registration may hold before Marfa refuses more for it.
             ///   - inboundBacklogBytes: The bytes of unhandled deliveries one registration may hold before Marfa refuses more for it.
+            ///   - webhookBacklogDeliveries: Maximum number of pending deliveries per webhook. Marfa records a new delivery as `canceled` if adding it would exceed this limit.
+            ///   - webhookBacklogBytes: Maximum total payload size in bytes for a webhook's pending deliveries. Marfa records a new delivery as `canceled` if adding its payload would exceed this total.
             ///   - inboundRetainedDeliveries: The most deliveries one registration retains across its live and retired endpoints.
             ///   - inboundRetainedBytes: The most bytes of bodies, headers and queries one registration retains across its live and retired endpoints.
             ///   - corsOrigins: The browser origins allowed to call the API across origins with a token, beside the web pages the owner approves. Each is an origin with no path.
@@ -16713,6 +16724,8 @@ extension Components {
                 inboundInFlightBytes: Swift.Int? = nil,
                 inboundBacklogDeliveries: Swift.Int? = nil,
                 inboundBacklogBytes: Swift.Int? = nil,
+                webhookBacklogDeliveries: Swift.Int? = nil,
+                webhookBacklogBytes: Swift.Int? = nil,
                 inboundRetainedDeliveries: Swift.Int? = nil,
                 inboundRetainedBytes: Swift.Int? = nil,
                 corsOrigins: [Swift.String]? = nil
@@ -16779,6 +16792,8 @@ extension Components {
                 self.inboundInFlightBytes = inboundInFlightBytes
                 self.inboundBacklogDeliveries = inboundBacklogDeliveries
                 self.inboundBacklogBytes = inboundBacklogBytes
+                self.webhookBacklogDeliveries = webhookBacklogDeliveries
+                self.webhookBacklogBytes = webhookBacklogBytes
                 self.inboundRetainedDeliveries = inboundRetainedDeliveries
                 self.inboundRetainedBytes = inboundRetainedBytes
                 self.corsOrigins = corsOrigins
@@ -16846,6 +16861,8 @@ extension Components {
                 case inboundInFlightBytes = "inbound_in_flight_bytes"
                 case inboundBacklogDeliveries = "inbound_backlog_deliveries"
                 case inboundBacklogBytes = "inbound_backlog_bytes"
+                case webhookBacklogDeliveries = "webhook_backlog_deliveries"
+                case webhookBacklogBytes = "webhook_backlog_bytes"
                 case inboundRetainedDeliveries = "inbound_retained_deliveries"
                 case inboundRetainedBytes = "inbound_retained_bytes"
                 case corsOrigins = "cors_origins"
@@ -23201,6 +23218,7 @@ extension Components {
                 case connector = "connector"
                 case folder = "folder"
                 case key = "key"
+                case webhook = "webhook"
                 case backup = "backup"
                 case setting = "setting"
                 case clock = "clock"

@@ -125259,7 +125259,7 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `conflict`: Marfa can't send it again. `details.reason` is the first that applies: `webhook_inactive`; `credential_unavailable`, the registering key or app is gone or lacks `webhooks.manage`; `delivery_not_failed`; or `delivery_expired`, past audit retention.
+            /// - `conflict`: Marfa can't send it again. `details.reason` is the first that applies: `webhook_inactive`; `credential_unavailable`, the registering key or app is gone or lacks `webhooks.manage`; `delivery_not_failed`; `delivery_expired`, past audit retention; or `backlog_full`, sending it again would pass `webhook_backlog_deliveries` or `webhook_backlog_bytes`.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/deliveries/{delivery_id}/redeliver/post(redeliverWebhookDelivery)/responses/409`.
             ///
@@ -202018,6 +202018,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/inbound_backlog_bytes`.
                     public var inboundBacklogBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d?
+                    /// Maximum number of pending deliveries per webhook. Marfa records a new delivery as `canceled` if adding it would exceed this limit. `null` removes it, so the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/webhook_backlog_deliveries`.
+                    public var webhookBacklogDeliveries: Components.Schemas.MarfaNullableMarfaInline700693241c848bce?
+                    /// Maximum total payload size in bytes for a webhook's pending deliveries. Marfa records a new delivery as `canceled` if adding its payload would exceed this total. `null` removes it, so the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/webhook_backlog_bytes`.
+                    public var webhookBacklogBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d?
                     /// The most deliveries one registration retains across its live and retired endpoints. `null` removes it, so the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PATCH/requestBody/json/inbound_retained_deliveries`.
@@ -202108,6 +202116,8 @@ public enum Operations {
                     ///   - inboundInFlightBytes: The most bytes of inbound webhook deliveries Marfa holds in memory at once. One source holds at most half. `null` removes it, so the server's default applies.
                     ///   - inboundBacklogDeliveries: The unhandled deliveries one registration may hold before Marfa refuses more for it. `null` removes it, so the server's default applies.
                     ///   - inboundBacklogBytes: The bytes of unhandled deliveries one registration may hold before Marfa refuses more for it. `null` removes it, so the server's default applies.
+                    ///   - webhookBacklogDeliveries: Maximum number of pending deliveries per webhook. Marfa records a new delivery as `canceled` if adding it would exceed this limit. `null` removes it, so the server's default applies.
+                    ///   - webhookBacklogBytes: Maximum total payload size in bytes for a webhook's pending deliveries. Marfa records a new delivery as `canceled` if adding its payload would exceed this total. `null` removes it, so the server's default applies.
                     ///   - inboundRetainedDeliveries: The most deliveries one registration retains across its live and retired endpoints. `null` removes it, so the server's default applies.
                     ///   - inboundRetainedBytes: The most bytes of bodies, headers and queries one registration retains across its live and retired endpoints. `null` removes it, so the server's default applies.
                     ///   - corsOrigins: The browser origins allowed to call the API across origins with a token, beside the web pages the owner approves. Each is an origin with no path. `null` removes it, so the server's default applies.
@@ -202187,6 +202197,8 @@ public enum Operations {
                         inboundInFlightBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d? = nil,
                         inboundBacklogDeliveries: Components.Schemas.MarfaNullableMarfaInline700693241c848bce? = nil,
                         inboundBacklogBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d? = nil,
+                        webhookBacklogDeliveries: Components.Schemas.MarfaNullableMarfaInline700693241c848bce? = nil,
+                        webhookBacklogBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d? = nil,
                         inboundRetainedDeliveries: Components.Schemas.MarfaNullableMarfaInline700693241c848bce? = nil,
                         inboundRetainedBytes: Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d? = nil,
                         corsOrigins: Components.Schemas.MarfaNullableMarfaInline681004346c78d5f3? = nil
@@ -202266,6 +202278,8 @@ public enum Operations {
                         self.inboundInFlightBytes = inboundInFlightBytes
                         self.inboundBacklogDeliveries = inboundBacklogDeliveries
                         self.inboundBacklogBytes = inboundBacklogBytes
+                        self.webhookBacklogDeliveries = webhookBacklogDeliveries
+                        self.webhookBacklogBytes = webhookBacklogBytes
                         self.inboundRetainedDeliveries = inboundRetainedDeliveries
                         self.inboundRetainedBytes = inboundRetainedBytes
                         self.corsOrigins = corsOrigins
@@ -202346,6 +202360,8 @@ public enum Operations {
                         case inboundInFlightBytes = "inbound_in_flight_bytes"
                         case inboundBacklogDeliveries = "inbound_backlog_deliveries"
                         case inboundBacklogBytes = "inbound_backlog_bytes"
+                        case webhookBacklogDeliveries = "webhook_backlog_deliveries"
+                        case webhookBacklogBytes = "webhook_backlog_bytes"
                         case inboundRetainedDeliveries = "inbound_retained_deliveries"
                         case inboundRetainedBytes = "inbound_retained_bytes"
                         case corsOrigins = "cors_origins"
@@ -202652,6 +202668,14 @@ public enum Operations {
                             Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d.self,
                             forKey: .inboundBacklogBytes
                         )
+                        self.webhookBacklogDeliveries = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline700693241c848bce.self,
+                            forKey: .webhookBacklogDeliveries
+                        )
+                        self.webhookBacklogBytes = try container.decodeIfPresent(
+                            Components.Schemas.MarfaNullableMarfaInline85c0b849645b528d.self,
+                            forKey: .webhookBacklogBytes
+                        )
                         self.inboundRetainedDeliveries = try container.decodeIfPresent(
                             Components.Schemas.MarfaNullableMarfaInline700693241c848bce.self,
                             forKey: .inboundRetainedDeliveries
@@ -202740,6 +202764,8 @@ public enum Operations {
                             "inbound_in_flight_bytes",
                             "inbound_backlog_deliveries",
                             "inbound_backlog_bytes",
+                            "webhook_backlog_deliveries",
+                            "webhook_backlog_bytes",
                             "inbound_retained_deliveries",
                             "inbound_retained_bytes",
                             "cors_origins"
@@ -204262,6 +204288,14 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/inbound_backlog_bytes`.
                     public var inboundBacklogBytes: Swift.Int?
+                    /// Maximum number of pending deliveries per webhook. Marfa records a new delivery as `canceled` if adding it would exceed this limit. Absent: the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/webhook_backlog_deliveries`.
+                    public var webhookBacklogDeliveries: Swift.Int?
+                    /// Maximum total payload size in bytes for a webhook's pending deliveries. Marfa records a new delivery as `canceled` if adding its payload would exceed this total. Absent: the server's default applies.
+                    ///
+                    /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/webhook_backlog_bytes`.
+                    public var webhookBacklogBytes: Swift.Int?
                     /// The most deliveries one registration retains across its live and retired endpoints. Absent: the server's default applies.
                     ///
                     /// - Remark: Generated from `#/paths/config/PUT/requestBody/json/inbound_retained_deliveries`.
@@ -204352,6 +204386,8 @@ public enum Operations {
                     ///   - inboundInFlightBytes: The most bytes of inbound webhook deliveries Marfa holds in memory at once. One source holds at most half. Absent: the server's default applies.
                     ///   - inboundBacklogDeliveries: The unhandled deliveries one registration may hold before Marfa refuses more for it. Absent: the server's default applies.
                     ///   - inboundBacklogBytes: The bytes of unhandled deliveries one registration may hold before Marfa refuses more for it. Absent: the server's default applies.
+                    ///   - webhookBacklogDeliveries: Maximum number of pending deliveries per webhook. Marfa records a new delivery as `canceled` if adding it would exceed this limit. Absent: the server's default applies.
+                    ///   - webhookBacklogBytes: Maximum total payload size in bytes for a webhook's pending deliveries. Marfa records a new delivery as `canceled` if adding its payload would exceed this total. Absent: the server's default applies.
                     ///   - inboundRetainedDeliveries: The most deliveries one registration retains across its live and retired endpoints. Absent: the server's default applies.
                     ///   - inboundRetainedBytes: The most bytes of bodies, headers and queries one registration retains across its live and retired endpoints. Absent: the server's default applies.
                     ///   - corsOrigins: The browser origins allowed to call the API across origins with a token, beside the web pages the owner approves. Each is an origin with no path. Absent: the server's default applies.
@@ -204431,6 +204467,8 @@ public enum Operations {
                         inboundInFlightBytes: Swift.Int? = nil,
                         inboundBacklogDeliveries: Swift.Int? = nil,
                         inboundBacklogBytes: Swift.Int? = nil,
+                        webhookBacklogDeliveries: Swift.Int? = nil,
+                        webhookBacklogBytes: Swift.Int? = nil,
                         inboundRetainedDeliveries: Swift.Int? = nil,
                         inboundRetainedBytes: Swift.Int? = nil,
                         corsOrigins: [Swift.String]? = nil
@@ -204510,6 +204548,8 @@ public enum Operations {
                         self.inboundInFlightBytes = inboundInFlightBytes
                         self.inboundBacklogDeliveries = inboundBacklogDeliveries
                         self.inboundBacklogBytes = inboundBacklogBytes
+                        self.webhookBacklogDeliveries = webhookBacklogDeliveries
+                        self.webhookBacklogBytes = webhookBacklogBytes
                         self.inboundRetainedDeliveries = inboundRetainedDeliveries
                         self.inboundRetainedBytes = inboundRetainedBytes
                         self.corsOrigins = corsOrigins
@@ -204590,6 +204630,8 @@ public enum Operations {
                         case inboundInFlightBytes = "inbound_in_flight_bytes"
                         case inboundBacklogDeliveries = "inbound_backlog_deliveries"
                         case inboundBacklogBytes = "inbound_backlog_bytes"
+                        case webhookBacklogDeliveries = "webhook_backlog_deliveries"
+                        case webhookBacklogBytes = "webhook_backlog_bytes"
                         case inboundRetainedDeliveries = "inbound_retained_deliveries"
                         case inboundRetainedBytes = "inbound_retained_bytes"
                         case corsOrigins = "cors_origins"
@@ -204896,6 +204938,14 @@ public enum Operations {
                             Swift.Int.self,
                             forKey: .inboundBacklogBytes
                         )
+                        self.webhookBacklogDeliveries = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .webhookBacklogDeliveries
+                        )
+                        self.webhookBacklogBytes = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .webhookBacklogBytes
+                        )
                         self.inboundRetainedDeliveries = try container.decodeIfPresent(
                             Swift.Int.self,
                             forKey: .inboundRetainedDeliveries
@@ -204984,6 +205034,8 @@ public enum Operations {
                             "inbound_in_flight_bytes",
                             "inbound_backlog_deliveries",
                             "inbound_backlog_bytes",
+                            "webhook_backlog_deliveries",
+                            "webhook_backlog_bytes",
                             "inbound_retained_deliveries",
                             "inbound_retained_bytes",
                             "cors_origins"
