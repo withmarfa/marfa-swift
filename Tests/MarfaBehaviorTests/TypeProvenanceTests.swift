@@ -20,11 +20,16 @@ import Testing
         let types = [
             ItemType(id: "core.note", origin: .platform),
             ItemType(id: "reading.story", origin: .plugin, plugin: plugin),
+            ItemType(id: "user.missing", origin: .plugin),
+            ItemType(id: "user.story", origin: .registered, plugin: plugin),
             ItemType(id: "user.unknown"),
         ]
         let copy = WorkingCopy.fake(itemTypes: types).copy
         #expect(try await copy.catalog.itemTypes() == types)
         #expect(try await copy.catalog.itemType("reading.story").plugin == plugin)
+        #expect(try await copy.catalog.itemType("user.missing").origin == .unknown)
+        #expect(try await copy.catalog.itemType("user.story").plugin == nil)
+        #expect(try await copy.catalog.itemType("user.unknown").origin == .unknown)
         await copy.close()
     }
 

@@ -67,7 +67,7 @@ import Synchronization
 /// of range or has no partner, a body that links to another item, a tag with
 /// surrounding whitespace, a value for any field other than a string field, an
 /// enum field that lists its values or a status field, which it judges, and
-/// `declareTypes(_:)` with a status field, status words or a table. A type it holds answers the tables it
+/// `declareTypes(_:)` with provenance, a status field, status words or a table. A type it holds answers the tables it
 /// was given and a subtype the ones it inherits. A filter that names
 /// `status_group` is a `filter`, so the fake does not answer it.
 ///
