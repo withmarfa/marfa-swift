@@ -79,8 +79,8 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// By name, with the fields it inherits; a field declared again nearer
     /// this type takes the place of the one above it.
     public let fields: [TypeField]
-    /// Each table the type declares or inherits, by name, as the core read them: each value is the table's
-    /// definition, with a label where the type's chain names none made from its name.
+    /// Each table the type declares or inherits, by name, as the core reads them. Each value is the table's
+    /// definition; where no type in the chain labels the table, the core makes a label from its name.
     ///
     /// Empty when the type declares and inherits no table.
     public let tables: JSONObject
