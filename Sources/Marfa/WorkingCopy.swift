@@ -776,8 +776,13 @@ public struct Items: Sendable {
         try await write { core in try core.restoreItem(id: id) }
     }
 
-    public func transition(_ id: String, to state: ItemState) async throws -> QueuedWrite {
-        try await write { core in try core.transitionItem(id: id, state: state.core, from: nil) }
+    /// Queues a move from the state the copy shows.
+    ///
+    /// Pass the state the person saw as `from` to refuse a stale move before queuing it. A local mismatch throws
+    /// `MarfaError.validation` with code `state_conflict`. If the item moves on the server before the queue drains,
+    /// the write's refused verdict carries the server's code and message.
+    public func transition(_ id: String, to state: ItemState, from: ItemState? = nil) async throws -> QueuedWrite {
+        try await write { core in try core.transitionItem(id: id, state: state.core, from: from?.core) }
     }
 
     /// Queues three writes, each with its own verdict: the upload, a file item

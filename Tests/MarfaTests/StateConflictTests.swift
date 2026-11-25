@@ -1,4 +1,5 @@
 import MarfaCore
+import MarfaTypes
 import Testing
 
 @testable import Marfa
@@ -6,7 +7,7 @@ import Testing
 @Suite struct StateConflict {
     @Test func aServerConflictPreservesItsMessageAndStatesThroughBothTransports() async throws {
         let message = "The item is trashed."
-        let details: Marfa.JSONValue = ["expected": "archived", "actual": "trashed"]
+        let details: Marfa.JSONValue = ["actual": "trashed", "expected": "archived"]
         let answer = Marfa.ServerAnswer(status: 409, code: "state_conflict", details: details, requestId: "request")
         let expected = Marfa.MarfaError.validation(
             code: "state_conflict", message: message, details: details, server: answer)
