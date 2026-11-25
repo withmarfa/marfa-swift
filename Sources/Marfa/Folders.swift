@@ -853,9 +853,8 @@ public struct FlaggedFile: Sendable, Hashable {
     /// The id of the item a pull held back, where a pull did.
     ///
     /// Set for a `flag` of `unwritten`, `outside`, `unsuited` or `absent`, where the pull didn't write the item's
-    /// file, and `retained`, for a file the pull couldn't let go to another folder. Then `path` is where the pull
-    /// would have written the file, or the item's own file where it left that file as it stands. `nil` for a file
-    /// the scan flagged. Two items held back at one path are two entries.
+    /// file. Then `path` is where the pull would have written the file, or the item's own file where it left that
+    /// file as it stands. `nil` for a file the scan flagged. Two items held back at one path are two entries.
     public let item: String?
 
     init(_ core: MarfaCore.FlaggedFile) {

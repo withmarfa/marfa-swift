@@ -32,4 +32,27 @@ struct DeclaredTypes {
         #expect(try await reopened.queue.all().contains { $0.id == write.id })
         await reopened.close()
     }
+
+    @Test func aDeclaredFeedWindowReachesTheTypeAndItsSubtypesUntilOneKeepsItsFeedItems() async throws {
+        let copy = try await WorkingCopy.open(store: temporaryStore())
+        try await copy.declareTypes([
+            ["id": "app.readinglist.article", "retention_policy": ["feed_days": 30]],
+            ["id": "app.readinglist.clipping", "parent": "app.readinglist.article"],
+            [
+                "id": "app.readinglist.keeper", "parent": "app.readinglist.article",
+                "retention_policy": ["feed_days": .null],
+            ],
+            [
+                "id": "app.readinglist.brief", "parent": "app.readinglist.article",
+                "retention_policy": ["feed_days": 7],
+            ],
+        ])
+        let types = try await copy.catalog.itemTypes()
+        let windows = types.filter { $0.id.hasPrefix("app.readinglist.") }.map { [$0.id: $0.feedDays] }
+        #expect(windows.contains(["app.readinglist.article": 30]))
+        #expect(windows.contains(["app.readinglist.clipping": 30]))
+        #expect(windows.contains(["app.readinglist.keeper": nil]))
+        #expect(windows.contains(["app.readinglist.brief": 7]))
+        await copy.close()
+    }
 }
