@@ -385,6 +385,7 @@ const serverOnly = new Set([
   "getItemExtension",
   "listItemExtensions",
   "getFolderStatus",
+  "getFolderDirectories",
   "countItemLinks",
 ]);
 // A copy uploads a blob's bytes and fetches them itself.

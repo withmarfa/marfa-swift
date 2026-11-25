@@ -24,14 +24,14 @@ import Synchronization
 /// that time throws `MarfaError.readingHandle`, naming the folder. `watch(_:)` doesn't ask: it throws
 /// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
-public struct Folders: Sendable {
+public struct Folders: FolderFileManaging {
     /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)` and `watch(_:)` reach.
     public let server: Server?
 
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
-    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` and `resume(_:)` work.
+    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)` and the unmatched and kept file calls work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -58,6 +58,29 @@ public struct Folders: Sendable {
     public func status(of directory: URL) async throws -> FolderStatus {
         let dir = directory.path(percentEncoded: false)
         return FolderStatus(try await run { folders in try folders.status(dir: dir) })
+    }
+
+    /// Removes the named files that are still unmatched and unchanged, leaving their items in Marfa.
+    ///
+    /// Ask the person before removing them. Each path is relative to the folder. A file that cannot safely go is
+    /// returned with its reason. The next sync sends the placement changes.
+    public func removeUnmatched(in directory: URL, paths: [String]) async throws -> UnmatchedRemoved {
+        try await run { folders in
+            UnmatchedRemoved(try folders.removeUnmatched(dir: directory.path(percentEncoded: false), paths: paths))
+        }
+    }
+
+    /// Reads the files Marfa set aside, in path order, even while a watch holds the folder.
+    public func keptFiles(in directory: URL) async throws -> [KeptFile] {
+        try await run { folders in try folders.kept(dir: directory.path(percentEncoded: false)).map(KeptFile.init) }
+    }
+
+    /// Discards unchanged kept files and puts back those a program wrote to.
+    ///
+    /// Ask the person before discarding. Like `removeUnmatched(in:paths:)`, this waits up to ten seconds for a
+    /// watch to release the folder, then throws `MarfaError.readingHandle` if the watch still holds it.
+    public func discardKept(in directory: URL) async throws -> KeptDiscarded {
+        try await run { folders in KeptDiscarded(try folders.discardKept(dir: directory.path(percentEncoded: false))) }
     }
 
     /// Pauses the directory's sync until ``resume(_:)``.
@@ -330,16 +353,20 @@ public struct ListedFolder: Sendable, Hashable {
     /// The directory's sync is paused with ``Folders/pause(_:)``.
     public var syncPaused: Bool
 
-    public init(directory: URL, folderId: String, syncPaused: Bool = false) {
+    /// The opaque ID this copy reports in server folder status, when the registry has one.
+    public var storeId: String?
+
+    public init(directory: URL, folderId: String, syncPaused: Bool = false, storeId: String? = nil) {
         self.directory = directory
         self.folderId = folderId
         self.syncPaused = syncPaused
+        self.storeId = storeId
     }
 
     init(_ core: MarfaCore.ListedFolder) {
         self.init(
             directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder,
-            syncPaused: core.paused)
+            syncPaused: core.paused, storeId: core.store)
     }
 }
 
@@ -353,17 +380,20 @@ public struct AddedFolder: Sendable, Hashable {
     ///
     /// The folder works all the same.
     public var storage: StorageCause?
+    /// Whether Git tracks files in the directory, or `false` when Git could not answer.
+    public var gitTracked: Bool
 
-    public init(directory: URL, folderId: String, storage: StorageCause? = nil) {
+    public init(directory: URL, folderId: String, storage: StorageCause? = nil, gitTracked: Bool = false) {
         self.directory = directory
         self.folderId = folderId
         self.storage = storage
+        self.gitTracked = gitTracked
     }
 
     init(_ core: MarfaCore.AddedFolder) {
         self.init(
             directory: URL(filePath: core.dir, directoryHint: .isDirectory), folderId: core.folder,
-            storage: core.storage.map(StorageCause.init))
+            storage: core.storage.map(StorageCause.init), gitTracked: core.gitTracked)
     }
 }
 
@@ -550,7 +580,8 @@ public struct FileStatus: Sendable, Hashable {
 
     init(_ core: MarfaCore.FileStatus) {
         self.init(
-            path: core.path, itemId: core.itemId, state: FileState(core.state), waits: core.waits, flag: core.flag,
+            path: core.path, itemId: core.itemId, state: FileState(core.state, flag: core.flag), waits: core.waits,
+            flag: core.flag,
             reason: core.reason, warning: core.warning)
     }
 }
@@ -562,6 +593,10 @@ public enum FileState: Sendable, Hashable {
     case waiting
     /// The file isn't sent; its status says why.
     case held
+    /// An interrupted removal holds the file. Its status gives the reason.
+    case removing
+    /// The folder cannot safely decide what happened to the file. Its status gives the reason.
+    case unsure
     /// The file's item no longer matches the folder's query.
     case unmatched
     /// The scan didn't reach the file, so it's held rather than deleted.
@@ -569,11 +604,16 @@ public enum FileState: Sendable, Hashable {
     /// The file lies where the folder doesn't take files.
     case outside
 
-    init(_ core: MarfaCore.FileState) {
+    init(_ core: MarfaCore.FileState, flag: String?) {
         switch core {
         case .inStep: self = .inStep
         case .waiting: self = .waiting
-        case .held: self = .held
+        case .held:
+            switch flag {
+            case "removing": self = .removing
+            case "unsure": self = .unsure
+            default: self = .held
+            }
         case .unmatched: self = .unmatched
         case .unreached: self = .unreached
         case .outside: self = .outside

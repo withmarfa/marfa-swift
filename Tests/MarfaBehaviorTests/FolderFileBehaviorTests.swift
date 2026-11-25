@@ -6,6 +6,29 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct FolderFileBehaviorTests {
+    @Test func folderScriptsReturnTheSelectedPathsAndDirectories() async throws {
+        let fake = WorkingCopy.fake()
+        let directory = URL(filePath: "/example")
+        let kept = KeptFile(path: "aside", from: "notes/a.md", writers: .unknown, until: "2026-12-01", reason: "busy")
+        let folders = fake.folders(
+            removeUnmatched: { _, paths in
+                .init(removed: paths.map { .init(path: $0, itemId: nil) }, kept: [], ended: 1)
+            },
+            keptFiles: { _ in [kept] },
+            discardKept: { _ in .init(discarded: [], putBack: ["b.md"], kept: [kept]) })
+        #expect(
+            try await folders.removeUnmatched(in: directory, paths: ["a"]).removed == [.init(path: "a", itemId: nil)])
+        #expect(try await folders.keptFiles(in: directory) == [kept])
+        #expect(try await folders.discardKept(in: directory) == .init(discarded: [], putBack: ["b.md"], kept: [kept]))
+        let client = fake.folderClient { id, under in
+            .init(
+                folderId: id, under: under ?? "", directFiles: 1, totalFiles: 2, unreadablePlacements: 0,
+                directories: [])
+        }
+        let page = try await client.folderDirectories("folder", under: "notes")
+        #expect(page.folderId == "folder" && page.under == "notes" && page.directFiles == 1 && page.totalFiles == 2)
+    }
+
     @Test(arguments: CopyKind.allCases)
     func anUnregisteredDirectoryKeepsItsFile(kind: CopyKind) async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "marfa-folder-\(UUID())")

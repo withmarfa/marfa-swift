@@ -128,6 +128,37 @@ func aListedFolderSaysWhetherItsSyncIsPaused(paused: Bool) {
     #expect(listed.folderId == "f")
 }
 
+@Test(arguments: [("removing", Marfa.FileState.removing), ("unsure", .unsure), ("future", .held)])
+func aHeldFileKeepsItsFlagAndReason(flag: String, expected: Marfa.FileState) {
+    let file = Marfa.FileStatus(
+        MarfaCore.FileStatus(
+            path: "a.md", itemId: "a", state: .held, waits: [], flag: flag, reason: "why", warning: nil))
+    #expect(file.state == expected && file.reason == "why" && file.flag == flag)
+}
+
+@Test func unmatchedAndKeptResultsCarryEveryBindingField() {
+    let removal = Marfa.UnmatchedRemoved(
+        MarfaCore.UnmatchedRemoved(
+            removed: [.init(path: "a", itemId: "1")], kept: [.init(path: "b", itemId: nil, reason: "edited")], ended: 2)
+    )
+    #expect(
+        removal
+            == .init(
+                removed: [.init(path: "a", itemId: "1")], kept: [.init(path: "b", itemId: nil, reason: "edited")],
+                ended: 2))
+    let records = MarfaCore.KeptWriters.allCases.enumerated().map { index, writer in
+        MarfaCore.KeptFile(
+            path: "aside-\(index)", from: "old", writers: writer, until: index == 1 ? "2026-12-01" : nil, reason: "busy"
+        )
+    }
+    let discard = Marfa.KeptDiscarded(.init(discarded: ["gone"], putBack: ["edited"], kept: records))
+    #expect(discard.discarded == ["gone"] && discard.putBack == ["edited"])
+    #expect(discard.kept.map(\.writers) == [.open, .unknown, .notLooked])
+    #expect(discard.kept.map(\.path) == ["aside-0", "aside-1", "aside-2"])
+    #expect(discard.kept.map(\.until) == [nil, "2026-12-01", nil])
+    #expect(discard.kept.allSatisfy { $0.from == "old" && $0.reason == "busy" })
+}
+
 @Test(arguments: [(true, UInt64(3)), (false, UInt64(0)), (false, UInt64(7))])
 func aFolderStatusSaysWhetherItsSyncIsPausedAndHowManyDirectoriesAreUnwatched(paused: Bool, unwatched: UInt64) {
     let status = Marfa.FolderStatus(
