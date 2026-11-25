@@ -301,7 +301,7 @@ enum Declaring {
             nameFromBody: hints.flatMap { Properties.bool($0, "name_from_body") } ?? inherited?.nameFromBody ?? true,
             icon: hints.flatMap { Properties.string($0, "icon") } ?? inherited?.icon,
             linkField: Properties.string(row, "link_field"), roles: Properties.strings(row, "roles"),
-            feedDays: inherited?.feedDays)
+            feedDays: inherited?.feedDays, origin: .registered, plugin: nil)
     }
 }
 #endif

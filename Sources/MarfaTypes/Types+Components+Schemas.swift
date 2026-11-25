@@ -660,7 +660,7 @@ extension Components {
                 case version
             }
         }
-        /// A sign-in recorded as the one that wrote a version of an item or first installed a plugin, named as it was then.
+        /// The sign-in that wrote an item version, first installed a plugin, or last changed an item's lifecycle state, named as it was then.
         ///
         /// - Remark: Generated from `#/components/schemas/Writer`.
         public struct Writer: Codable, Hashable, Sendable {
@@ -884,6 +884,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/writer`.
             public var writer: Components.Schemas.MarfaNullableWriter?
+            /// The sign-in that last changed the item's lifecycle state, named as it was then. `null` if the item has never moved, a server job moved it, or its last move predates this field. Present only where `include` names `writer`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/state_writer`.
+            public var stateWriter: Components.Schemas.MarfaNullableWriter?
             /// Creates a new `Item`.
             ///
             /// - Parameters:
@@ -911,6 +915,7 @@ extension Components {
             ///   - edges: The item's outbound edges you can read, by edge type, each the first page that `GET /items/{id}/edges` continues. Empty if `source_filter` leaves the item out. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
             ///   - extensions: The item's extension namespaces that you can read, each mapped to its data. Present only where `include` names `extensions`.
             ///   - writer: The sign-in that wrote the item's current version, named as it was then, even after it ends. `null` if no sign-in wrote it, such as when Marfa reads a file's text. Present only where `include` names `writer`.
+            ///   - stateWriter: The sign-in that last changed the item's lifecycle state, named as it was then. `null` if the item has never moved, a server job moved it, or its last move predates this field. Present only where `include` names `writer`.
             public init(
                 id: Swift.String,
                 _type: Swift.String,
@@ -935,7 +940,8 @@ extension Components {
                 trashedWith: Swift.String? = nil,
                 edges: Components.Schemas.Item.EdgesPayload? = nil,
                 extensions: Components.Schemas.Item.ExtensionsPayload? = nil,
-                writer: Components.Schemas.MarfaNullableWriter? = nil
+                writer: Components.Schemas.MarfaNullableWriter? = nil,
+                stateWriter: Components.Schemas.MarfaNullableWriter? = nil
             ) {
                 self.id = id
                 self._type = _type
@@ -961,6 +967,7 @@ extension Components {
                 self.edges = edges
                 self.extensions = extensions
                 self.writer = writer
+                self.stateWriter = stateWriter
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -987,6 +994,7 @@ extension Components {
                 case edges
                 case extensions
                 case writer
+                case stateWriter = "state_writer"
             }
         }
         /// A page of edges.
@@ -22807,6 +22815,146 @@ extension Components {
                 case error
             }
         }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/StateConflictRefusal`.
+        public struct StateConflictRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case stateConflict = "state_conflict"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/code`.
+                public var code: Components.Schemas.StateConflictRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/message`.
+                public var message: Swift.String
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// The state `from` named.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/details/expected`.
+                    @frozen public enum ExpectedPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case active = "active"
+                        case archived = "archived"
+                        case trashed = "trashed"
+                    }
+                    /// The state `from` named.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/details/expected`.
+                    public var expected: Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload.ExpectedPayload
+                    /// The state the item is in now.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/details/actual`.
+                    @frozen public enum ActualPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                        case active = "active"
+                        case archived = "archived"
+                        case trashed = "trashed"
+                        case revoked = "revoked"
+                    }
+                    /// The state the item is in now.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/details/actual`.
+                    public var actual: Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload.ActualPayload
+                    /// A container of undocumented properties.
+                    public var additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer]
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - expected: The state `from` named.
+                    ///   - actual: The state the item is in now.
+                    ///   - additionalProperties: A container of undocumented properties.
+                    public init(
+                        expected: Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload.ExpectedPayload,
+                        actual: Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload.ActualPayload,
+                        additionalProperties: [String: OpenAPIRuntime.OpenAPIValueContainer] = .init()
+                    ) {
+                        self.expected = expected
+                        self.actual = actual
+                        self.additionalProperties = additionalProperties
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case expected
+                        case actual
+                    }
+                    public init(from decoder: any Swift.Decoder) throws {
+                        let container = try decoder.container(keyedBy: CodingKeys.self)
+                        self.expected = try container.decode(
+                            Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload.ExpectedPayload.self,
+                            forKey: .expected
+                        )
+                        self.actual = try container.decode(
+                            Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload.ActualPayload.self,
+                            forKey: .actual
+                        )
+                        additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [
+                            "expected",
+                            "actual"
+                        ])
+                    }
+                    public func encode(to encoder: any Swift.Encoder) throws {
+                        var container = encoder.container(keyedBy: CodingKeys.self)
+                        try container.encode(
+                            self.expected,
+                            forKey: .expected
+                        )
+                        try container.encode(
+                            self.actual,
+                            forKey: .actual
+                        )
+                        try encoder.encodeAdditionalProperties(additionalProperties)
+                    }
+                }
+                /// More about the error, such as the field it concerns. Each code defines its own details.
+                ///
+                /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error/details`.
+                public var details: Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: More about the error, such as the field it concerns. Each code defines its own details.
+                public init(
+                    code: Components.Schemas.StateConflictRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.StateConflictRefusal._ErrorPayload.DetailsPayload
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/StateConflictRefusal/error`.
+            public var error: Components.Schemas.StateConflictRefusal._ErrorPayload
+            /// Creates a new `StateConflictRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.StateConflictRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
         /// A batch a table's change log holds.
         ///
         /// - Remark: Generated from `#/components/schemas/RowBatchEntry`.
@@ -31377,6 +31525,172 @@ extension Components {
                     "removed_items",
                     "removed_types",
                     "remaining_items"
+                ])
+            }
+        }
+        /// A directory below a folder's root, with how many placed files it holds.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderDirectory`.
+        public struct FolderDirectory: Codable, Hashable, Sendable {
+            /// The directory's path from the folder's root, with `/` between names.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectory/path`.
+            public var path: Swift.String
+            /// How many placed files sit directly in the directory.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectory/direct_files`.
+            public var directFiles: Swift.Int
+            /// How many placed files sit in the directory and in every directory beneath it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectory/all_files`.
+            public var allFiles: Swift.Int
+            /// `true` if a placed file sits in a directory beneath this one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectory/has_directories`.
+            public var hasDirectories: Swift.Bool
+            /// Creates a new `FolderDirectory`.
+            ///
+            /// - Parameters:
+            ///   - path: The directory's path from the folder's root, with `/` between names.
+            ///   - directFiles: How many placed files sit directly in the directory.
+            ///   - allFiles: How many placed files sit in the directory and in every directory beneath it.
+            ///   - hasDirectories: `true` if a placed file sits in a directory beneath this one.
+            public init(
+                path: Swift.String,
+                directFiles: Swift.Int,
+                allFiles: Swift.Int,
+                hasDirectories: Swift.Bool
+            ) {
+                self.path = path
+                self.directFiles = directFiles
+                self.allFiles = allFiles
+                self.hasDirectories = hasDirectories
+            }
+            public enum CodingKeys: String, CodingKey {
+                case path
+                case directFiles = "direct_files"
+                case allFiles = "all_files"
+                case hasDirectories = "has_directories"
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.path = try container.decode(
+                    Swift.String.self,
+                    forKey: .path
+                )
+                self.directFiles = try container.decode(
+                    Swift.Int.self,
+                    forKey: .directFiles
+                )
+                self.allFiles = try container.decode(
+                    Swift.Int.self,
+                    forKey: .allFiles
+                )
+                self.hasDirectories = try container.decode(
+                    Swift.Bool.self,
+                    forKey: .hasDirectories
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "path",
+                    "direct_files",
+                    "all_files",
+                    "has_directories"
+                ])
+            }
+        }
+        /// The directories directly under a path in a folder, with counts of placed files.
+        ///
+        /// - Remark: Generated from `#/components/schemas/FolderDirectories`.
+        public struct FolderDirectories: Codable, Hashable, Sendable {
+            /// The ID of the folder.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectories/folder_id`.
+            public var folderId: Swift.String
+            /// The path the answer is for, tidied: empty for the top level, otherwise names joined by `/`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectories/under`.
+            public var under: Swift.String
+            /// How many placed files sit directly at `under`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectories/direct_files`.
+            public var directFiles: Swift.Int
+            /// How many placed files you can list in the entire folder, regardless of `under`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectories/total_files`.
+            public var totalFiles: Swift.Int
+            /// How many placements you can read are left out of every count because the stored `path` is not a string or is a path no write would accept. It names no file or path, and counts nothing you cannot read.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectories/unreadable_placements`.
+            public var unreadablePlacements: Swift.Int
+            /// The immediate subdirectories that contain a placed file you can list, sorted by the UTF-8 bytes of their paths.
+            ///
+            /// - Remark: Generated from `#/components/schemas/FolderDirectories/directories`.
+            public var directories: [Components.Schemas.FolderDirectory]
+            /// Creates a new `FolderDirectories`.
+            ///
+            /// - Parameters:
+            ///   - folderId: The ID of the folder.
+            ///   - under: The path the answer is for, tidied: empty for the top level, otherwise names joined by `/`.
+            ///   - directFiles: How many placed files sit directly at `under`.
+            ///   - totalFiles: How many placed files you can list in the entire folder, regardless of `under`.
+            ///   - unreadablePlacements: How many placements you can read are left out of every count because the stored `path` is not a string or is a path no write would accept. It names no file or path, and counts nothing you cannot read.
+            ///   - directories: The immediate subdirectories that contain a placed file you can list, sorted by the UTF-8 bytes of their paths.
+            public init(
+                folderId: Swift.String,
+                under: Swift.String,
+                directFiles: Swift.Int,
+                totalFiles: Swift.Int,
+                unreadablePlacements: Swift.Int,
+                directories: [Components.Schemas.FolderDirectory]
+            ) {
+                self.folderId = folderId
+                self.under = under
+                self.directFiles = directFiles
+                self.totalFiles = totalFiles
+                self.unreadablePlacements = unreadablePlacements
+                self.directories = directories
+            }
+            public enum CodingKeys: String, CodingKey {
+                case folderId = "folder_id"
+                case under
+                case directFiles = "direct_files"
+                case totalFiles = "total_files"
+                case unreadablePlacements = "unreadable_placements"
+                case directories
+            }
+            public init(from decoder: any Swift.Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                self.folderId = try container.decode(
+                    Swift.String.self,
+                    forKey: .folderId
+                )
+                self.under = try container.decode(
+                    Swift.String.self,
+                    forKey: .under
+                )
+                self.directFiles = try container.decode(
+                    Swift.Int.self,
+                    forKey: .directFiles
+                )
+                self.totalFiles = try container.decode(
+                    Swift.Int.self,
+                    forKey: .totalFiles
+                )
+                self.unreadablePlacements = try container.decode(
+                    Swift.Int.self,
+                    forKey: .unreadablePlacements
+                )
+                self.directories = try container.decode(
+                    [Components.Schemas.FolderDirectory].self,
+                    forKey: .directories
+                )
+                try decoder.ensureNoAdditionalProperties(knownKeys: [
+                    "folder_id",
+                    "under",
+                    "direct_files",
+                    "total_files",
+                    "unreadable_placements",
+                    "directories"
                 ])
             }
         }

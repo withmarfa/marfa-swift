@@ -109,7 +109,7 @@ func aFlaggedFileNamesTheItemAPullHeldBack(flag: String) {
     (.networkFileSystem(kind: "smbfs"), .networkFileSystem(kind: "smbfs")),
 ])
 func aFolderInSyncedOrNetworkStorageIsAddedWithTheCause(core: MarfaCore.StorageCause, expected: Marfa.StorageCause) {
-    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: core))
+    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: core, gitTracked: false))
     #expect(added.storage == expected)
     #expect(added.folderId == "f")
     #expect(added.directory == URL(filePath: "/Notes", directoryHint: .isDirectory))
@@ -119,7 +119,7 @@ func aFolderInSyncedOrNetworkStorageIsAddedWithTheCause(core: MarfaCore.StorageC
 
 @Test(arguments: [true, false])
 func aListedFolderSaysWhetherItsSyncIsPaused(paused: Bool) {
-    let listed = Marfa.ListedFolder(MarfaCore.ListedFolder(dir: "/Notes", folder: "f", paused: paused))
+    let listed = Marfa.ListedFolder(MarfaCore.ListedFolder(dir: "/Notes", folder: "f", paused: paused, store: nil))
     #expect(listed.syncPaused == paused)
     #expect(listed.folderId == "f")
 }
@@ -165,7 +165,7 @@ func aFolderStatusSaysWhetherItsSyncIsPausedAndHowManyDirectoriesAreUnwatched(pa
 }
 
 @Test func aFolderInPlainStorageIsAddedWithNoCause() {
-    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: nil))
+    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: nil, gitTracked: false))
     #expect(added.storage == nil)
     #expect(
         Marfa.FolderEvent(MarfaCore.FolderEvent.watching(dir: "/Notes", storage: nil))

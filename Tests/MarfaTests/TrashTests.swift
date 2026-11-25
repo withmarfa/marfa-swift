@@ -176,7 +176,7 @@ struct SeveralItemTrash {
             _ = try await copy.hydrate(types: ["core.note"], tier: .feed)
         } throws: { error in
             guard case .serverTooOld(let served, let oldest, let message)? = error as? MarfaError else { return false }
-            return served == "0.0.77" && oldest == "0.0.91" && message.contains("0.0.77")
+            return served == "0.0.77" && oldest == "0.0.110" && message.contains("0.0.77")
         }
         #expect(server.log.all.allSatisfy { $0.hasPrefix("GET / ") }, "only the root was read: \(server.log.all)")
         await copy.close()

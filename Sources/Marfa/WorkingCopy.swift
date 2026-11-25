@@ -777,7 +777,7 @@ public struct Items: Sendable {
     }
 
     public func transition(_ id: String, to state: ItemState) async throws -> QueuedWrite {
-        try await write { core in try core.transitionItem(id: id, state: state.core) }
+        try await write { core in try core.transitionItem(id: id, state: state.core, from: nil) }
     }
 
     /// Queues three writes, each with its own verdict: the upload, a file item
