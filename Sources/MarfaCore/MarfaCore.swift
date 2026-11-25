@@ -1338,9 +1338,11 @@ public protocol CoreProtocol: AnyObject, Sendable {
     func thumbnail(id: String) throws  -> Thumbnail?
     
     /**
-     * Moves an item to another lifecycle state.
+     * Moves an item to another lifecycle state. With `from`, the state
+     * the person saw it in, throws `state_conflict` and queues nothing
+     * where the copy shows another.
      */
-    func transitionItem(id: String, state: ItemState) throws  -> QueuedWrite
+    func transitionItem(id: String, state: ItemState, from: ItemState?) throws  -> QueuedWrite
     
     /**
      * Trims the cache to its budget now and answers the bytes it took.
@@ -2471,14 +2473,17 @@ open func thumbnail(id: String)throws  -> Thumbnail?  {
 }
     
     /**
-     * Moves an item to another lifecycle state.
+     * Moves an item to another lifecycle state. With `from`, the state
+     * the person saw it in, throws `state_conflict` and queues nothing
+     * where the copy shows another.
      */
-open func transitionItem(id: String, state: ItemState)throws  -> QueuedWrite  {
+open func transitionItem(id: String, state: ItemState, from: ItemState? = nil)throws  -> QueuedWrite  {
     return try  FfiConverterTypeQueuedWrite_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_core_transition_item(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(id),
-        FfiConverterTypeItemState_lower(state),$0
+        FfiConverterTypeItemState_lower(state),
+        FfiConverterOptionTypeItemState.lower(from),$0
     )
 })
 }
@@ -3593,11 +3598,12 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * lists it in the machine's registry. The directory is made if it is
      * not there. Its first sync waits: `sync` says what it will do, and
      * `confirm_first_sync` lets it go. The answer says why the directory is
-     * in cloud-synced or network storage, where it is; the folder is added
-     * all the same. Reads the file system, so it can wait on a mount that
-     * does not answer. Over a folder a watch holds, asks the watch to let it
-     * go and waits up to 10 seconds, as every call that works a folder does:
-     * past that, it is refused with `ReadingHandle`, naming the folder.
+     * in cloud-synced or network storage, where it is, and whether git
+     * tracks it; the folder is added all the same. Reads the file system,
+     * so it can wait on a mount that does not answer. Over a folder a watch
+     * holds, asks the watch to let it go and waits up to 10 seconds, as
+     * every call that works a folder does: past that, it is refused with
+     * `ReadingHandle`, naming the folder.
      */
     func add(dir: String, folder: String) throws  -> AddedFolder
     
@@ -3615,6 +3621,20 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * that holds the folder to let it go, as `add` does.
      */
     func confirmFirstSync(dir: String) throws  -> Bool
+    
+    /**
+     * Deletes each kept file that is unchanged since Marfa set it
+     * aside, whatever programs hold it, as `folders kept --discard`
+     * does once the person agrees. One a program wrote to goes back to
+     * its path instead. Needs no server. Asks a watch that holds the
+     * folder to let it go, as `add` does.
+     */
+    func discardKept(dir: String) throws  -> KeptDiscarded
+    
+    /**
+     * Lists kept-file records in path order, even while a watch holds the folder.
+     */
+    func kept(dir: String) throws  -> [KeptFile]
     
     /**
      * The folders the machine's registry lists, the command line's among
@@ -3646,6 +3666,19 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * does; that watch then ends with `Removed` or `Unlisted`.
      */
     func remove(dir: String) throws  -> FolderRemoval
+    
+    /**
+     * Takes away the named unmatched files, as `folders unmatched
+     * --remove` does once the person agrees, and never the items: the
+     * folder's placement of each ends, sent at the next sync. A file is
+     * kept, with why, where its bytes differ from what the folder wrote,
+     * an edit of it waits or was held, it is not unmatched, or the path
+     * is not plainly a file inside the folder; a path named twice is
+     * taken once. Needs no server. Refused while the first sync waits
+     * and while the directory is paused. Asks a watch that holds the
+     * folder to let it go, as `add` does.
+     */
+    func removeUnmatched(dir: String, paths: [String]) throws  -> UnmatchedRemoved
     
     /**
      * Cancels a paused large removal: files gone from the disk are written
@@ -3737,8 +3770,8 @@ open class Folders: FoldersProtocol, @unchecked Sendable {
         return try! rustCall { uniffi_marfa_core_ffi_fn_clone_folders(self.handle, $0) }
     }
     /**
-     * `url` and `key` go together; without them only `list`, `status`,
-     * `confirm_first_sync`, `confirm`, `restore` and `remove` work.
+     * Supply both `url` and `key` for calls that contact the server.
+     * Listing, removing unmatched files and discarding kept files work offline.
      * `renewer` renews `key` when the server refuses it, for every folder
      * these calls and watches work, as `CredentialRenewer` describes; it needs
      * `url` and `key`.
@@ -3772,11 +3805,12 @@ public convenience init(url: String?, key: String?, renewer: CredentialRenewer? 
      * lists it in the machine's registry. The directory is made if it is
      * not there. Its first sync waits: `sync` says what it will do, and
      * `confirm_first_sync` lets it go. The answer says why the directory is
-     * in cloud-synced or network storage, where it is; the folder is added
-     * all the same. Reads the file system, so it can wait on a mount that
-     * does not answer. Over a folder a watch holds, asks the watch to let it
-     * go and waits up to 10 seconds, as every call that works a folder does:
-     * past that, it is refused with `ReadingHandle`, naming the folder.
+     * in cloud-synced or network storage, where it is, and whether git
+     * tracks it; the folder is added all the same. Reads the file system,
+     * so it can wait on a mount that does not answer. Over a folder a watch
+     * holds, asks the watch to let it go and waits up to 10 seconds, as
+     * every call that works a folder does: past that, it is refused with
+     * `ReadingHandle`, naming the folder.
      */
 open func add(dir: String, folder: String)throws  -> AddedFolder  {
     return try  FfiConverterTypeAddedFolder_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -3811,6 +3845,34 @@ open func confirm(dir: String)throws  -> ConfirmedFolder  {
 open func confirmFirstSync(dir: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_confirm_first_sync(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Deletes each kept file that is unchanged since Marfa set it
+     * aside, whatever programs hold it, as `folders kept --discard`
+     * does once the person agrees. One a program wrote to goes back to
+     * its path instead. Needs no server. Asks a watch that holds the
+     * folder to let it go, as `add` does.
+     */
+open func discardKept(dir: String)throws  -> KeptDiscarded  {
+    return try  FfiConverterTypeKeptDiscarded_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_discard_kept(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Lists kept-file records in path order, even while a watch holds the folder.
+     */
+open func kept(dir: String)throws  -> [KeptFile]  {
+    return try  FfiConverterSequenceTypeKeptFile.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_kept(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
     )
@@ -3864,6 +3926,27 @@ open func remove(dir: String)throws  -> FolderRemoval  {
     uniffi_marfa_core_ffi_fn_method_folders_remove(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Takes away the named unmatched files, as `folders unmatched
+     * --remove` does once the person agrees, and never the items: the
+     * folder's placement of each ends, sent at the next sync. A file is
+     * kept, with why, where its bytes differ from what the folder wrote,
+     * an edit of it waits or was held, it is not unmatched, or the path
+     * is not plainly a file inside the folder; a path named twice is
+     * taken once. Needs no server. Refused while the first sync waits
+     * and while the directory is paused. Asks a watch that holds the
+     * folder to let it go, as `add` does.
+     */
+open func removeUnmatched(dir: String, paths: [String])throws  -> UnmatchedRemoved  {
+    return try  FfiConverterTypeUnmatchedRemoved_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_remove_unmatched(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),
+        FfiConverterSequenceString.lower(paths),$0
     )
 })
 }
@@ -4337,6 +4420,13 @@ public struct AddedFolder: Equatable, Hashable {
      * Why the directory is in cloud-synced or network storage, where it is.
      */
     public var storage: StorageCause?
+    /**
+     * Git tracks the directory: it is in a git work tree whose index holds a
+     * file in it. Checking out, resetting or switching branches then changes
+     * the files, and the folder syncs those changes. `false` where git cannot
+     * be run or errors. The folder is added all the same.
+     */
+    public var gitTracked: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -4349,10 +4439,17 @@ public struct AddedFolder: Equatable, Hashable {
          */folder: String, 
         /**
          * Why the directory is in cloud-synced or network storage, where it is.
-         */storage: StorageCause?) {
+         */storage: StorageCause?, 
+        /**
+         * Git tracks the directory: it is in a git work tree whose index holds a
+         * file in it. Checking out, resetting or switching branches then changes
+         * the files, and the folder syncs those changes. `false` where git cannot
+         * be run or errors. The folder is added all the same.
+         */gitTracked: Bool) {
         self.dir = dir
         self.folder = folder
         self.storage = storage
+        self.gitTracked = gitTracked
     }
 
     
@@ -4373,7 +4470,8 @@ public struct FfiConverterTypeAddedFolder: FfiConverterRustBuffer {
             try AddedFolder(
                 dir: FfiConverterString.read(from: &buf), 
                 folder: FfiConverterString.read(from: &buf), 
-                storage: FfiConverterOptionTypeStorageCause.read(from: &buf)
+                storage: FfiConverterOptionTypeStorageCause.read(from: &buf), 
+                gitTracked: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -4381,6 +4479,7 @@ public struct FfiConverterTypeAddedFolder: FfiConverterRustBuffer {
         FfiConverterString.write(value.dir, into: &buf)
         FfiConverterString.write(value.folder, into: &buf)
         FfiConverterOptionTypeStorageCause.write(value.storage, into: &buf)
+        FfiConverterBool.write(value.gitTracked, into: &buf)
     }
 }
 
@@ -8943,6 +9042,14 @@ public struct ItemType: Equatable, Hashable {
      * The resolved feed expiry window in days. `nil` when the type has no window.
      */
     public var feedDays: Int64?
+    /**
+     * Where the type came from.
+     */
+    public var origin: TypeOrigin
+    /**
+     * The plugin that installed the type, `nil` for any other origin.
+     */
+    public var plugin: TypePlugin?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -8963,7 +9070,13 @@ public struct ItemType: Equatable, Hashable {
          */icon: String?, linkField: String?, roles: [String], 
         /**
          * The resolved feed expiry window in days. `nil` when the type has no window.
-         */feedDays: Int64?) {
+         */feedDays: Int64?, 
+        /**
+         * Where the type came from.
+         */origin: TypeOrigin, 
+        /**
+         * The plugin that installed the type, `nil` for any other origin.
+         */plugin: TypePlugin?) {
         self.id = id
         self.label = label
         self.plural = plural
@@ -8979,6 +9092,8 @@ public struct ItemType: Equatable, Hashable {
         self.linkField = linkField
         self.roles = roles
         self.feedDays = feedDays
+        self.origin = origin
+        self.plugin = plugin
     }
 
     
@@ -9011,7 +9126,9 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
                 icon: FfiConverterOptionString.read(from: &buf), 
                 linkField: FfiConverterOptionString.read(from: &buf), 
                 roles: FfiConverterSequenceString.read(from: &buf), 
-                feedDays: FfiConverterOptionInt64.read(from: &buf)
+                feedDays: FfiConverterOptionInt64.read(from: &buf), 
+                origin: FfiConverterTypeTypeOrigin.read(from: &buf), 
+                plugin: FfiConverterOptionTypeTypePlugin.read(from: &buf)
         )
     }
 
@@ -9031,6 +9148,8 @@ public struct FfiConverterTypeItemType: FfiConverterRustBuffer {
         FfiConverterOptionString.write(value.linkField, into: &buf)
         FfiConverterSequenceString.write(value.roles, into: &buf)
         FfiConverterOptionInt64.write(value.feedDays, into: &buf)
+        FfiConverterTypeTypeOrigin.write(value.origin, into: &buf)
+        FfiConverterOptionTypeTypePlugin.write(value.plugin, into: &buf)
     }
 }
 
@@ -9164,6 +9283,87 @@ public func FfiConverterTypeJsonObject_lower(_ value: JsonObject) -> RustBuffer 
 
 
 /**
+ * What `discard_kept` did.
+ */
+public struct KeptDiscarded: Equatable, Hashable {
+    /**
+     * The kept files deleted, each unchanged since Marfa set it aside.
+     */
+    public var discarded: [String]
+    /**
+     * The paths a kept file a program wrote to went back to, or was kept
+     * beside, in place of being deleted. The next sync sends it.
+     */
+    public var putBack: [String]
+    /**
+     * The files whose records remain after the discard.
+     */
+    public var kept: [KeptFile]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The kept files deleted, each unchanged since Marfa set it aside.
+         */discarded: [String], 
+        /**
+         * The paths a kept file a program wrote to went back to, or was kept
+         * beside, in place of being deleted. The next sync sends it.
+         */putBack: [String], 
+        /**
+         * The files whose records remain after the discard.
+         */kept: [KeptFile]) {
+        self.discarded = discarded
+        self.putBack = putBack
+        self.kept = kept
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension KeptDiscarded: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptDiscarded: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptDiscarded {
+        return
+            try KeptDiscarded(
+                discarded: FfiConverterSequenceString.read(from: &buf), 
+                putBack: FfiConverterSequenceString.read(from: &buf), 
+                kept: FfiConverterSequenceTypeKeptFile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KeptDiscarded, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.discarded, into: &buf)
+        FfiConverterSequenceString.write(value.putBack, into: &buf)
+        FfiConverterSequenceTypeKeptFile.write(value.kept, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptDiscarded_lift(_ buf: RustBuffer) throws -> KeptDiscarded {
+    return try FfiConverterTypeKeptDiscarded.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptDiscarded_lower(_ value: KeptDiscarded) -> RustBuffer {
+    return FfiConverterTypeKeptDiscarded.lower(value)
+}
+
+
+/**
  * What a fetch of the attachments did.
  */
 public struct KeptFetch: Equatable, Hashable {
@@ -9235,6 +9435,167 @@ public func FfiConverterTypeKeptFetch_lift(_ buf: RustBuffer) throws -> KeptFetc
 #endif
 public func FfiConverterTypeKeptFetch_lower(_ value: KeptFetch) -> RustBuffer {
     return FfiConverterTypeKeptFetch.lower(value)
+}
+
+
+/**
+ * A file a pull set aside under a `.marfa-kept-` name because a program
+ * might still write to it.
+ */
+public struct KeptFile: Equatable, Hashable {
+    /**
+     * Its path in the directory, under the reserved name.
+     */
+    public var path: String
+    /**
+     * The path Marfa replaced or removed it at.
+     */
+    public var from: String
+    public var writers: KeptWriters
+    /**
+     * The UTC discard date for an unchanged file, when set, as `YYYY-MM-DD`.
+     */
+    public var until: String?
+    public var reason: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Its path in the directory, under the reserved name.
+         */path: String, 
+        /**
+         * The path Marfa replaced or removed it at.
+         */from: String, writers: KeptWriters, 
+        /**
+         * The UTC discard date for an unchanged file, when set, as `YYYY-MM-DD`.
+         */until: String?, reason: String) {
+        self.path = path
+        self.from = from
+        self.writers = writers
+        self.until = until
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension KeptFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptFile {
+        return
+            try KeptFile(
+                path: FfiConverterString.read(from: &buf), 
+                from: FfiConverterString.read(from: &buf), 
+                writers: FfiConverterTypeKeptWriters.read(from: &buf), 
+                until: FfiConverterOptionString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KeptFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterString.write(value.from, into: &buf)
+        FfiConverterTypeKeptWriters.write(value.writers, into: &buf)
+        FfiConverterOptionString.write(value.until, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptFile_lift(_ buf: RustBuffer) throws -> KeptFile {
+    return try FfiConverterTypeKeptFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptFile_lower(_ value: KeptFile) -> RustBuffer {
+    return FfiConverterTypeKeptFile.lower(value)
+}
+
+
+/**
+ * A path `remove_unmatched` was given and left in place.
+ */
+public struct KeptUnmatched: Equatable, Hashable {
+    public var path: String
+    /**
+     * The file's item, where the path is a file of the folder.
+     */
+    public var itemId: String?
+    /**
+     * Why it was kept, as a clause that follows "is kept:".
+     */
+    public var reason: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, 
+        /**
+         * The file's item, where the path is a file of the folder.
+         */itemId: String?, 
+        /**
+         * Why it was kept, as a clause that follows "is kept:".
+         */reason: String) {
+        self.path = path
+        self.itemId = itemId
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension KeptUnmatched: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptUnmatched: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptUnmatched {
+        return
+            try KeptUnmatched(
+                path: FfiConverterString.read(from: &buf), 
+                itemId: FfiConverterOptionString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: KeptUnmatched, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterOptionString.write(value.itemId, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptUnmatched_lift(_ buf: RustBuffer) throws -> KeptUnmatched {
+    return try FfiConverterTypeKeptUnmatched.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptUnmatched_lower(_ value: KeptUnmatched) -> RustBuffer {
+    return FfiConverterTypeKeptUnmatched.lower(value)
 }
 
 
@@ -9717,6 +10078,13 @@ public struct ListedFolder: Equatable, Hashable {
      * Its sync is paused with `Folders.pause`.
      */
     public var paused: Bool
+    /**
+     * The opaque ID this directory's copy reports under, the
+     * `folder_store_id` the server returns for it in a folder's status. It
+     * is not a path and names no machine. `nil` where the registry entry
+     * holds none.
+     */
+    public var store: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -9729,10 +10097,17 @@ public struct ListedFolder: Equatable, Hashable {
          */folder: String, 
         /**
          * Its sync is paused with `Folders.pause`.
-         */paused: Bool) {
+         */paused: Bool, 
+        /**
+         * The opaque ID this directory's copy reports under, the
+         * `folder_store_id` the server returns for it in a folder's status. It
+         * is not a path and names no machine. `nil` where the registry entry
+         * holds none.
+         */store: String?) {
         self.dir = dir
         self.folder = folder
         self.paused = paused
+        self.store = store
     }
 
     
@@ -9753,7 +10128,8 @@ public struct FfiConverterTypeListedFolder: FfiConverterRustBuffer {
             try ListedFolder(
                 dir: FfiConverterString.read(from: &buf), 
                 folder: FfiConverterString.read(from: &buf), 
-                paused: FfiConverterBool.read(from: &buf)
+                paused: FfiConverterBool.read(from: &buf), 
+                store: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -9761,6 +10137,7 @@ public struct FfiConverterTypeListedFolder: FfiConverterRustBuffer {
         FfiConverterString.write(value.dir, into: &buf)
         FfiConverterString.write(value.folder, into: &buf)
         FfiConverterBool.write(value.paused, into: &buf)
+        FfiConverterOptionString.write(value.store, into: &buf)
     }
 }
 
@@ -12264,6 +12641,189 @@ public func FfiConverterTypeTypeField_lift(_ buf: RustBuffer) throws -> TypeFiel
 #endif
 public func FfiConverterTypeTypeField_lower(_ value: TypeField) -> RustBuffer {
     return FfiConverterTypeTypeField.lower(value)
+}
+
+
+/**
+ * The plugin that installed a type.
+ */
+public struct TypePlugin: Equatable, Hashable {
+    public var name: String
+    public var version: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(name: String, version: String) {
+        self.name = name
+        self.version = version
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension TypePlugin: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTypePlugin: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TypePlugin {
+        return
+            try TypePlugin(
+                name: FfiConverterString.read(from: &buf), 
+                version: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: TypePlugin, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.version, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTypePlugin_lift(_ buf: RustBuffer) throws -> TypePlugin {
+    return try FfiConverterTypeTypePlugin.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTypePlugin_lower(_ value: TypePlugin) -> RustBuffer {
+    return FfiConverterTypeTypePlugin.lower(value)
+}
+
+
+/**
+ * An unmatched file `remove_unmatched` took away. Its item is unchanged.
+ */
+public struct UnmatchedFile: Equatable, Hashable {
+    public var path: String
+    public var itemId: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, itemId: String?) {
+        self.path = path
+        self.itemId = itemId
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnmatchedFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnmatchedFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnmatchedFile {
+        return
+            try UnmatchedFile(
+                path: FfiConverterString.read(from: &buf), 
+                itemId: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnmatchedFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterOptionString.write(value.itemId, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnmatchedFile_lift(_ buf: RustBuffer) throws -> UnmatchedFile {
+    return try FfiConverterTypeUnmatchedFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnmatchedFile_lower(_ value: UnmatchedFile) -> RustBuffer {
+    return FfiConverterTypeUnmatchedFile.lower(value)
+}
+
+
+/**
+ * What `remove_unmatched` did.
+ */
+public struct UnmatchedRemoved: Equatable, Hashable {
+    public var removed: [UnmatchedFile]
+    public var kept: [KeptUnmatched]
+    /**
+     * The folder's placements of the removed files' items, ended and queued
+     * to be sent at the next sync.
+     */
+    public var ended: UInt64
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(removed: [UnmatchedFile], kept: [KeptUnmatched], 
+        /**
+         * The folder's placements of the removed files' items, ended and queued
+         * to be sent at the next sync.
+         */ended: UInt64) {
+        self.removed = removed
+        self.kept = kept
+        self.ended = ended
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension UnmatchedRemoved: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUnmatchedRemoved: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UnmatchedRemoved {
+        return
+            try UnmatchedRemoved(
+                removed: FfiConverterSequenceTypeUnmatchedFile.read(from: &buf), 
+                kept: FfiConverterSequenceTypeKeptUnmatched.read(from: &buf), 
+                ended: FfiConverterUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: UnmatchedRemoved, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeUnmatchedFile.write(value.removed, into: &buf)
+        FfiConverterSequenceTypeKeptUnmatched.write(value.kept, into: &buf)
+        FfiConverterUInt64.write(value.ended, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnmatchedRemoved_lift(_ buf: RustBuffer) throws -> UnmatchedRemoved {
+    return try FfiConverterTypeUnmatchedRemoved.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUnmatchedRemoved_lower(_ value: UnmatchedRemoved) -> RustBuffer {
+    return FfiConverterTypeUnmatchedRemoved.lower(value)
 }
 
 
@@ -15253,6 +15813,92 @@ public func FfiConverterTypeJsonValue_lower(_ value: JsonValue) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * What Marfa last found of the programs writing to a kept file.
+ */
+
+public enum KeptWriters: Equatable, Hashable, CaseIterable {
+    
+    /**
+     * A program holds it open for writing.
+     */
+    case `open`
+    /**
+     * Marfa cannot tell. When set, `until` gives its discard date.
+     */
+    case unknown
+    /**
+     * Marfa has not looked since it set the file aside.
+     */
+    case notLooked
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension KeptWriters: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeKeptWriters: FfiConverterRustBuffer {
+    typealias SwiftType = KeptWriters
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> KeptWriters {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .`open`
+        
+        case 2: return .unknown
+        
+        case 3: return .notLooked
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: KeptWriters, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .`open`:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .notLooked:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptWriters_lift(_ buf: RustBuffer) throws -> KeptWriters {
+    return try FfiConverterTypeKeptWriters.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeKeptWriters_lower(_ value: KeptWriters) -> RustBuffer {
+    return FfiConverterTypeKeptWriters.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * Whether a link names one item.
  */
 
@@ -17075,6 +17721,90 @@ public func FfiConverterTypeTier_lower(_ value: Tier) -> RustBuffer {
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
+ * Where a type came from: `Unknown` where the copy cannot tell.
+ */
+
+public enum TypeOrigin: Equatable, Hashable, CaseIterable {
+    
+    case platform
+    case registered
+    case plugin
+    case unknown
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension TypeOrigin: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeTypeOrigin: FfiConverterRustBuffer {
+    typealias SwiftType = TypeOrigin
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TypeOrigin {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .platform
+        
+        case 2: return .registered
+        
+        case 3: return .plugin
+        
+        case 4: return .unknown
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: TypeOrigin, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .platform:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .registered:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .plugin:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .unknown:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTypeOrigin_lift(_ buf: RustBuffer) throws -> TypeOrigin {
+    return try FfiConverterTypeTypeOrigin.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeTypeOrigin_lower(_ value: TypeOrigin) -> RustBuffer {
+    return FfiConverterTypeTypeOrigin.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
  * How a file differs from what the folder's server last received.
  */
 
@@ -18239,6 +18969,30 @@ fileprivate struct FfiConverterOptionTypeThumbnail: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeTypePlugin: FfiConverterRustBuffer {
+    typealias SwiftType = TypePlugin?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeTypePlugin.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeTypePlugin.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeViewRow: FfiConverterRustBuffer {
     typealias SwiftType = ViewRow?
 
@@ -19073,6 +19827,56 @@ fileprivate struct FfiConverterSequenceTypeJsonObject: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeKeptFile: FfiConverterRustBuffer {
+    typealias SwiftType = [KeptFile]
+
+    public static func write(_ value: [KeptFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeKeptFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [KeptFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [KeptFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeKeptFile.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeKeptUnmatched: FfiConverterRustBuffer {
+    typealias SwiftType = [KeptUnmatched]
+
+    public static func write(_ value: [KeptUnmatched], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeKeptUnmatched.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [KeptUnmatched] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [KeptUnmatched]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeKeptUnmatched.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeLinkCandidates: FfiConverterRustBuffer {
     typealias SwiftType = [LinkCandidates]
 
@@ -19340,6 +20144,31 @@ fileprivate struct FfiConverterSequenceTypeTypeField: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeTypeField.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeUnmatchedFile: FfiConverterRustBuffer {
+    typealias SwiftType = [UnmatchedFile]
+
+    public static func write(_ value: [UnmatchedFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeUnmatchedFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [UnmatchedFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [UnmatchedFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeUnmatchedFile.read(from: &buf))
         }
         return seq
     }
@@ -20004,7 +20833,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_thumbnail() != 9618) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_transition_item() != 52263) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_transition_item() != 29534) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_trim_files() != 62056) {
@@ -20139,13 +20968,19 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folderlistener_ended() != 28733) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 37317) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_add() != 27600) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_confirm() != 53432) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_confirm_first_sync() != 5573) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_discard_kept() != 64486) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_kept() != 18161) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_list() != 39495) {
@@ -20155,6 +20990,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 58181) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remove_unmatched() != 15504) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_restore() != 57957) {
@@ -20187,7 +21025,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_constructor_stop_new() != 25264) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 33553) {
+    if (uniffi_marfa_core_ffi_checksum_constructor_folders_new() != 29962) {
         return InitializationResult.apiChecksumMismatch
     }
 
