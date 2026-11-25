@@ -79,6 +79,13 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// By name, with the fields it inherits; a field declared again nearer
     /// this type takes the place of the one above it.
     public let fields: [TypeField]
+    /// Each table the type declares or inherits, by name, as the core reads them.
+    ///
+    /// Each value is the table's definition; where no type in the chain labels the table, the core makes a label
+    /// from its name.
+    ///
+    /// Empty when the type declares and inherits no table.
+    public let tables: JSONObject
     /// Each display hint comes from the nearest type that sets it: a subtype
     /// naming only its body keeps its parent's title field.
     public let titleField: String?
@@ -99,6 +106,10 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// exactly this type.
     public let linkField: String?
     public let roles: [String]
+    /// Whether the type declares or inherits a table, so an item of it can hold rows.
+    public var holdsTable: Bool { !tables.members.isEmpty }
+    /// The name of each table the type declares or inherits, in the order of ``tables``.
+    public var tableNames: [String] { tables.members.map(\.key) }
     /// The name of the type's `status` field, or `nil` for a type with none.
     ///
     /// A type has at most one.
@@ -112,7 +123,8 @@ public struct ItemType: Sendable, Hashable, Identifiable {
     /// For an app's previews and tests.
     public init(
         id: String, label: String? = nil, plural: String? = nil, description: String? = nil, parent: String? = nil,
-        version: Int64 = 0, fields: [TypeField] = [], titleField: String? = nil, bodyField: String? = nil,
+        version: Int64 = 0, fields: [TypeField] = [], tables: JSONObject = [:], titleField: String? = nil,
+        bodyField: String? = nil,
         nameFromBody: Bool = true, icon: String? = nil,
         linkField: String? = nil, roles: [String] = []
     ) {
@@ -127,6 +139,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.parent = parent
         self.version = version
         self.fields = fields
+        self.tables = tables
         self.titleField = titleField
         self.bodyField = bodyField
         self.nameFromBody = nameFromBody
@@ -142,7 +155,7 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         self.init(
             id: core.id, label: core.label, plural: core.plural, description: core.description,
             parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
-            titleField: core.titleField,
+            tables: JSONObject(core.tables), titleField: core.titleField,
             bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField,
             roles: core.roles)
     }
