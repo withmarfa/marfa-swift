@@ -138,20 +138,6 @@ extension InMemoryCore {
         try unsupported("watch")
     }
 
-    func changeFolder(id: String, change: FolderSettingsChange, version: Int64, idempotencyKey: String?) throws
-        -> FolderRow
-    {
-        try unsupported("changeFolder")
-    }
-
-    func createFolder(settings: FolderSettings, idempotencyKey: String?) throws -> FolderRow {
-        try unsupported("createFolder")
-    }
-
-    func folder(id: String) throws -> FolderRow? {
-        try unsupported("folder")
-    }
-
     func listInFolder(id: String, sort: Sort, limit: UInt32?, offset: UInt32?) throws -> Listing {
         try unsupported("listInFolder")
     }

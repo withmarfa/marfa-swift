@@ -1,5 +1,5 @@
 import Foundation
-internal import MarfaCore
+package import MarfaCore
 
 /// A `system.folder`: the query and defaults that folders on disk follow.
 public struct Folder: Sendable, Hashable, Identifiable {
@@ -8,6 +8,17 @@ public struct Folder: Sendable, Hashable, Identifiable {
     /// `.revoked` is final: the folder changes no more.
     public let state: ItemState
     public let settings: FolderSettings
+
+    public init(id: String, version: Int64, state: ItemState, settings: FolderSettings) {
+        self.id = id
+        self.version = version
+        self.state = state
+        self.settings = settings
+    }
+
+    package var core: MarfaCore.FolderRow {
+        .init(id: id, version: version, state: state.core, settings: settings.core)
+    }
 
     init(_ core: MarfaCore.FolderRow) {
         id = core.id
@@ -33,12 +44,15 @@ public struct FolderSettings: Sendable, Hashable {
     public var additionThreshold: AdditionThreshold
     /// What the folder does with a new file its query would not hold.
     public var outsideQuery: OutsideQuery
+    /// Seconds between reads of every file, from 60 through 86400, or `nil` for the default.
+    public var fullPassIntervalSeconds: UInt64?
 
     public init(
         title: String? = nil, query: FolderQuery = FolderQuery(), defaults: FolderDefaults = FolderDefaults(),
         include: [String] = [], ignore: [String] = [], firstPlacement: [String: String] = [:],
         removalThreshold: RemovalThreshold = RemovalThreshold(),
-        additionThreshold: AdditionThreshold = AdditionThreshold(), outsideQuery: OutsideQuery = .send
+        additionThreshold: AdditionThreshold = AdditionThreshold(), outsideQuery: OutsideQuery = .send,
+        fullPassIntervalSeconds: UInt64? = nil
     ) {
         self.title = title
         self.query = query
@@ -49,20 +63,23 @@ public struct FolderSettings: Sendable, Hashable {
         self.removalThreshold = removalThreshold
         self.additionThreshold = additionThreshold
         self.outsideQuery = outsideQuery
+        self.fullPassIntervalSeconds = fullPassIntervalSeconds
     }
 
-    init(_ core: MarfaCore.FolderSettings) {
+    package init(_ core: MarfaCore.FolderSettings) {
         self.init(
             title: core.title, query: FolderQuery(core.query), defaults: FolderDefaults(core.defaults),
             include: core.include, ignore: core.ignore, firstPlacement: core.firstPlacement,
             removalThreshold: RemovalThreshold(core.removalThreshold),
-            additionThreshold: AdditionThreshold(core.additionThreshold), outsideQuery: OutsideQuery(core.outsideQuery))
+            additionThreshold: AdditionThreshold(core.additionThreshold), outsideQuery: OutsideQuery(core.outsideQuery),
+            fullPassIntervalSeconds: core.fullPassIntervalSeconds)
     }
 
     var core: MarfaCore.FolderSettings {
         MarfaCore.FolderSettings(
             title: title, query: query.core, defaults: defaults.core, include: include, ignore: ignore,
             firstPlacement: firstPlacement, removalThreshold: removalThreshold.core,
+            fullPassIntervalSeconds: fullPassIntervalSeconds,
             additionThreshold: additionThreshold.core, outsideQuery: outsideQuery.core)
     }
 }
@@ -215,11 +232,13 @@ public struct FolderSettingsChange: Sendable, Hashable {
     public var removalThreshold: RemovalThreshold?
     public var additionThreshold: AdditionThreshold?
     public var outsideQuery: OutsideQuery?
+    public var fullPassIntervalSeconds: UInt64?
 
     public init(
         title: String? = nil, query: FolderQuery? = nil, defaults: FolderDefaults? = nil, include: [String]? = nil,
         ignore: [String]? = nil, firstPlacement: [String: String]? = nil, removalThreshold: RemovalThreshold? = nil,
-        additionThreshold: AdditionThreshold? = nil, outsideQuery: OutsideQuery? = nil
+        additionThreshold: AdditionThreshold? = nil, outsideQuery: OutsideQuery? = nil,
+        fullPassIntervalSeconds: UInt64? = nil
     ) {
         self.title = title
         self.query = query
@@ -230,12 +249,25 @@ public struct FolderSettingsChange: Sendable, Hashable {
         self.removalThreshold = removalThreshold
         self.additionThreshold = additionThreshold
         self.outsideQuery = outsideQuery
+        self.fullPassIntervalSeconds = fullPassIntervalSeconds
+    }
+
+    package init(_ core: MarfaCore.FolderSettingsChange) {
+        self.init(
+            title: core.title, query: core.query.map(FolderQuery.init),
+            defaults: core.defaults.map(FolderDefaults.init),
+            include: core.include, ignore: core.ignore, firstPlacement: core.firstPlacement,
+            removalThreshold: core.removalThreshold.map(RemovalThreshold.init),
+            additionThreshold: core.additionThreshold.map(AdditionThreshold.init),
+            outsideQuery: core.outsideQuery.map(OutsideQuery.init),
+            fullPassIntervalSeconds: core.fullPassIntervalSeconds)
     }
 
     var core: MarfaCore.FolderSettingsChange {
         MarfaCore.FolderSettingsChange(
             title: title, query: query?.core, defaults: defaults?.core, include: include, ignore: ignore,
             firstPlacement: firstPlacement, removalThreshold: removalThreshold?.core,
+            fullPassIntervalSeconds: fullPassIntervalSeconds,
             additionThreshold: additionThreshold?.core, outsideQuery: outsideQuery?.core)
     }
 }
@@ -263,6 +295,7 @@ extension WorkingCopy {
     /// A `network` failure after the request went out may follow a folder the server made. Retry with the same
     /// `idempotencyKey`, which answers the first folder, rather than creating a second.
     public func createFolder(_ settings: FolderSettings, idempotencyKey: String? = nil) async throws -> Folder {
+        try checkFullPassInterval(settings.fullPassIntervalSeconds)
         let folder = try await holder.run { core in
             Folder(try core.createFolder(settings: settings.core, idempotencyKey: idempotencyKey))
         }
@@ -277,6 +310,7 @@ extension WorkingCopy {
     public func changeFolder(
         _ id: String, _ change: FolderSettingsChange, baseVersion: Int64, idempotencyKey: String? = nil
     ) async throws -> Folder {
+        try checkFullPassInterval(change.fullPassIntervalSeconds)
         let folder = try await holder.run { core in
             Folder(
                 try core.changeFolder(
@@ -296,5 +330,11 @@ extension WorkingCopy {
         }
         feed.announce(Change(origin: .refreshed(.folderWritten), itemId: id, edgeId: nil))
         return folder
+    }
+}
+
+private func checkFullPassInterval(_ seconds: UInt64?) throws {
+    if let seconds, !(60...86_400).contains(seconds) {
+        throw MarfaError.invalid(message: "full_pass_interval_seconds must be between 60 and 86400")
     }
 }
