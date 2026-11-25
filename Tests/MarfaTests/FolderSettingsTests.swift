@@ -15,9 +15,12 @@ import Testing
                 edges: ["about": ["topic"]]),
             include: ["*.md"], ignore: ["drafts/"], firstPlacement: ["core.note": "Notes"],
             removalThreshold: RemovalThreshold(files: 4, fraction: 0.5, ceiling: 3),
-            additionThreshold: AdditionThreshold(files: 7, fraction: 0.5), outsideQuery: .hold)
+            additionThreshold: AdditionThreshold(files: 7, fraction: 0.5), outsideQuery: .hold,
+            fullPassIntervalSeconds: 60)
         let crossed = FolderSettings(settings.core)
         #expect(crossed == settings)
+        #expect(crossed.fullPassIntervalSeconds == 60)
+        #expect(FolderSettings(FolderSettings().core).fullPassIntervalSeconds == nil)
         #expect(crossed.removalThreshold.ceiling == 3, "the removal threshold's ceiling")
         #expect(FolderSettings(FolderSettings().core).removalThreshold.ceiling == nil, "no ceiling is 100, not 0")
         #expect(crossed.query.tier == .all, "a query of both tiers")
@@ -60,12 +63,18 @@ extension LiveWorkingCopies {
 
             let made = try await copy.createFolder(
                 FolderSettings(
-                    title: "Shelf", query: FolderQuery(types: ["core.note"], filter: "tags contains \"shelf\"")))
+                    title: "Shelf", query: FolderQuery(types: ["core.note"], filter: "tags contains \"shelf\""),
+                    fullPassIntervalSeconds: 60))
             #expect(made.version == 1 && made.state == .active)
             #expect(try await copy.items.folder(made.id)?.settings.title == "Shelf", "held at once")
             let renamed = try await copy.changeFolder(
                 made.id, FolderSettingsChange(title: "Pantry"), baseVersion: made.version)
             #expect(renamed.version == 2 && renamed.settings.title == "Pantry")
+            #expect(renamed.settings.fullPassIntervalSeconds == 60)
+            let changed = try await copy.changeFolder(
+                made.id, FolderSettingsChange(fullPassIntervalSeconds: 86_400), baseVersion: renamed.version)
+            #expect(changed.settings.fullPassIntervalSeconds == 86_400)
+            #expect(try await copy.items.folder(made.id)?.settings.fullPassIntervalSeconds == 86_400)
             #expect(renamed.settings.query.types == ["core.note"], "a setting the change did not name stays")
 
             let revoked = try await copy.revokeFolder(made.id)
@@ -83,7 +92,7 @@ extension LiveWorkingCopies {
             #expect(try await copy.queue.all().allSatisfy { $0.itemId != made.id }, "nothing was queued")
             try await Task.sleep(for: .milliseconds(300))
             let written = Change(origin: .refreshed(.folderWritten), itemId: made.id, edgeId: nil)
-            #expect(heard.all.filter { $0 == written }.count == 3, "each of the create, the change and the revoke")
+            #expect(heard.all.filter { $0 == written }.count == 4, "the create, both changes and the revoke")
         }
 
         @Test func aStaleChangeIsRefusedAndARepeatedCreateAnswersTheFirstFolder() async throws {

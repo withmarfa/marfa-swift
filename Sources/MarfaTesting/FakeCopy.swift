@@ -159,6 +159,12 @@ public final class FakeCopy: Sendable {
         core.writes.map(Marfa.QueuedWrite.init)
     }
 
+    /// Scripts folder writes and reads, leaving unset calls unsupported.
+    public var folderSettings: FolderSettingsScript {
+        get { core.folderSettings.withLock { $0 } }
+        set { core.folderSettings.withLock { $0 = newValue } }
+    }
+
     /// Scripts the name and preview `copy.items.displays(for:)` and `displays(of:)` answer, once for each input.
     ///
     /// The fake does not work out a name from the type's display hints, as the Rust core does, so the closure says
