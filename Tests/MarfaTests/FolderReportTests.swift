@@ -119,7 +119,11 @@ func aFolderInSyncedOrNetworkStorageIsAddedWithTheCause(core: MarfaCore.StorageC
 
 @Test(arguments: [true, false])
 func aListedFolderSaysWhetherItsSyncIsPaused(paused: Bool) {
-    let listed = Marfa.ListedFolder(MarfaCore.ListedFolder(dir: "/Notes", folder: "f", paused: paused, store: nil))
+    let store = paused ? "store-1" : nil
+    let listed = Marfa.ListedFolder(MarfaCore.ListedFolder(dir: "/Notes", folder: "f", paused: paused, store: store))
+    #expect(listed.storeId == store)
+    let added = Marfa.AddedFolder(MarfaCore.AddedFolder(dir: "/Notes", folder: "f", storage: nil, gitTracked: paused))
+    #expect(added.gitTracked == paused)
     #expect(listed.syncPaused == paused)
     #expect(listed.folderId == "f")
 }
