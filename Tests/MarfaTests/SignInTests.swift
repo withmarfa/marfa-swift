@@ -11,6 +11,38 @@ private let service = "com.withmarfa.marfa-swift.tests"
 private let client = Authorization.Client(
     name: "Sign-in tests", redirect: URL(string: "so.marfa.tests:/signed-in"), scopes: ["core.note:read"])
 
+@Suite(.timeLimit(.minutes(1)))
+struct SignInDiscoveryTransportTests {
+    @Test(
+        arguments: [
+            (URLError.Code.cannotFindHost, "The server name could not be resolved."),
+            (.dnsLookupFailed, "The server name could not be resolved."),
+            (.cannotConnectToHost, "The server could not be contacted."),
+            (.timedOut, "The server could not be contacted."),
+            (.serverCertificateUntrusted, "The server certificate could not be trusted."),
+            (.serverCertificateHasUnknownRoot, "The server certificate could not be trusted."),
+            (.serverCertificateHasBadDate, "The server certificate could not be trusted."),
+            (.serverCertificateNotYetValid, "The server certificate could not be trusted."),
+        ], [false, true])
+    func classifiesDiscoveryFailure(failure: (URLError.Code, String), device: Bool) async throws {
+        let server = ScriptedAuthServer { _ in .failure(failure.0) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            await #expect {
+                if device {
+                    _ = try await authorization.startDeviceSignIn()
+                } else {
+                    _ = try await authorization.signIn { url, _ in url }
+                }
+            } throws: { error in
+                (error as? SignInError)?.description == failure.1
+            }
+        }
+    }
+}
+
 /// Answers discovery and registration as Marfa does, and hands every other request to `rest`.
 private func marfa(
     _ server: ScriptedAuthServer, issParameter: Bool? = nil,
