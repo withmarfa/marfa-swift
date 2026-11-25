@@ -488,6 +488,13 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `GET /folders/{id}/status`.
     /// - Remark: Generated from `#/paths//folders/{id}/status/get(getFolderStatus)`.
     func getFolderStatus(_ input: Operations.GetFolderStatus.Input) async throws -> Operations.GetFolderStatus.Output
+    /// Get folder directories
+    ///
+    /// Returns one level of a folder's directory tree with file counts. Counts include items you can list with an `in-folder` edge, archived ones too, and leave out the trash. `unreadable_placements` counts placements left out for a damaged path.
+    ///
+    /// - Remark: HTTP `GET /folders/{id}/directories`.
+    /// - Remark: Generated from `#/paths//folders/{id}/directories/get(getFolderDirectories)`.
+    func getFolderDirectories(_ input: Operations.GetFolderDirectories.Input) async throws -> Operations.GetFolderDirectories.Output
     /// List connectors
     ///
     /// Returns your registration, or every registration if you hold `connectors.manage`, newest first.
@@ -1876,6 +1883,23 @@ extension ClientProtocol {
     ) async throws -> Operations.GetFolderStatus.Output {
         try await getFolderStatus(Operations.GetFolderStatus.Input(
             path: path,
+            headers: headers
+        ))
+    }
+    /// Get folder directories
+    ///
+    /// Returns one level of a folder's directory tree with file counts. Counts include items you can list with an `in-folder` edge, archived ones too, and leave out the trash. `unreadable_placements` counts placements left out for a damaged path.
+    ///
+    /// - Remark: HTTP `GET /folders/{id}/directories`.
+    /// - Remark: Generated from `#/paths//folders/{id}/directories/get(getFolderDirectories)`.
+    public func getFolderDirectories(
+        path: Operations.GetFolderDirectories.Input.Path,
+        query: Operations.GetFolderDirectories.Input.Query = .init(),
+        headers: Operations.GetFolderDirectories.Input.Headers = .init()
+    ) async throws -> Operations.GetFolderDirectories.Output {
+        try await getFolderDirectories(Operations.GetFolderDirectories.Input(
+            path: path,
+            query: query,
             headers: headers
         ))
     }

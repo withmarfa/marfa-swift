@@ -631,7 +631,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
     "endSignIn", "listAppGrants", "narrowAppGrant", "revokeAppGrant", "getProfile", "updateProfile", "getProfileAvatar",
     "replaceProfileAvatar", "listTrash", "emptyTrash", "listAttention", "listConnectors", "getConnector",
     "deleteConnector", "listConnectorRuns", "deleteConnectorState", "listInboundEndpoints", "createInboundEndpoint",
-    "retireInboundEndpoint",
+    "retireInboundEndpoint", "getFolderDirectories",
   ];
   for (const kept of ["registerType", "moveType", "applyBulkAction", "getBulkActionJob", "cancelBulkActionJob", "getCurrentKey", ...owner])
     assert.ok(client.has(kept), kept);
