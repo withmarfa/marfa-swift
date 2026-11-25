@@ -660,6 +660,52 @@ extension Components {
                 case version
             }
         }
+        /// A sign-in recorded as the one that wrote a version of an item or first installed a plugin, named as it was then.
+        ///
+        /// - Remark: Generated from `#/components/schemas/Writer`.
+        public struct Writer: Codable, Hashable, Sendable {
+            /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Writer/kind`.
+            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                case browser = "browser"
+                case app = "app"
+                case key = "key"
+                case local = "local"
+            }
+            /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Writer/kind`.
+            public var kind: Components.Schemas.Writer.KindPayload
+            /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Writer/id`.
+            public var id: Swift.String
+            /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Writer/name`.
+            public var name: Swift.String
+            /// Creates a new `Writer`.
+            ///
+            /// - Parameters:
+            ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
+            ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
+            ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
+            public init(
+                kind: Components.Schemas.Writer.KindPayload,
+                id: Swift.String,
+                name: Swift.String
+            ) {
+                self.kind = kind
+                self.id = id
+                self.name = name
+            }
+            public enum CodingKeys: String, CodingKey {
+                case kind
+                case id
+                case name
+            }
+        }
         /// An item is one record in Marfa.
         ///
         /// - Remark: Generated from `#/components/schemas/Item`.
@@ -834,6 +880,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Item/extensions`.
             public var extensions: Components.Schemas.Item.ExtensionsPayload?
+            /// The sign-in that wrote the item's current version, named as it was then, even after it ends. `null` if no sign-in wrote it, such as when Marfa reads a file's text. Present only where `include` names `writer`.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Item/writer`.
+            public var writer: Components.Schemas.MarfaNullableWriter?
             /// Creates a new `Item`.
             ///
             /// - Parameters:
@@ -860,6 +910,7 @@ extension Components {
             ///   - trashedWith: The ID of the item whose trash took this one into the trash, beside `trashed_by_cascade`, whatever became of that item since. Present only if you can read that item's type.
             ///   - edges: The item's outbound edges you can read, by edge type, each the first page that `GET /items/{id}/edges` continues. Empty if `source_filter` leaves the item out. Absent where an operation doesn't return edges, such as a listing without `include=edges`.
             ///   - extensions: The item's extension namespaces that you can read, each mapped to its data. Present only where `include` names `extensions`.
+            ///   - writer: The sign-in that wrote the item's current version, named as it was then, even after it ends. `null` if no sign-in wrote it, such as when Marfa reads a file's text. Present only where `include` names `writer`.
             public init(
                 id: Swift.String,
                 _type: Swift.String,
@@ -883,7 +934,8 @@ extension Components {
                 trashedByCascade: Swift.Bool? = nil,
                 trashedWith: Swift.String? = nil,
                 edges: Components.Schemas.Item.EdgesPayload? = nil,
-                extensions: Components.Schemas.Item.ExtensionsPayload? = nil
+                extensions: Components.Schemas.Item.ExtensionsPayload? = nil,
+                writer: Components.Schemas.MarfaNullableWriter? = nil
             ) {
                 self.id = id
                 self._type = _type
@@ -908,6 +960,7 @@ extension Components {
                 self.trashedWith = trashedWith
                 self.edges = edges
                 self.extensions = extensions
+                self.writer = writer
             }
             public enum CodingKeys: String, CodingKey {
                 case id
@@ -933,6 +986,7 @@ extension Components {
                 case trashedWith = "trashed_with"
                 case edges
                 case extensions
+                case writer
             }
         }
         /// A page of edges.
@@ -1285,53 +1339,7 @@ extension Components {
             /// The sign-in that wrote this version, named as it was then, even after it ends. Whoever can read the snapshot sees it, such as another app's name or a key's label. `null` if no sign-in wrote it, such as when Marfa reads a file's text.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/writer`.
-            public struct WriterPayload: Codable, Hashable, Sendable {
-                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Version/writer/kind`.
-                @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                    case browser = "browser"
-                    case app = "app"
-                    case key = "key"
-                    case local = "local"
-                }
-                /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Version/writer/kind`.
-                public var kind: Components.Schemas.Version.WriterPayload.KindPayload
-                /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Version/writer/id`.
-                public var id: Swift.String
-                /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
-                ///
-                /// - Remark: Generated from `#/components/schemas/Version/writer/name`.
-                public var name: Swift.String
-                /// Creates a new `WriterPayload`.
-                ///
-                /// - Parameters:
-                ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
-                ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-                ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
-                public init(
-                    kind: Components.Schemas.Version.WriterPayload.KindPayload,
-                    id: Swift.String,
-                    name: Swift.String
-                ) {
-                    self.kind = kind
-                    self.id = id
-                    self.name = name
-                }
-                public enum CodingKeys: String, CodingKey {
-                    case kind
-                    case id
-                    case name
-                }
-            }
-            /// The sign-in that wrote this version, named as it was then, even after it ends. Whoever can read the snapshot sees it, such as another app's name or a key's label. `null` if no sign-in wrote it, such as when Marfa reads a file's text.
-            ///
-            /// - Remark: Generated from `#/components/schemas/Version/writer`.
-            public var writer: Components.Schemas.Version.WriterPayload?
+            public var writer: Components.Schemas.MarfaNullableWriter
             /// When Marfa recorded the snapshot, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/Version/created_at`.
@@ -1358,7 +1366,7 @@ extension Components {
                 tier: Components.Schemas.Tier,
                 occurredAt: Swift.String,
                 sourceId: Swift.String? = nil,
-                writer: Components.Schemas.Version.WriterPayload? = nil,
+                writer: Components.Schemas.MarfaNullableWriter,
                 createdAt: Swift.String
             ) {
                 self.id = id
@@ -2294,7 +2302,7 @@ extension Components {
                 case message
             }
         }
-        /// A field: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `last_activity_at`, `type`, `state`, `tier`, `tags`) or `properties.<name>`.
+        /// Field to sort by. Use an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier`, `tags`, or `source`), `last_activity_at`, or `properties.<name>`.
         ///
         /// - Remark: Generated from `#/components/schemas/ViewField`.
         public typealias ViewField = Swift.String
@@ -2361,7 +2369,7 @@ extension Components {
         ///
         /// - Remark: Generated from `#/components/schemas/ViewGroup`.
         public struct ViewGroup: Codable, Hashable, Sendable {
-            /// The field to group by: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier` or `tags`), `properties.<name>`, `source`, `status_group`, `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            /// The field to group by: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier`, `tags` or `source`), `properties.<name>`, `status_group`, `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
             ///
             /// - Remark: Generated from `#/components/schemas/ViewGroup/by`.
             public var by: Swift.String
@@ -2390,7 +2398,7 @@ extension Components {
             /// Creates a new `ViewGroup`.
             ///
             /// - Parameters:
-            ///   - by: The field to group by: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier` or `tags`), `properties.<name>`, `source`, `status_group`, `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
+            ///   - by: The field to group by: an own field (`title`, `created_at`, `updated_at`, `occurred_at`, `type`, `state`, `tier`, `tags` or `source`), `properties.<name>`, `status_group`, `edge[<type>]` or `backref[<type>]` for the item an edge of that type joins.
             ///   - bucket: For a date field, the span each group covers. For `tags`, a property or an edge type, `presence` groups by whether the item has a value, with the keys `false` and `true`. Absent groups by the value.
             ///   - order: The values whose groups come first, in this order. Other groups follow. With `status_group`, the four status group names or `null`. With `presence`, `true` or `false`.
             ///   - hidden: The values whose groups the view leaves out. With `status_group`, the four status group names or `null`. With `presence`, `true` or `false`.
@@ -25300,7 +25308,7 @@ extension Components {
             /// The sign-in that first installed the plugin, or `null` when it is not known.
             ///
             /// - Remark: Generated from `#/components/schemas/Plugin/installed_by`.
-            public var installedBy: Components.Schemas.MarfaNullablePluginInstaller
+            public var installedBy: Components.Schemas.MarfaNullableWriter
             /// When the installed version last changed.
             ///
             /// - Remark: Generated from `#/components/schemas/Plugin/updated_at`.
@@ -25337,7 +25345,7 @@ extension Components {
                 connectorHost: Swift.String? = nil,
                 fingerprint: Swift.String,
                 installedAt: Foundation.Date,
-                installedBy: Components.Schemas.MarfaNullablePluginInstaller,
+                installedBy: Components.Schemas.MarfaNullableWriter,
                 updatedAt: Foundation.Date
             ) {
                 self.name = name
@@ -25428,7 +25436,7 @@ extension Components {
                     forKey: .installedAt
                 )
                 self.installedBy = try container.decode(
-                    Components.Schemas.MarfaNullablePluginInstaller.self,
+                    Components.Schemas.MarfaNullableWriter.self,
                     forKey: .installedBy
                 )
                 self.updatedAt = try container.decode(
@@ -25513,7 +25521,7 @@ extension Components {
             /// The sign-in that first installed the plugin, or `null` when it is not known.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginInstalled/installed_by`.
-            public var installedBy: Components.Schemas.MarfaNullablePluginInstaller
+            public var installedBy: Components.Schemas.MarfaNullableWriter
             /// When the installed version last changed.
             ///
             /// - Remark: Generated from `#/components/schemas/PluginInstalled/updated_at`.
@@ -25563,7 +25571,7 @@ extension Components {
                 connectorHost: Swift.String? = nil,
                 fingerprint: Swift.String,
                 installedAt: Foundation.Date,
-                installedBy: Components.Schemas.MarfaNullablePluginInstaller,
+                installedBy: Components.Schemas.MarfaNullableWriter,
                 updatedAt: Foundation.Date,
                 outcome: Components.Schemas.PluginInstalled.OutcomePayload
             ) {
@@ -25657,7 +25665,7 @@ extension Components {
                     forKey: .installedAt
                 )
                 self.installedBy = try container.decode(
-                    Components.Schemas.MarfaNullablePluginInstaller.self,
+                    Components.Schemas.MarfaNullableWriter.self,
                     forKey: .installedBy
                 )
                 self.updatedAt = try container.decode(
@@ -26299,52 +26307,6 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case error
-            }
-        }
-        /// The sign-in that first installed a plugin.
-        ///
-        /// - Remark: Generated from `#/components/schemas/PluginInstaller`.
-        public struct PluginInstaller: Codable, Hashable, Sendable {
-            /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
-            ///
-            /// - Remark: Generated from `#/components/schemas/PluginInstaller/kind`.
-            @frozen public enum KindPayload: String, Codable, Hashable, Sendable, CaseIterable {
-                case browser = "browser"
-                case app = "app"
-                case key = "key"
-                case local = "local"
-            }
-            /// The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
-            ///
-            /// - Remark: Generated from `#/components/schemas/PluginInstaller/kind`.
-            public var kind: Components.Schemas.PluginInstaller.KindPayload
-            /// The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-            ///
-            /// - Remark: Generated from `#/components/schemas/PluginInstaller/id`.
-            public var id: Swift.String
-            /// The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
-            ///
-            /// - Remark: Generated from `#/components/schemas/PluginInstaller/name`.
-            public var name: Swift.String
-            /// Creates a new `PluginInstaller`.
-            ///
-            /// - Parameters:
-            ///   - kind: The recorded sign-in kind. `browser`: the owner's browser. `app`: an app the owner approved. `key`: an API key. `local`: the local command on the server's machine.
-            ///   - id: The ID the sign-in has in `GET /owner/sign-ins`, `local` for the local command, or an app's client ID if its sign-in was already gone. It stays the same after the sign-in ends.
-            ///   - name: The sign-in's name when the action happened, as `GET /owner/sign-ins` showed it. At most 200 characters.
-            public init(
-                kind: Components.Schemas.PluginInstaller.KindPayload,
-                id: Swift.String,
-                name: Swift.String
-            ) {
-                self.kind = kind
-                self.id = id
-                self.name = name
-            }
-            public enum CodingKeys: String, CodingKey {
-                case kind
-                case id
-                case name
             }
         }
         /// A page holding every installed plugin.
@@ -31790,6 +31752,8 @@ extension Components {
         public typealias MarfaNullableMarfaInlinefba6ed0c457db5a5 = MarfaNullable<Components.Schemas.MarfaInlinefba6ed0c457db5a5>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInline44fbb8f844b56845`.
         public typealias MarfaNullableMarfaInline44fbb8f844b56845 = MarfaNullable<Components.Schemas.MarfaInline44fbb8f844b56845>
+        /// - Remark: Generated from `#/components/schemas/MarfaNullableWriter`.
+        public typealias MarfaNullableWriter = MarfaNullable<Components.Schemas.Writer>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinecddf8275afa15408`.
         public typealias MarfaNullableMarfaInlinecddf8275afa15408 = MarfaNullable<Components.Schemas.MarfaInlinecddf8275afa15408>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableMarfaInlinefdf0831745ef621f`.
@@ -31820,8 +31784,6 @@ extension Components {
         public typealias MarfaNullableUpdateLast = MarfaNullable<Components.Schemas.UpdateLast>
         /// - Remark: Generated from `#/components/schemas/MarfaNullablePluginConnector`.
         public typealias MarfaNullablePluginConnector = MarfaNullable<Components.Schemas.PluginConnector>
-        /// - Remark: Generated from `#/components/schemas/MarfaNullablePluginInstaller`.
-        public typealias MarfaNullablePluginInstaller = MarfaNullable<Components.Schemas.PluginInstaller>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorMappingKind`.
         public typealias MarfaNullableConnectorMappingKind = MarfaNullable<Components.Schemas.ConnectorMappingKind>
         /// - Remark: Generated from `#/components/schemas/MarfaNullableConnectorPreviewResult`.

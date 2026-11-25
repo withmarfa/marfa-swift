@@ -2991,7 +2991,7 @@ public enum Operations {
     }
     /// Get an item
     ///
-    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call. Use `state` to read an item in the trash.
+    /// Returns an item with its metadata, outbound edges and any extras you ask for. Use `state` to read an item in the trash.
     ///
     /// - Remark: HTTP `GET /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/get(getItem)`.
@@ -3015,7 +3015,7 @@ public enum Operations {
             public var path: Operations.GetItem.Input.Path
             /// - Remark: Generated from `#/paths/items/{id}/GET/query`.
             public struct Query: Sendable, Hashable {
-                /// Comma-separated extras: `backrefs` adds inbound edges, `neighbors` adds the items at the other end of the edges returned, and `versions` adds the first page of version snapshots you can read, oldest first.
+                /// Comma-separated extras. `backrefs` adds inbound edges. `neighbors` adds the items at the other end of the returned edges. `versions` adds the first page of readable snapshots, oldest first. `writer` adds the current version's writer.
                 ///
                 /// - Remark: Generated from `#/paths/items/{id}/GET/query/include`.
                 public var include: Swift.String?
@@ -3026,7 +3026,7 @@ public enum Operations {
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
-                ///   - include: Comma-separated extras: `backrefs` adds inbound edges, `neighbors` adds the items at the other end of the edges returned, and `versions` adds the first page of version snapshots you can read, oldest first.
+                ///   - include: Comma-separated extras. `backrefs` adds inbound edges. `neighbors` adds the items at the other end of the returned edges. `versions` adds the first page of readable snapshots, oldest first. `writer` adds the current version's writer.
                 ///   - state: Read the item only if it is in one of these lifecycle states: one state or a comma-separated list, such as `active,trashed`. Send `any` on its own for every state, the trash included. Without it, you get an item in any state but `trashed`.
                 public init(
                     include: Swift.String? = nil,
@@ -3229,7 +3229,7 @@ public enum Operations {
                 }
             }
             /// - `invalid_id`: the ID is not a valid item ID.
-            /// - `validation_error`: the query has a parameter this endpoint doesn't take, or `state` is empty, names a state that doesn't exist, or puts `any` beside another state.
+            /// - `validation_error`: the query has an unknown parameter, `include` names an unknown extra, or `state` is empty, names a state that doesn't exist, or puts `any` beside another state.
             ///
             /// - Remark: Generated from `#/paths//items/{id}/get(getItem)/responses/400`.
             ///
@@ -18305,13 +18305,14 @@ public enum Operations {
                         case edges = "edges"
                         case metadata = "metadata"
                         case extensions = "extensions"
+                        case writer = "writer"
                         case hidden = "hidden"
                     }
-                    /// `edges`, `metadata` and `extensions` add that data to each item. `hidden` also returns `system.*` and `app.*` items, which are left out by default.
+                    /// `edges`, `metadata` and `extensions` add that data to each item. `writer` adds the sign-in that wrote each item's current version. `hidden` also returns `system.*` and `app.*` items, which are left out by default.
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/requestBody/json/include`.
                     public typealias IncludePayload = [Operations.BulkGetItems.Input.Body.JsonPayload.IncludePayloadPayload]
-                    /// `edges`, `metadata` and `extensions` add that data to each item. `hidden` also returns `system.*` and `app.*` items, which are left out by default.
+                    /// `edges`, `metadata` and `extensions` add that data to each item. `writer` adds the sign-in that wrote each item's current version. `hidden` also returns `system.*` and `app.*` items, which are left out by default.
                     ///
                     /// - Remark: Generated from `#/paths/items/bulk-get/POST/requestBody/json/include`.
                     public var include: Operations.BulkGetItems.Input.Body.JsonPayload.IncludePayload?
@@ -18319,7 +18320,7 @@ public enum Operations {
                     ///
                     /// - Parameters:
                     ///   - ids: The IDs of the items to read, at most 100.
-                    ///   - include: `edges`, `metadata` and `extensions` add that data to each item. `hidden` also returns `system.*` and `app.*` items, which are left out by default.
+                    ///   - include: `edges`, `metadata` and `extensions` add that data to each item. `writer` adds the sign-in that wrote each item's current version. `hidden` also returns `system.*` and `app.*` items, which are left out by default.
                     public init(
                         ids: [Swift.String],
                         include: Operations.BulkGetItems.Input.Body.JsonPayload.IncludePayload? = nil
@@ -18554,7 +18555,7 @@ public enum Operations {
                 }
             }
             /// - `missing_required_field`: `ids` is missing.
-            /// - `validation_error`: `ids` is not a list or has more than 100 IDs, or the body has a field this endpoint doesn't take.
+            /// - `validation_error`: `ids` isn't a list or has more than 100 IDs, `include` names an unknown extra, or the body has a field this endpoint doesn't take.
             /// - `invalid_id`: an ID in `ids` is not a valid item ID.
             ///
             /// - Remark: Generated from `#/paths//items/bulk-get/post(bulkGetItems)/responses/400`.
