@@ -565,6 +565,16 @@ public struct FileStatus: Sendable, Hashable {
     public var reason: String?
     public var warning: String?
 
+    public enum Hold: String, Sendable {
+        case removing
+        case unsure
+    }
+
+    /// The reported removal hold, with its explanation in `reason`.
+    public var hold: Hold? {
+        state == .held ? flag.flatMap(Hold.init(rawValue:)) : nil
+    }
+
     public init(
         path: String, itemId: String? = nil, state: FileState, waits: [String] = [], flag: String? = nil,
         reason: String? = nil, warning: String? = nil
@@ -580,8 +590,7 @@ public struct FileStatus: Sendable, Hashable {
 
     init(_ core: MarfaCore.FileStatus) {
         self.init(
-            path: core.path, itemId: core.itemId, state: FileState(core.state, flag: core.flag), waits: core.waits,
-            flag: core.flag,
+            path: core.path, itemId: core.itemId, state: FileState(core.state), waits: core.waits, flag: core.flag,
             reason: core.reason, warning: core.warning)
     }
 }
@@ -593,10 +602,6 @@ public enum FileState: Sendable, Hashable {
     case waiting
     /// The file isn't sent; its status says why.
     case held
-    /// An interrupted removal holds the file. Its status gives the reason.
-    case removing
-    /// The folder cannot safely decide what happened to the file. Its status gives the reason.
-    case unsure
     /// The file's item no longer matches the folder's query.
     case unmatched
     /// The scan didn't reach the file, so it's held rather than deleted.
@@ -604,16 +609,11 @@ public enum FileState: Sendable, Hashable {
     /// The file lies where the folder doesn't take files.
     case outside
 
-    init(_ core: MarfaCore.FileState, flag: String?) {
+    init(_ core: MarfaCore.FileState) {
         switch core {
         case .inStep: self = .inStep
         case .waiting: self = .waiting
-        case .held:
-            switch flag {
-            case "removing": self = .removing
-            case "unsure": self = .unsure
-            default: self = .held
-            }
+        case .held: self = .held
         case .unmatched: self = .unmatched
         case .unreached: self = .unreached
         case .outside: self = .outside

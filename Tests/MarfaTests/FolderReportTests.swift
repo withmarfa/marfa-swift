@@ -128,12 +128,14 @@ func aListedFolderSaysWhetherItsSyncIsPaused(paused: Bool) {
     #expect(listed.folderId == "f")
 }
 
-@Test(arguments: [("removing", Marfa.FileState.removing), ("unsure", .unsure), ("future", .held)])
-func aHeldFileKeepsItsFlagAndReason(flag: String, expected: Marfa.FileState) {
+@Test(arguments: [
+    ("removing", Marfa.FileStatus.Hold.removing as Marfa.FileStatus.Hold?), ("unsure", .unsure), ("future", nil),
+])
+func aHeldFileKeepsItsFlagAndReason(flag: String, expected: Marfa.FileStatus.Hold?) {
     let file = Marfa.FileStatus(
         MarfaCore.FileStatus(
             path: "a.md", itemId: "a", state: .held, waits: [], flag: flag, reason: "why", warning: nil))
-    #expect(file.state == expected && file.reason == "why" && file.flag == flag)
+    #expect(file.state == .held && file.hold == expected && file.reason == "why" && file.flag == flag)
 }
 
 @Test func unmatchedAndKeptResultsCarryEveryBindingField() {
