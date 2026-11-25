@@ -27,7 +27,7 @@ public protocol APIProtocol: Sendable {
     func createItem(_ input: Operations.CreateItem.Input) async throws -> Operations.CreateItem.Output
     /// Get an item
     ///
-    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call. Use `state` to read an item in the trash.
+    /// Returns an item with its metadata, outbound edges and any extras you ask for. Use `state` to read an item in the trash.
     ///
     /// - Remark: HTTP `GET /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/get(getItem)`.
@@ -1419,7 +1419,7 @@ extension APIProtocol {
     }
     /// Get an item
     ///
-    /// Returns an item with its metadata and outbound edges. Use `include` to add its inbound edges, the items at the other end of its edges, or its version history in the same call. Use `state` to read an item in the trash.
+    /// Returns an item with its metadata, outbound edges and any extras you ask for. Use `state` to read an item in the trash.
     ///
     /// - Remark: HTTP `GET /items/{id}`.
     /// - Remark: Generated from `#/paths//items/{id}/get(getItem)`.

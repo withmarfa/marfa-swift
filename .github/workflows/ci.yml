@@ -220,6 +220,8 @@ jobs:
         run: |
           if [[ -n "$(git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated)" ]]; then
             git status --porcelain -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
+            git add -A -- Sources/MarfaCore Sources/MarfaTypes Sources/MarfaAPI/Generated
+            git diff --cached --binary --no-renames > "${RUNNER_TEMP}/generated.patch"
             echo "::error::The glue, the wire types or the client are not what the pinned commit generates. Run scripts/core.sh and commit them."
             exit 1
           fi
@@ -321,6 +323,7 @@ jobs:
             ${{ runner.temp }}/swift-build.log
             ${{ runner.temp }}/swift-test.log
             ${{ runner.temp }}/swift-test-events.jsonl
+            ${{ runner.temp }}/generated.patch
           if-no-files-found: ignore
           retention-days: 3
 

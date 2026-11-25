@@ -473,7 +473,7 @@ struct CatalogTypes {
             ],
             tables: JsonObject(members: []),
             titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-            linkField: "vendor_id", roles: ["container"])
+            linkField: "vendor_id", roles: ["container"], feedDays: nil)
         let type = Marfa.ItemType(core)
         #expect(
             type
