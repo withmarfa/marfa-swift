@@ -24,5 +24,18 @@ import Testing
         #expect(write.body == ["state": "trashed", "from": "archived"])
         await copy.close()
     }
+
+    @Test func aFakeDrainCanRefuseTheExpectedStateWithAMessage() async throws {
+        let fake = try await CopyKind.makeFake()
+        let id = try await ItemsOffline.note("Story", in: fake.copy)
+        let refused = Refusal(reason: "state_conflict", code: "state_conflict", message: "The item is trashed.")
+        fake.verdict = { write in
+            write.kind == .transitionItem && write.body["from"] == "active" ? .refused(refused) : .accepted
+        }
+        let write = try await fake.copy.items.transition(id, to: .archived, from: .active)
+        let report = try await fake.copy.queue.drain()
+        #expect(report.verdicts.first { $0.id == write.id }?.verdict == .refused(refused))
+        await fake.copy.close()
+    }
 }
 #endif

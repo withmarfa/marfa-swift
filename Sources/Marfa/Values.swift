@@ -25,8 +25,7 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     case unauthorized(code: String, message: String, server: ServerAnswer?)
     /// The key is valid but lacks the permission the call needs (403), such as `type_not_permitted`.
     case forbidden(code: String, message: String, server: ServerAnswer?)
-    /// The server refused the values sent (400 or 422), or the copy refused them before sending, as the server
-    /// would.
+    /// The server refused the values sent (400 or 422) or the expected item state (409), or the copy refused the write locally.
     ///
     /// `details` holds what the server's `error.details` holds for the same refusal, for each
     /// `edge_constraint_violation` and `edge_cycle` the copy gives itself (an edge check, an edge write, a move
@@ -44,7 +43,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// - `edge_cycle`: `edge_type`, `from_id` and `to_id` for a longer cycle, and `edge_type` alone for an
     ///   edge from an item to itself.
     ///
-    /// It is `nil` for every other refusal, including one the server answers to a request sent to it directly.
+    /// For `state_conflict`, `details.expected` and `details.actual` name the state the transition expected and the
+    /// state the item has. A direct server request also includes these in `server.details`.
     case validation(code: String, message: String, details: JSONValue?, server: ServerAnswer?)
     /// The copy's type catalog holds no type of the name given.
     case unknownType(message: String, server: ServerAnswer?)
@@ -423,6 +423,10 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
                 server: server.map(ServerAnswer.init))
         case .Server(409, "version_conflict", let message, _, let server):
             self = .versionConflict(message: message, server: server.map(ServerAnswer.init))
+        case .Server(409, "state_conflict", let message, let details, let server):
+            self = .validation(
+                code: "state_conflict", message: message, details: details.map(JSONValue.init),
+                server: server.map(ServerAnswer.init))
         case .Server(409, "trash_plan_changed", let message, _, let server):
             self = .trashPlanChanged(message: message, server: server.map(ServerAnswer.init))
         case .Server(409, "instance_changed", let message, _, let server):
