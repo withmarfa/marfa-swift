@@ -16,7 +16,7 @@ import Synchronization
 /// server's side or write either side, such as `sync(_:)`, throws ``MarfaError/syncPaused(message:)``.
 ///
 /// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `trashHeld(in:paths:)`,
-/// `keepHeld(in:paths:writeBack:)`, `confirmFirstSync(in:)`,
+/// `keepHeld(in:paths:writeBack:)`, `forget(_:)`, `confirmFirstSync(in:)`,
 /// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` or `resume(_:)` finds the folder held
 /// by a watch, whether this app's own or the command-line tool's, it asks the watch to let the folder go and
 /// waits up to 10 seconds. A watch of this app lets it go at the end of the step of its pass under way, tells
@@ -37,7 +37,8 @@ public struct Folders: FolderFileManaging {
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
     /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)`, the unmatched and kept file calls,
-    /// `heldFiles(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` with `writeBack: false` work.
+    /// `heldFiles(in:)`, `trashHeld(in:paths:)`, `keepHeld(in:paths:writeBack:)` with `writeBack: false`,
+    /// `remembering(_:)` and `forget(_:)` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -128,6 +129,42 @@ public struct Folders: FolderFileManaging {
             SettledHeld(
                 try folders.keepHeld(dir: directory.path(percentEncoded: false), paths: paths, writeBack: writeBack))
         }
+    }
+
+    /// Which folders on this Mac remember a directory, such as one the registry no longer lists, and what
+    /// forgetting it would release or keep held.
+    ///
+    /// Show the person each folder and held file before ``forget(_:)``: a held file whose
+    /// ``WaitingHeldFile/stillWaitsOn`` is empty is decided again at its folder's next sync once the directory is
+    /// forgotten, which can send its item to the bin. The directory is matched exactly as a folder records it,
+    /// made absolute without following symbolic links. Unless the registry lists the directory, this throws
+    /// `MarfaError.invalid` when anything but an empty directory stands at the path, since it may still be the
+    /// folder. A folder that can't be read is named in ``Remembered/notRead``.
+    ///
+    /// This only reads, asks no watch for a folder, and needs no server or sign-in.
+    public func remembering(_ directory: URL) async throws -> Remembered {
+        let dir = directory.path(percentEncoded: false)
+        return Remembered(try await run(reaching: .never) { folders in try folders.remembering(dir: dir) })
+    }
+
+    /// Forgets a directory in each folder `remembered` names, once the person confirms it is gone for good.
+    ///
+    /// Pass the value ``remembering(_:)`` returned, unchanged. Each held file it showed with no other directory to
+    /// wait on is released, and its folder's next sync decides it again; one that waits on other directories stays
+    /// held on those. Only a hold that still records the directory, for the same item missing since the same moment,
+    /// is changed. Nothing is trashed, and the registry is left as it was.
+    ///
+    /// A folder is left as it was, and named in ``Forgotten/notChanged`` with why, when another process doesn't let
+    /// it go, its store is no longer the one shown, the directory has since become occupied, or the registry listed
+    /// the directory when it was shown or lists it now. Where the registry lists it now, ``Forgotten/listed`` is
+    /// `true`: remove it first, then call ``remembering(_:)`` again. Unless the registry lists the directory, this
+    /// throws `MarfaError.invalid` when anything but an empty directory stands at the path.
+    ///
+    /// This needs no server or sign-in, so a locked keychain doesn't stop it. It waits up to 10 seconds for a watch
+    /// to release each folder.
+    public func forget(_ remembered: Remembered) async throws -> Forgotten {
+        let shown = remembered.core
+        return Forgotten(try await run(reaching: .never) { folders in try folders.forgetRemembered(remembered: shown) })
     }
 
     /// Pauses the directory's sync until ``resume(_:)``.
