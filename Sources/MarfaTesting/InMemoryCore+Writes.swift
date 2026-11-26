@@ -100,7 +100,6 @@ extension InMemoryCore {
     }
 
     private func update(id: String, edit: Edit, asRead: Bool) throws -> QueuedWrite {
-        if edit.exact { throw FakeCopyError.unsupported(call: "items.update(exact:)") }
         try Properties.cross(edit.properties)
         try Checks.links(edit.properties, call: "items.update")
         try Properties.keptAsWritten(edit.properties)
@@ -125,8 +124,14 @@ extension InMemoryCore {
             let ownCreate = asRead && edit.baseVersion == 0 && held.version > 0
             let base: Int64 = ownCreate && state.tookOwnCreate(of: id) ? 1 : edit.baseVersion
             let behindOwnCreate = ownCreate && base == 0 && !state.pendingCreates(of: id).isEmpty
-            let readEarlier = asRead && (base > 0 || behindOwnCreate) && base <= held.version
-            guard base == held.version || readEarlier else {
+            // The copy already holds a later version, so the server would refuse an exact edit for it.
+            if edit.exact && base < held.version && !behindOwnCreate {
+                throw Refuse.validation(
+                    "version_conflict", "\(id) is at version \(held.version) in this working copy, not \(base)",
+                    details: Refuse.details(["expected": .integer(base), "actual": .integer(held.version)]))
+            }
+            let readEarlier = asRead && !edit.exact && (base > 0 || behindOwnCreate) && base <= held.version
+            guard base == held.version || readEarlier || (edit.exact && behindOwnCreate) else {
                 throw Refuse.invalid(
                     "the update to \(id) is based on version \(base) and this copy holds version \(held.version); read it again"
                 )
@@ -172,6 +177,7 @@ extension InMemoryCore {
             } else if let occurredAt = edit.occurredAt {
                 body.members.append(.init(key: "occurred_at", value: .string(occurredAt)))
             }
+            if edit.exact { body.members.append(.init(key: "version_match", value: .string("exact"))) }
             try Properties.refuseTooDeep(body)
             let target = types[retype ?? held.type]
             if let target {

@@ -309,9 +309,9 @@ public struct Edit: Sendable, Hashable {
     /// Use it for a change a person made to what they saw, such as a move to another tier, where a merge onto a later
     /// version would act on something they never saw. The queued write's verdict is refused with the reason
     /// `version_conflict`, it is not sent again, and the copy shows the item as the server holds it. A `baseVersion`
-    /// older than the copy holds throws ``MarfaError/validation(code:message:details:server:)`` with the code
-    /// `version_conflict` and queues nothing, through ``Items/updateAsRead(_:_:)`` too, except `0` read behind this
-    /// copy's own create that the server has yet to answer.
+    /// older than the copy holds throws ``MarfaError/versionConflict(message:server:)`` and queues nothing, through
+    /// ``Items/updateAsRead(_:_:)`` too, except `0` read behind this copy's own create that the server has yet to
+    /// answer.
     public var exact: Bool
 
     public init(

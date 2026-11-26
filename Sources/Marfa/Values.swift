@@ -171,8 +171,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// The call came while ``WorkingCopy/use(_:)`` replaced the copy's sign-in, and was not made. Ask again once
     /// the change is done.
     case keyChanging(message: String)
-    /// The server refused a write made against a version of the row that is no longer current (409
-    /// `version_conflict`). Read the row again and decide what to write.
+    /// A write was made against a version of the row that is no longer current: the server refused it (409
+    /// `version_conflict`), or the copy refused an exact edit, whose ``Edit/baseVersion`` is older than the version it
+    /// holds, before queueing it, and then `server` is `nil`. Read the row again and decide what to write.
     case versionConflict(message: String, server: ServerAnswer?)
     /// Another Marfa instance answers at the server's address (409 `instance_changed`), so the copy needs a
     /// hydration from it. Its queue is kept.
@@ -411,6 +412,8 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
             self = .forbidden(code: code, message: message, server: server.map(ServerAnswer.init))
         case .Validation("item_being_removed", let message, let details, _):
             self = .itemBeingRemoved(id: details.map(JSONValue.init)?.object?["id"]?.string, message: message)
+        case .Validation("version_conflict", let message, _, let server):
+            self = .versionConflict(message: message, server: server.map(ServerAnswer.init))
         case .Validation(let code, let message, let details, let server):
             self = .validation(
                 code: code, message: message, details: details.map(JSONValue.init),
