@@ -3632,6 +3632,20 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     func discardKept(dir: String) throws  -> KeptDiscarded
     
     /**
+     * Forgets the directory in each folder `remembered` names, once the
+     * person confirms it is gone for good, and takes it off each held
+     * file shown: one that waits on nothing else is decided again at its
+     * folder's next sync, and one that waits on other directories stays
+     * held on those. Trashes and keeps nothing itself, and changes
+     * nothing while the registry lists `dir`. A folder another process
+     * does not let go, whose store is not the one shown or has moved, or
+     * that is no longer at its listed path, is left as it was and named
+     * in `not_changed`. Asks a watch that holds a folder to let it go, as
+     * `add` does.
+     */
+    func forgetRemembered(remembered: Remembered) throws  -> Forgotten
+    
+    /**
      * The folder's held files, in path order. Asks no watch for the folder.
      */
     func held(dir: String) throws  -> [HeldFile]
@@ -3663,6 +3677,15 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * to let it go, as `add` does.
      */
     func pause(dir: String) throws  -> Bool
+    
+    /**
+     * Which listed folders remember `dir`, a folder the registry may no
+     * longer list, or hold a file that waits on it, and for each such
+     * held file the other directories that still keep it held once `dir`
+     * is forgotten. Show the person this before `forget_remembered`.
+     * Reads only, and asks no watch for a folder.
+     */
+    func remembering(dir: String) throws  -> Remembered
     
     /**
      * Takes the folder off this machine: its state under `.marfa` goes and
@@ -3888,6 +3911,27 @@ open func discardKept(dir: String)throws  -> KeptDiscarded  {
 }
     
     /**
+     * Forgets the directory in each folder `remembered` names, once the
+     * person confirms it is gone for good, and takes it off each held
+     * file shown: one that waits on nothing else is decided again at its
+     * folder's next sync, and one that waits on other directories stays
+     * held on those. Trashes and keeps nothing itself, and changes
+     * nothing while the registry lists `dir`. A folder another process
+     * does not let go, whose store is not the one shown or has moved, or
+     * that is no longer at its listed path, is left as it was and named
+     * in `not_changed`. Asks a watch that holds a folder to let it go, as
+     * `add` does.
+     */
+open func forgetRemembered(remembered: Remembered)throws  -> Forgotten  {
+    return try  FfiConverterTypeForgotten_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_forget_remembered(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeRemembered_lower(remembered),$0
+    )
+})
+}
+    
+    /**
      * The folder's held files, in path order. Asks no watch for the folder.
      */
 open func held(dir: String)throws  -> [HeldFile]  {
@@ -3950,6 +3994,22 @@ open func list()throws  -> [ListedFolder]  {
 open func pause(dir: String)throws  -> Bool  {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
     uniffi_marfa_core_ffi_fn_method_folders_pause(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Which listed folders remember `dir`, a folder the registry may no
+     * longer list, or hold a file that waits on it, and for each such
+     * held file the other directories that still keep it held once `dir`
+     * is forgotten. Show the person this before `forget_remembered`.
+     * Reads only, and asks no watch for a folder.
+     */
+open func remembering(dir: String)throws  -> Remembered  {
+    return try  FfiConverterTypeRemembered_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_remembering(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
     )
@@ -7081,6 +7141,63 @@ public func FfiConverterTypeFolderDefaults_lower(_ value: FolderDefaults) -> Rus
 
 
 /**
+ * A folder the call did not read or change, and why.
+ */
+public struct FolderLeft: Equatable, Hashable {
+    public var dir: String
+    public var reason: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dir: String, reason: String) {
+        self.dir = dir
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension FolderLeft: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFolderLeft: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FolderLeft {
+        return
+            try FolderLeft(
+                dir: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FolderLeft, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderLeft_lift(_ buf: RustBuffer) throws -> FolderLeft {
+    return try FfiConverterTypeFolderLeft.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFolderLeft_lower(_ value: FolderLeft) -> RustBuffer {
+    return FfiConverterTypeFolderLeft.lower(value)
+}
+
+
+/**
  * One pass: the settings file's edit, the scan, the drain and the pull.
  */
 public struct FolderPass: Equatable, Hashable {
@@ -8281,6 +8398,166 @@ public func FfiConverterTypeFolderSync_lift(_ buf: RustBuffer) throws -> FolderS
 #endif
 public func FfiConverterTypeFolderSync_lower(_ value: FolderSync) -> RustBuffer {
     return FfiConverterTypeFolderSync.lower(value)
+}
+
+
+/**
+ * What forgetting a directory changed.
+ */
+public struct Forgotten: Equatable, Hashable {
+    public var dir: String
+    public var listed: Bool
+    public var forgotten: [ForgottenIn]
+    /**
+     * Folders left as they were, each with why.
+     */
+    public var notChanged: [FolderLeft]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dir: String, listed: Bool, forgotten: [ForgottenIn], 
+        /**
+         * Folders left as they were, each with why.
+         */notChanged: [FolderLeft]) {
+        self.dir = dir
+        self.listed = listed
+        self.forgotten = forgotten
+        self.notChanged = notChanged
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Forgotten: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeForgotten: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Forgotten {
+        return
+            try Forgotten(
+                dir: FfiConverterString.read(from: &buf), 
+                listed: FfiConverterBool.read(from: &buf), 
+                forgotten: FfiConverterSequenceTypeForgottenIn.read(from: &buf), 
+                notChanged: FfiConverterSequenceTypeFolderLeft.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Forgotten, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterBool.write(value.listed, into: &buf)
+        FfiConverterSequenceTypeForgottenIn.write(value.forgotten, into: &buf)
+        FfiConverterSequenceTypeFolderLeft.write(value.notChanged, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeForgotten_lift(_ buf: RustBuffer) throws -> Forgotten {
+    return try FfiConverterTypeForgotten.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeForgotten_lower(_ value: Forgotten) -> RustBuffer {
+    return FfiConverterTypeForgotten.lower(value)
+}
+
+
+/**
+ * A folder that forgot the directory.
+ */
+public struct ForgottenIn: Equatable, Hashable {
+    public var dir: String
+    public var folder: String
+    /**
+     * Paths of its held files no longer held, which its next sync decides.
+     */
+    public var released: [String]
+    /**
+     * Its held files that waited on the directory and still wait on others.
+     */
+    public var stillHeld: [StillHeldFile]
+    /**
+     * Held files shown as staying held that wait on nothing else by now;
+     * they stay held.
+     */
+    public var notReleased: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dir: String, folder: String, 
+        /**
+         * Paths of its held files no longer held, which its next sync decides.
+         */released: [String], 
+        /**
+         * Its held files that waited on the directory and still wait on others.
+         */stillHeld: [StillHeldFile], 
+        /**
+         * Held files shown as staying held that wait on nothing else by now;
+         * they stay held.
+         */notReleased: [String]) {
+        self.dir = dir
+        self.folder = folder
+        self.released = released
+        self.stillHeld = stillHeld
+        self.notReleased = notReleased
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ForgottenIn: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeForgottenIn: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ForgottenIn {
+        return
+            try ForgottenIn(
+                dir: FfiConverterString.read(from: &buf), 
+                folder: FfiConverterString.read(from: &buf), 
+                released: FfiConverterSequenceString.read(from: &buf), 
+                stillHeld: FfiConverterSequenceTypeStillHeldFile.read(from: &buf), 
+                notReleased: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ForgottenIn, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterString.write(value.folder, into: &buf)
+        FfiConverterSequenceString.write(value.released, into: &buf)
+        FfiConverterSequenceTypeStillHeldFile.write(value.stillHeld, into: &buf)
+        FfiConverterSequenceString.write(value.notReleased, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeForgottenIn_lift(_ buf: RustBuffer) throws -> ForgottenIn {
+    return try FfiConverterTypeForgottenIn.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeForgottenIn_lower(_ value: ForgottenIn) -> RustBuffer {
+    return FfiConverterTypeForgottenIn.lower(value)
 }
 
 
@@ -10905,6 +11182,185 @@ public func FfiConverterTypeRefusal_lower(_ value: Refusal) -> RustBuffer {
 
 
 /**
+ * The folders on this computer that remember a directory, as
+ * `Folders::remembering` read them once. Pass it unchanged to
+ * `forget_remembered`.
+ */
+public struct Remembered: Equatable, Hashable {
+    /**
+     * The directory, made absolute as a folder records it.
+     */
+    public var dir: String
+    /**
+     * Whether the registry lists it too, so every folder finds it again at
+     * its next pass and no held delete is decided again.
+     */
+    public var listed: Bool
+    public var folders: [RememberingFolder]
+    /**
+     * Listed folders whose memory could not be read, each with why.
+     */
+    public var notRead: [FolderLeft]
+    /**
+     * Remembered directories that differ from `dir` only in case, which are
+     * not forgotten.
+     */
+    public var alike: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The directory, made absolute as a folder records it.
+         */dir: String, 
+        /**
+         * Whether the registry lists it too, so every folder finds it again at
+         * its next pass and no held delete is decided again.
+         */listed: Bool, folders: [RememberingFolder], 
+        /**
+         * Listed folders whose memory could not be read, each with why.
+         */notRead: [FolderLeft], 
+        /**
+         * Remembered directories that differ from `dir` only in case, which are
+         * not forgotten.
+         */alike: [String]) {
+        self.dir = dir
+        self.listed = listed
+        self.folders = folders
+        self.notRead = notRead
+        self.alike = alike
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension Remembered: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRemembered: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Remembered {
+        return
+            try Remembered(
+                dir: FfiConverterString.read(from: &buf), 
+                listed: FfiConverterBool.read(from: &buf), 
+                folders: FfiConverterSequenceTypeRememberingFolder.read(from: &buf), 
+                notRead: FfiConverterSequenceTypeFolderLeft.read(from: &buf), 
+                alike: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: Remembered, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterBool.write(value.listed, into: &buf)
+        FfiConverterSequenceTypeRememberingFolder.write(value.folders, into: &buf)
+        FfiConverterSequenceTypeFolderLeft.write(value.notRead, into: &buf)
+        FfiConverterSequenceString.write(value.alike, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRemembered_lift(_ buf: RustBuffer) throws -> Remembered {
+    return try FfiConverterTypeRemembered.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRemembered_lower(_ value: Remembered) -> RustBuffer {
+    return FfiConverterTypeRemembered.lower(value)
+}
+
+
+/**
+ * A listed folder that remembers the directory or holds a delete that
+ * waits on it.
+ */
+public struct RememberingFolder: Equatable, Hashable {
+    public var dir: String
+    public var folder: String
+    /**
+     * The store read, which the forget finds again before it writes.
+     * Compare it for equality and do not parse it.
+     */
+    public var store: String
+    /**
+     * Its held files that wait on the directory.
+     */
+    public var held: [WaitingHeldFile]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(dir: String, folder: String, 
+        /**
+         * The store read, which the forget finds again before it writes.
+         * Compare it for equality and do not parse it.
+         */store: String, 
+        /**
+         * Its held files that wait on the directory.
+         */held: [WaitingHeldFile]) {
+        self.dir = dir
+        self.folder = folder
+        self.store = store
+        self.held = held
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RememberingFolder: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRememberingFolder: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RememberingFolder {
+        return
+            try RememberingFolder(
+                dir: FfiConverterString.read(from: &buf), 
+                folder: FfiConverterString.read(from: &buf), 
+                store: FfiConverterString.read(from: &buf), 
+                held: FfiConverterSequenceTypeWaitingHeldFile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RememberingFolder, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.dir, into: &buf)
+        FfiConverterString.write(value.folder, into: &buf)
+        FfiConverterString.write(value.store, into: &buf)
+        FfiConverterSequenceTypeWaitingHeldFile.write(value.held, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRememberingFolder_lift(_ buf: RustBuffer) throws -> RememberingFolder {
+    return try FfiConverterTypeRememberingFolder.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRememberingFolder_lower(_ value: RememberingFolder) -> RustBuffer {
+    return FfiConverterTypeRememberingFolder.lower(value)
+}
+
+
+/**
  * How large a removal must be to wait for confirmation.
  */
 public struct RemovalThreshold: Equatable, Hashable {
@@ -12237,6 +12693,63 @@ public func FfiConverterTypeStatusGroups_lift(_ buf: RustBuffer) throws -> Statu
 #endif
 public func FfiConverterTypeStatusGroups_lower(_ value: StatusGroups) -> RustBuffer {
     return FfiConverterTypeStatusGroups.lower(value)
+}
+
+
+/**
+ * A held file that still waits on other directories after a forget.
+ */
+public struct StillHeldFile: Equatable, Hashable {
+    public var path: String
+    public var stillWaitsOn: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, stillWaitsOn: [String]) {
+        self.path = path
+        self.stillWaitsOn = stillWaitsOn
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension StillHeldFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeStillHeldFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StillHeldFile {
+        return
+            try StillHeldFile(
+                path: FfiConverterString.read(from: &buf), 
+                stillWaitsOn: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: StillHeldFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterSequenceString.write(value.stillWaitsOn, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStillHeldFile_lift(_ buf: RustBuffer) throws -> StillHeldFile {
+    return try FfiConverterTypeStillHeldFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeStillHeldFile_lower(_ value: StillHeldFile) -> RustBuffer {
+    return FfiConverterTypeStillHeldFile.lower(value)
 }
 
 
@@ -13750,6 +14263,85 @@ public func FfiConverterTypeWaitingFirstSync_lift(_ buf: RustBuffer) throws -> W
 #endif
 public func FfiConverterTypeWaitingFirstSync_lower(_ value: WaitingFirstSync) -> RustBuffer {
     return FfiConverterTypeWaitingFirstSync.lower(value)
+}
+
+
+/**
+ * A held file that waits on the directory being forgotten.
+ */
+public struct WaitingHeldFile: Equatable, Hashable {
+    public var path: String
+    public var item: String
+    public var missingSince: String
+    public var reason: String
+    /**
+     * The other directories that keep it held once the directory is
+     * forgotten. Where there are none, the forget releases it and the
+     * folder's next sync decides it again.
+     */
+    public var stillWaitsOn: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, item: String, missingSince: String, reason: String, 
+        /**
+         * The other directories that keep it held once the directory is
+         * forgotten. Where there are none, the forget releases it and the
+         * folder's next sync decides it again.
+         */stillWaitsOn: [String]) {
+        self.path = path
+        self.item = item
+        self.missingSince = missingSince
+        self.reason = reason
+        self.stillWaitsOn = stillWaitsOn
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension WaitingHeldFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeWaitingHeldFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> WaitingHeldFile {
+        return
+            try WaitingHeldFile(
+                path: FfiConverterString.read(from: &buf), 
+                item: FfiConverterString.read(from: &buf), 
+                missingSince: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf), 
+                stillWaitsOn: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: WaitingHeldFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterString.write(value.item, into: &buf)
+        FfiConverterString.write(value.missingSince, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+        FfiConverterSequenceString.write(value.stillWaitsOn, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeWaitingHeldFile_lift(_ buf: RustBuffer) throws -> WaitingHeldFile {
+    return try FfiConverterTypeWaitingHeldFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeWaitingHeldFile_lower(_ value: WaitingHeldFile) -> RustBuffer {
+    return FfiConverterTypeWaitingHeldFile.lower(value)
 }
 
 // Note that we don't yet support `indirect` for enums.
@@ -19906,6 +20498,56 @@ fileprivate struct FfiConverterSequenceTypeFlaggedFile: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFolderLeft: FfiConverterRustBuffer {
+    typealias SwiftType = [FolderLeft]
+
+    public static func write(_ value: [FolderLeft], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFolderLeft.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FolderLeft] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FolderLeft]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFolderLeft.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeForgottenIn: FfiConverterRustBuffer {
+    typealias SwiftType = [ForgottenIn]
+
+    public static func write(_ value: [ForgottenIn], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeForgottenIn.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ForgottenIn] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ForgottenIn]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeForgottenIn.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeHeldFile: FfiConverterRustBuffer {
     typealias SwiftType = [HeldFile]
 
@@ -20306,6 +20948,31 @@ fileprivate struct FfiConverterSequenceTypeQueuedWrite: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeRememberingFolder: FfiConverterRustBuffer {
+    typealias SwiftType = [RememberingFolder]
+
+    public static func write(_ value: [RememberingFolder], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRememberingFolder.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RememberingFolder] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RememberingFolder]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRememberingFolder.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeRowConflict: FfiConverterRustBuffer {
     typealias SwiftType = [RowConflict]
 
@@ -20348,6 +21015,31 @@ fileprivate struct FfiConverterSequenceTypeSearchHit: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeSearchHit.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeStillHeldFile: FfiConverterRustBuffer {
+    typealias SwiftType = [StillHeldFile]
+
+    public static func write(_ value: [StillHeldFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeStillHeldFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [StillHeldFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [StillHeldFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeStillHeldFile.read(from: &buf))
         }
         return seq
     }
@@ -20623,6 +21315,31 @@ fileprivate struct FfiConverterSequenceTypeViewRow: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeViewRow.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeWaitingHeldFile: FfiConverterRustBuffer {
+    typealias SwiftType = [WaitingHeldFile]
+
+    public static func write(_ value: [WaitingHeldFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeWaitingHeldFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [WaitingHeldFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [WaitingHeldFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeWaitingHeldFile.read(from: &buf))
         }
         return seq
     }
@@ -21284,6 +22001,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_discard_kept() != 64486) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_forget_remembered() != 52257) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_folders_held() != 45429) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -21297,6 +22017,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_pause() != 37864) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_remembering() != 33257) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_remove() != 58181) {

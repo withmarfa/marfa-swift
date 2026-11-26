@@ -41,11 +41,17 @@ extension FakeCopy {
         },
         keepHeld: @escaping @Sendable (URL, [String], Bool) throws -> SettledHeld = { _, _, _ in
             throw FakeCopyError.unsupported(call: "folders.keepHeld")
+        },
+        remembering: @escaping @Sendable (URL) throws -> Remembered = { _ in
+            throw FakeCopyError.unsupported(call: "folders.remembering")
+        },
+        forget: @escaping @Sendable (Remembered) throws -> Forgotten = { _ in
+            throw FakeCopyError.unsupported(call: "folders.forget")
         }
     ) -> some FolderFileManaging {
         ScriptedFolderFiles(
             remove: removeUnmatched, list: keptFiles, discard: discardKept, held: heldFiles, trash: trashHeld,
-            keep: keepHeld)
+            keep: keepHeld, recall: remembering, forgetting: forget)
     }
 }
 
@@ -56,6 +62,8 @@ private struct ScriptedFolderFiles: FolderFileManaging {
     let held: @Sendable (URL) throws -> [HeldFile]
     let trash: @Sendable (URL, [String]) throws -> SettledHeld
     let keep: @Sendable (URL, [String], Bool) throws -> SettledHeld
+    let recall: @Sendable (URL) throws -> Remembered
+    let forgetting: @Sendable (Remembered) throws -> Forgotten
 
     func removeUnmatched(in directory: URL, paths: [String]) async throws -> UnmatchedRemoved {
         try remove(directory, paths)
@@ -72,6 +80,10 @@ private struct ScriptedFolderFiles: FolderFileManaging {
     func keepHeld(in directory: URL, paths: [String], writeBack: Bool) async throws -> SettledHeld {
         try keep(directory, paths, writeBack)
     }
+
+    func remembering(_ directory: URL) async throws -> Remembered { try recall(directory) }
+
+    func forget(_ remembered: Remembered) async throws -> Forgotten { try forgetting(remembered) }
 }
 #endif
 #endif

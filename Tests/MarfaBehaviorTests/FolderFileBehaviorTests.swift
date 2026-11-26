@@ -141,6 +141,117 @@ struct FolderFileBehaviorTests {
         await #expect(throws: FakeCopyError.self) {
             try await folders.keepHeld(in: directory, paths: ["a"], writeBack: true)
         }
+        await #expect(throws: FakeCopyError.self) { try await folders.remembering(directory) }
+        await #expect(throws: FakeCopyError.self) {
+            try await folders.forget(Remembered(directory: directory, listed: false, folders: []))
+        }
+    }
+
+    @Test func forgetScriptsAnswerEachCallAndKeepEveryField() async throws {
+        let gone = URL(filePath: "/Volumes/Old/Notes", directoryHint: .isDirectory)
+        let other = URL(filePath: "/Volumes/Other/Notes", directoryHint: .isDirectory)
+        let holder = URL(filePath: "/work/notes", directoryHint: .isDirectory)
+        let shown = Remembered(
+            directory: gone, listed: false,
+            folders: [
+                RememberingFolder(
+                    directory: holder, folderId: "folder-a", store: "store-a",
+                    held: [
+                        WaitingHeldFile(
+                            path: "a.md", item: "item-a", missingSince: "2026-11-01T10:00:00Z", reason: "gone"),
+                        WaitingHeldFile(
+                            path: "b.md", item: "item-b", missingSince: "2026-11-02T10:00:00Z", reason: "gone",
+                            stillWaitsOn: [other]),
+                    ])
+            ],
+            notRead: [FolderLeft(directory: URL(filePath: "/work/locked"), reason: "unreadable")],
+            alike: [URL(filePath: "/Volumes/Old/notes", directoryHint: .isDirectory)])
+        let done = Forgotten(
+            directory: gone, listed: false,
+            forgotten: [
+                ForgottenIn(
+                    directory: holder, folderId: "folder-a", released: ["a.md"],
+                    stillHeld: [StillHeldFile(path: "b.md", stillWaitsOn: [other])], notReleased: [])
+            ],
+            notChanged: [FolderLeft(directory: URL(filePath: "/work/locked"), reason: "unreadable")])
+        let recorded = Mutex<[String]>([])
+        let folders = WorkingCopy.fake().folders(
+            remembering: { dir in
+                recorded.withLock { $0.append("remembering \(dir.path)") }
+                return shown
+            },
+            forget: { remembered in
+                recorded.withLock { $0.append("forget \(remembered.directory.path)") }
+                #expect(remembered == shown)
+                return done
+            })
+        let read = try await folders.remembering(gone)
+        #expect(read == shown)
+        #expect(read.folders.first?.held.map(\.stillWaitsOn) == [[], [other]])
+        #expect(try await folders.forget(read) == done)
+        #expect(recorded.withLock { $0 } == ["remembering /Volumes/Old/Notes", "forget /Volumes/Old/Notes"])
+    }
+
+    /// A gone directory no folder remembers is shown with nothing in it, and forgetting it changes nothing.
+    @Test(arguments: CopyKind.allCases)
+    func aDirectoryNoFolderRemembersIsShownEmptyAndForgettingItChangesNothing(kind: CopyKind) async throws {
+        let gone = FileManager.default.temporaryDirectory.appending(
+            path: "marfa-gone-\(UUID())", directoryHint: .isDirectory)
+        let folders: any FolderFileManaging
+        switch kind {
+        case .real:
+            folders = FolderRegistry.folders()
+            #expect(FolderRegistry.isNamed)
+        case .fake:
+            folders = WorkingCopy.fake().folders(
+                remembering: { dir in
+                    #expect(dir == gone)
+                    return Remembered(directory: gone, listed: false, folders: [])
+                },
+                forget: { remembered in
+                    #expect(remembered == Remembered(directory: gone, listed: false, folders: []))
+                    return Forgotten(directory: gone, listed: false, forgotten: [])
+                })
+        }
+        let shown = try await folders.remembering(gone)
+        #expect(shown == Remembered(directory: gone, listed: false, folders: []))
+        #expect(try await folders.forget(shown) == Forgotten(directory: gone, listed: false, forgotten: []))
+    }
+
+    /// Something standing at the path may still be the folder, or hold a file moved into it, so both calls refuse.
+    @Test(arguments: CopyKind.allCases)
+    func anOccupiedPathIsNeitherShownNorForgottenAndKeepsItsFile(kind: CopyKind) async throws {
+        let occupied = FileManager.default.temporaryDirectory.appending(
+            path: "marfa-occupied-\(UUID())", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: occupied, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: occupied) }
+        let file = occupied.appending(path: "moved.md")
+        let bytes = Data("Moved here".utf8)
+        try bytes.write(to: file)
+
+        let folders: any FolderFileManaging
+        switch kind {
+        case .real:
+            folders = FolderRegistry.folders()
+            #expect(FolderRegistry.isNamed)
+        case .fake:
+            folders = WorkingCopy.fake().folders(
+                remembering: { dir in
+                    #expect(dir == occupied)
+                    throw MarfaError.invalid(message: "it may still be the folder")
+                },
+                forget: { remembered in
+                    #expect(remembered.directory == occupied)
+                    throw MarfaError.invalid(message: "it may still be the folder")
+                })
+        }
+        let shown = await #expect(throws: MarfaError.self) { try await folders.remembering(occupied) }
+        #expect(refusesAsNotAFolder(shown))
+        let forgotten = await #expect(throws: MarfaError.self) {
+            try await folders.forget(Remembered(directory: occupied, listed: false, folders: []))
+        }
+        #expect(refusesAsNotAFolder(forgotten))
+        #expect(try Data(contentsOf: file) == bytes)
     }
 
     @Test(arguments: CopyKind.allCases)
@@ -252,6 +363,10 @@ struct FolderFileBehaviorTests {
             #expect(refusesAsNotAFolder(refused), "\(call)")
             #expect(memory.reads == reads, "\(call) read the keychain")
         }
+        let shown = try await folders.remembering(directory)
+        #expect(memory.reads == reads, "remembering read the keychain")
+        _ = try await folders.forget(shown)
+        #expect(memory.reads == reads, "forget read the keychain")
 
         let reporting: [(String, () async throws -> Void)] = [
             ("pause", { _ = try await folders.pause(directory) }),

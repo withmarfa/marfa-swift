@@ -16,14 +16,15 @@ import Synchronization
 /// server's side or write either side, such as `sync(_:)`, throws ``MarfaError/syncPaused(message:)``.
 ///
 /// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `trashHeld(in:paths:)`,
-/// `keepHeld(in:paths:writeBack:)`, `confirmFirstSync(in:)`,
+/// `keepHeld(in:paths:writeBack:)`, `forget(_:)`, `confirmFirstSync(in:)`,
 /// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` or `resume(_:)` finds the folder held
 /// by a watch, whether this app's own or the command-line tool's, it asks the watch to let the folder go and
 /// waits up to 10 seconds. A watch of this app lets it go at the end of the step of its pass under way, tells
 /// ``FolderEvent/handedOver``, and takes the folder back once the call ends, telling ``FolderEvent/takenBack``;
-/// while the sync is paused it tells ``FolderEvent/paused`` and holds nothing. A folder that isn't let go in
-/// that time throws `MarfaError.readingHandle`, naming the folder. `watch(_:)` doesn't ask: it throws
-/// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
+/// while the sync is paused it tells ``FolderEvent/paused`` and holds nothing. If a watch keeps the folder past
+/// that time, `forget(_:)` reports it in ``Forgotten/notChanged``; the other calls throw `MarfaError.readingHandle`.
+/// `watch(_:)` throws `readingHandle` at once while another process holds the folder.
+/// `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
 public struct Folders: FolderFileManaging {
     /// The server configuration for `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
@@ -37,7 +38,8 @@ public struct Folders: FolderFileManaging {
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
     /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)`, the unmatched and kept file calls,
-    /// `heldFiles(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` with `writeBack: false` work.
+    /// `heldFiles(in:)`, `trashHeld(in:paths:)`, `keepHeld(in:paths:writeBack:)` with `writeBack: false`,
+    /// `remembering(_:)` and `forget(_:)` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -128,6 +130,45 @@ public struct Folders: FolderFileManaging {
             SettledHeld(
                 try folders.keepHeld(dir: directory.path(percentEncoded: false), paths: paths, writeBack: writeBack))
         }
+    }
+
+    /// Which folders on this Mac remember a directory, such as one the registry no longer lists, and what
+    /// forgetting it would release or keep held.
+    ///
+    /// Show the person each folder and held file before ``forget(_:)``: a held file whose
+    /// ``WaitingHeldFile/stillWaitsOn`` is empty is decided again at its folder's next sync once the directory is
+    /// forgotten, which can send its item to the bin. The directory is matched exactly as a folder records it,
+    /// made absolute without following symbolic links. Unless the registry lists the directory, this throws
+    /// `MarfaError.invalid` if the path exists and is anything other than a readable empty directory. The check
+    /// ignores system names such as `.DS_Store`. The preview names unreadable folders in ``Remembered/notRead``.
+    ///
+    /// This only reads, asks no watch for a folder, and needs no server or sign-in.
+    public func remembering(_ directory: URL) async throws -> Remembered {
+        let dir = directory.path(percentEncoded: false)
+        return Remembered(try await run(reaching: .never) { folders in try folders.remembering(dir: dir) })
+    }
+
+    /// Forgets a directory in each folder `remembered` names, once the person confirms it is gone for good.
+    ///
+    /// Pass the value ``remembering(_:)`` returned, unchanged. A hold can change if it still records the directory
+    /// and the same item has stayed missing since the time shown. A hold shown as releasable is released if it still
+    /// waits on this directory alone, and its folder's next sync decides it again. A hold that now waits on other
+    /// directories stays held on those. If the preview showed other directories and none remain, the hold still
+    /// waits on this directory and the result names it in ``ForgottenIn/notReleased``.
+    /// The call leaves the registry and the bin untouched.
+    ///
+    /// A folder is left as it was, and named in ``Forgotten/notChanged`` with why, when another process doesn't let
+    /// it go, its store is no longer the one shown, the directory has since become occupied, or the registry listed
+    /// the directory when it was shown or lists it now. Where the registry lists it now, ``Forgotten/listed`` is
+    /// `true`: remove it first, then call ``remembering(_:)`` again. If the path is occupied when the call starts
+    /// and the registry doesn't list it, this throws `MarfaError.invalid`, with the same occupancy check as
+    /// ``remembering(_:)``.
+    ///
+    /// This needs no server or sign-in, so a locked keychain doesn't stop it. It waits up to 10 seconds for a watch
+    /// to release each folder.
+    public func forget(_ remembered: Remembered) async throws -> Forgotten {
+        let shown = remembered.core
+        return Forgotten(try await run(reaching: .never) { folders in try folders.forgetRemembered(remembered: shown) })
     }
 
     /// Pauses the directory's sync until ``resume(_:)``.
