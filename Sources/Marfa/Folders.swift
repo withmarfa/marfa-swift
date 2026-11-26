@@ -27,7 +27,10 @@ import Synchronization
 /// Every call runs off the caller's thread.
 public struct Folders: FolderFileManaging {
     /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
-    /// `keepHeld(in:paths:writeBack:)` with `writeBack: true` can reach.
+    /// `keepHeld(in:paths:writeBack:)` with `writeBack: true` can reach, and that `pause(_:)` and `resume(_:)` tell.
+    ///
+    /// Only those calls read its sign-in, so a locked keychain stops no other call. `pause(_:)` and `resume(_:)`
+    /// tell the server only when they can read the sign-in.
     public let server: Server?
 
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
@@ -54,13 +57,13 @@ public struct Folders: FolderFileManaging {
 
     /// The folders the Mac's registry lists, including those the command-line tool added.
     public func list() async throws -> [ListedFolder] {
-        try await run { folders in try folders.list().map(ListedFolder.init) }
+        try await run(reaching: .never) { folders in try folders.list().map(ListedFolder.init) }
     }
 
     /// Where every file in the folder stands, read from the folder's own store without asking the server.
     public func status(of directory: URL) async throws -> FolderStatus {
         let dir = directory.path(percentEncoded: false)
-        return FolderStatus(try await run { folders in try folders.status(dir: dir) })
+        return FolderStatus(try await run(reaching: .never) { folders in try folders.status(dir: dir) })
     }
 
     /// Removes the named files that are still unmatched and unchanged, leaving their items in Marfa.
@@ -68,14 +71,16 @@ public struct Folders: FolderFileManaging {
     /// Ask the person before removing them. Each path is relative to the folder. A file that cannot safely go is
     /// returned with its reason. The next sync sends the placement changes.
     public func removeUnmatched(in directory: URL, paths: [String]) async throws -> UnmatchedRemoved {
-        try await run { folders in
+        try await run(reaching: .never) { folders in
             UnmatchedRemoved(try folders.removeUnmatched(dir: directory.path(percentEncoded: false), paths: paths))
         }
     }
 
     /// Reads the files Marfa set aside, in path order, even while a watch holds the folder.
     public func keptFiles(in directory: URL) async throws -> [KeptFile] {
-        try await run { folders in try folders.kept(dir: directory.path(percentEncoded: false)).map(KeptFile.init) }
+        try await run(reaching: .never) { folders in
+            try folders.kept(dir: directory.path(percentEncoded: false)).map(KeptFile.init)
+        }
     }
 
     /// Discards unchanged kept files and puts back those a program wrote to.
@@ -83,14 +88,16 @@ public struct Folders: FolderFileManaging {
     /// Ask the person before discarding. Like `removeUnmatched(in:paths:)`, this waits up to ten seconds for a
     /// watch to release the folder, then throws `MarfaError.readingHandle` if the watch still holds it.
     public func discardKept(in directory: URL) async throws -> KeptDiscarded {
-        try await run { folders in KeptDiscarded(try folders.discardKept(dir: directory.path(percentEncoded: false))) }
+        try await run(reaching: .never) { folders in
+            KeptDiscarded(try folders.discardKept(dir: directory.path(percentEncoded: false)))
+        }
     }
 
     /// The files whose delete the folder holds, in path order, each with why.
     ///
     /// A folder with no holds answers an empty list. Asks no watch for the folder, and needs no server or sign-in.
     public func heldFiles(in directory: URL) async throws -> [HeldFile] {
-        try await run(reaching: false) { folders in
+        try await run(reaching: .never) { folders in
             try folders.held(dir: directory.path(percentEncoded: false)).map(HeldFile.init)
         }
     }
@@ -103,7 +110,7 @@ public struct Folders: FolderFileManaging {
     /// locked keychain doesn't stop it. It waits up to 10 seconds for a watch to release the folder, and throws
     /// ``MarfaError/syncPaused(message:)`` while paused.
     public func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld {
-        try await run(reaching: false) { folders in
+        try await run(reaching: .never) { folders in
             SettledHeld(try folders.trashHeld(dir: directory.path(percentEncoded: false), paths: paths))
         }
     }
@@ -117,7 +124,7 @@ public struct Folders: FolderFileManaging {
     /// reads the sign-in. It waits up to 10 seconds for a watch to release the folder, and throws
     /// ``MarfaError/syncPaused(message:)`` while paused.
     public func keepHeld(in directory: URL, paths: [String], writeBack: Bool = false) async throws -> SettledHeld {
-        try await run(reaching: writeBack) { folders in
+        try await run(reaching: writeBack ? .server : .never) { folders in
             SettledHeld(
                 try folders.keepHeld(dir: directory.path(percentEncoded: false), paths: paths, writeBack: writeBack))
         }
@@ -129,19 +136,22 @@ public struct Folders: FolderFileManaging {
     /// `restoreRemoval(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` throw
     /// ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it stands, and the files stay as they
     /// are. Returns whether the sync was running.
+    ///
+    /// Tells the server once where it can read the sign-in; a locked keychain doesn't stop the pause.
     @discardableResult
     public func pause(_ directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
-        return try await run { folders in try folders.pause(dir: dir) }
+        return try await run(reaching: .whenSignedIn) { folders in try folders.pause(dir: dir) }
     }
 
     /// Lets a paused directory's sync go on.
     ///
-    /// Returns whether it was paused.
+    /// Returns whether it was paused. Tells the server once where it can read the sign-in; a locked keychain
+    /// doesn't stop it.
     @discardableResult
     public func resume(_ directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
-        return try await run { folders in try folders.resume(dir: dir) }
+        return try await run(reaching: .whenSignedIn) { folders in try folders.resume(dir: dir) }
     }
 
     /// Syncs the folder once: sends what changed on disk, catches up with the server, writes out what the
@@ -163,14 +173,14 @@ public struct Folders: FolderFileManaging {
     @discardableResult
     public func confirmFirstSync(in directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
-        return try await run { folders in try folders.confirmFirstSync(dir: dir) }
+        return try await run(reaching: .never) { folders in try folders.confirmFirstSync(dir: dir) }
     }
 
     /// Lets a paused large removal and a paused drop of new files go: deletes are queued for the next sync, files
     /// whose items left elsewhere are removed, and the held new files are queued as items.
     public func confirmRemoval(in directory: URL) async throws -> ConfirmedFolder {
         let dir = directory.path(percentEncoded: false)
-        return ConfirmedFolder(try await run { folders in try folders.confirm(dir: dir) })
+        return ConfirmedFolder(try await run(reaching: .never) { folders in try folders.confirm(dir: dir) })
     }
 
     /// Cancels a paused large removal: files gone from the disk are written back, and items that left elsewhere
@@ -196,7 +206,7 @@ public struct Folders: FolderFileManaging {
     /// not send, so also ask the person to check any other file that differs from that instance's copy.
     public func remove(_ directory: URL) async throws -> FolderRemoval {
         let dir = directory.path(percentEncoded: false)
-        return FolderRemoval(try await run { folders in try folders.remove(dir: dir) })
+        return FolderRemoval(try await run(reaching: .never) { folders in try folders.remove(dir: dir) })
     }
 
     /// Starts keeping the folder in step while the app runs, as `marfa folders watch` does.
@@ -217,20 +227,36 @@ public struct Folders: FolderFileManaging {
         return FolderWatch(events: events, subscription: subscription, ending: ending)
     }
 
-    /// Runs `work` on the core's folders.
-    ///
-    /// A call with `reaching` false is given no server, so it reads no credential, and a locked keychain doesn't
-    /// stop it.
+    /// Runs `work` on the core's folders, given the server as `reaching` says.
     private func run<T: Sendable>(
-        reaching: Bool = true, _ work: @escaping @Sendable (MarfaCore.Folders) throws -> T
+        reaching: Reaching = .server, _ work: @escaping @Sendable (MarfaCore.Folders) throws -> T
     ) async throws -> T {
-        let server = reaching ? server : nil
+        let server = reaching == .never ? nil : server
         return try await background {
-            try work(
+            var reached = server
+            var key: String?
+            do {
+                key = try server?.openingToken()
+            } catch is Keychain.Failure where reaching == .whenSignedIn {
+                reached = nil
+            } catch SignInError.notSignedIn where reaching == .whenSignedIn {
+                reached = nil
+            }
+            return try work(
                 MarfaCore.Folders(
-                    url: server?.url.absoluteString, key: try server?.openingToken(),
-                    renewer: server?.credential.map(TokenRenewer.init)))
+                    url: reached?.url.absoluteString, key: key, renewer: reached?.credential.map(TokenRenewer.init)))
         }
+    }
+
+    /// Whether a call is given the server, and so reads its sign-in.
+    private enum Reaching {
+        /// The call needs the server, and a sign-in it can't read stops it.
+        case server
+        /// The core works the call locally, so it reads no sign-in.
+        case never
+        /// The core only tells the server, and doesn't fail when it can't, so a sign-in it can't read leaves the
+        /// server out, as `marfa` does with a locked keychain.
+        case whenSignedIn
     }
 }
 

@@ -1,5 +1,7 @@
 #if os(macOS)
 import Foundation
+import MarfaTesting
+import Security
 import Synchronization
 import Testing
 
@@ -528,6 +530,47 @@ extension LiveWorkingCopies {
             #expect(try await !folders.status(of: directory).syncPaused)
             #expect(try await !(folders.list().first { FolderFixture.listed(directory, in: [$0]) }?.syncPaused ?? true))
             _ = try await FolderFixture.sync(directory)
+        }
+
+        /// An app signed in to the folder's server works the folder locally while its keychain is locked; only a
+        /// call that reaches the server reads the sign-in.
+        @Test func theLocalCallsWorkAFolderWhileTheKeychainIsLocked() async throws {
+            let directory = try await FolderFixture.synced()
+            let home = try #require(Live.server).url
+            let memory = MemoryKeychain()
+            let locked = Folders(server: try Server(url: home, credential: try memory.signIn(to: home)))
+            memory.failReads(with: errSecInteractionNotAllowed)
+
+            #expect(try await locked.list().contains { FolderFixture.listed(directory, in: [$0]) })
+            #expect(try await !locked.status(of: directory).syncPaused)
+            #expect(try await locked.pause(directory), "it was running")
+            #expect(try await locked.status(of: directory).syncPaused)
+            #expect(try await locked.resume(directory), "it was paused")
+            #expect(try await !locked.confirmFirstSync(in: directory), "its first sync was confirmed")
+            #expect(try await locked.confirmRemoval(in: directory).deleted == 0)
+            #expect(try await locked.removeUnmatched(in: directory, paths: ["missing.md"]).removed.isEmpty)
+            #expect(try await locked.keptFiles(in: directory).isEmpty)
+            #expect(try await locked.discardKept(in: directory).discarded.isEmpty)
+            #expect(try await locked.heldFiles(in: directory).isEmpty)
+
+            let synced = await #expect(throws: Keychain.Failure.self) { try await locked.sync(directory) }
+            #expect(synced?.status == errSecInteractionNotAllowed)
+
+            _ = try await locked.remove(directory)
+            #expect(try await !locked.list().contains { FolderFixture.listed(directory, in: [$0]) })
+        }
+
+        /// Pause and resume only tell the server, so a sign-in the keychain no longer holds doesn't stop them.
+        @Test func pauseAndResumeWorkAFolderWhoseSignInIsGone() async throws {
+            let directory = try await FolderFixture.synced()
+            let home = try #require(Live.server).url
+            let credential = try MemoryKeychain().signIn(to: home)
+            let signedOut = Folders(server: try Server(url: home, credential: credential))
+            try credential.place.drop()
+
+            #expect(try await signedOut.pause(directory), "it was running")
+            #expect(try await signedOut.resume(directory), "it was paused")
+            await #expect(throws: SignInError.notSignedIn) { try await signedOut.sync(directory) }
         }
 
         @Test func aWatchTellsPausedWhenTheFolderIsPausedAndTakesTheFolderBackWhenItIsResumed() async throws {
