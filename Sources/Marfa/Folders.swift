@@ -26,11 +26,11 @@ import Synchronization
 /// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
 public struct Folders: FolderFileManaging {
-    /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
-    /// `keepHeld(in:paths:writeBack:)` with `writeBack: true` can reach, and that `pause(_:)` and `resume(_:)` tell.
+    /// The server configuration for `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
+    /// `keepHeld(in:paths:writeBack:)` with `writeBack: true`.
     ///
-    /// Only those calls read its sign-in, so a locked keychain stops no other call. `pause(_:)` and `resume(_:)`
-    /// tell the server only when they can read the sign-in.
+    /// Those calls need access to any configured credential. `pause(_:)` and `resume(_:)` use the configuration
+    /// for best-effort health reports when the credential is available.
     public let server: Server?
 
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
@@ -134,10 +134,10 @@ public struct Folders: FolderFileManaging {
     ///
     /// A watch skips the folder, and `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
     /// `restoreRemoval(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` throw
-    /// ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it stands, and the files stay as they
-    /// are. Returns whether the sync was running.
+    /// ``MarfaError/syncPaused(message:)``. Sync leaves the folder's files as they are while paused.
+    /// Returns whether the sync was running.
     ///
-    /// Tells the server once where it can read the sign-in; a locked keychain doesn't stop the pause.
+    /// When the pause changes, the folder can send a best-effort health report to the server.
     @discardableResult
     public func pause(_ directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
@@ -146,8 +146,8 @@ public struct Folders: FolderFileManaging {
 
     /// Lets a paused directory's sync go on.
     ///
-    /// Returns whether it was paused. Tells the server once where it can read the sign-in; a locked keychain
-    /// doesn't stop it.
+    /// Returns whether it was paused. When the pause ends, the folder can send a best-effort health report to
+    /// the server.
     @discardableResult
     public func resume(_ directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
@@ -227,7 +227,6 @@ public struct Folders: FolderFileManaging {
         return FolderWatch(events: events, subscription: subscription, ending: ending)
     }
 
-    /// Runs `work` on the core's folders, given the server as `reaching` says.
     private func run<T: Sendable>(
         reaching: Reaching = .server, _ work: @escaping @Sendable (MarfaCore.Folders) throws -> T
     ) async throws -> T {
@@ -248,14 +247,11 @@ public struct Folders: FolderFileManaging {
         }
     }
 
-    /// Whether a call is given the server, and so reads its sign-in.
+    /// When a call gets the configured server.
     private enum Reaching {
-        /// The call needs the server, and a sign-in it can't read stops it.
         case server
-        /// The core works the call locally, so it reads no sign-in.
         case never
-        /// The core only tells the server, and doesn't fail when it can't, so a sign-in it can't read leaves the
-        /// server out, as `marfa` does with a locked keychain.
+        /// A failed health report does not stop the local pause or resume.
         case whenSignedIn
     }
 }
