@@ -360,6 +360,59 @@ extension LiveWorkingCopies {
             #expect(fields == ["body"])
         }
 
+        @Test func anExactUpdateIsRefusedWhereAnotherCopyMovedTheItemFirstAndAMergingOneIsNot() async throws {
+            let copy = try await Live.hydrated()
+            let exactNote = try await copy.items.create(
+                Draft(type: "core.note", properties: ["title": "first", "body": "first"], tier: .feed))
+            let mergedNote = try await copy.items.create(
+                Draft(type: "core.note", properties: ["title": "other", "body": "first"], tier: .feed))
+            _ = try await copy.queue.drain()
+            let exactId = try #require(exactNote.itemId)
+            let mergedId = try #require(mergedNote.itemId)
+            let read = try #require(try await copy.items.get(exactId)).version
+
+            let elsewhere = try await Live.hydrated()
+            for id in [exactId, mergedId] {
+                _ = try await elsewhere.items.update(
+                    id, Edit(properties: ["title": "moved elsewhere"], baseVersion: read))
+            }
+            let moved = try await elsewhere.queue.drain()
+            #expect(moved.verdicts.allSatisfy { $0.verdict == .accepted }, "\(moved.verdicts)")
+
+            // This copy has not heard, so both go on a version the server has left behind.
+            let exact = try await copy.items.update(
+                exactId, Edit(properties: ["body": "written here"], baseVersion: read, exact: true))
+            let merging = try await copy.items.update(
+                mergedId, Edit(properties: ["body": "written here"], baseVersion: read))
+            let report = try await copy.queue.drain()
+
+            guard case .refused(let refusal)? = report.verdicts.first(where: { $0.id == exact.id })?.verdict else {
+                Issue.record("the stale exact update was not refused: \(report.verdicts)")
+                return
+            }
+            #expect(refusal.reason == "version_conflict")
+            #expect(refusal.code == "version_conflict")
+            #expect(report.verdicts.first { $0.id == merging.id }?.verdict == .accepted)
+
+            let kept = try #require(try await copy.items.get(exactId))
+            #expect(kept.properties["title"] == "moved elsewhere", "the other copy's change was kept")
+            #expect(kept.properties["body"] == "first", "none of the refused update was applied")
+            let merged = try #require(try await copy.items.get(mergedId))
+            #expect(merged.properties["title"] == "moved elsewhere" && merged.properties["body"] == "written here")
+            let served = try await Live.read("items/\(exactId)")
+            #expect(served["item"]?.object?["properties"]?.object?["body"] == "first")
+
+            // Now the copy has heard, so the same update is refused before anything is queued.
+            let before = try await copy.queue.all()
+            await #expect {
+                _ = try await copy.items.update(
+                    exactId, Edit(properties: ["body": "late"], baseVersion: read, exact: true))
+            } throws: { error in
+                if case Marfa.MarfaError.versionConflict = error { true } else { false }
+            }
+            #expect(try await copy.queue.all() == before)
+        }
+
         @Test func aWriteToASystemRowIsRefusedBeforeItIsQueued() async throws {
             let copy = try await Live.hydrated()
             let note = try await copy.items.create(Live.note("queued \(UUID())"))
