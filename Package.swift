@@ -69,7 +69,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MarfaTests",
-            dependencies: ["Marfa", "MarfaAPI", "MarfaCore", "MarfaTypes"],
+            dependencies: ["Marfa", "MarfaAPI", "MarfaCore", "MarfaTesting", "MarfaTypes"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

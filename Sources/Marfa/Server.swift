@@ -39,9 +39,8 @@ public struct Server: Sendable, Hashable, CustomStringConvertible, CustomDebugSt
 
     /// The server at `url`, signed in to with `credential`.
     ///
-    /// A ``WorkingCopy`` or ``Folders`` opened on it sends the access token kept at the time and renews it
-    /// whenever the server refuses it. Once the server ends the sign-in, calls throw
-    /// ``MarfaError/signedOut(origin:message:)`` until the app signs in again.
+    /// A ``WorkingCopy`` or authenticated ``Folders`` call reads the current access token when it opens.
+    /// The token can be renewed if the server refuses it.
     ///
     /// Throws ``SignInError/notAServer`` when `url` holds a user or a password, ``SignInError/otherServer`` when
     /// it is not on the server the credential is for, and ``SignInError/notSignedIn`` when the keychain no

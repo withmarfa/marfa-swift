@@ -2387,7 +2387,9 @@ struct SigningOut {
             await #expect(throws: SignInError.notSignedIn) { try await WorkingCopy.open(store: store, server: made) }
             #if os(macOS)
             _ = FolderFixture.registry
-            await #expect(throws: SignInError.notSignedIn) { try await Folders(server: made).list() }
+            await #expect(throws: SignInError.notSignedIn) {
+                try await Folders(server: made).sync(FolderFixture.directory())
+            }
             #endif
         }
     }
