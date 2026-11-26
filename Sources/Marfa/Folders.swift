@@ -204,6 +204,9 @@ public struct Folders: FolderFileManaging {
     /// Show the person every file in the answer: a deleted file and a moved one are in no file of the folder. The
     /// changes to changed, new and moved files stay in the directory. The answer names only what the folder could
     /// not send, so also ask the person to check any other file that differs from that instance's copy.
+    ///
+    /// This reads no sign-in, so a locked keychain doesn't stop it. Where the folder recorded that another instance
+    /// answered at its server, it asks that server, with no credential, which instance answers there now.
     public func remove(_ directory: URL) async throws -> FolderRemoval {
         let dir = directory.path(percentEncoded: false)
         return FolderRemoval(try await run(reaching: .never) { folders in try folders.remove(dir: dir) })
