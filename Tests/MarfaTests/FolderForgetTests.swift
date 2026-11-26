@@ -5,26 +5,39 @@ import Testing
 
 @testable import Marfa
 
-/// The core finds each folder and hold again by the paths it showed, so the preview must come back to it unchanged.
-@Test(arguments: ["/volumes/old/notes", "/", "/Volumes/Old Disk/Notes #1 50%?", "/Users/me/Café/ノート"])
-func whatRememberingShowedComesBackToTheCoreUnchanged(gone: String) {
+/// The core finds each folder and hold again by the exact bytes of the paths it showed, so the preview must reach it
+/// byte for byte as it gave it.
+@Test(arguments: [
+    "/", "/Volumes/Old/Notes\u{0600}", "/Users/me/Caf\u{E9}", "/Users/me/Cafe\u{301}",
+    "/Volumes/Old Disk/Notes #1 50%?", "/volumes/old/notes",
+])
+func whatRememberingShowedReachesTheCoreByteForByte(gone: String) {
     let shown = MarfaCore.Remembered(
         dir: gone, listed: false,
         folders: [
             MarfaCore.RememberingFolder(
-                dir: "/work/notes", folder: "folder-a", store: "1:2:store-a",
+                dir: gone, folder: "folder-a", store: "1:2:store-a",
                 held: [
                     MarfaCore.WaitingHeldFile(
                         path: "held.md", item: "item-a", missingSince: "2026-01-01T00:00:00Z",
                         reason: "the folder \(gone) cannot be reached", stillWaitsOn: ["/volumes/other/notes", gone])
                 ])
         ],
-        notRead: [MarfaCore.FolderLeft(dir: "/work/locked dir", reason: "its saved state cannot be read")],
-        alike: ["/volumes/old/Notes"])
-    let remembered = Remembered(shown)
-    #expect(remembered.core == shown)
-    #expect(remembered.directory.path(percentEncoded: false).hasPrefix(gone))
-    #expect(remembered.folders.first?.held.first?.stillWaitsOn.count == 2)
+        notRead: [MarfaCore.FolderLeft(dir: gone, reason: "its saved state cannot be read")],
+        alike: [gone])
+    var given: [UInt8] = []
+    FfiConverterTypeRemembered.write(shown, into: &given)
+    var received: [UInt8] = []
+    FfiConverterTypeRemembered.write(Remembered(shown).core, into: &received)
+    #expect(received == given)
+}
+
+/// A scripted value's directory reaches the core without the slash a directory URL adds, even where the slash joins
+/// the character before it in one grapheme.
+@Test(arguments: ["/", "/Volumes/Old/Notes", "/Volumes/Old/Notes\u{0600}", "/Volumes/Old Disk/Notes #1 50%?"])
+func aScriptedDirectoryReachesTheCoreWithoutItsSlash(gone: String) {
+    let scripted = Remembered(directory: URL(filePath: gone, directoryHint: .isDirectory), listed: false, folders: [])
+    #expect(Array(scripted.core.dir.utf8) == Array(gone.utf8))
 }
 
 @Test func aForgetCarriesEveryFolderAndHoldItReports() {

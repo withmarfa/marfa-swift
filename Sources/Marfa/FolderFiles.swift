@@ -186,127 +186,111 @@ public struct SettledHeld: Sendable, Hashable {
 /// while one of those can't be read, since the file may have moved there. Show the person each folder and held
 /// file, and pass this value unchanged to ``FolderFileManaging/forget(_:)`` once they confirm the directory is
 /// gone for good.
+///
+/// The value keeps every path exactly as the core wrote it, since the core finds each folder and hold again by
+/// those bytes. Its `URL` properties are for display, and two values are equal only when those bytes are.
 public struct Remembered: Sendable, Hashable {
+    private let shown: MarfaCore.Remembered
+
     /// The directory, made absolute as a folder records it, without following symbolic links.
-    public let directory: URL
+    public var directory: URL { folderPath(shown.dir) }
     /// Whether the registry lists the directory.
     ///
     /// A listed directory is found again by every folder at its next pass, so forgetting it changes nothing: remove
     /// it with ``Folders/remove(_:)`` first.
-    public let listed: Bool
+    public var listed: Bool { shown.listed }
     /// The listed folders that remember the directory or hold a file that waits on it.
-    public let folders: [RememberingFolder]
+    public var folders: [RememberingFolder] { shown.folders.map(RememberingFolder.init) }
     /// Listed folders that couldn't be read, each with why.
-    public let notRead: [FolderLeft]
+    public var notRead: [FolderLeft] { shown.notRead.map(FolderLeft.init) }
     /// Remembered directories that differ from ``directory`` only in case, which a forget leaves remembered.
-    public let alike: [URL]
+    public var alike: [URL] { shown.alike.map(folderPath) }
 
     public init(
         directory: URL, listed: Bool, folders: [RememberingFolder], notRead: [FolderLeft] = [], alike: [URL] = []
     ) {
-        self.directory = directory
-        self.listed = listed
-        self.folders = folders
-        self.notRead = notRead
-        self.alike = alike
-    }
-
-    init(_ core: MarfaCore.Remembered) {
-        self.init(
-            directory: folderPath(core.dir), listed: core.listed, folders: core.folders.map(RememberingFolder.init),
-            notRead: core.notRead.map(FolderLeft.init), alike: core.alike.map(folderPath))
-    }
-
-    var core: MarfaCore.Remembered {
-        MarfaCore.Remembered(
+        shown = MarfaCore.Remembered(
             dir: corePath(directory), listed: listed, folders: folders.map(\.core), notRead: notRead.map(\.core),
             alike: alike.map(corePath))
     }
+
+    init(_ core: MarfaCore.Remembered) {
+        shown = core
+    }
+
+    var core: MarfaCore.Remembered { shown }
 }
 
 /// A listed folder that remembers a directory or holds a file that waits on it.
 public struct RememberingFolder: Sendable, Hashable {
-    public let directory: URL
-    /// The id of the `system.folder` item whose settings the folder follows.
-    public let folderId: String
-    /// The folder's store as it was read, which ``FolderFileManaging/forget(_:)`` checks is still there before it
-    /// writes.
-    ///
-    /// Compare it for equality only; its form is not part of the API.
-    public let store: String
-    /// The folder's held files that wait on the directory, empty where the registry lists it.
-    public let held: [WaitingHeldFile]
+    private let shown: MarfaCore.RememberingFolder
 
+    public var directory: URL { folderPath(shown.dir) }
+    /// The id of the `system.folder` item whose settings the folder follows.
+    public var folderId: String { shown.folder }
+    /// The folder's held files that wait on the directory, empty where the registry lists it.
+    public var held: [WaitingHeldFile] { shown.held.map(WaitingHeldFile.init) }
+
+    /// Makes a folder for a scripted answer; `store` stands for the store ``FolderFileManaging/forget(_:)`` checks
+    /// is still there before it writes.
     public init(directory: URL, folderId: String, store: String, held: [WaitingHeldFile] = []) {
-        self.directory = directory
-        self.folderId = folderId
-        self.store = store
-        self.held = held
+        shown = MarfaCore.RememberingFolder(
+            dir: corePath(directory), folder: folderId, store: store, held: held.map(\.core))
     }
 
     init(_ core: MarfaCore.RememberingFolder) {
-        self.init(
-            directory: folderPath(core.dir), folderId: core.folder, store: core.store,
-            held: core.held.map(WaitingHeldFile.init))
+        shown = core
     }
 
-    var core: MarfaCore.RememberingFolder {
-        MarfaCore.RememberingFolder(
-            dir: corePath(directory), folder: folderId, store: store, held: held.map(\.core))
-    }
+    var core: MarfaCore.RememberingFolder { shown }
 }
 
 /// A held file that waits on the directory a forget would forget.
 public struct WaitingHeldFile: Sendable, Hashable {
+    private let shown: MarfaCore.WaitingHeldFile
+
     /// The file's path inside its folder.
-    public let path: String
+    public var path: String { shown.path }
     /// The id of the item the file stood for.
-    public let item: String
+    public var item: String { shown.item }
     /// When the folder first found the file missing, as the core reports it.
-    public let missingSince: String
+    public var missingSince: String { shown.missingSince }
     /// Why the delete is held, in the core's words.
-    public let reason: String
+    public var reason: String { shown.reason }
     /// The other directories that keep the file held once the directory is forgotten.
     ///
     /// An empty array means forgetting can release this hold if it still waits on this directory alone.
-    public let stillWaitsOn: [URL]
+    public var stillWaitsOn: [URL] { shown.stillWaitsOn.map(folderPath) }
 
     public init(path: String, item: String, missingSince: String, reason: String, stillWaitsOn: [URL] = []) {
-        self.path = path
-        self.item = item
-        self.missingSince = missingSince
-        self.reason = reason
-        self.stillWaitsOn = stillWaitsOn
-    }
-
-    init(_ core: MarfaCore.WaitingHeldFile) {
-        self.init(
-            path: core.path, item: core.item, missingSince: core.missingSince, reason: core.reason,
-            stillWaitsOn: core.stillWaitsOn.map(folderPath))
-    }
-
-    var core: MarfaCore.WaitingHeldFile {
-        MarfaCore.WaitingHeldFile(
+        shown = MarfaCore.WaitingHeldFile(
             path: path, item: item, missingSince: missingSince, reason: reason,
             stillWaitsOn: stillWaitsOn.map(corePath))
     }
+
+    init(_ core: MarfaCore.WaitingHeldFile) {
+        shown = core
+    }
+
+    var core: MarfaCore.WaitingHeldFile { shown }
 }
 
 /// A folder a call didn't read or change, and why.
 public struct FolderLeft: Sendable, Hashable {
-    public let directory: URL
-    public let reason: String
+    private let shown: MarfaCore.FolderLeft
+
+    public var directory: URL { folderPath(shown.dir) }
+    public var reason: String { shown.reason }
 
     public init(directory: URL, reason: String) {
-        self.directory = directory
-        self.reason = reason
+        shown = MarfaCore.FolderLeft(dir: corePath(directory), reason: reason)
     }
 
     init(_ core: MarfaCore.FolderLeft) {
-        self.init(directory: folderPath(core.dir), reason: core.reason)
+        shown = core
     }
 
-    var core: MarfaCore.FolderLeft { MarfaCore.FolderLeft(dir: corePath(directory), reason: reason) }
+    var core: MarfaCore.FolderLeft { shown }
 }
 
 /// What ``FolderFileManaging/forget(_:)`` changed.
@@ -390,11 +374,13 @@ private func folderPath(_ path: String) -> URL {
     URL(filePath: path, directoryHint: .isDirectory)
 }
 
-/// The path as the core gave it: the core finds each folder and hold again by the exact paths it showed, and a
-/// directory URL's path carries a trailing slash the core's doesn't.
+/// A scripted value's path in the core's form, which has no trailing slash.
+///
+/// The slash is dropped as a scalar, since it can join the character before it in one grapheme.
 private func corePath(_ url: URL) -> String {
-    let path = url.path(percentEncoded: false)
-    return path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+    var path = url.path(percentEncoded: false).unicodeScalars
+    if path.count > 1 && path.last == "/" { path.removeLast() }
+    return String(path)
 }
 
 /// What Marfa knows about programs writing to a kept file.

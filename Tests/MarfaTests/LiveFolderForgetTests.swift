@@ -56,18 +56,12 @@ private func forgettingAGoneFolder() async throws {
     try #require(held.reason.contains(second.path(percentEncoded: false).dropLast()))
 
     let shown = try await folders.remembering(second)
+    try #require(shown.directory == second && !shown.listed && shown.notRead.isEmpty && shown.alike.isEmpty)
+    try #require(shown.folders.map(\.directory) == [first] && shown.folders.map(\.folderId) == [folderId])
     try #require(
-        shown
-            == Remembered(
-                directory: second, listed: false,
-                folders: [
-                    RememberingFolder(
-                        directory: first, folderId: folderId, store: try #require(shown.folders.first?.store),
-                        held: [
-                            WaitingHeldFile(
-                                path: "Held.md", item: item, missingSince: held.missingSince, reason: held.reason)
-                        ])
-                ]))
+        shown.folders.first?.held == [
+            WaitingHeldFile(path: "Held.md", item: item, missingSince: held.missingSince, reason: held.reason)
+        ])
 
     // Shown but not yet forgotten, the delete stays held.
     try #require(try await FolderFixture.sync(first).pass.scan.trashed.isEmpty)
