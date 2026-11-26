@@ -21,9 +21,10 @@ import Synchronization
 /// by a watch, whether this app's own or the command-line tool's, it asks the watch to let the folder go and
 /// waits up to 10 seconds. A watch of this app lets it go at the end of the step of its pass under way, tells
 /// ``FolderEvent/handedOver``, and takes the folder back once the call ends, telling ``FolderEvent/takenBack``;
-/// while the sync is paused it tells ``FolderEvent/paused`` and holds nothing. A folder that isn't let go in
-/// that time throws `MarfaError.readingHandle`, naming the folder. `watch(_:)` doesn't ask: it throws
-/// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
+/// while the sync is paused it tells ``FolderEvent/paused`` and holds nothing. If a watch keeps the folder past
+/// that time, `forget(_:)` reports it in ``Forgotten/notChanged``; the other calls throw `MarfaError.readingHandle`.
+/// `watch(_:)` throws `readingHandle` at once while another process holds the folder.
+/// `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
 public struct Folders: FolderFileManaging {
     /// The server configuration for `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
@@ -138,8 +139,8 @@ public struct Folders: FolderFileManaging {
     /// ``WaitingHeldFile/stillWaitsOn`` is empty is decided again at its folder's next sync once the directory is
     /// forgotten, which can send its item to the bin. The directory is matched exactly as a folder records it,
     /// made absolute without following symbolic links. Unless the registry lists the directory, this throws
-    /// `MarfaError.invalid` when anything but an empty directory stands at the path, since it may still be the
-    /// folder. A folder that can't be read is named in ``Remembered/notRead``.
+    /// `MarfaError.invalid` if the path exists and is anything other than a readable empty directory. The check
+    /// ignores system names such as `.DS_Store`. The preview names unreadable folders in ``Remembered/notRead``.
     ///
     /// This only reads, asks no watch for a folder, and needs no server or sign-in.
     public func remembering(_ directory: URL) async throws -> Remembered {
@@ -149,16 +150,19 @@ public struct Folders: FolderFileManaging {
 
     /// Forgets a directory in each folder `remembered` names, once the person confirms it is gone for good.
     ///
-    /// Pass the value ``remembering(_:)`` returned, unchanged. Each held file it showed with no other directory to
-    /// wait on is released, and its folder's next sync decides it again; one that waits on other directories stays
-    /// held on those. Only a hold that still records the directory, for the same item missing since the same moment,
-    /// is changed. Nothing is trashed, and the registry is left as it was.
+    /// Pass the value ``remembering(_:)`` returned, unchanged. A hold can change if it still records the directory
+    /// and the same item has stayed missing since the time shown. A hold shown as releasable is released if it still
+    /// waits on this directory alone, and its folder's next sync decides it again. A hold that now waits on other
+    /// directories stays held on those. If the preview showed other directories and none remain, the hold still
+    /// waits on this directory and the result names it in ``ForgottenIn/notReleased``.
+    /// The call leaves the registry and the bin untouched.
     ///
     /// A folder is left as it was, and named in ``Forgotten/notChanged`` with why, when another process doesn't let
     /// it go, its store is no longer the one shown, the directory has since become occupied, or the registry listed
     /// the directory when it was shown or lists it now. Where the registry lists it now, ``Forgotten/listed`` is
-    /// `true`: remove it first, then call ``remembering(_:)`` again. Unless the registry lists the directory, this
-    /// throws `MarfaError.invalid` when anything but an empty directory stands at the path.
+    /// `true`: remove it first, then call ``remembering(_:)`` again. If the path is occupied when the call starts
+    /// and the registry doesn't list it, this throws `MarfaError.invalid`, with the same occupancy check as
+    /// ``remembering(_:)``.
     ///
     /// This needs no server or sign-in, so a locked keychain doesn't stop it. It waits up to 10 seconds for a watch
     /// to release each folder.

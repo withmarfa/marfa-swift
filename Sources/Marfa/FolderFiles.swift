@@ -111,8 +111,9 @@ public struct KeptDiscarded: Sendable, Hashable {
 /// A missing file whose delete the folder holds, because Marfa can't tell whether the person deleted it or moved
 /// it into another folder.
 ///
-/// It stays held until the person settles it with ``FolderFileManaging/trashHeld(in:paths:)`` or
-/// ``FolderFileManaging/keepHeld(in:paths:writeBack:)``.
+/// To settle the hold, call ``FolderFileManaging/trashHeld(in:paths:)`` or
+/// ``FolderFileManaging/keepHeld(in:paths:writeBack:)``. If the file waits on a directory that is gone for good,
+/// ``FolderFileManaging/remembering(_:)`` shows whether forgetting that directory would release it.
 public struct HeldFile: Sendable, Hashable {
     /// The file's path inside the folder.
     public let path: String
@@ -267,7 +268,7 @@ public struct WaitingHeldFile: Sendable, Hashable {
     public let reason: String
     /// The other directories that keep the file held once the directory is forgotten.
     ///
-    /// Where it is empty, forgetting the directory releases the file, and its folder's next sync decides it again.
+    /// An empty array means forgetting can release this hold if it still waits on this directory alone.
     public let stillWaitsOn: [URL]
 
     public init(path: String, item: String, missingSince: String, reason: String, stillWaitsOn: [URL] = []) {
@@ -310,16 +311,15 @@ public struct FolderLeft: Sendable, Hashable {
 
 /// What ``FolderFileManaging/forget(_:)`` changed.
 ///
-/// Check ``notChanged`` before telling the person the directory is forgotten everywhere.
+/// Check ``listed`` and ``notChanged`` before telling the person the directory is forgotten everywhere.
 public struct Forgotten: Sendable, Hashable {
-    /// The directory forgotten.
+    /// The directory the person asked to forget.
     public let directory: URL
     /// Whether the registry listed the directory when the forget checked, in which case nothing changed.
     public let listed: Bool
     /// Each folder that forgot the directory.
     public let forgotten: [ForgottenIn]
-    /// Folders left as they were, each with why: one another process didn't let go, whose store is no longer the
-    /// one shown, or that was left because the directory was listed or became occupied.
+    /// Folders the preview couldn't read or the forget couldn't change, each with the reason.
     public let notChanged: [FolderLeft]
 
     public init(directory: URL, listed: Bool, forgotten: [ForgottenIn], notChanged: [FolderLeft] = []) {

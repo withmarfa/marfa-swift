@@ -10,12 +10,9 @@ extension LiveWorkingCopies {
     struct LiveFolderForget {
         /// Every other folder listed or remembered also withholds a delete, so the scenario runs in a process of its
         /// own, whose registry holds only its two folders.
-        @Test func aDeleteHeldForAGoneFolderIsShownReleasedByForgettingItAndDecidedAgain() async throws {
-            let result = await #expect(processExitsWith: .success, observing: [\.standardErrorContent]) {
+        @Test func aDeleteHeldForAGoneFolderIsShownReleasedByForgettingItAndDecidedAgain() async {
+            await #expect(processExitsWith: .success) {
                 try await forgettingAGoneFolder()
-            }
-            if let result, case .exitCode(let code) = result.exitStatus, code != EXIT_SUCCESS {
-                Issue.record("\(String(decoding: result.standardErrorContent, as: UTF8.self))")
             }
         }
     }
