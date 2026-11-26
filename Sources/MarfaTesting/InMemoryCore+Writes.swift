@@ -256,17 +256,19 @@ extension InMemoryCore {
     }
 
     func transitionItem(id: String, state target: ItemState, from: ItemState?) throws -> QueuedWrite {
-        if from != nil { throw FakeCopyError.unsupported(call: "items.transition(from:)") }
+        if target == .revoked {
+            throw Refuse.validation(
+                "validation_error",
+                "state: a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
+            )
+        }
         return try state.withLock { state in
             guard var held = state.items[id] else { throw Refuse.item(id) }
-            if target == .revoked {
-                if held.type.hasPrefix("system.") {
-                    throw FakeCopyError.unsupported(call: "items.transition(to: .revoked) on a system type")
-                }
+            try Checks.writable(held.type)
+            if let from, from != held.state {
                 throw Refuse.validation(
-                    "validation_error",
-                    "state: a device cannot move \(id) to the revoked state; it is reachable only on a reserved type and on the server's authority"
-                )
+                    "state_conflict", "\(id) is \(held.state.name), not \(from.name)",
+                    details: Refuse.details(["expected": .string(from.name), "actual": .string(held.state.name)]))
             }
             let body = JsonObject(members: [
                 JsonMember(key: "state", value: .string(target.name)),

@@ -88,6 +88,8 @@ package func refusal(
     case 403: return .forbidden(code: code, message: shown, server: answer)
     case 404: return .notFound(code: code, message: shown, server: answer)
     case 409 where code == "version_conflict": return .versionConflict(message: shown, server: answer)
+    case 409 where code == "state_conflict":
+        return .validation(code: code, message: shown, details: answer.details, server: answer)
     case 409 where code == "instance_changed": return .instanceChanged(message: shown, server: answer)
     case 429:
         return .rateLimited(
