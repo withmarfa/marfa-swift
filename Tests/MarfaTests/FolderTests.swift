@@ -442,13 +442,14 @@ extension LiveWorkingCopies {
             _ = try await folders.sync(directory)
             #expect(!(try await folders.status(of: directory).paused.isPaused))
 
+            // A confirm inside the rename grace keeps each file paused, since a rename may not show yet.
+            // Past it, the outcome depends on the other folders this suite's shared registry lists.
             #expect(try await removeAll().pass.scan.paused == 3)
             let confirmed = try await folders.confirmRemoval(in: directory)
-            #expect(confirmed.deleted == 3)
-            #expect(confirmed.unsure.isEmpty)
-            let sent = try await FolderFixture.sync(directory)
-            #expect(sent.pass.drain.answered >= 3)
-            #expect(try await folders.status(of: directory) == FolderStatus(files: []))
+            #expect(confirmed.deleted == 0)
+            #expect(confirmed.unsure.map(\.path).sorted() == names.map { "\($0).md" }.sorted())
+            #expect(confirmed.unsure.allSatisfy { $0.reason.contains("rename grace") })
+            #expect(try await folders.status(of: directory).paused == FolderPaused(disk: 3))
         }
 
         @Test func aWatchKeepsTheFolderInStepHoldsItAndLetsItGoWhenStopped() async throws {
