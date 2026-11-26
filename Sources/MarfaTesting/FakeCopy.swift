@@ -35,8 +35,8 @@ import Synchronization
 ///   one above it, exactly, and a wildcard opens none; a list of the bin's state alone shows them. `declareTypes(_:)`
 ///   refuses an id outside `app.` as the core does.
 /// - Writes: `items.create(_:)` without `sourceId`, including `state`, a
-///   capture location and `edges`, `items.update(_:_:)`, including `occurredAt`,
-///   `clearOccurredAt` and `clearProperties`, `items.updateAsRead(_:_:)`, `items.delete(_:)`,
+///   capture location and `edges`, `items.update(_:_:)` without `exact`, including `occurredAt`,
+///   `clearOccurredAt` and `clearProperties`, `items.updateAsRead(_:_:)` without `exact`, `items.delete(_:)`,
 ///   `items.restore(_:)`, `items.transition(_:to:)`, `tags`, `metadata`,
 ///   `extensions`, `edges.create`, `edges.check(from:to:type:)`, `edges.check(_:moving:)`, `edges.update(_:_:)`,
 ///   `edges.delete(_:)` and `declareTypes(_:)`.

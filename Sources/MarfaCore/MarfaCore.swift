@@ -6262,6 +6262,17 @@ public struct Edit: Equatable, Hashable {
      * Refused beside `occurred_at`.
      */
     public var clearOccurredAt: Bool
+    /**
+     * The server refuses the change, merging none of it, where the item has
+     * moved past `base_version`: the queued write is refused with the reason
+     * `version_conflict`, and the copy shows the item as the server holds
+     * it. A `base_version` older than the copy holds throws `Validation`
+     * with `version_conflict` and queues nothing, except `0` read behind this
+     * copy's own create that the server has yet to answer: it is queued on
+     * the version that create made, and the server refuses it if the item has
+     * moved since.
+     */
+    public var exact: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -6304,7 +6315,17 @@ public struct Edit: Equatable, Hashable {
         /**
          * Gives the item no time of its own again, so it is its creation time.
          * Refused beside `occurred_at`.
-         */clearOccurredAt: Bool = false) {
+         */clearOccurredAt: Bool = false, 
+        /**
+         * The server refuses the change, merging none of it, where the item has
+         * moved past `base_version`: the queued write is refused with the reason
+         * `version_conflict`, and the copy shows the item as the server holds
+         * it. A `base_version` older than the copy holds throws `Validation`
+         * with `version_conflict` and queues nothing, except `0` read behind this
+         * copy's own create that the server has yet to answer: it is queued on
+         * the version that create made, and the server refuses it if the item has
+         * moved since.
+         */exact: Bool = false) {
         self.properties = properties
         self.replaceProperties = replaceProperties
         self.clearProperties = clearProperties
@@ -6314,6 +6335,7 @@ public struct Edit: Equatable, Hashable {
         self.tier = tier
         self.occurredAt = occurredAt
         self.clearOccurredAt = clearOccurredAt
+        self.exact = exact
     }
 
     
@@ -6340,7 +6362,8 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
                 type: FfiConverterOptionString.read(from: &buf), 
                 tier: FfiConverterOptionTypeTier.read(from: &buf), 
                 occurredAt: FfiConverterOptionString.read(from: &buf), 
-                clearOccurredAt: FfiConverterBool.read(from: &buf)
+                clearOccurredAt: FfiConverterBool.read(from: &buf), 
+                exact: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -6354,6 +6377,7 @@ public struct FfiConverterTypeEdit: FfiConverterRustBuffer {
         FfiConverterOptionTypeTier.write(value.tier, into: &buf)
         FfiConverterOptionString.write(value.occurredAt, into: &buf)
         FfiConverterBool.write(value.clearOccurredAt, into: &buf)
+        FfiConverterBool.write(value.exact, into: &buf)
     }
 }
 

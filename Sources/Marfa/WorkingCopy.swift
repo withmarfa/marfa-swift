@@ -715,8 +715,8 @@ public struct Items: Sendable {
 
     /// Queues an edit based on a version older than the one the copy holds.
     ///
-    /// The server merges it against what was read. An editor that held a row
-    /// while the copy caught up saves this way.
+    /// The server merges it against what was read, unless `edit.exact` is set.
+    /// An editor that held a row while the copy caught up saves this way.
     public func updateAsRead(_ id: String, _ edit: Edit) async throws -> QueuedWrite {
         try await write { core in try core.updateItemAsRead(id: id, edit: edit.core) }
     }
