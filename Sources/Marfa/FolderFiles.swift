@@ -7,6 +7,9 @@ public protocol FolderFileManaging: Sendable {
     func removeUnmatched(in directory: URL, paths: [String]) async throws -> UnmatchedRemoved
     func keptFiles(in directory: URL) async throws -> [KeptFile]
     func discardKept(in directory: URL) async throws -> KeptDiscarded
+    func heldFiles(in directory: URL) async throws -> [HeldFile]
+    func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld
+    func keepHeld(in directory: URL, paths: [String], writeBack: Bool) async throws -> SettledHeld
 }
 
 /// The outcome for each requested path and the number of placements ended.
@@ -100,6 +103,73 @@ public struct KeptDiscarded: Sendable, Hashable {
 
     init(_ core: MarfaCore.KeptDiscarded) {
         self.init(discarded: core.discarded, putBack: core.putBack, kept: core.kept.map(KeptFile.init))
+    }
+}
+
+/// A missing file whose delete the folder holds, because Marfa can't tell whether the person deleted it or moved
+/// it into another folder.
+///
+/// It stays held until the person settles it with ``FolderFileManaging/trashHeld(in:paths:)`` or
+/// ``FolderFileManaging/keepHeld(in:paths:writeBack:)``.
+public struct HeldFile: Sendable, Hashable {
+    /// The file's path inside the folder.
+    public let path: String
+    /// The id of the item the file stood for.
+    public let item: String
+    /// When the folder first found the file missing, as the core reports it.
+    public let missingSince: String
+    /// Why the delete is held, as a sentence the core words. It may name the other folders the file could be in.
+    public let reason: String
+
+    public init(path: String, item: String, missingSince: String, reason: String) {
+        self.path = path
+        self.item = item
+        self.missingSince = missingSince
+        self.reason = reason
+    }
+
+    init(_ core: MarfaCore.HeldFile) {
+        self.init(path: core.path, item: core.item, missingSince: core.missingSince, reason: core.reason)
+    }
+}
+
+/// What settling held files did, for each file the call named.
+///
+/// A file the call could not settle is in ``notSettled`` with why, and stays held: check it before telling the
+/// person the delete went through.
+public struct SettledHeld: Sendable, Hashable {
+    /// Files whose items' deletes are queued, sent at the next sync.
+    public let trashed: [String]
+    /// Files whose items were already in the bin or gone.
+    public let gone: [String]
+    /// Files one other readable folder now holds, whose items stay.
+    public let moved: [String]
+    /// Files whose items stay, and which the folder lets go.
+    public let kept: [String]
+    /// Kept files written again.
+    public let writtenBack: [String]
+    /// Kept files not written again, each with why.
+    public let notWrittenBack: [FlaggedFile]
+    /// Named files left as they were and still held, each with why.
+    public let notSettled: [UnsureFile]
+
+    public init(
+        trashed: [String] = [], gone: [String] = [], moved: [String] = [], kept: [String] = [],
+        writtenBack: [String] = [], notWrittenBack: [FlaggedFile] = [], notSettled: [UnsureFile] = []
+    ) {
+        self.trashed = trashed
+        self.gone = gone
+        self.moved = moved
+        self.kept = kept
+        self.writtenBack = writtenBack
+        self.notWrittenBack = notWrittenBack
+        self.notSettled = notSettled
+    }
+
+    init(_ core: MarfaCore.SettledHeld) {
+        self.init(
+            trashed: core.trashed, gone: core.gone, moved: core.moved, kept: core.kept, writtenBack: core.writtenBack,
+            notWrittenBack: core.notWrittenBack.map(FlaggedFile.init), notSettled: core.notSettled.map(UnsureFile.init))
     }
 }
 

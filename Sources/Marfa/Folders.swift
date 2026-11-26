@@ -15,7 +15,8 @@ import Synchronization
 /// `pause(_:)` stops a directory's sync until `resume(_:)`: a watch skips it, and a call that would read the
 /// server's side or write either side, such as `sync(_:)`, throws ``MarfaError/syncPaused(message:)``.
 ///
-/// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `confirmFirstSync(in:)`,
+/// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `trashHeld(in:paths:)`,
+/// `keepHeld(in:paths:writeBack:)`, `confirmFirstSync(in:)`,
 /// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` or `resume(_:)` finds the folder held
 /// by a watch, whether this app's own or the command-line tool's, it asks the watch to let the folder go and
 /// waits up to 10 seconds. A watch of this app lets it go at the end of the step of its pass under way, tells
@@ -31,7 +32,8 @@ public struct Folders: FolderFileManaging {
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
-    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)` and the unmatched and kept file calls work.
+    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)`, the unmatched and kept file calls, `heldFiles(in:)` and
+    /// `trashHeld(in:paths:)` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -81,6 +83,38 @@ public struct Folders: FolderFileManaging {
     /// watch to release the folder, then throws `MarfaError.readingHandle` if the watch still holds it.
     public func discardKept(in directory: URL) async throws -> KeptDiscarded {
         try await run { folders in KeptDiscarded(try folders.discardKept(dir: directory.path(percentEncoded: false))) }
+    }
+
+    /// The files whose delete the folder holds, in path order, each with why.
+    ///
+    /// A folder with no holds answers an empty list. Asks no watch for the folder.
+    public func heldFiles(in directory: URL) async throws -> [HeldFile] {
+        try await run { folders in try folders.held(dir: directory.path(percentEncoded: false)).map(HeldFile.init) }
+    }
+
+    /// Queues the delete of each named held file's item, checked against the item's version.
+    ///
+    /// Show the person each file first. Each path is relative to the folder. The delete is sent at the next sync.
+    /// A file the call can't settle, because another folder now holds it or its item changed meanwhile, comes back
+    /// in ``SettledHeld/notSettled`` with why, and stays held. Needs no server. Like `removeUnmatched(in:paths:)`,
+    /// this waits up to ten seconds for a watch to release the folder.
+    public func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld {
+        try await run { folders in
+            SettledHeld(try folders.trashHeld(dir: directory.path(percentEncoded: false), paths: paths))
+        }
+    }
+
+    /// Keeps each named held file's item and lets the folder's file of it go.
+    ///
+    /// With `writeBack`, writes the file again where the folder's query holds the item, never over a file now at
+    /// its path; a file it can't write comes back in ``SettledHeld/notWrittenBack`` with why. A file the call can't
+    /// settle comes back in ``SettledHeld/notSettled`` and stays held. Like `removeUnmatched(in:paths:)`, this waits
+    /// up to ten seconds for a watch to release the folder.
+    public func keepHeld(in directory: URL, paths: [String], writeBack: Bool = false) async throws -> SettledHeld {
+        try await run { folders in
+            SettledHeld(
+                try folders.keepHeld(dir: directory.path(percentEncoded: false), paths: paths, writeBack: writeBack))
+        }
     }
 
     /// Pauses the directory's sync until ``resume(_:)``.
@@ -897,6 +931,13 @@ public struct FlaggedFile: Sendable, Hashable {
     /// file as it stands. `nil` for a file the scan flagged. Two items held back at one path are two entries.
     public let item: String?
 
+    public init(path: String, flag: String, reason: String, item: String? = nil) {
+        self.path = path
+        self.flag = flag
+        self.reason = reason
+        self.item = item
+    }
+
     init(_ core: MarfaCore.FlaggedFile) {
         path = core.path
         flag = core.flag
@@ -933,6 +974,11 @@ public struct ConfirmedFolder: Sendable, Hashable {
 public struct UnsureFile: Sendable, Hashable {
     public let path: String
     public let reason: String
+
+    public init(path: String, reason: String) {
+        self.path = path
+        self.reason = reason
+    }
 
     init(_ core: MarfaCore.UnsureFile) {
         path = core.path
