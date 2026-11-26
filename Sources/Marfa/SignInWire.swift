@@ -214,7 +214,7 @@ struct Discovery: Sendable, Decodable {
         guard let at = URL(string: "\(server)/.well-known/oauth-authorization-server") else {
             throw .unreadable(message: "\(server) is not an address a sign-in can use")
         }
-        return try parse(try await send(URLRequest(url: at), transport), from: server)
+        return try parse(try await send(URLRequest(url: at), transport, forDiscovery: true), from: server)
     }
 
     /// The metadata `answer` holds, read from `server` and held to it.
@@ -300,7 +300,9 @@ func formRequest(_ url: String, _ fields: [(String, String)]) throws(SignInError
     return request
 }
 
-func send(_ request: URLRequest, _ transport: SignInTransport) async throws(SignInError) -> Answer {
+func send(_ request: URLRequest, _ transport: SignInTransport, forDiscovery: Bool = false)
+    async throws(SignInError) -> Answer
+{
     do {
         let (body, response) = try await transport.data(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -314,6 +316,18 @@ func send(_ request: URLRequest, _ transport: SignInTransport) async throws(Sign
     } catch let error as URLError where error.code == .cancelled {
         throw .canceled
     } catch {
+        if forDiscovery, let urlError = error as? URLError {
+            switch urlError.code {
+            case .cannotFindHost, .dnsLookupFailed:
+                throw .discoveryTransport(reason: .dnsFailure)
+            case .cannotConnectToHost, .timedOut:
+                throw .discoveryTransport(reason: .connectionFailed)
+            case .serverCertificateUntrusted, .serverCertificateHasUnknownRoot, .serverCertificateHasBadDate,
+                .serverCertificateNotYetValid:
+                throw .discoveryTransport(reason: .untrustedCertificate)
+            default: break
+            }
+        }
         throw .unavailable(message: "the server could not be reached: \(error.localizedDescription)")
     }
 }

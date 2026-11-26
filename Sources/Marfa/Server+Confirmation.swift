@@ -116,6 +116,8 @@ extension Server {
             throw .signedOut(origin: credential.server.absoluteString, message: "the app is no longer signed in")
         } catch SignInError.unavailable(let message) {
             throw .network(message: message)
+        } catch SignInError.discoveryTransport(let reason) {
+            throw .network(message: reason.description)
         } catch {
             throw .invalid(message: "the owner's sign-in was not confirmed: \(error)")
         }

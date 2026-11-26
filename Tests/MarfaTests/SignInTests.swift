@@ -11,6 +11,56 @@ private let service = "com.withmarfa.marfa-swift.tests"
 private let client = Authorization.Client(
     name: "Sign-in tests", redirect: URL(string: "so.marfa.tests:/signed-in"), scopes: ["core.note:read"])
 
+@Suite(.timeLimit(.minutes(1)))
+struct SignInDiscoveryTransportTests {
+    @Test(
+        arguments: [
+            (URLError.Code.cannotFindHost, Optional.some(SignInError.discoveryTransport(reason: .dnsFailure))),
+            (.dnsLookupFailed, .discoveryTransport(reason: .dnsFailure)),
+            (.cannotConnectToHost, .discoveryTransport(reason: .connectionFailed)),
+            (.timedOut, .discoveryTransport(reason: .connectionFailed)),
+            (.serverCertificateUntrusted, .discoveryTransport(reason: .untrustedCertificate)),
+            (.serverCertificateHasUnknownRoot, .discoveryTransport(reason: .untrustedCertificate)),
+            (.serverCertificateHasBadDate, .discoveryTransport(reason: .untrustedCertificate)),
+            (.serverCertificateNotYetValid, .discoveryTransport(reason: .untrustedCertificate)),
+            (.cancelled, .canceled),
+            (.unknown, nil),
+            (.secureConnectionFailed, nil),
+        ], [false, true])
+    func classifiesDiscoveryFailure(failure: (URLError.Code, SignInError?), device: Bool) async throws {
+        let server = ScriptedAuthServer { _ in .failure(failure.0) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            await #expect {
+                if device {
+                    _ = try await authorization.startDeviceSignIn()
+                } else {
+                    _ = try await authorization.signIn { url, _ in url }
+                }
+            } throws: { error in
+                if let expected = failure.1 { return (error as? SignInError) == expected }
+                guard case SignInError.unavailable = error else { return false }
+                return true
+            }
+        }
+    }
+
+    @Test(arguments: [
+        ("http://marfa-sign-in.invalid", SignInError.DiscoveryTransportReason.dnsFailure),
+        ("http://127.0.0.1:1", .connectionFailed),
+    ])
+    func classifiesSystemURLSessionFailure(server: (String, SignInError.DiscoveryTransportReason)) async {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForResource = 10
+        let transport = SignInTransport(session: URLSession(configuration: configuration))
+        await #expect(throws: SignInError.discoveryTransport(reason: server.1)) {
+            try await Discovery.read(server.0, transport)
+        }
+    }
+}
+
 /// Answers discovery and registration as Marfa does, and hands every other request to `rest`.
 private func marfa(
     _ server: ScriptedAuthServer, issParameter: Bool? = nil,
