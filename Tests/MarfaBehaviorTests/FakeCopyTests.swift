@@ -179,6 +179,8 @@ struct FakeCopyBehavior {
             ("queue.release(reason:)", { _ = try await copy.queue.release(reason: .keySpent) }),
             ("items.list(filter:)", { _ = try await copy.items.list(ListFilters(filter: "x")) }),
             ("items.create(sourceId:)", { _ = try await copy.items.create(Draft(type: "core.note", sourceId: "k")) }),
+            ("items.update(exact:)", { _ = try await copy.items.update(id, Edit(baseVersion: 4, exact: true)) }),
+            ("items.update(exact:)", { _ = try await copy.items.updateAsRead(id, Edit(baseVersion: 4, exact: true)) }),
             ("revokeFolder", { _ = try await copy.revokeFolder(id) }),
             ("search(filter:)", { _ = try await copy.search("seed", filters: SearchFilters(filter: "x")) }),
         ]

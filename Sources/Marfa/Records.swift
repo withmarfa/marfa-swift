@@ -304,11 +304,20 @@ public struct Edit: Sendable, Hashable {
     ///
     /// Refused beside `occurredAt`.
     public var clearOccurredAt: Bool
+    /// The server refuses the change, merging none of it, where the item has moved past `baseVersion`.
+    ///
+    /// Use it for a change a person made to what they saw, such as a move to another tier, where a merge onto a later
+    /// version would act on something they never saw. The queued write's verdict is refused with the reason
+    /// `version_conflict`, it is not sent again, and the copy shows the item as the server holds it. A `baseVersion`
+    /// older than the copy holds throws ``MarfaError/validation(code:message:details:server:)`` with the code
+    /// `version_conflict` and queues nothing, through ``Items/updateAsRead(_:_:)`` too, except `0` read behind this
+    /// copy's own create that the server has yet to answer.
+    public var exact: Bool
 
     public init(
         properties: JSONObject = [:], replaceProperties: Bool = false, clearProperties: Set<String> = [],
         baseVersion: Int64, sourceId: String? = nil, type: String? = nil, tier: Tier? = nil, occurredAt: String? = nil,
-        clearOccurredAt: Bool = false
+        clearOccurredAt: Bool = false, exact: Bool = false
     ) {
         self.properties = properties
         self.replaceProperties = replaceProperties
@@ -319,6 +328,7 @@ public struct Edit: Sendable, Hashable {
         self.tier = tier
         self.occurredAt = occurredAt
         self.clearOccurredAt = clearOccurredAt
+        self.exact = exact
     }
 
     package init(_ core: MarfaCore.Edit) {
@@ -331,6 +341,7 @@ public struct Edit: Sendable, Hashable {
         tier = core.tier.map(Tier.init)
         occurredAt = core.occurredAt
         clearOccurredAt = core.clearOccurredAt
+        exact = core.exact
     }
 
     package var core: MarfaCore.Edit {
@@ -344,7 +355,8 @@ public struct Edit: Sendable, Hashable {
             type: type,
             tier: tier.map(\.core),
             occurredAt: occurredAt,
-            clearOccurredAt: clearOccurredAt
+            clearOccurredAt: clearOccurredAt,
+            exact: exact
         )
     }
 }

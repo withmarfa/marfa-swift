@@ -100,6 +100,7 @@ extension InMemoryCore {
     }
 
     private func update(id: String, edit: Edit, asRead: Bool) throws -> QueuedWrite {
+        if edit.exact { throw FakeCopyError.unsupported(call: "items.update(exact:)") }
         try Properties.cross(edit.properties)
         try Checks.links(edit.properties, call: "items.update")
         try Properties.keptAsWritten(edit.properties)
