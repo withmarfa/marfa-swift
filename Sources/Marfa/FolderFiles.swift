@@ -118,7 +118,9 @@ public struct HeldFile: Sendable, Hashable {
     public let item: String
     /// When the folder first found the file missing, as the core reports it.
     public let missingSince: String
-    /// Why the delete is held, as a sentence the core words. It may name the other folders the file could be in.
+    /// Why the delete is held, in the core's words.
+    ///
+    /// It may name the other folders the file could be in.
     public let reason: String
 
     public init(path: String, item: String, missingSince: String, reason: String) {

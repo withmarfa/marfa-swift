@@ -96,7 +96,10 @@ struct FolderFileBehaviorTests {
         #expect(kept.kept == ["a.md"] && kept.writtenBack == ["a.md"] && kept.notWrittenBack == [notWritten])
         let keptOnly = try await folders.keepHeld(in: directory, paths: ["a.md"], writeBack: false)
         #expect(keptOnly.writtenBack.isEmpty)
-        #expect(recorded.withLock { $0 } == ["held /example", "trash [\"a.md\", \"b.md\"]", "keep [\"a.md\"] true", "keep [\"a.md\"] false"])
+        #expect(
+            recorded.withLock { $0 } == [
+                "held /example", "trash [\"a.md\", \"b.md\"]", "keep [\"a.md\"] true", "keep [\"a.md\"] false",
+            ])
     }
 
     @Test func unscriptedHeldCallsAreUnsupported() async throws {
