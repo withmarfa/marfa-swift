@@ -88,19 +88,22 @@ public struct Folders: FolderFileManaging {
 
     /// The files whose delete the folder holds, in path order, each with why.
     ///
-    /// A folder with no holds answers an empty list. Asks no watch for the folder.
+    /// A folder with no holds answers an empty list. Asks no watch for the folder, and needs no server or sign-in.
     public func heldFiles(in directory: URL) async throws -> [HeldFile] {
-        try await run { folders in try folders.held(dir: directory.path(percentEncoded: false)).map(HeldFile.init) }
+        try await run(reaching: false) { folders in
+            try folders.held(dir: directory.path(percentEncoded: false)).map(HeldFile.init)
+        }
     }
 
     /// Queues the delete of each named held file's item, checked against the item's version.
     ///
     /// Show the person each file first. Each path is relative to the folder. The delete is sent at the next sync.
     /// A file found in another folder as a move comes back in ``SettledHeld/moved`` and its item stays. A path the
-    /// call can't settle comes back in ``SettledHeld/notSettled`` with why. This needs no server, waits up to
-    /// 10 seconds for a watch to release the folder, and throws ``MarfaError/syncPaused(message:)`` while paused.
+    /// call can't settle comes back in ``SettledHeld/notSettled`` with why. This needs no server or sign-in, so a
+    /// locked keychain doesn't stop it. It waits up to 10 seconds for a watch to release the folder, and throws
+    /// ``MarfaError/syncPaused(message:)`` while paused.
     public func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld {
-        try await run { folders in
+        try await run(reaching: false) { folders in
             SettledHeld(try folders.trashHeld(dir: directory.path(percentEncoded: false), paths: paths))
         }
     }
@@ -110,10 +113,11 @@ public struct Folders: FolderFileManaging {
     /// With `writeBack`, writes the file again where the folder's query holds the item. A settled file the call
     /// can't write comes back in ``SettledHeld/notWrittenBack`` with why. A path the call can't settle, such as
     /// one occupied by another item's file that write-back would replace, comes back in ``SettledHeld/notSettled``.
-    /// This waits up to 10 seconds for a watch to release the folder, and throws ``MarfaError/syncPaused(message:)``
-    /// while paused.
+    /// Without `writeBack` this needs no server or sign-in, so a locked keychain doesn't stop it; with it, the pull
+    /// reads the sign-in. It waits up to 10 seconds for a watch to release the folder, and throws
+    /// ``MarfaError/syncPaused(message:)`` while paused.
     public func keepHeld(in directory: URL, paths: [String], writeBack: Bool = false) async throws -> SettledHeld {
-        try await run { folders in
+        try await run(reaching: writeBack) { folders in
             SettledHeld(
                 try folders.keepHeld(dir: directory.path(percentEncoded: false), paths: paths, writeBack: writeBack))
         }
@@ -213,8 +217,14 @@ public struct Folders: FolderFileManaging {
         return FolderWatch(events: events, subscription: subscription, ending: ending)
     }
 
-    private func run<T: Sendable>(_ work: @escaping @Sendable (MarfaCore.Folders) throws -> T) async throws -> T {
-        let server = server
+    /// Runs `work` on the core's folders.
+    ///
+    /// A call with `reaching` false is given no server, so it reads no credential, and a locked keychain doesn't
+    /// stop it.
+    private func run<T: Sendable>(
+        reaching: Bool = true, _ work: @escaping @Sendable (MarfaCore.Folders) throws -> T
+    ) async throws -> T {
+        let server = reaching ? server : nil
         return try await background {
             try work(
                 MarfaCore.Folders(

@@ -152,7 +152,9 @@ public struct SettledHeld: Sendable, Hashable {
     public let writtenBack: [String]
     /// Kept files not written again, each with why.
     public let notWrittenBack: [FlaggedFile]
-    /// Named files left as they were, each with why. Any existing hold remains.
+    /// Named files left as they were, each with why.
+    ///
+    /// Any existing hold remains.
     public let notSettled: [UnsureFile]
 
     public init(
