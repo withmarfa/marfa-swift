@@ -15,7 +15,8 @@ import Synchronization
 /// `pause(_:)` stops a directory's sync until `resume(_:)`: a watch skips it, and a call that would read the
 /// server's side or write either side, such as `sync(_:)`, throws ``MarfaError/syncPaused(message:)``.
 ///
-/// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `confirmFirstSync(in:)`,
+/// One process works a folder at a time. When `add(_:following:)`, `sync(_:)`, `trashHeld(in:paths:)`,
+/// `keepHeld(in:paths:writeBack:)`, `confirmFirstSync(in:)`,
 /// `confirmRemoval(in:)`, `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)` or `resume(_:)` finds the folder held
 /// by a watch, whether this app's own or the command-line tool's, it asks the watch to let the folder go and
 /// waits up to 10 seconds. A watch of this app lets it go at the end of the step of its pass under way, tells
@@ -25,13 +26,15 @@ import Synchronization
 /// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
 public struct Folders: FolderFileManaging {
-    /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)` and `watch(_:)` reach.
+    /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
+    /// `keepHeld(in:paths:writeBack:)` with `writeBack: true` can reach.
     public let server: Server?
 
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
-    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)` and the unmatched and kept file calls work.
+    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)`, the unmatched and kept file calls,
+    /// `heldFiles(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` with `writeBack: false` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -83,11 +86,49 @@ public struct Folders: FolderFileManaging {
         try await run { folders in KeptDiscarded(try folders.discardKept(dir: directory.path(percentEncoded: false))) }
     }
 
+    /// The files whose delete the folder holds, in path order, each with why.
+    ///
+    /// A folder with no holds answers an empty list. Asks no watch for the folder, and needs no server or sign-in.
+    public func heldFiles(in directory: URL) async throws -> [HeldFile] {
+        try await run(reaching: false) { folders in
+            try folders.held(dir: directory.path(percentEncoded: false)).map(HeldFile.init)
+        }
+    }
+
+    /// Queues the delete of each named held file's item, checked against the item's version.
+    ///
+    /// Show the person each file first. Each path is relative to the folder. The delete is sent at the next sync.
+    /// A file found in another folder as a move comes back in ``SettledHeld/moved`` and its item stays. A path the
+    /// call can't settle comes back in ``SettledHeld/notSettled`` with why. This needs no server or sign-in, so a
+    /// locked keychain doesn't stop it. It waits up to 10 seconds for a watch to release the folder, and throws
+    /// ``MarfaError/syncPaused(message:)`` while paused.
+    public func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld {
+        try await run(reaching: false) { folders in
+            SettledHeld(try folders.trashHeld(dir: directory.path(percentEncoded: false), paths: paths))
+        }
+    }
+
+    /// Keeps each named held file's item and lets the folder's file of it go.
+    ///
+    /// With `writeBack`, writes the file again where the folder's query holds the item. A settled file the call
+    /// can't write comes back in ``SettledHeld/notWrittenBack`` with why. A path the call can't settle, such as
+    /// one occupied by another item's file that write-back would replace, comes back in ``SettledHeld/notSettled``.
+    /// Without `writeBack` this needs no server or sign-in, so a locked keychain doesn't stop it; with it, the pull
+    /// reads the sign-in. It waits up to 10 seconds for a watch to release the folder, and throws
+    /// ``MarfaError/syncPaused(message:)`` while paused.
+    public func keepHeld(in directory: URL, paths: [String], writeBack: Bool = false) async throws -> SettledHeld {
+        try await run(reaching: writeBack) { folders in
+            SettledHeld(
+                try folders.keepHeld(dir: directory.path(percentEncoded: false), paths: paths, writeBack: writeBack))
+        }
+    }
+
     /// Pauses the directory's sync until ``resume(_:)``.
     ///
-    /// A watch skips the folder, and `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)` and
-    /// `restoreRemoval(in:)` throw ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it
-    /// stands, and the files stay as they are. Returns whether the sync was running.
+    /// A watch skips the folder, and `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
+    /// `restoreRemoval(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` throw
+    /// ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it stands, and the files stay as they
+    /// are. Returns whether the sync was running.
     @discardableResult
     public func pause(_ directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
@@ -176,8 +217,14 @@ public struct Folders: FolderFileManaging {
         return FolderWatch(events: events, subscription: subscription, ending: ending)
     }
 
-    private func run<T: Sendable>(_ work: @escaping @Sendable (MarfaCore.Folders) throws -> T) async throws -> T {
-        let server = server
+    /// Runs `work` on the core's folders.
+    ///
+    /// A call with `reaching` false is given no server, so it reads no credential, and a locked keychain doesn't
+    /// stop it.
+    private func run<T: Sendable>(
+        reaching: Bool = true, _ work: @escaping @Sendable (MarfaCore.Folders) throws -> T
+    ) async throws -> T {
+        let server = reaching ? server : nil
         return try await background {
             try work(
                 MarfaCore.Folders(
@@ -890,12 +937,19 @@ public struct FlaggedFile: Sendable, Hashable {
     public let path: String
     public let flag: String
     public let reason: String
-    /// The id of the item a pull held back, where a pull did.
+    /// The ID of the item whose file could not be written, where known.
     ///
-    /// Set for a `flag` of `unwritten`, `outside`, `unsuited` or `absent`, where the pull didn't write the item's
-    /// file. Then `path` is where the pull would have written the file, or the item's own file where it left that
-    /// file as it stands. `nil` for a file the scan flagged. Two items held back at one path are two entries.
+    /// A pull sets this for `unwritten`, `outside`, `unsuited` or `absent`. Then `path` names where the pull
+    /// would have written the file or where it left the item's file. A held-file write-back also sets this for
+    /// `outside_query`. A file the scan flagged has `nil` here. Two items held back at one path are two entries.
     public let item: String?
+
+    public init(path: String, flag: String, reason: String, item: String? = nil) {
+        self.path = path
+        self.flag = flag
+        self.reason = reason
+        self.item = item
+    }
 
     init(_ core: MarfaCore.FlaggedFile) {
         path = core.path
@@ -933,6 +987,11 @@ public struct ConfirmedFolder: Sendable, Hashable {
 public struct UnsureFile: Sendable, Hashable {
     public let path: String
     public let reason: String
+
+    public init(path: String, reason: String) {
+        self.path = path
+        self.reason = reason
+    }
 
     init(_ core: MarfaCore.UnsureFile) {
         path = core.path

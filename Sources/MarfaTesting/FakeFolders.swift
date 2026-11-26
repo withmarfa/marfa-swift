@@ -32,9 +32,20 @@ extension FakeCopy {
         },
         discardKept: @escaping @Sendable (URL) throws -> KeptDiscarded = { _ in
             throw FakeCopyError.unsupported(call: "folders.discardKept")
+        },
+        heldFiles: @escaping @Sendable (URL) throws -> [HeldFile] = { _ in
+            throw FakeCopyError.unsupported(call: "folders.heldFiles")
+        },
+        trashHeld: @escaping @Sendable (URL, [String]) throws -> SettledHeld = { _, _ in
+            throw FakeCopyError.unsupported(call: "folders.trashHeld")
+        },
+        keepHeld: @escaping @Sendable (URL, [String], Bool) throws -> SettledHeld = { _, _, _ in
+            throw FakeCopyError.unsupported(call: "folders.keepHeld")
         }
     ) -> some FolderFileManaging {
-        ScriptedFolderFiles(remove: removeUnmatched, list: keptFiles, discard: discardKept)
+        ScriptedFolderFiles(
+            remove: removeUnmatched, list: keptFiles, discard: discardKept, held: heldFiles, trash: trashHeld,
+            keep: keepHeld)
     }
 }
 
@@ -42,6 +53,9 @@ private struct ScriptedFolderFiles: FolderFileManaging {
     let remove: @Sendable (URL, [String]) throws -> UnmatchedRemoved
     let list: @Sendable (URL) throws -> [KeptFile]
     let discard: @Sendable (URL) throws -> KeptDiscarded
+    let held: @Sendable (URL) throws -> [HeldFile]
+    let trash: @Sendable (URL, [String]) throws -> SettledHeld
+    let keep: @Sendable (URL, [String], Bool) throws -> SettledHeld
 
     func removeUnmatched(in directory: URL, paths: [String]) async throws -> UnmatchedRemoved {
         try remove(directory, paths)
@@ -50,6 +64,14 @@ private struct ScriptedFolderFiles: FolderFileManaging {
     func keptFiles(in directory: URL) async throws -> [KeptFile] { try list(directory) }
 
     func discardKept(in directory: URL) async throws -> KeptDiscarded { try discard(directory) }
+
+    func heldFiles(in directory: URL) async throws -> [HeldFile] { try held(directory) }
+
+    func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld { try trash(directory, paths) }
+
+    func keepHeld(in directory: URL, paths: [String], writeBack: Bool) async throws -> SettledHeld {
+        try keep(directory, paths, writeBack)
+    }
 }
 #endif
 #endif
