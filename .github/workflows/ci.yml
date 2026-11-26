@@ -240,6 +240,9 @@ jobs:
           server_env="$("${MARFA_MONOREPO}/core/scripts/server-up.sh")"
           eval "${server_env}"
           export MARFA_API_URL="${MARFA_TEST_URL}" MARFA_API_KEY="${MARFA_TEST_KEY}"
+          # Every live test shares this key, and each hydration reads `/keys/current`, so the suite passes the
+          # default of 200 `/keys` requests a minute for one key. The general request limit stays as it is.
+          MARFA_NO_KEYCHAIN=1 "${MARFA_CLI}" config set rate_limit_keys_requests 1000000
           swift build 2>&1 | tee "${RUNNER_TEMP}/swift-build.log"
           # What the package writes by hand builds without a warning. The generated wire types are out of
           # this check: their warnings come from the pinned generator, and `scripts/core.sh` rewrites them.

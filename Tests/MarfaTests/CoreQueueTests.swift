@@ -109,8 +109,12 @@ struct ACoreQueue {
         let ran = Mutex<qos_class_t?>(nil)
         // Awaiting the task would raise its priority to the test's, so its answer is polled for.
         Task(priority: priority) {
-            let qos = try await queue.run { qos_class_self() }
-            ran.withLock { $0 = qos }
+            do {
+                let qos = try await queue.run { qos_class_self() }
+                ran.withLock { $0 = qos }
+            } catch {
+                Issue.record(error, "the job threw")
+            }
         }
         try await eventually("the job ran") { ran.withLock { $0 } != nil }
         #expect(ran.withLock { $0 } == expected.rawValue)
