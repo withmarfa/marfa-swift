@@ -69,6 +69,10 @@ public struct ServerCatalog: Sendable, Hashable {
 /// An item type, read as the server's `GET /types/{id}` answers it.
 public struct ItemType: Sendable, Hashable, Identifiable {
     public let id: String
+    /// Where this type came from, independent of its parent.
+    public let origin: TypeOrigin
+    /// The plugin that installed this type, including after the plugin is removed.
+    public let plugin: TypePlugin?
     public let label: String?
     /// The name an app shows for more than one item of the type, such as `People`: the type's own, else one made
     /// from its label.
@@ -132,11 +136,14 @@ public struct ItemType: Sendable, Hashable, Identifiable {
         version: Int64 = 0, fields: [TypeField] = [], tables: JSONObject = [:], titleField: String? = nil,
         bodyField: String? = nil,
         nameFromBody: Bool = true, icon: String? = nil,
-        linkField: String? = nil, roles: [String] = [], feedDays: Int? = nil
+        linkField: String? = nil, roles: [String] = [], feedDays: Int? = nil,
+        origin: TypeOrigin = .unknown, plugin: TypePlugin? = nil
     ) {
         // An empty label or plural names nothing, as the core reads one.
         let label = label.flatMap { $0.isEmpty ? nil : $0 }
         self.id = id
+        self.origin = origin == .plugin && plugin == nil ? .unknown : origin
+        self.plugin = origin == .plugin ? plugin : nil
         self.label = label
         self.plural =
             plural.flatMap { $0.isEmpty ? nil : $0 }
@@ -164,7 +171,34 @@ public struct ItemType: Sendable, Hashable, Identifiable {
             parent: core.parent, version: core.version, fields: core.fields.map(TypeField.init),
             tables: JSONObject(core.tables), titleField: core.titleField,
             bodyField: core.bodyField, nameFromBody: core.nameFromBody, icon: core.icon, linkField: core.linkField,
-            roles: core.roles, feedDays: core.feedDays.map(Int.init))
+            roles: core.roles, feedDays: core.feedDays.map(Int.init), origin: TypeOrigin(core.origin),
+            plugin: core.plugin.map { TypePlugin(name: $0.name, version: $0.version) })
+    }
+}
+
+public enum TypeOrigin: Sendable, Hashable, CaseIterable {
+    case platform
+    case registered
+    case plugin
+    case unknown
+
+    init(_ core: MarfaCore.TypeOrigin) {
+        switch core {
+        case .platform: self = .platform
+        case .registered: self = .registered
+        case .plugin: self = .plugin
+        case .unknown: self = .unknown
+        }
+    }
+}
+
+public struct TypePlugin: Sendable, Hashable {
+    public let name: String
+    public let version: String
+
+    public init(name: String, version: String) {
+        self.name = name
+        self.version = version
     }
 }
 

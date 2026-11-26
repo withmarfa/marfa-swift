@@ -149,6 +149,9 @@ enum Declaring {
         if let issue = textIssue(definition, id: id) {
             throw Refuse.invalid("\(id) declares text that does not hold: \(issue)")
         }
+        if Properties.value(definition, "provenance") != nil {
+            throw FakeCopyError.unsupported(call: "declareTypes with provenance in \(id)")
+        }
         if Properties.value(definition, "tables") != nil {
             throw FakeCopyError.unsupported(call: "declareTypes with a table in \(id)")
         }

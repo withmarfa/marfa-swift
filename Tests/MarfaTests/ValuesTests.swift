@@ -489,7 +489,7 @@ struct CatalogTypes {
                             declaredBy: "user.recipe", definition: ["type": "string"]),
                     ],
                     titleField: "title", bodyField: "method", nameFromBody: false, icon: "lucide:chef-hat",
-                    linkField: "vendor_id", roles: ["container"], feedDays: 90))
+                    linkField: "vendor_id", roles: ["container"], feedDays: 90, origin: .registered))
         #expect(type.feedDays == 90)
     }
 
