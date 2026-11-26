@@ -38,6 +38,14 @@ public final class MemoryKeychain: Sendable {
         items.state.withLock { $0.writeFailure = status }
     }
 
+    /// How many reads it was asked for, refused ones included.
+    ///
+    /// Compare it before and after a call to show the call read nothing: a refused read the call set aside leaves
+    /// no other trace.
+    public var reads: Int {
+        items.state.withLock { $0.reads }
+    }
+
     /// Stops failing reads and writes.
     ///
     /// What was kept is as it was.
@@ -91,6 +99,7 @@ public final class MemoryKeychain: Sendable {
         var items: [Key: Item] = [:]
         var readFailure: OSStatus?
         var writeFailure: OSStatus?
+        var reads = 0
     }
 
     private final class Items: KeychainBackend {
@@ -98,6 +107,7 @@ public final class MemoryKeychain: Sendable {
 
         private func read<T>(_ work: (State) -> T) throws -> T {
             try state.withLock {
+                $0.reads += 1
                 if let status = $0.readFailure { throw Keychain.Failure(status: status) }
                 return work($0)
             }

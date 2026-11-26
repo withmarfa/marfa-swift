@@ -200,6 +200,7 @@ struct FolderFileBehaviorTests {
         let folders = FolderRegistry.folders(server: server)
         #expect(FolderRegistry.isNamed)
 
+        let reads = memory.reads
         let listed = await #expect(throws: MarfaError.self) { try await folders.heldFiles(in: directory) }
         #expect(refusesAsNotAFolder(listed))
         let trashed = await #expect(throws: MarfaError.self) {
@@ -210,16 +211,19 @@ struct FolderFileBehaviorTests {
             try await folders.keepHeld(in: directory, paths: ["held.md"], writeBack: false)
         }
         #expect(refusesAsNotAFolder(kept))
+        #expect(memory.reads == reads, "a local held call read the keychain")
 
         let writtenBack = await #expect(throws: Keychain.Failure.self) {
             try await folders.keepHeld(in: directory, paths: ["held.md"], writeBack: true)
         }
         #expect(writtenBack?.status == errSecInteractionNotAllowed)
+        #expect(memory.reads > reads, "the count sees a read")
     }
 
     /// The calls the core works locally read no sign-in, so a locked keychain doesn't stop them.
     ///
-    /// Pause and resume tell the server only when the sign-in can be read. A sync reaches the server, and so reads it.
+    /// Pause and resume try the sign-in, to tell the server, and go on without it. A sync reaches the server, and so
+    /// reads it.
     @Test func theLocalFolderCallsReadNoSignIn() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: "marfa-local-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -231,25 +235,38 @@ struct FolderFileBehaviorTests {
         let folders = FolderRegistry.folders(server: server)
         #expect(FolderRegistry.isNamed)
 
+        var reads = memory.reads
         await #expect(throws: Never.self) { _ = try await folders.list() }
-        let refusals: [(String, () async throws -> Void)] = [
+        #expect(memory.reads == reads, "list")
+        let local: [(String, () async throws -> Void)] = [
             ("status", { _ = try await folders.status(of: directory) }),
             ("removeUnmatched", { _ = try await folders.removeUnmatched(in: directory, paths: ["a.md"]) }),
             ("keptFiles", { _ = try await folders.keptFiles(in: directory) }),
             ("discardKept", { _ = try await folders.discardKept(in: directory) }),
             ("confirmFirstSync", { _ = try await folders.confirmFirstSync(in: directory) }),
             ("confirmRemoval", { _ = try await folders.confirmRemoval(in: directory) }),
-            ("pause", { _ = try await folders.pause(directory) }),
-            ("resume", { _ = try await folders.resume(directory) }),
             ("remove", { _ = try await folders.remove(directory) }),
         ]
-        for (call, work) in refusals {
+        for (call, work) in local {
             let refused = await #expect(throws: MarfaError.self, "\(call)") { try await work() }
             #expect(refusesAsNotAFolder(refused), "\(call)")
+            #expect(memory.reads == reads, "\(call) read the keychain")
+        }
+
+        let reporting: [(String, () async throws -> Void)] = [
+            ("pause", { _ = try await folders.pause(directory) }),
+            ("resume", { _ = try await folders.resume(directory) }),
+        ]
+        for (call, work) in reporting {
+            let refused = await #expect(throws: MarfaError.self, "\(call)") { try await work() }
+            #expect(refusesAsNotAFolder(refused), "\(call)")
+            #expect(memory.reads > reads, "\(call) tries the sign-in")
+            reads = memory.reads
         }
 
         let synced = await #expect(throws: Keychain.Failure.self) { try await folders.sync(directory) }
         #expect(synced?.status == errSecInteractionNotAllowed)
+        #expect(memory.reads > reads, "the count sees a read")
     }
 }
 #endif
