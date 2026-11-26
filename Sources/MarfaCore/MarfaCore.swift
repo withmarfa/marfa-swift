@@ -3632,6 +3632,19 @@ public protocol FoldersProtocol: AnyObject, Sendable {
     func discardKept(dir: String) throws  -> KeptDiscarded
     
     /**
+     * The folder's held files, in path order. Asks no watch for the folder.
+     */
+    func held(dir: String) throws  -> [HeldFile]
+    
+    /**
+     * Keeps each named held file's item and lets the folder's file of it
+     * go. With `write_back`, writes the file again where the folder's
+     * query holds the item, never over a file now at its path. Asks a
+     * watch that holds the folder to let it go, as `add` does.
+     */
+    func keepHeld(dir: String, paths: [String], writeBack: Bool) throws  -> SettledHeld
+    
+    /**
      * Lists kept-file records in path order, even while a watch holds the folder.
      */
     func kept(dir: String) throws  -> [KeptFile]
@@ -3708,6 +3721,13 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * it go, as `add` does.
      */
     func sync(dir: String) throws  -> FolderSyncOutcome
+    
+    /**
+     * Sends the delete of each named held file's item, checked against
+     * the item's version. Show the person each file before calling. Asks
+     * a watch that holds the folder to let it go, as `add` does.
+     */
+    func trashHeld(dir: String, paths: [String]) throws  -> SettledHeld
     
     /**
      * Keeps the folder in step on a thread of its own, as the command
@@ -3868,6 +3888,35 @@ open func discardKept(dir: String)throws  -> KeptDiscarded  {
 }
     
     /**
+     * The folder's held files, in path order. Asks no watch for the folder.
+     */
+open func held(dir: String)throws  -> [HeldFile]  {
+    return try  FfiConverterSequenceTypeHeldFile.lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_held(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Keeps each named held file's item and lets the folder's file of it
+     * go. With `write_back`, writes the file again where the folder's
+     * query holds the item, never over a file now at its path. Asks a
+     * watch that holds the folder to let it go, as `add` does.
+     */
+open func keepHeld(dir: String, paths: [String], writeBack: Bool)throws  -> SettledHeld  {
+    return try  FfiConverterTypeSettledHeld_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_keep_held(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),
+        FfiConverterSequenceString.lower(paths),
+        FfiConverterBool.lower(writeBack),$0
+    )
+})
+}
+    
+    /**
      * Lists kept-file records in path order, even while a watch holds the folder.
      */
 open func kept(dir: String)throws  -> [KeptFile]  {
@@ -4004,6 +4053,21 @@ open func sync(dir: String)throws  -> FolderSyncOutcome  {
     uniffi_marfa_core_ffi_fn_method_folders_sync(
             self.uniffiCloneHandle(),
         FfiConverterString.lower(dir),$0
+    )
+})
+}
+    
+    /**
+     * Sends the delete of each named held file's item, checked against
+     * the item's version. Show the person each file before calling. Asks
+     * a watch that holds the folder to let it go, as `add` does.
+     */
+open func trashHeld(dir: String, paths: [String])throws  -> SettledHeld  {
+    return try  FfiConverterTypeSettledHeld_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
+    uniffi_marfa_core_ffi_fn_method_folders_trash_held(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(dir),
+        FfiConverterSequenceString.lower(paths),$0
     )
 })
 }
@@ -8278,6 +8342,78 @@ public func FfiConverterTypeFound_lower(_ value: Found) -> RustBuffer {
 }
 
 
+/**
+ * A missing file whose deletion is held, because Marfa cannot tell whether
+ * it was deleted or moved into another folder.
+ */
+public struct HeldFile: Equatable, Hashable {
+    public var path: String
+    public var item: String
+    /**
+     * When this folder first found it missing.
+     */
+    public var missingSince: String
+    public var reason: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(path: String, item: String, 
+        /**
+         * When this folder first found it missing.
+         */missingSince: String, reason: String) {
+        self.path = path
+        self.item = item
+        self.missingSince = missingSince
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension HeldFile: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeHeldFile: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> HeldFile {
+        return
+            try HeldFile(
+                path: FfiConverterString.read(from: &buf), 
+                item: FfiConverterString.read(from: &buf), 
+                missingSince: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: HeldFile, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.path, into: &buf)
+        FfiConverterString.write(value.item, into: &buf)
+        FfiConverterString.write(value.missingSince, into: &buf)
+        FfiConverterString.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHeldFile_lift(_ buf: RustBuffer) throws -> HeldFile {
+    return try FfiConverterTypeHeldFile.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeHeldFile_lower(_ value: HeldFile) -> RustBuffer {
+    return FfiConverterTypeHeldFile.lower(value)
+}
+
+
 public struct HeldTable: Equatable, Hashable {
     public var itemId: String
     public var table: String
@@ -11713,6 +11849,125 @@ public func FfiConverterTypeSettingsFileOutcome_lift(_ buf: RustBuffer) throws -
 #endif
 public func FfiConverterTypeSettingsFileOutcome_lower(_ value: SettingsFileOutcome) -> RustBuffer {
     return FfiConverterTypeSettingsFileOutcome.lower(value)
+}
+
+
+/**
+ * What settling held files did.
+ */
+public struct SettledHeld: Equatable, Hashable {
+    /**
+     * Files whose items' deletes are queued, sent at the next sync.
+     */
+    public var trashed: [String]
+    /**
+     * Files whose items were already in the bin or gone.
+     */
+    public var gone: [String]
+    /**
+     * Files one other readable folder now holds, whose items stay.
+     */
+    public var moved: [String]
+    /**
+     * Files whose items stay, and which the folder lets go.
+     */
+    public var kept: [String]
+    /**
+     * Kept files written again.
+     */
+    public var writtenBack: [String]
+    /**
+     * Kept files not written again, each with why.
+     */
+    public var notWrittenBack: [FlaggedFile]
+    /**
+     * Named files left as they were, each with why.
+     */
+    public var notSettled: [UnsureFile]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * Files whose items' deletes are queued, sent at the next sync.
+         */trashed: [String], 
+        /**
+         * Files whose items were already in the bin or gone.
+         */gone: [String], 
+        /**
+         * Files one other readable folder now holds, whose items stay.
+         */moved: [String], 
+        /**
+         * Files whose items stay, and which the folder lets go.
+         */kept: [String], 
+        /**
+         * Kept files written again.
+         */writtenBack: [String], 
+        /**
+         * Kept files not written again, each with why.
+         */notWrittenBack: [FlaggedFile], 
+        /**
+         * Named files left as they were, each with why.
+         */notSettled: [UnsureFile]) {
+        self.trashed = trashed
+        self.gone = gone
+        self.moved = moved
+        self.kept = kept
+        self.writtenBack = writtenBack
+        self.notWrittenBack = notWrittenBack
+        self.notSettled = notSettled
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension SettledHeld: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeSettledHeld: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SettledHeld {
+        return
+            try SettledHeld(
+                trashed: FfiConverterSequenceString.read(from: &buf), 
+                gone: FfiConverterSequenceString.read(from: &buf), 
+                moved: FfiConverterSequenceString.read(from: &buf), 
+                kept: FfiConverterSequenceString.read(from: &buf), 
+                writtenBack: FfiConverterSequenceString.read(from: &buf), 
+                notWrittenBack: FfiConverterSequenceTypeFlaggedFile.read(from: &buf), 
+                notSettled: FfiConverterSequenceTypeUnsureFile.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: SettledHeld, into buf: inout [UInt8]) {
+        FfiConverterSequenceString.write(value.trashed, into: &buf)
+        FfiConverterSequenceString.write(value.gone, into: &buf)
+        FfiConverterSequenceString.write(value.moved, into: &buf)
+        FfiConverterSequenceString.write(value.kept, into: &buf)
+        FfiConverterSequenceString.write(value.writtenBack, into: &buf)
+        FfiConverterSequenceTypeFlaggedFile.write(value.notWrittenBack, into: &buf)
+        FfiConverterSequenceTypeUnsureFile.write(value.notSettled, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSettledHeld_lift(_ buf: RustBuffer) throws -> SettledHeld {
+    return try FfiConverterTypeSettledHeld.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeSettledHeld_lower(_ value: SettledHeld) -> RustBuffer {
+    return FfiConverterTypeSettledHeld.lower(value)
 }
 
 
@@ -19651,6 +19906,31 @@ fileprivate struct FfiConverterSequenceTypeFlaggedFile: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeHeldFile: FfiConverterRustBuffer {
+    typealias SwiftType = [HeldFile]
+
+    public static func write(_ value: [HeldFile], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeHeldFile.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [HeldFile] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [HeldFile]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeHeldFile.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeHeldTable: FfiConverterRustBuffer {
     typealias SwiftType = [HeldTable]
 
@@ -21004,6 +21284,12 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_discard_kept() != 64486) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_held() != 45429) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_keep_held() != 17792) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_marfa_core_ffi_checksum_method_folders_kept() != 18161) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -21029,6 +21315,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_sync() != 24267) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_marfa_core_ffi_checksum_method_folders_trash_held() != 35566) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_watch() != 17682) {
