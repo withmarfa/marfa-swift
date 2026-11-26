@@ -137,8 +137,8 @@ public struct HeldFile: Sendable, Hashable {
 
 /// What settling held files did, for each file the call named.
 ///
-/// A file the call could not settle is in ``notSettled`` with why, and stays held: check it before telling the
-/// person the delete went through.
+/// Before reporting that a delete is queued, check both ``trashed`` and ``notSettled`` for its path.
+/// A path can occur more than once when multiple items were held there.
 public struct SettledHeld: Sendable, Hashable {
     /// Files whose items' deletes are queued, sent at the next sync.
     public let trashed: [String]
@@ -152,7 +152,7 @@ public struct SettledHeld: Sendable, Hashable {
     public let writtenBack: [String]
     /// Kept files not written again, each with why.
     public let notWrittenBack: [FlaggedFile]
-    /// Named files left as they were and still held, each with why.
+    /// Named files left as they were, each with why. Any existing hold remains.
     public let notSettled: [UnsureFile]
 
     public init(

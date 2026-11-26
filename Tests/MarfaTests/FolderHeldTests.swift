@@ -46,14 +46,12 @@ extension LiveWorkingCopies {
                 #expect(!file.missingSince.isEmpty && !file.reason.isEmpty)
             }
 
-            // Status shows each as held with the same reason the list gives.
             let status = try await folders.status(of: first).files.filter { $0.state == .held }
             #expect(status.map(\.path).sorted() == held.map(\.path))
             for file in held {
                 let shown = try #require(status.first { $0.path == file.path })
                 #expect(shown.hold == .unsure && shown.reason == file.reason && shown.itemId == file.item)
             }
-            // A folder with no hold has an empty list, and a path that is not a folder is refused.
             #expect(try await folders.heldFiles(in: second).isEmpty)
             await #expect(throws: MarfaError.self) { try await folders.heldFiles(in: first.appending(path: "nowhere")) }
 

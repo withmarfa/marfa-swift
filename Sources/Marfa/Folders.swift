@@ -26,14 +26,15 @@ import Synchronization
 /// `readingHandle` at once while another process holds the folder. `status(of:)` still answers beside a watch.
 /// Every call runs off the caller's thread.
 public struct Folders: FolderFileManaging {
-    /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)` and `watch(_:)` reach.
+    /// The server that `add(_:following:)`, `sync(_:)`, `restoreRemoval(in:)`, `watch(_:)` and
+    /// `keepHeld(in:paths:writeBack:)` with `writeBack: true` can reach.
     public let server: Server?
 
     /// Creates a value that works the Mac's folders, reaching `server` where one is given.
     ///
     /// Without a server, only `list()`, `status(of:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
-    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)`, the unmatched and kept file calls, `heldFiles(in:)` and
-    /// `trashHeld(in:paths:)` work.
+    /// `restoreRemoval(in:)`, `remove(_:)`, `pause(_:)`, `resume(_:)`, the unmatched and kept file calls,
+    /// `heldFiles(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` with `writeBack: false` work.
     public init(server: Server? = nil) {
         self.server = server
     }
@@ -95,9 +96,9 @@ public struct Folders: FolderFileManaging {
     /// Queues the delete of each named held file's item, checked against the item's version.
     ///
     /// Show the person each file first. Each path is relative to the folder. The delete is sent at the next sync.
-    /// A file the call can't settle, because another folder now holds it or its item changed meanwhile, comes back
-    /// in ``SettledHeld/notSettled`` with why, and stays held. Needs no server. Like `removeUnmatched(in:paths:)`,
-    /// this waits up to ten seconds for a watch to release the folder.
+    /// A file found in another folder as a move comes back in ``SettledHeld/moved`` and its item stays. A path the
+    /// call can't settle comes back in ``SettledHeld/notSettled`` with why. This needs no server, waits up to
+    /// 10 seconds for a watch to release the folder, and throws ``MarfaError/syncPaused(message:)`` while paused.
     public func trashHeld(in directory: URL, paths: [String]) async throws -> SettledHeld {
         try await run { folders in
             SettledHeld(try folders.trashHeld(dir: directory.path(percentEncoded: false), paths: paths))
@@ -106,10 +107,11 @@ public struct Folders: FolderFileManaging {
 
     /// Keeps each named held file's item and lets the folder's file of it go.
     ///
-    /// With `writeBack`, writes the file again where the folder's query holds the item, never over a file now at
-    /// its path; a file it can't write comes back in ``SettledHeld/notWrittenBack`` with why. A file the call can't
-    /// settle comes back in ``SettledHeld/notSettled`` and stays held. Like `removeUnmatched(in:paths:)`, this waits
-    /// up to ten seconds for a watch to release the folder.
+    /// With `writeBack`, writes the file again where the folder's query holds the item. A settled file the call
+    /// can't write comes back in ``SettledHeld/notWrittenBack`` with why. A path the call can't settle, such as
+    /// one occupied by another item's file that write-back would replace, comes back in ``SettledHeld/notSettled``.
+    /// This waits up to 10 seconds for a watch to release the folder, and throws ``MarfaError/syncPaused(message:)``
+    /// while paused.
     public func keepHeld(in directory: URL, paths: [String], writeBack: Bool = false) async throws -> SettledHeld {
         try await run { folders in
             SettledHeld(
@@ -119,9 +121,10 @@ public struct Folders: FolderFileManaging {
 
     /// Pauses the directory's sync until ``resume(_:)``.
     ///
-    /// A watch skips the folder, and `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)` and
-    /// `restoreRemoval(in:)` throw ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it
-    /// stands, and the files stay as they are. Returns whether the sync was running.
+    /// A watch skips the folder, and `sync(_:)`, `confirmFirstSync(in:)`, `confirmRemoval(in:)`,
+    /// `restoreRemoval(in:)`, `trashHeld(in:paths:)` and `keepHeld(in:paths:writeBack:)` throw
+    /// ``MarfaError/syncPaused(message:)``. Nothing is sent or written while it stands, and the files stay as they
+    /// are. Returns whether the sync was running.
     @discardableResult
     public func pause(_ directory: URL) async throws -> Bool {
         let dir = directory.path(percentEncoded: false)
@@ -924,11 +927,11 @@ public struct FlaggedFile: Sendable, Hashable {
     public let path: String
     public let flag: String
     public let reason: String
-    /// The id of the item a pull held back, where a pull did.
+    /// The ID of the item whose file could not be written, where known.
     ///
-    /// Set for a `flag` of `unwritten`, `outside`, `unsuited` or `absent`, where the pull didn't write the item's
-    /// file. Then `path` is where the pull would have written the file, or the item's own file where it left that
-    /// file as it stands. `nil` for a file the scan flagged. Two items held back at one path are two entries.
+    /// A pull sets this for `unwritten`, `outside`, `unsuited` or `absent`. Then `path` names where the pull
+    /// would have written the file or where it left the item's file. A held-file write-back also sets this for
+    /// `outside_query`. A file the scan flagged has `nil` here. Two items held back at one path are two entries.
     public let item: String?
 
     public init(path: String, flag: String, reason: String, item: String? = nil) {
