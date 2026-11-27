@@ -32,7 +32,7 @@ struct StorageUsageTests {
         #expect(usage.filesByKind.pdfs == .init(count: 1, bytes: 17))
         #expect(usage.filesByKind.audioAndVideo == .init(count: 3, bytes: 31))
         #expect(usage.filesByKind.other == .init(count: 4, bytes: 47))
-        #expect(usage.filesByKind.inDisplayOrder.map(\.count) == [2, 1, 3, 4])
+        #expect(StorageUsage.Kind.allCases.map { usage.filesByKind[$0].count } == [2, 1, 3, 4])
         #expect(usage.databaseBytes == 4096 && usage.writeAheadLogBytes == 8192)
         #expect(usage.freeBytes == 18_014_398_509_481_985 && usage.diskSizeBytes == 36_028_797_018_963_967)
 
@@ -92,7 +92,7 @@ struct StorageUsageTests {
     func liveStorageUsageReportsMatchingTotalsAndAvailableSpace() async throws {
         let server = try #require(Live.server)
         let usage = try await server.storageUsage()
-        let kinds = usage.filesByKind.inDisplayOrder
+        let kinds = StorageUsage.Kind.allCases.map { usage.filesByKind[$0] }
         #expect(kinds.reduce(0) { $0 + $1.count } == usage.files.count)
         #expect(kinds.reduce(0) { $0 + $1.bytes } == usage.files.bytes)
         #expect(usage.freeBytes != nil)

@@ -14,6 +14,20 @@ public struct StorageUsage: Sendable, Hashable {
         }
     }
 
+    /// A kind of stored file, as the server groups files by media type.
+    ///
+    /// `allCases` lists the kinds in the order a usage bar draws them.
+    public enum Kind: Sendable, Hashable, CaseIterable {
+        /// Files whose media type is `image/*`.
+        case pictures
+        /// Files whose media type is `application/pdf`.
+        case pdfs
+        /// Files whose media type is `audio/*` or `video/*`.
+        case audioAndVideo
+        /// Files of any other media type.
+        case other
+    }
+
     /// The usage of stored files grouped by media type.
     public struct FilesByKind: Sendable, Hashable {
         /// The usage of image files.
@@ -25,8 +39,15 @@ public struct StorageUsage: Sendable, Hashable {
         /// The usage of files outside the preceding kinds.
         public let other: FileUsage
 
-        /// The readings for pictures, PDFs, audio and video, and other files, in that order.
-        public var inDisplayOrder: [FileUsage] { [pictures, pdfs, audioAndVideo, other] }
+        /// The reading for the given kind of file.
+        public subscript(kind: Kind) -> FileUsage {
+            switch kind {
+            case .pictures: pictures
+            case .pdfs: pdfs
+            case .audioAndVideo: audioAndVideo
+            case .other: other
+            }
+        }
 
         /// Creates a breakdown with a reading for each file kind.
         public init(pictures: FileUsage, pdfs: FileUsage, audioAndVideo: FileUsage, other: FileUsage) {
