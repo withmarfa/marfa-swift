@@ -17,8 +17,12 @@ public enum ItemStatsGrouping: String, Sendable, Hashable, CaseIterable {
 /// absent, its `created_at`.
 public struct ItemStatsFilters: Sendable, Hashable {
     /// Up to ten type identifiers or wildcard patterns, each including its subtypes.
+    ///
+    /// Use `nil` to omit the type filter. The server refuses an empty set.
     public var types: Set<String>?
-    /// The lifecycle states to count. `nil` counts every state, including the bin.
+    /// The lifecycle states to count.
+    ///
+    /// Use `nil` to count every state, including the bin. The server refuses an empty set.
     public var states: Set<ItemState>?
     /// The tier to count. `nil` counts both tiers.
     public var tier: Tier?
@@ -36,7 +40,9 @@ public struct ItemStatsFilters: Sendable, Hashable {
     public var updatedAfter: String?
     /// Exclusive upper bound on the time the item was last changed.
     public var updatedBefore: String?
-    /// An expression in the server's listing grammar, including readable `edge` and `backref` terms.
+    /// An expression in the server's listing grammar.
+    ///
+    /// An `edge` or `backref` term requires read access to the edge type it names.
     public var filter: String?
     /// The ID of an item to count along with its readable descendants.
     ///
