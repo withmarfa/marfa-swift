@@ -198,20 +198,27 @@ struct LiveSignIn {
         Draft(type: "core.note", properties: ["title": .string(title), "body": "b", "notes": "n"], tier: .library)
     }
 
-    /// The owner's session cookie, as a `Cookie` header, from a password sign-in.
+    /// The owner's session cookie, as a `Cookie` header, from the sign-in page's password form.
     private static func ownerCookie(_ own: OwnServer, _ session: URLSession) async throws -> String {
         let owner = try #require(own.owner, "the server printed no test owner")
         let origin = own.url.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        var fields = URLComponents()
+        fields.queryItems = [
+            URLQueryItem(name: "username", value: owner.username),
+            URLQueryItem(name: "password", value: owner.password),
+        ]
         var signIn = URLRequest(url: try #require(URL(string: "\(origin)/auth/sign-in")))
         signIn.httpMethod = "POST"
-        signIn.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        signIn.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         signIn.setValue(origin, forHTTPHeaderField: "Origin")
-        signIn.httpBody = try JSONSerialization.data(withJSONObject: [
-            "username": owner.username, "password": owner.password,
-        ])
-        let (_, signedIn) = try await session.data(for: signIn)
+        signIn.httpBody = Data(
+            (fields.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B").utf8)
+        let (_, signedIn) = try await session.data(for: signIn, delegate: NoRedirect())
         let response = try #require(signedIn as? HTTPURLResponse)
-        try #require(response.statusCode == 200, "the owner could not sign in: \(response.statusCode)")
+        let location = response.value(forHTTPHeaderField: "Location") ?? ""
+        try #require(
+            response.statusCode == 302 && !location.contains("error="),
+            "the owner could not sign in: \(response.statusCode) \(location)")
         let cookies = HTTPCookie.cookies(
             withResponseHeaderFields: response.allHeaderFields as? [String: String] ?? [:], for: own.url)
         let cookie = try #require(cookies.first { $0.name == "marfa_session" })
