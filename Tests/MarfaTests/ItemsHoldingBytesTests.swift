@@ -38,6 +38,11 @@ private func holders(count: Int, hash: String, items: String = "[]", more: Bool 
     return #"{"data":[\#(Array(repeating: entry, count: count).joined(separator: ","))]}"#
 }
 
+private func holderItems(_ count: Int) -> String {
+    let items = (0..<count).map { #"{"id":"item-\#($0)","type":"core.file","title":null}"# }
+    return "[\(items.joined(separator: ","))]"
+}
+
 private func requestedHashes(_ raw: String) -> [String]? {
     guard let range = raw.range(of: "\r\n\r\n") else { return nil }
     guard let object = try? JSONSerialization.jsonObject(with: Data(raw[range.upperBound...].utf8)) as? [String: Any]
@@ -173,7 +178,7 @@ struct ItemsHoldingBytes {
             }
             return (
                 200, "application/json",
-                holders(count: 1, hash: abcHash, items: "[\(item),\(nullTitle)]", more: true)
+                holders(count: 1, hash: abcHash, items: "[\(item),\(nullTitle)]", more: false)
             )
         }
         defer { local.stop() }
@@ -189,7 +194,7 @@ struct ItemsHoldingBytes {
                     items: [
                         FileHolder(id: "item-1", type: "core.file", title: "Shot"),
                         FileHolder(id: "item-2", type: "core.file", title: nil),
-                    ], more: true))
+                    ], more: false))
         let sent = local.log.all.compactMap(requestedHashes)
         #expect(sent == [[abcHash]])
     }
@@ -232,6 +237,41 @@ struct ItemsHoldingBytes {
         #expect(try await asked.itemsHoldingBytes(of: []).isEmpty)
         #expect(try await asked.itemsHoldingBytes(of: [folder]) == [.notAFile])
         #expect(local.log.all.isEmpty)
+    }
+
+    @Test func aLinkThatReplacesACachedFileIsNotFollowed() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let cached = try write("cached.txt", Data("abc".utf8), in: folder)
+        let target = try write("target.txt", Data("xyz".utf8), in: folder)
+        let plain = folder.appending(path: "plain")
+        try FileManager.default.createSymbolicLink(at: plain, withDestinationURL: target)
+        let pipe = folder.appending(path: "pipe")
+        #expect(mkfifo(pipe.path(percentEncoded: false), 0o644) == 0)
+        let regular = try write("abc.txt", Data("abc".utf8), in: folder)
+
+        #expect(try cached.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true)
+        try FileManager.default.removeItem(at: cached)
+        try FileManager.default.createSymbolicLink(at: cached, withDestinationURL: target)
+        #expect(try cached.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true)
+
+        let (local, asked) = try await server { method, path in
+            guard (method, path) == ("POST", "/items/blobs") else {
+                return (500, "application/json", #"{"error":{"code":"unexpected","message":"\#(method) \#(path)"}}"#)
+            }
+            return (200, "application/json", holders(count: 1, hash: abcHash))
+        }
+        defer { local.stop() }
+        let started = ContinuousClock.now
+        let matches = try await asked.itemsHoldingBytes(of: [regular, plain, cached, pipe, folder])
+        #expect(ContinuousClock.now - started < .seconds(2))
+        #expect(
+            matches
+                == [
+                    .held(hash: abcHash, items: [], more: false),
+                    .notAFile, .notAFile, .notAFile, .notAFile,
+                ])
+        #expect(local.log.all.compactMap(requestedHashes) == [[abcHash]])
     }
 
     @Test func aLookupFailureThrowsAndAnEmptyAnswerDoesNot() async throws {
@@ -322,6 +362,60 @@ struct ItemsHoldingBytes {
                 return
             }
         }
+    }
+
+    @Test func anAnswerWithTooManyHoldersOrMoreSetEarlyThrows() async throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = try write("abc.txt", Data("abc".utf8), in: folder)
+        let rejected = [
+            holders(count: 1, hash: abcHash, items: holderItems(0), more: true),
+            holders(count: 1, hash: abcHash, items: holderItems(2), more: true),
+            holders(count: 1, hash: abcHash, items: holderItems(19), more: true),
+            holders(count: 1, hash: abcHash, items: holderItems(21), more: false),
+            holders(count: 1, hash: abcHash, items: holderItems(21), more: true),
+        ]
+        let accepted = [
+            holders(count: 1, hash: abcHash, items: holderItems(20), more: true),
+            holders(count: 1, hash: abcHash, items: holderItems(20), more: false),
+            holders(count: 1, hash: abcHash, items: holderItems(19), more: false),
+        ]
+        let bodies = rejected + accepted
+        let index = Mutex(0)
+        let (local, asked) = try await server { _, _ in
+            let cursor = index.withLock { value -> Int in
+                let cursor = value
+                value += 1
+                return cursor
+            }
+            return (200, "application/json", bodies[cursor])
+        }
+        defer { local.stop() }
+        for _ in rejected {
+            let error = await thrown { try await asked.itemsHoldingBytes(of: [file]) }
+            guard case .decoding = error else {
+                Issue.record("the holder list was \(String(describing: error))")
+                return
+            }
+        }
+        let full = try await asked.itemsHoldingBytes(of: [file])
+        guard case .held(_, let fullItems, true) = full.first else {
+            Issue.record("twenty holders with more were \(full)")
+            return
+        }
+        #expect(fullItems.count == 20 && fullItems.first?.id == "item-0" && fullItems.last?.id == "item-19")
+        let exact = try await asked.itemsHoldingBytes(of: [file])
+        guard case .held(_, let exactItems, false) = exact.first else {
+            Issue.record("twenty holders were \(exact)")
+            return
+        }
+        #expect(exactItems.count == 20)
+        let short = try await asked.itemsHoldingBytes(of: [file])
+        guard case .held(_, let shortItems, false) = short.first else {
+            Issue.record("nineteen holders were \(short)")
+            return
+        }
+        #expect(shortItems.count == 19)
     }
 
     @Test func appsCanBuildTheValuesForPreviews() {

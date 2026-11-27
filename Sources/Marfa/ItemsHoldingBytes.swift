@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 /// An item the key can list that holds the file's bytes.
@@ -94,6 +95,10 @@ extension Server {
         guard wire.data.count == hashes.count, zip(hashes, wire.data).allSatisfy({ $0.0 == $0.1.hash }) else {
             throw .decoding(message: "\(origin) answered hashes that are not the ones asked, in that order")
         }
+        let page = FileDigest.holderPage
+        guard wire.data.allSatisfy({ $0.items.count <= page && !($0.more && $0.items.count < page) }) else {
+            throw .decoding(message: "\(origin) answered a hash with a holder list its more does not match")
+        }
         return wire.data
     }
 }
@@ -101,6 +106,8 @@ extension Server {
 /// SHA-256 of a file, and the request size `POST /items/blobs` accepts.
 enum FileDigest {
     static let chunkBytes = 1 << 20
+    /// `POST /items/blobs` answers at most this many items for one hash (`items/blobs-list`).
+    static let holderPage = 20
     /// `POST /items/blobs` refuses a list longer than this (`items/blobs-limits`).
     static let lookupLimit = 200
 
@@ -117,10 +124,14 @@ enum FileDigest {
     }
 
     static func sha256(of file: URL, chunkBytes size: Int = chunkBytes) throws -> String {
-        let handle = try FileHandle(forReadingFrom: file)
-        defer { try? handle.close() }
-        return try sha256 {
-            try handle.read(upToCount: size)
+        guard case .descriptor(let fd) = openForDigest(file) else { throw CocoaError(.fileReadUnknown) }
+        defer { Darwin.close(fd) }
+        return try sha256(descriptor: fd, chunkBytes: size)
+    }
+
+    static func sha256(descriptor fd: Int32, chunkBytes size: Int = chunkBytes) throws -> String {
+        try sha256 {
+            try readChunk(fd, size)
         }
     }
 
@@ -153,21 +164,79 @@ private func prepare(_ files: [URL]) async throws -> [LocalFile] {
 
 private func classify(_ file: URL) throws -> LocalFile {
     try Task.checkCancellation()
-    let regular: Bool
-    do {
-        regular = try file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true
-    } catch is CancellationError {
-        throw CancellationError()
-    } catch {
-        return .unreadable
+    switch openForDigest(file) {
+    case .unreadable: return .unreadable
+    case .notAFile: return .notAFile
+    case .descriptor(let fd):
+        defer { Darwin.close(fd) }
+        do {
+            return .hashed(try FileDigest.sha256(descriptor: fd))
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            return .unreadable
+        }
     }
-    guard regular else { return .notAFile }
-    do {
-        return .hashed(try FileDigest.sha256(of: file))
-    } catch is CancellationError {
-        throw CancellationError()
-    } catch {
-        return .unreadable
+}
+
+private enum OpenedFile {
+    case descriptor(Int32)
+    case unreadable
+    case notAFile
+}
+
+private func openForDigest(_ file: URL) -> OpenedFile {
+    // One open names the file: O_NOFOLLOW refuses a link, and O_NONBLOCK so a fifo does not wait.
+    file.withUnsafeFileSystemRepresentation { path in
+        guard let path else { return .unreadable }
+        let fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        if fd < 0 { return errno == ELOOP ? .notAFile : .unreadable }
+        guard let info = status(fd) else {
+            Darwin.close(fd)
+            return .unreadable
+        }
+        guard isRegularFile(info) else {
+            Darwin.close(fd)
+            return .notAFile
+        }
+        guard clearNonblock(fd) else {
+            Darwin.close(fd)
+            return .unreadable
+        }
+        return .descriptor(fd)
+    }
+}
+
+private func status(_ fd: Int32) -> stat? {
+    var info = stat()
+    guard fstat(fd, &info) == 0 else { return nil }
+    return info
+}
+
+private func isRegularFile(_ info: stat) -> Bool {
+    info.st_mode & S_IFMT == S_IFREG
+}
+
+private func clearNonblock(_ fd: Int32) -> Bool {
+    let flags = fcntl(fd, F_GETFL)
+    guard flags >= 0 else { return false }
+    if flags & O_NONBLOCK == 0 { return true }
+    return fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) >= 0
+}
+
+private func readChunk(_ fd: Int32, _ size: Int) throws -> Data? {
+    guard size > 0 else { return nil }
+    var buffer = [UInt8](repeating: 0, count: size)
+    while true {
+        let (count, error) = buffer.withUnsafeMutableBytes { raw -> (Int, Int32) in
+            guard let base = raw.baseAddress else { return (-1, EINVAL) }
+            let read = Darwin.read(fd, base, raw.count)
+            return (read, errno)
+        }
+        if count > 0 { return Data(buffer[..<count]) }
+        if count == 0 { return nil }
+        if error != EINTR { throw POSIXError(POSIXErrorCode(rawValue: error) ?? .EIO) }
+        try Task.checkCancellation()
     }
 }
 
