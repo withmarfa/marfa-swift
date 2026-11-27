@@ -213541,7 +213541,7 @@ public enum Operations {
     }
     /// Get instance metrics
     ///
-    /// Returns instance-wide counters, how much memory, CPU and disk this server uses, and process uptime. The counters are counted when you ask. Requires `instance.read`; the counters include records outside your content permissions.
+    /// Returns current instance-wide counters, blob usage by kind, resource usage, blob disk capacity, and uptime. Requires `instance.read`; the counters include records outside your content permissions.
     ///
     /// - Remark: HTTP `GET /metrics`.
     /// - Remark: Generated from `#/paths//metrics/get(getInstanceMetrics)`.
@@ -213664,21 +213664,74 @@ public enum Operations {
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/total_bytes`.
                             public var totalBytes: Swift.Double
+                            /// Stored blobs by MIME type, including blobs kept in object stores. Marfa trims whitespace and ignores case and parameters. The four kinds add up to the overall blob count and size.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/by_kind`.
+                            public struct ByKindPayload: Codable, Hashable, Sendable {
+                                /// Blobs with an `image/*` MIME type.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/by_kind/image`.
+                                public var image: Components.Schemas.BlobKindMetrics
+                                /// Blobs with the `application/pdf` MIME type.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/by_kind/pdf`.
+                                public var pdf: Components.Schemas.BlobKindMetrics
+                                /// Blobs with an `audio/*` or `video/*` MIME type.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/by_kind/audio_video`.
+                                public var audioVideo: Components.Schemas.BlobKindMetrics
+                                /// Blobs with all other MIME types, including missing or malformed types.
+                                ///
+                                /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/by_kind/other`.
+                                public var other: Components.Schemas.BlobKindMetrics
+                                /// Creates a new `ByKindPayload`.
+                                ///
+                                /// - Parameters:
+                                ///   - image: Blobs with an `image/*` MIME type.
+                                ///   - pdf: Blobs with the `application/pdf` MIME type.
+                                ///   - audioVideo: Blobs with an `audio/*` or `video/*` MIME type.
+                                ///   - other: Blobs with all other MIME types, including missing or malformed types.
+                                public init(
+                                    image: Components.Schemas.BlobKindMetrics,
+                                    pdf: Components.Schemas.BlobKindMetrics,
+                                    audioVideo: Components.Schemas.BlobKindMetrics,
+                                    other: Components.Schemas.BlobKindMetrics
+                                ) {
+                                    self.image = image
+                                    self.pdf = pdf
+                                    self.audioVideo = audioVideo
+                                    self.other = other
+                                }
+                                public enum CodingKeys: String, CodingKey {
+                                    case image
+                                    case pdf
+                                    case audioVideo = "audio_video"
+                                    case other
+                                }
+                            }
+                            /// Stored blobs by MIME type, including blobs kept in object stores. Marfa trims whitespace and ignores case and parameters. The four kinds add up to the overall blob count and size.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/blobs/by_kind`.
+                            public var byKind: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.BlobsPayload.ByKindPayload
                             /// Creates a new `BlobsPayload`.
                             ///
                             /// - Parameters:
                             ///   - count: Number of stored blobs.
                             ///   - totalBytes: Total size of stored blobs, in bytes.
+                            ///   - byKind: Stored blobs by MIME type, including blobs kept in object stores. Marfa trims whitespace and ignores case and parameters. The four kinds add up to the overall blob count and size.
                             public init(
                                 count: Swift.Double,
-                                totalBytes: Swift.Double
+                                totalBytes: Swift.Double,
+                                byKind: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.BlobsPayload.ByKindPayload
                             ) {
                                 self.count = count
                                 self.totalBytes = totalBytes
+                                self.byKind = byKind
                             }
                             public enum CodingKeys: String, CodingKey {
                                 case count
                                 case totalBytes = "total_bytes"
+                                case byKind = "by_kind"
                             }
                         }
                         /// Stored blob counts and size.
@@ -213793,7 +213846,7 @@ public enum Operations {
                         ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/process`.
                         public var process: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.ProcessPayload
-                        /// Database size and row counts.
+                        /// Database size and row counts, and capacity of the volume that holds the disk store.
                         ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage`.
                         public struct StoragePayload: Codable, Hashable, Sendable {
@@ -213805,6 +213858,14 @@ public enum Operations {
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/wal_bytes`.
                             public var walBytes: Swift.Double?
+                            /// Bytes available on the volume that holds the disk store. `null` if Marfa can't read this figure.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/blob_volume_free_bytes`.
+                            public var blobVolumeFreeBytes: Swift.Int?
+                            /// Total size in bytes of the volume that holds the disk store. `null` if Marfa can't read this figure.
+                            ///
+                            /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/blob_volume_size_bytes`.
+                            public var blobVolumeSizeBytes: Swift.Int?
                             /// Row counts of the largest tables, counted when the request is read. `null` if a count can't be read.
                             ///
                             /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage/rows`.
@@ -213859,23 +213920,31 @@ public enum Operations {
                             /// - Parameters:
                             ///   - databaseBytes: Size of the database file, in bytes. `null` if it can't be read.
                             ///   - walBytes: Size of the database's write-ahead log file, in bytes. 0 when there is none. `null` if it can't be read.
+                            ///   - blobVolumeFreeBytes: Bytes available on the volume that holds the disk store. `null` if Marfa can't read this figure.
+                            ///   - blobVolumeSizeBytes: Total size in bytes of the volume that holds the disk store. `null` if Marfa can't read this figure.
                             ///   - rows: Row counts of the largest tables, counted when the request is read. `null` if a count can't be read.
                             public init(
                                 databaseBytes: Swift.Double? = nil,
                                 walBytes: Swift.Double? = nil,
+                                blobVolumeFreeBytes: Swift.Int? = nil,
+                                blobVolumeSizeBytes: Swift.Int? = nil,
                                 rows: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload.RowsPayload
                             ) {
                                 self.databaseBytes = databaseBytes
                                 self.walBytes = walBytes
+                                self.blobVolumeFreeBytes = blobVolumeFreeBytes
+                                self.blobVolumeSizeBytes = blobVolumeSizeBytes
                                 self.rows = rows
                             }
                             public enum CodingKeys: String, CodingKey {
                                 case databaseBytes = "database_bytes"
                                 case walBytes = "wal_bytes"
+                                case blobVolumeFreeBytes = "blob_volume_free_bytes"
+                                case blobVolumeSizeBytes = "blob_volume_size_bytes"
                                 case rows
                             }
                         }
-                        /// Database size and row counts.
+                        /// Database size and row counts, and capacity of the volume that holds the disk store.
                         ///
                         /// - Remark: Generated from `#/paths/metrics/GET/responses/200/content/json/storage`.
                         public var storage: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.StoragePayload
@@ -213889,7 +213958,7 @@ public enum Operations {
                         ///   - webhooks: Number of webhook registrations.
                         ///   - uptimeSeconds: Seconds since this server process started.
                         ///   - process: What this server process costs, since it started.
-                        ///   - storage: Database size and row counts.
+                        ///   - storage: Database size and row counts, and capacity of the volume that holds the disk store.
                         public init(
                             items: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.ItemsPayload,
                             blobs: Operations.GetInstanceMetrics.Output.Ok.Body.JsonPayload.BlobsPayload,

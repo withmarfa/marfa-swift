@@ -19168,6 +19168,35 @@ extension Components {
                 case details
             }
         }
+        /// Count and total size for one kind of blob, both zero when none are stored.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BlobKindMetrics`.
+        public struct BlobKindMetrics: Codable, Hashable, Sendable {
+            /// Number of stored blobs of this kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobKindMetrics/count`.
+            public var count: Swift.Int
+            /// Total size in bytes of stored blobs of this kind.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobKindMetrics/total_bytes`.
+            public var totalBytes: Swift.Int
+            /// Creates a new `BlobKindMetrics`.
+            ///
+            /// - Parameters:
+            ///   - count: Number of stored blobs of this kind.
+            ///   - totalBytes: Total size in bytes of stored blobs of this kind.
+            public init(
+                count: Swift.Int,
+                totalBytes: Swift.Int
+            ) {
+                self.count = count
+                self.totalBytes = totalBytes
+            }
+            public enum CodingKeys: String, CodingKey {
+                case count
+                case totalBytes = "total_bytes"
+            }
+        }
         /// Number of keys that haven't been revoked or expired.
         ///
         /// - Remark: Generated from `#/components/schemas/MetricCount`.
