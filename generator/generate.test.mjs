@@ -639,7 +639,7 @@ test("the committed client makes what the rule keeps from the pinned document", 
     "createItem", "trashItems", "previewItemTrash", "registerConnector", "sendConnectorHeartbeat", "reportConnectorRun",
     "takeConnectorHold", "replaceConnectorState", "listInboundDeliveries", "createOwner", "getInstance", "listItemVersions",
     "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
-    "countItemLinks",
+    "countItemLinks", "findItemsByBlob",
   ]) {
     assert.ok(wire.has(left), left);
     assert.ok(!client.has(left), left);
