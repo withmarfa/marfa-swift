@@ -7206,6 +7206,43 @@ extension Components {
                 case hasBlob = "has_blob"
             }
         }
+        /// An item whose `blob_ref` property holds a hash you asked about.
+        ///
+        /// - Remark: Generated from `#/components/schemas/BlobHolder`.
+        public struct BlobHolder: Codable, Hashable, Sendable {
+            /// The item's ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobHolder/id`.
+            public var id: Swift.String
+            /// The item's type.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobHolder/type`.
+            public var _type: Swift.String
+            /// The item's title, or `null` if its title property is absent or does not hold text.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BlobHolder/title`.
+            public var title: Swift.String?
+            /// Creates a new `BlobHolder`.
+            ///
+            /// - Parameters:
+            ///   - id: The item's ID.
+            ///   - _type: The item's type.
+            ///   - title: The item's title, or `null` if its title property is absent or does not hold text.
+            public init(
+                id: Swift.String,
+                _type: Swift.String,
+                title: Swift.String? = nil
+            ) {
+                self.id = id
+                self._type = _type
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case id
+                case _type = "type"
+                case title
+            }
+        }
         /// An error response.
         ///
         /// - Remark: Generated from `#/components/schemas/MissingRequiredFieldOrValidationErrorRefusal`.

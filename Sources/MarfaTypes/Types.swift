@@ -102,6 +102,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /items/titles`.
     /// - Remark: Generated from `#/paths//items/titles/post(findItemsByTitle)`.
     func findItemsByTitle(_ input: Operations.FindItemsByTitle.Input) async throws -> Operations.FindItemsByTitle.Output
+    /// Find items by blob
+    ///
+    /// For each blob hash, finds active and archived items whose `blob_ref` matches. Only items you can list are eligible. Marfa omits `system.*` and `app.*` items.
+    ///
+    /// - Remark: HTTP `POST /items/blobs`.
+    /// - Remark: Generated from `#/paths//items/blobs/post(findItemsByBlob)`.
+    func findItemsByBlob(_ input: Operations.FindItemsByBlob.Input) async throws -> Operations.FindItemsByBlob.Output
     /// Get items in bulk
     ///
     /// Returns up to 100 items by ID in one call, in the order you named them, each once. Items you can't read, trashed items and IDs that name nothing are left out.
@@ -1603,6 +1610,21 @@ extension APIProtocol {
         body: Operations.FindItemsByTitle.Input.Body
     ) async throws -> Operations.FindItemsByTitle.Output {
         try await findItemsByTitle(Operations.FindItemsByTitle.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Find items by blob
+    ///
+    /// For each blob hash, finds active and archived items whose `blob_ref` matches. Only items you can list are eligible. Marfa omits `system.*` and `app.*` items.
+    ///
+    /// - Remark: HTTP `POST /items/blobs`.
+    /// - Remark: Generated from `#/paths//items/blobs/post(findItemsByBlob)`.
+    public func findItemsByBlob(
+        headers: Operations.FindItemsByBlob.Input.Headers = .init(),
+        body: Operations.FindItemsByBlob.Input.Body
+    ) async throws -> Operations.FindItemsByBlob.Output {
+        try await findItemsByBlob(Operations.FindItemsByBlob.Input(
             headers: headers,
             body: body
         ))
