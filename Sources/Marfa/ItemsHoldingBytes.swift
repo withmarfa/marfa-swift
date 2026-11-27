@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-/// An item the key may list whose `blob_ref` is a file's bytes.
+/// An item the key can list that holds the file's bytes.
 public struct FileHolder: Sendable, Hashable {
     public let id: String
     public let type: String
@@ -15,30 +15,32 @@ public struct FileHolder: Sendable, Hashable {
     }
 }
 
-/// One local file and the items that hold its bytes, or why that file was not asked about.
+/// A file's matching items or the reason the file was skipped.
 public enum FileMatch: Sendable, Hashable {
     /// The file's SHA-256 and the items the key may list that hold those bytes.
     ///
-    /// `hash` is `sha256:` and 64 lowercase hexadecimal digits. An empty `items` is the server's answer for a hash
-    /// it was asked, including when the only items that hold the bytes are ones the key may not list. `more` is
-    /// true when that list stopped at 20.
+    /// `hash` is `sha256:` followed by 64 lowercase hexadecimal digits. `items` is empty when none of the items
+    /// the key can list hold the bytes. When more than 20 items match, `more` is true and `items` contains the
+    /// first 20 by item ID.
     case held(hash: String, items: [FileHolder], more: Bool)
     /// The file could not be read, so its bytes were not hashed.
     case unreadable
     /// The path is not a regular file, so its bytes were not hashed.
     ///
-    /// A directory, a symbolic link, a device or a stream is this. A symbolic link is not followed.
+    /// Examples include directories, symbolic links, devices, and streams.
     case notAFile
 }
 
 extension Server {
     /// The items that hold each file's bytes, in the order of `files`.
     ///
-    /// Each regular file is hashed in pieces, off the main actor. The hashes go in one `POST /items/blobs`, or in
-    /// several of 200 when there are more, and each of those requests gets `timeout`. A file that cannot be read,
-    /// or that is not a regular file, is ``FileMatch/unreadable`` or ``FileMatch/notAFile`` and is left out of
-    /// the request. A lookup that fails throws. An empty `items` is only an answer the server gave. A canceled
-    /// task hashes no further file and sends no further request.
+    /// Pass the URLs your app will upload. If it uploads the target of a symbolic link or Finder alias, pass the
+    /// resolved URL. Passing a Finder alias directly hashes the alias file's bytes. Keep security-scoped access
+    /// open for the duration of the call when a URL requires it.
+    ///
+    /// The method hashes regular files in pieces off the main actor and sends up to 200 hashes per request.
+    /// `timeout` applies to each request. Files marked ``FileMatch/unreadable`` or ``FileMatch/notAFile`` are
+    /// excluded from the request. A failed lookup throws. A canceled task stops hashing and skips remaining requests.
     public func itemsHoldingBytes(of files: [URL], timeout: Duration = Server.defaultTimeout) async throws(MarfaError)
         -> [FileMatch]
     {
@@ -98,7 +100,6 @@ extension Server {
 
 /// SHA-256 of a file, and the request size `POST /items/blobs` accepts.
 enum FileDigest {
-    /// A read is at most this many bytes, so a file is never held whole.
     static let chunkBytes = 1 << 20
     /// `POST /items/blobs` refuses a list longer than this (`items/blobs-limits`).
     static let lookupLimit = 200
@@ -184,7 +185,7 @@ private struct BlobLookupWire: Decodable {
             let values = try decoder.container(keyedBy: Key.self)
             id = try values.decode(String.self, forKey: .id)
             type = try values.decode(String.self, forKey: .type)
-            // Null is an item with no title. A missing key is not that answer.
+            // The wire format requires the key even when the item has no title.
             title = try values.decode(String?.self, forKey: .title)
         }
     }
