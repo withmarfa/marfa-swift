@@ -387,13 +387,14 @@ const serverOnly = new Set([
   "getFolderStatus",
   "getFolderDirectories",
   "countItemLinks",
+  "findItemsByBlob",
 ]);
 // A copy uploads a blob's bytes and fetches them itself.
 const copyBlobs = new Set(["uploadBlob", "downloadBlob"]);
 // `Server` in the Marfa module makes these itself, so an app has one way to call each.
 const serverCalls = new Set([
   "listItemVersions", "setTypeIcon", "clearTypeIcon", "listSources", "getSource", "updateSource", "getItemStats",
-  "countItemLinks",
+  "countItemLinks", "findItemsByBlob",
 ]);
 const methods = ["get", "put", "post", "delete", "options", "head", "patch", "trace"];
 
