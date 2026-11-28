@@ -15,11 +15,12 @@ public struct Tables: Sendable {
     ///
     /// `type` is a type, or a pattern of types as ``WorkingCopy/hydrate(types:tier:edgeTypes:inPlaceOnly:)`` takes
     /// it. The copy keeps the choice and holds the table of an item that arrives later. The fill needs the server and
-    /// runs where no other call holds the copy's stream; where one does, `fill` is `nil` and that call's own fill
-    /// takes the table. Throws `invalid` for a table that no type `type` names declares. Tells every held stream
-    /// `.refreshed(.tables)` for a new choice or a fill that read rows, completed a table, or found one past the cap.
-    /// A catch-up lists the tables it filled in ``CatchUpReport/changedTables``. When the follow fills a table,
-    /// ``WorkingCopy/changes()`` reports `.refreshed(.tables)` with the item's ID.
+    /// runs where no other call holds the copy's stream and its hydration is complete. Otherwise `fill` is `nil` and
+    /// the table stays owed for the next follow or catch-up, or ``fill()``. Throws `invalid` for a table that no
+    /// type `type` names declares. Tells every held stream `.refreshed(.tables)` for a new choice or a fill that read
+    /// rows, completed a table, or found one past the cap. A catch-up lists the tables it filled in
+    /// ``CatchUpReport/changedTables``. When the follow fills a table, ``WorkingCopy/changes()`` reports
+    /// `.refreshed(.tables)` with the item's ID.
     public func hold(_ table: String, ofType type: String) async throws -> TableHold {
         let hold = try await holder.runUntilCanceled { core, stop in
             TableHold(try core.holdTable(typeId: type, table: table, stop: stop))
