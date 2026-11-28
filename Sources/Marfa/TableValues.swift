@@ -64,7 +64,7 @@ public struct TableHold: Sendable, Hashable {
     public var table: String
     /// Whether the copy already held this choice.
     public var wasHeld: Bool
-    /// What the fill that followed did; `nil` where another call holds the stream, whose own fill takes the table.
+    /// What the fill that followed did; `nil` where the table was left owed instead.
     public var fill: TableFill?
 
     public init(type: String, table: String, wasHeld: Bool, fill: TableFill? = nil) {

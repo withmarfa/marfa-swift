@@ -239,7 +239,8 @@ struct ItemsHoldingBytes {
         #expect(local.log.all.isEmpty)
     }
 
-    @Test func aLinkThatReplacesACachedFileIsNotFollowed() async throws {
+    // Opening the FIFO would block with no writer, so a hang, not a slow answer, is the failure to catch.
+    @Test(.timeLimit(.minutes(1))) func aLinkThatReplacesACachedFileIsNotFollowed() async throws {
         let folder = try directory()
         defer { try? FileManager.default.removeItem(at: folder) }
         let cached = try write("cached.txt", Data("abc".utf8), in: folder)
@@ -262,9 +263,7 @@ struct ItemsHoldingBytes {
             return (200, "application/json", holders(count: 1, hash: abcHash))
         }
         defer { local.stop() }
-        let started = ContinuousClock.now
         let matches = try await asked.itemsHoldingBytes(of: [regular, plain, cached, pipe, folder])
-        #expect(ContinuousClock.now - started < .seconds(2))
         #expect(
             matches
                 == [

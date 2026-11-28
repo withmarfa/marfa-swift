@@ -15,11 +15,12 @@ public struct Tables: Sendable {
     ///
     /// `type` is a type, or a pattern of types as ``WorkingCopy/hydrate(types:tier:edgeTypes:inPlaceOnly:)`` takes
     /// it. The copy keeps the choice and holds the table of an item that arrives later. The fill needs the server and
-    /// runs where no other call holds the copy's stream; where one does, `fill` is `nil` and that call's own fill
-    /// takes the table. Throws `invalid` for a table that no type `type` names declares. Tells every held stream
-    /// `.refreshed(.tables)` for a new choice or a fill that read rows, completed a table, or found one past the cap.
-    /// A catch-up lists the tables it filled in ``CatchUpReport/changedTables``. When the follow fills a table,
-    /// ``WorkingCopy/changes()`` reports `.refreshed(.tables)` with the item's ID.
+    /// runs where no other call holds the copy's stream and its hydration is complete. Otherwise `fill` is `nil` and
+    /// the table stays owed for the next follow or catch-up, or ``fill()``. Throws `invalid` for a table that no
+    /// type `type` names declares. Tells every held stream `.refreshed(.tables)` for a new choice or a fill that read
+    /// rows, completed a table, or found one past the cap. A catch-up lists the tables it filled in
+    /// ``CatchUpReport/changedTables``. When the follow fills a table, ``WorkingCopy/changes()`` reports
+    /// `.refreshed(.tables)` with the item's ID.
     public func hold(_ table: String, ofType type: String) async throws -> TableHold {
         let hold = try await holder.runUntilCanceled { core, stop in
             TableHold(try core.holdTable(typeId: type, table: table, stop: stop))
@@ -50,6 +51,11 @@ public struct Tables: Sendable {
     /// Call this to fill tables without waiting for a catch-up or the follow. The next pass retries tables whose
     /// reads failed. ``TableFill/failed`` counts those failures. A pass that reads rows, completes a table (even an
     /// empty one), or finds a table past the cap sends `.refreshed(.tables)` to every held change stream.
+    ///
+    /// The call takes the copy's stream, so it throws ``MarfaError/invalid(message:)`` while a hydration, a catch-up,
+    /// a follow or another fill holds it. A writer with a server follows while a ``WorkingCopy/changes()`` stream or
+    /// a ``WorkingCopy/updates()`` sequence is held, once its hydration is complete and until the follow stops, so
+    /// then the call is refused.
     public func fill() async throws -> TableFill {
         let fill = try await holder.runUntilCanceled { core, stop in TableFill(try core.fillTables(stop: stop)) }
         if fill.changedTables {

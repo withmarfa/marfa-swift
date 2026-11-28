@@ -45,6 +45,23 @@ check "a passing run is clean" "$(run "${dir}/pass")" "|0"
 } >"${dir}/flaky"
 check "a test that failed then passed is flaky and does not fail the run" "$(run "${dir}/flaky")" "flaky M.S/a()|0"
 
+# A test that takes no arguments has no test case events, only its own.
+{
+  event runStarted '' 1
+  event testStarted "$a" 1; event issueRecorded "$a" 1; event testEnded "$a" 1
+  event testStarted "$a" 2; event testEnded "$a" 2
+  event runEnded '' 2
+} >"${dir}/flaky-plain"
+check "a test without arguments that failed then passed is flaky" "$(run "${dir}/flaky-plain")" "flaky M.S/a()|0"
+
+{
+  event runStarted '' 1
+  event testStarted "$a" 1; event issueRecorded "$a" 1; event testEnded "$a" 1
+  event testStarted "$a" 2; event issueRecorded "$a" 2; event testEnded "$a" 2
+  event runEnded '' 2
+} >"${dir}/both-plain"
+check "a test without arguments that failed twice fails the run" "$(run "${dir}/both-plain")" "failed M.S/a()|1"
+
 {
   event runStarted '' 1
   event testCaseStarted "$a" 1; event issueRecorded "$a" 1; event testCaseEnded "$a" 1

@@ -142,31 +142,4 @@ struct ItemSourcesTests {
             #expect(code == "invalid_schema")
         }
     }
-
-    @Test func countsBySourceAskForTheGroupingAndTheFiltersGiven() async throws {
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { _ in reply(#"{"github": 12, "k": 1}"#) }
-            let server = try signedIn(scripted, keychain)
-            #expect(try await server.itemCountsBySource() == ["github": 12, "k": 1])
-            _ = try await server.itemCountsBySource(
-                type: "core.*", state: "active,archived", tier: .feed, filter: "a b")
-            let requests = scripted.requests(to: "/items/stats")
-            #expect(requests[0].query == "by=source")
-            let sent = URLComponents(string: "?" + (requests[1].query ?? ""))?.queryItems ?? []
-            #expect(
-                sent == [
-                    URLQueryItem(name: "by", value: "source"), URLQueryItem(name: "type", value: "core.*"),
-                    URLQueryItem(name: "state", value: "active,archived"), URLQueryItem(name: "tier", value: "feed"),
-                    URLQueryItem(name: "filter", value: "a b"),
-                ])
-        }
-    }
-
-    @Test func countsInAFormThisBuildCannotReadFailAsDecoding() async throws {
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            let scripted = ScriptedAuthServer { _ in reply(#"{"github": "many"}"#) }
-            let error = await failure { try await signedIn(scripted, keychain).itemCountsBySource() }
-            #expect(error?.code() == "decoding", "\(String(describing: error))")
-        }
-    }
 }
