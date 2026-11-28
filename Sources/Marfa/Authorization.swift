@@ -508,7 +508,8 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     ///
     /// A renewal and a confirmation keep it. Signing in again registers a new client, so the new credential's ID
     /// differs from the one it replaced, and records made under the old sign-in still carry the old ID. It
-    /// identifies the client and is not a secret.
+    /// is read when the credential is made, so a credential held across another sign-in keeps the ID it was
+    /// made with. It identifies the client and is not a secret.
     public let clientID: String
     /// Whether the grant of the sign-in this one replaced still stands at the server.
     ///
