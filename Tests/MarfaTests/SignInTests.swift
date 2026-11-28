@@ -2242,6 +2242,67 @@ struct SigningInAgain {
         }
     }
 
+    /// A cancel recorded before the write is admitted wins over finding another client's sign-in in the slot.
+    @Test(arguments: [false, true])
+    func aCancelWhileTheKeychainReadsAnotherClientsSignInIsACancellationAndRevokesOnlyOurAccessToken(
+        throughTheBrowser: Bool
+    ) async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let probe = KeychainProbe()
+            let watched = probe.on(keychain, account: server.origin)
+            let (authorization, _) = try signedIn(server, watched, transport: server.transport())
+            if !throughTheBrowser {
+                var kept = try #require(try authorization.place.read())
+                kept.grantTypes = [deviceCodeGrant, "refresh_token"]
+                kept.redirect = nil
+                try authorization.place.keep(kept)
+            }
+            // Another holder keeps a sign-in on another client, and the read the write makes is held back.
+            @Sendable func anotherClientMeanwhile() throws -> KeptSignIn {
+                var other = try #require(try authorization.place.read())
+                other.clientId = "client-9"
+                other.accessToken = "at-9"
+                other.refreshToken = "rt-9"
+                try authorization.place.keep(other)
+                probe.holdNextRead()
+                return other
+            }
+            let meanwhile = Mutex<KeptSignIn?>(nil)
+            let signingIn: Task<Credential, any Error>
+            if throughTheBrowser {
+                signingIn = Task {
+                    try await authorization.signIn { url, scheme in
+                        let other = try anotherClientMeanwhile()
+                        meanwhile.withLock { $0 = other }
+                        return try await approveAtOnce(url, scheme)
+                    }
+                }
+            } else {
+                let started = try await Authorization(
+                    server: server.url, client: deviceClient, keychain: watched, service: service,
+                    transport: server.transport()
+                ).startDeviceSignIn()
+                let other = try anotherClientMeanwhile()
+                meanwhile.withLock { $0 = other }
+                signingIn = Task { try await started.credential() }
+            }
+            try await eventually("the tokens are in hand and the keychain read waits") {
+                server.requests(to: "/oauth/token").count == 1 && probe.holding
+            }
+            signingIn.cancel()
+            try await Task.sleep(for: .milliseconds(100))
+            probe.release()
+            await #expect(throws: CancellationError.self) { try await signingIn.value }
+
+            let other = meanwhile.withLock { $0 }
+            #expect(try authorization.place.read() == other)
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+            #expect(
+                revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
+        }
+    }
+
     @Test(arguments: [(SignInError.canceled, nil), (.denied, "access_denied")] as [(SignInError, String?)])
     func aSignInCanceledOrDeclinedOnTheKeptClientChangesNothingAndEndsNothing(
         outcome: (SignInError, String?)
@@ -2524,7 +2585,11 @@ struct SigningInAgainOnTheKeptClient {
         }
     }
 
-    @Test func anotherHolderSigningOutAfterOurExchangeLeavesNothingKeptAndWeEndNothing() async throws {
+    /// A sign-in on the kept client is kept when it finds the slot empty, which does not prove the grant ended.
+    ///
+    /// A renewal refused as `invalid_grant` empties the slot too, while the server's new chain stands. Where a
+    /// sign-out did end the grant, the kept tokens fail on first use and the sign-in ends as for any ended grant.
+    @Test func anotherHolderSigningOutAfterOurExchangeLeavesOurSignInKeptAndWeRevokeNothing() async throws {
         let hold = Hold()
         let server = replacingServer(holding: holdingTheExchange(hold))
         try await inIsolatedKeychainAsync { keychain, _ async throws in
@@ -2533,18 +2598,50 @@ struct SigningInAgainOnTheKeptClient {
             try await eventually("the server has issued our tokens on the kept client") {
                 server.requests(to: "/oauth/token").count == 1
             }
-            // Its sign-out ends the kept client's grant, our new tokens with it.
             let other = try Self.anotherHolder(of: authorization, client: client, server)
             #expect(try await other.signOut() == .endedAtServer)
             hold.release()
 
-            await #expect(throws: SignInError.keptSignInChanged) { try await signingIn.value }
-            #expect(try authorization.place.read() == nil)
+            let credential = try await signingIn.value
+            #expect(!credential.replacedGrantStands)
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.clientId == "client-1" && kept.refreshToken == "rt-2")
+            // Only the other holder's sign-out revoked anything.
             #expect(
-                revocations(server) == [
-                    ["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"],
-                    ["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"],
-                ])
+                revocations(server) == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
+        }
+    }
+
+    @Test func aRenewalThatEndsTheKeptSignInWhileTheBrowserIsOpenLeavesOurSignInKeptAndRevokesNothing()
+        async throws
+    {
+        let server = ScriptedAuthServer()
+        marfa(server) { request in
+            switch (request.path, request.form["grant_type"]) {
+            case ("/oauth/token", "refresh_token"): oauthError("invalid_grant")
+            case ("/oauth/token", _): tokens("at-2", "rt-2")
+            default: .json(200, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            let signedInAgain = try await authorization.signIn { url, scheme in
+                // A copy's renewal of the kept sign-in is refused while the owner approves, so it deletes it.
+                await #expect {
+                    try await renew(credential, refused: "at-1")
+                } throws: { error in
+                    guard case RenewalError.Ended = error else { return false }
+                    return true
+                }
+                #expect(try authorization.place.read() == nil)
+                return try await approveAtOnce(url, scheme)
+            }
+
+            #expect(!signedInAgain.replacedGrantStands)
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.clientId == "client-1" && kept.accessToken == "at-2" && kept.refreshToken == "rt-2")
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+            #expect(revocations(server).isEmpty)
         }
     }
 

@@ -19,11 +19,13 @@ import Synchronization
 ///
 /// Signing in again replaces the sign-in kept for the server. A sign-in on the kept client shares that sign-in's
 /// grant, so only the replaced access token is revoked, and a sign-in on the kept client that cannot be kept
-/// revokes only its own access token. If the kept sign-in is signed out, or replaced by one on another client,
-/// while a sign-in on its client is under way, that grant may have ended, so the sign-in keeps nothing and throws
-/// ``SignInError/keptSignInChanged``. A sign-in on a new client ends the grant the replaced sign-in held, as
-/// ``signOut()`` does, so each sign-in leaves one grant standing. ``Credential/replacedGrantStands`` says when the
-/// server did not confirm the replaced grant ended.
+/// revokes only its own access token. If the kept sign-in is replaced by one on another client while a sign-in on
+/// its client is under way, keeping this one would overwrite that sign-in and revoke its grant, so this one keeps
+/// nothing and throws ``SignInError/keptSignInChanged``. If the kept sign-in is gone by then, because it was signed
+/// out or a renewal found its grant ended, this one is kept and revokes nothing. Where a sign-out ended the grant,
+/// the kept tokens fail on first use and the sign-in ends as it does for any ended grant. A sign-in on a new
+/// client ends the grant the replaced sign-in held, as ``signOut()`` does, so each sign-in leaves one grant
+/// standing. ``Credential/replacedGrantStands`` says when the server did not confirm the replaced grant ended.
 ///
 /// Sign in with a browser through ``signIn(presentingFrom:prefersEphemeralWebBrowserSession:)`` or
 /// ``signIn(using:)``, or, without a browser, through ``startDeviceSignIn()``. Then open a copy with
@@ -130,9 +132,10 @@ public struct Authorization: Sendable {
     /// ``SignInError/noRedirect`` when the client names no redirect,
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
     /// keep the approval, and ``SignInError/keptSignInChanged``, keeping nothing, when the approval is on the kept
-    /// client and the kept sign-in was signed out or replaced by one on another client meanwhile. When the check of
-    /// the kept client gets no answer, or one that says neither that the server holds the client nor that it does
-    /// not, it throws ``SignInError/unavailable(message:)``, ``SignInError/refused(code:message:)`` or
+    /// client and a sign-in on another client was kept meanwhile. An approval on the kept client is kept when the
+    /// kept sign-in was signed out or ended meanwhile, and then revokes nothing. When the check of the kept client
+    /// gets no answer, or one that says neither that the server holds the client nor that it does not, it throws
+    /// ``SignInError/unavailable(message:)``, ``SignInError/refused(code:message:)`` or
     /// ``SignInError/unreadable(message:)`` with no browser opened and nothing kept changed. When the approval
     /// cannot be kept, it asks the server to revoke it: by its refresh token, which ends its grant, on a new client,
     /// or by its access token alone on the kept client, whose grant other sign-ins on that client may share. The
@@ -353,8 +356,8 @@ public struct Authorization: Sendable {
     ///
     /// The server checks the client before the token: it refuses a client it does not hold as `invalid_client`
     /// with a `400` or `401`, and answers a client it holds `200` with an empty object, revoking nothing, since no
-    /// token has that shape. Any other answer, a `200` with anything else in its body included, or none, says
-    /// neither, and throws.
+    /// token has that shape. A `200` whose body is empty or only whitespace counts as that answer too. Any other
+    /// answer, a `200` with anything else in its body included, or none, says neither, and throws.
     private func serverHolds(_ clientId: String, _ discovery: Discovery) async throws -> Bool {
         guard let endpoint = discovery.revocationEndpoint else {
             throw SignInError.unreadable(
@@ -439,17 +442,17 @@ public struct Authorization: Sendable {
                 try await background {
                     try place.exclusively(transport) { () throws -> KeptSignIn? in
                         let replaced = try place.read()
-                        // Signing out, or keeping a sign-in on another client, revokes the kept client's refresh
-                        // token, which ends every token of that client, the ones this sign-in holds included.
-                        if registered.reused, replaced?.clientId != registered.clientId {
-                            throw SignInError.keptSignInChanged
-                        }
                         let admitted = admission.withLock { admission in
                             guard admission == .open else { return false }
                             admission = .admitted
                             return true
                         }
                         guard admitted else { throw CancellationError() }
+                        // Writing would overwrite another client's sign-in and revoke its grant. An empty slot
+                        // does not prove the grant ended: a renewal refused as `invalid_grant` empties it too.
+                        if registered.reused, let replaced, replaced.clientId != registered.clientId {
+                            throw SignInError.keptSignInChanged
+                        }
                         try place.keep(kept)
                         return replaced
                     }
@@ -529,11 +532,14 @@ public struct DeviceSignIn: Sendable {
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
     /// expires, ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
     /// too long to keep the approval, and ``SignInError/keptSignInChanged``, keeping nothing, when the approval is
-    /// on the kept client and the kept sign-in was signed out or replaced by one on another client meanwhile. When
-    /// the approval cannot be kept, for those or a keychain error, it asks the server to revoke it: by its refresh
-    /// token, which ends its grant, on a new client, or by its access token alone on the kept client, whose grant
-    /// other sign-ins on that client may share. The error does not say whether the server confirmed it.
-    /// Cancel the task to stop waiting; it throws `CancellationError`.
+    /// on the kept client and a sign-in on another client was kept meanwhile. An approval on the kept client is
+    /// kept when the kept sign-in was signed out or ended meanwhile, and then revokes nothing. When the approval
+    /// cannot be kept, for those or a keychain error, it asks the server to revoke it: by its refresh token, which
+    /// ends its grant, on a new client, or by its access token alone on the kept client, whose grant other sign-ins
+    /// on that client may share. The error does not say whether the server confirmed it.
+    ///
+    /// Cancel the task to stop waiting; it throws `CancellationError`, whatever the keychain holds, until the
+    /// sign-in is being written. A cancel after that is too late, and the sign-in finishes as if not canceled.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
         var interval = polling.interval
@@ -735,12 +741,13 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     /// Another process sharing the keychain, such as an app extension, held the sign-in too long, so the
     /// keychain was left as it was.
     case heldElsewhere
-    /// While this sign-in was on the client of the sign-in kept for the server, that sign-in was signed out or
-    /// replaced by one on another client, in this process or another sharing the keychain.
+    /// While this sign-in was on the client of the sign-in kept for the server, that sign-in was replaced by one on
+    /// another client, in this process or another sharing the keychain.
     ///
-    /// Either may have ended, at the server, the grant this sign-in's tokens belong to, so this sign-in was not
-    /// kept and only its access token was revoked. The keychain holds what the sign-out or the other sign-in left,
-    /// which a new sign-in replaces.
+    /// Keeping this sign-in would have overwritten the other one and revoked its grant, so this sign-in was not
+    /// kept, and the package asked the server to revoke only its access token. Keeping the other sign-in may also
+    /// have ended the grant this sign-in's tokens belong to. The keychain holds the other sign-in, which a new
+    /// sign-in replaces. A sign-in whose kept sign-in was signed out or ended meanwhile is kept instead.
     case keptSignInChanged
     /// The server answered something this package cannot use, or named another server as the one that signs
     /// in to it.
@@ -758,7 +765,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .otherServer: "The sign-in is for another server."
         case .noRedirect: "The app names no redirect address for a browser sign-in."
         case .heldElsewhere: "Another process is using the sign-in."
-        case .keptSignInChanged: "The app signed out or signed in again elsewhere while this sign-in was approved."
+        case .keptSignInChanged: "The app signed in again elsewhere while this sign-in was approved."
         case .refused(let code, let message): "The server refused the sign-in (\(code)): \(message)"
         case .discoveryTransport(let reason): reason.description
         case .unavailable(let message), .unreadable(let message): message
