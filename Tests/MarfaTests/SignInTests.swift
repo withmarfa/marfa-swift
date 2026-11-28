@@ -2142,6 +2142,39 @@ struct SigningInAgain {
         }
     }
 
+    /// Only a `400` or `401` `invalid_client` says the server does not hold the client; any other status names no
+    /// client the server forgot, so registering one would end the kept grant for nothing.
+    @Test(arguments: [503, 500, 403])
+    func aDeviceRequestRefusedAsAnUnknownClientWithAnotherStatusThrowsAndRegistersNothing(status: Int) async throws {
+        let server = replacingServer()
+        server.answer { [discovery = server.discovery()] request in
+            switch request.path {
+            case "/.well-known/oauth-authorization-server": discovery
+            case "/oauth/register": .json(201, ["client_id": "client-2"])
+            case "/oauth/device-authorization": oauthError("invalid_client", status: status)
+            default: .json(200, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            var kept = try #require(try authorization.place.read())
+            kept.grantTypes = [deviceCodeGrant, "refresh_token"]
+            kept.redirect = nil
+            try authorization.place.keep(kept)
+            await #expect {
+                try await authorization.startDeviceSignIn()
+            } throws: { error in
+                guard case SignInError.refused(let code, _) = error else { return false }
+                return code == "invalid_client"
+            }
+
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+            #expect(server.requests(to: "/oauth/device-authorization").map { $0.form["client_id"] } == ["client-1"])
+            #expect(try authorization.place.read() == kept)
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
+        }
+    }
+
     /// What a sign-in that cannot be kept revokes: on a new client, its refresh token, which ends its grant; on
     /// the kept client it reused, only its access token, since its grant is the kept sign-in's too.
     private static func revokedWhenNotKept(forgotten: Bool) -> [[String: String]] {

@@ -211,7 +211,15 @@ public struct Authorization: Sendable {
     /// ``DeviceSignIn/credential()``.
     ///
     /// It asks with the client of the sign-in kept for the server when that client holds the device grant. When
-    /// the server refuses that client as one it does not hold, it registers a new client and asks once more.
+    /// the server refuses that client as one it does not hold, a `400` or `401` with the OAuth error
+    /// `invalid_client`, it registers a new client and asks once more.
+    ///
+    /// Throws ``SignInError/refused(code:message:)`` when the server refuses the request, registering nothing
+    /// after any other refusal of the kept client. The server refuses as `invalid_scope` a scope the kept client
+    /// cannot be approved for: one outside the scopes it registered and the scopes the server offers every client,
+    /// such as a type the owner made or another app's namespace. Throws ``SignInError/unavailable(message:)``
+    /// when the server cannot be reached, and ``SignInError/unreadable(message:)`` for an answer this package
+    /// cannot use.
     public func startDeviceSignIn() async throws -> DeviceSignIn {
         let discovery = try await Discovery.read(place.account, transport)
         let transport = transport
@@ -224,7 +232,7 @@ public struct Authorization: Sendable {
         }
         var registered = try await registration(discovery, for: deviceCodeGrant)
         var started = try await ask(registered)
-        if registered.reused, started.oauthError == "invalid_client" {
+        if registered.reused, started.status == 400 || started.status == 401, started.oauthError == "invalid_client" {
             registered = try await register(discovery, for: deviceCodeGrant)
             started = try await ask(registered)
         }
