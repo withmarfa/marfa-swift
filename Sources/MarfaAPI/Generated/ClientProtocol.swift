@@ -152,7 +152,7 @@ public protocol ClientProtocol: Sendable {
     /// - Remark: HTTP `DELETE /plugins/{name}`.
     /// - Remark: Generated from `#/paths//plugins/{name}/delete(removePlugin)`.
     func removePlugin(_ input: Operations.RemovePlugin.Input) async throws -> Operations.RemovePlugin.Output
-    /// Get a connector's state
+    /// Get a connector's controls
     ///
     /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
     ///
@@ -1180,7 +1180,7 @@ extension ClientProtocol {
             headers: headers
         ))
     }
-    /// Get a connector's state
+    /// Get a connector's controls
     ///
     /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
     ///

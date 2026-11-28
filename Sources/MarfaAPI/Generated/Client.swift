@@ -1913,7 +1913,7 @@ public struct Client: ClientProtocol {
             }
         )
     }
-    /// Get a connector's state
+    /// Get a connector's controls
     ///
     /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
     ///
@@ -4353,6 +4353,13 @@ public struct Client: ClientProtocol {
                     explode: true,
                     name: "force",
                     value: input.query.force
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: true,
+                    name: "revision",
+                    value: input.query.revision
                 )
                 try converter.setHeaderFieldAsURI(
                     in: &request.headerFields,

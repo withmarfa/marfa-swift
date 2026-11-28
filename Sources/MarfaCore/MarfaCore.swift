@@ -1508,8 +1508,9 @@ public protocol CoreProtocol: AnyObject, Sendable {
     
     /**
      * Holds the table named `table` of every item of `type_id`, a pattern as
-     * a hydration reads it, and fills it, or leaves it to the follow or
-     * catch-up that holds the stream.
+     * a hydration reads it, and fills it. Where another call holds the
+     * stream, or the copy is not hydrated, it leaves the table owed for
+     * the next follow, catch-up or table fill, and never waits.
      */
     func holdTable(typeId: String, table: String, stop: Stop?) throws  -> TableHold
     
@@ -2832,8 +2833,9 @@ open func heldTables()throws  -> HeldTables  {
     
     /**
      * Holds the table named `table` of every item of `type_id`, a pattern as
-     * a hydration reads it, and fills it, or leaves it to the follow or
-     * catch-up that holds the stream.
+     * a hydration reads it, and fills it. Where another call holds the
+     * stream, or the copy is not hydrated, it leaves the table owed for
+     * the next follow, catch-up or table fill, and never waits.
      */
 open func holdTable(typeId: String, table: String, stop: Stop?)throws  -> TableHold  {
     return try  FfiConverterTypeTableHold_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -3640,8 +3642,10 @@ public protocol FoldersProtocol: AnyObject, Sendable {
      * nothing while the registry lists `dir`. A folder another process
      * does not let go, whose store is not the one shown or has moved, or
      * that is no longer at its listed path, is left as it was and named
-     * in `not_changed`. Asks a watch that holds a folder to let it go, as
-     * `add` does.
+     * in `not_changed`, as is each folder while anything but an empty
+     * directory stands at `dir`. Throws `invalid` for that only when
+     * `remembered` named no folder, read or not. Asks a watch that holds a
+     * folder to let it go, as `add` does.
      */
     func forgetRemembered(remembered: Remembered) throws  -> Forgotten
     
@@ -3919,8 +3923,10 @@ open func discardKept(dir: String)throws  -> KeptDiscarded  {
      * nothing while the registry lists `dir`. A folder another process
      * does not let go, whose store is not the one shown or has moved, or
      * that is no longer at its listed path, is left as it was and named
-     * in `not_changed`. Asks a watch that holds a folder to let it go, as
-     * `add` does.
+     * in `not_changed`, as is each folder while anything but an empty
+     * directory stands at `dir`. Throws `invalid` for that only when
+     * `remembered` named no folder, read or not. Asks a watch that holds a
+     * folder to let it go, as `add` does.
      */
 open func forgetRemembered(remembered: Remembered)throws  -> Forgotten  {
     return try  FfiConverterTypeForgotten_lift(try rustCallWithError(FfiConverterTypeMarfaError_lift) {
@@ -12919,7 +12925,9 @@ public struct TableHold: Equatable, Hashable {
     public var table: String
     public var wasHeld: Bool
     /**
-     * `None` where another call holds the stream, whose fill takes it.
+     * `None` where another call held the stream or the copy was not
+     * hydrated: the table is left owed for the next follow, catch-up or
+     * table fill.
      */
     public var fill: TableFill?
 
@@ -12927,7 +12935,9 @@ public struct TableHold: Equatable, Hashable {
     // declare one manually.
     public init(type: String, table: String, wasHeld: Bool, 
         /**
-         * `None` where another call holds the stream, whose fill takes it.
+         * `None` where another call held the stream or the copy was not
+         * hydrated: the table is left owed for the next follow, catch-up or
+         * table fill.
          */fill: TableFill?) {
         self.type = type
         self.table = table
@@ -21926,7 +21936,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_core_held_tables() != 55657) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_core_hold_table() != 37450) {
+    if (uniffi_marfa_core_ffi_checksum_method_core_hold_table() != 35718) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_core_let_go_table() != 28521) {
@@ -22001,7 +22011,7 @@ private let initializationResult: InitializationResult = {
     if (uniffi_marfa_core_ffi_checksum_method_folders_discard_kept() != 64486) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_marfa_core_ffi_checksum_method_folders_forget_remembered() != 52257) {
+    if (uniffi_marfa_core_ffi_checksum_method_folders_forget_remembered() != 57188) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_marfa_core_ffi_checksum_method_folders_held() != 45429) {
