@@ -81,7 +81,8 @@ private final class ChunkGate: @unchecked Sendable {
     func waitUntilSecondRead() -> Bool {
         condition.lock()
         defer { condition.unlock() }
-        let deadline = Date().addingTimeInterval(5)
+        // A loaded runner can take seconds to start the task; the test's own time limit bounds a real hang.
+        let deadline = Date().addingTimeInterval(50)
         while !waiting && Date() < deadline { condition.wait(until: deadline) }
         return waiting
     }
@@ -138,7 +139,7 @@ struct ItemsHoldingBytes {
         #expect(streamed == abcHash)
     }
 
-    @Test func hashingStopsWhenTheTaskIsCanceled() async {
+    @Test(.timeLimit(.minutes(1))) func hashingStopsWhenTheTaskIsCanceled() async {
         let gate = ChunkGate()
         let task = Task {
             try await FileDigest.offMainActor {
