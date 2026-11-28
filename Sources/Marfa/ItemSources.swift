@@ -116,24 +116,6 @@ extension Server {
                 "PATCH", "/sources/\(Server.segment(code))", body: body, timeout: timeout))
         return ItemSource(answer)
     }
-
-    /// How many items each source wrote, as `GET /items/stats` counts them, keyed by source code.
-    ///
-    /// The count is the server's own, under the filters given, which mean what they mean for a listing: `type` is a
-    /// type, a comma-separated list or a wildcard such as `core.*`; `state` is one lifecycle state or a comma-separated list, and without it every
-    /// state is counted, the bin included; `tier` leaves out the other tier; `filter` is a filter expression. A
-    /// source that wrote no matching item is absent. Items a key cannot read are not counted.
-    public func itemCountsBySource(
-        type: String? = nil, state: String? = nil, tier: Tier? = nil, filter: String? = nil,
-        timeout: Duration = Server.defaultTimeout
-    ) async throws(MarfaError) -> [String: Int] {
-        var query = [URLQueryItem(name: "by", value: "source")]
-        if let type { query.append(URLQueryItem(name: "type", value: type)) }
-        if let state { query.append(URLQueryItem(name: "state", value: state)) }
-        if let tier { query.append(URLQueryItem(name: "tier", value: tier == .feed ? "feed" : "library")) }
-        if let filter { query.append(URLQueryItem(name: "filter", value: filter)) }
-        return try decode(try await send("GET", "/items/stats", query: query, timeout: timeout))
-    }
 }
 
 private struct SourceWire: Decodable {

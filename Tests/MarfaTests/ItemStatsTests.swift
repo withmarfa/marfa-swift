@@ -57,12 +57,19 @@ struct ItemStatsTests {
         let counts = try await Self.server(scripted).itemStats(by: .source)
         #expect(counts.count == 2)
         #expect(Set(counts.map(\.count)) == [2, 3])
+        #expect(counts.contains { $0.key.unicodeScalars.elementsEqual("caf\u{E9}".unicodeScalars) && $0.count == 2 })
         #expect(counts.contains { $0.key.unicodeScalars.elementsEqual("cafe\u{301}".unicodeScalars) && $0.count == 3 })
     }
 
     @Test func refusesACountThatIsNotAWholeNumber() async throws {
         let scripted = ScriptedAuthServer { _ in .raw(200, Data(#"{"cli":1.5}"#.utf8), headers: Self.contract) }
         await #expect(throws: MarfaError.self) { try await Self.server(scripted).itemStats(by: .source) }
+    }
+
+    @Test func failsAsDecodingForACountInAFormThisBuildCannotRead() async throws {
+        let scripted = ScriptedAuthServer { _ in .raw(200, Data(#"{"github":"many"}"#.utf8), headers: Self.contract) }
+        let error = await #expect(throws: MarfaError.self) { try await Self.server(scripted).itemStats(by: .source) }
+        #expect(error?.code() == "decoding", "\(String(describing: error))")
     }
 
     @Test func defaultsToCountsByStateAcrossAllStates() async throws {
