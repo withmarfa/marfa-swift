@@ -174,6 +174,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// A write was made against a version of the row that is no longer current: the server refused it (409
     /// `version_conflict`), or the copy refused an exact edit, whose ``Edit/baseVersion`` is older than the version it
     /// holds, before queueing it, and then `server` is `nil`. Read the row again and decide what to write.
+    ///
+    /// For a webhook change or a type replacement or deletion made from a stale `version` or `revision`, the server's
+    /// current one is ``currentVersion`` or ``currentRevision``.
     case versionConflict(message: String, server: ServerAnswer?)
     /// Another Marfa instance answers at the server's address (409 `instance_changed`), so the copy needs a
     /// hydration from it. Its queue is kept.

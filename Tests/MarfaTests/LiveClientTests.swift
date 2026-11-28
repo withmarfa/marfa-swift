@@ -30,8 +30,8 @@ extension LiveWorkingCopies {
                 itemType: id, with: .init(fields: .init(additionalProperties: ["title": title, "notes": notes])))
             #expect(replaced.value1.fields.additionalProperties.keys.sorted() == ["notes", "title"])
 
-            try await api.delete(itemType: id)
-            let gone = await #expect(throws: MarfaError.self) { try await api.delete(itemType: id) }
+            try await api.delete(itemType: id, revision: nil)
+            let gone = await #expect(throws: MarfaError.self) { try await api.delete(itemType: id, revision: nil) }
             #expect(gone?.code() == "not_found", "\(String(describing: gone))")
 
             let edge = "app.swift\(suffix).follows"
@@ -111,7 +111,7 @@ extension LiveWorkingCopies {
                 try await server.setTypeIcon(nil, ofType: id) == "lucide:folder",
                 "clearing twice is fine")
 
-            try await api.delete(itemType: id)
+            try await api.delete(itemType: id, revision: nil)
         }
 
         @Test func healthIsReadWithNoCredentialAndWithTheKey() async throws {
@@ -179,8 +179,8 @@ extension LiveWorkingCopies {
             #expect(result.settingsRewritten == true)
             #expect(try await api.previewMove(ofType: from, to: to).matched == 0, "nothing is left to move")
 
-            try await api.delete(itemType: from)
-            try await api.delete(itemType: to, force: true)
+            try await api.delete(itemType: from, revision: nil)
+            try await api.delete(itemType: to, force: true, revision: nil)
         }
 
         @Test func aMoveCancelledPartwayLeavesItsSettingsAndARerunFinishesIt() async throws {
@@ -209,8 +209,8 @@ extension LiveWorkingCopies {
             let done = try await api.cancel(moveJob: finished.id)
             #expect(done.status == .completed, "the witness: a job that ended is answered as it ended")
             try await Live.deleteView(view)
-            try await api.delete(itemType: from)
-            try await api.delete(itemType: to, force: true)
+            try await api.delete(itemType: from, revision: nil)
+            try await api.delete(itemType: to, force: true, revision: nil)
         }
 
         @Test func aDeleteRefusedWhileAViewNamesTheTypeSaysTheTypeIsInUse() async throws {
@@ -220,7 +220,7 @@ extension LiveWorkingCopies {
                 "title": .string("Names \(Self.suffix())"), "query": ["types": [.string(from)]],
             ])
 
-            let refused = await #expect(throws: MarfaError.self) { try await api.delete(itemType: from) }
+            let refused = await #expect(throws: MarfaError.self) { try await api.delete(itemType: from, revision: nil) }
             guard case .server(let status, let code, let message, _, _)? = refused else {
                 Issue.record("refused as \(String(describing: refused))")
                 return
@@ -233,10 +233,10 @@ extension LiveWorkingCopies {
                 named.contains { $0.object?["kind"]?.string == "view" && $0.object?["id"]?.string == view },
                 "\(String(describing: refused?.server?.details))")
 
-            try await api.delete(itemType: to)  // the witness: a type no setting names is deleted
+            try await api.delete(itemType: to, revision: nil)  // the witness: a type no setting names is deleted
 
             try await Live.deleteView(view)
-            try await api.delete(itemType: from)
+            try await api.delete(itemType: from, revision: nil)
         }
 
         /// Assigning a connector, then sending `host: null`, leaves it on no host.

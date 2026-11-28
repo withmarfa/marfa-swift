@@ -15,6 +15,12 @@ extension Client {
     }
 
     /// Replaces the definition of the item type `id`, and answers it as the server stored it.
+    ///
+    /// Set the definition's `revision` to the one the app read, so that a type changed since is refused with
+    /// ``MarfaError/versionConflict(message:server:)`` and nothing is written; the error's
+    /// ``MarfaError/currentRevision`` is the revision now. Leave it `nil` to replace whatever the type holds.
+    /// The `revision` comes from `getType`, `listTypes` or the answer of ``register(itemType:)`` or this call; an
+    /// ``Marfa/ItemType`` from the working copy's catalog carries none.
     public func replace(itemType id: String, with definition: Components.Schemas.TypeDefinitionUpdate) async throws
         -> Components.Schemas.RegisteredType
     {
@@ -30,9 +36,15 @@ extension Client {
     /// table column still names is refused with `MarfaError.server` of status 409 and the code `type_in_use`, and the
     /// error's `details` hold the `item_count`, the `settings` and the `columns` that name it. Move the items with
     /// ``startMove(ofType:to:properties:)``, which rewrites those settings, or change the settings first.
-    public func delete(itemType id: String, force: Bool = false) async throws {
+    ///
+    /// `revision` is the revision the app read. A type changed since is refused with
+    /// ``MarfaError/versionConflict(message:server:)``, even with `force`, and nothing is deleted; the error's
+    /// ``MarfaError/currentRevision`` is the revision now. Pass `nil` to delete whatever the type holds. Where the
+    /// `revision` comes from is as for ``replace(itemType:with:)``.
+    public func delete(itemType id: String, force: Bool = false, revision: String?) async throws {
         try await answer("deleteType") {
-            _ = try await deleteType(path: .init(id: id), query: .init(force: force ? true : nil)).ok
+            _ = try await deleteType(path: .init(id: id), query: .init(force: force ? true : nil, revision: revision))
+                .ok
         }
     }
 
