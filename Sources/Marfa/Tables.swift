@@ -51,6 +51,10 @@ public struct Tables: Sendable {
     /// Call this to fill tables without waiting for a catch-up or the follow. The next pass retries tables whose
     /// reads failed. ``TableFill/failed`` counts those failures. A pass that reads rows, completes a table (even an
     /// empty one), or finds a table past the cap sends `.refreshed(.tables)` to every held change stream.
+    ///
+    /// The call takes the copy's stream, so it throws ``MarfaError/invalid(message:)`` while a hydration, a catch-up,
+    /// a follow or another fill holds it. A writer with a server follows while a ``WorkingCopy/changes()`` stream is
+    /// held, so there the call is refused.
     public func fill() async throws -> TableFill {
         let fill = try await holder.runUntilCanceled { core, stop in TableFill(try core.fillTables(stop: stop)) }
         if fill.changedTables {
