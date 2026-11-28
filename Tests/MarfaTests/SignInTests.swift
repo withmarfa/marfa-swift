@@ -3459,7 +3459,7 @@ struct CredentialClientID {
         }
     }
 
-    @Test func aSecondFullSignInCarriesTheNewRegistrationsClient() async throws {
+    @Test func aSecondFullSignInKeepsTheClientTheServerHolds() async throws {
         let server = replacingServer()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let authorization = try Authorization(
@@ -3469,8 +3469,21 @@ struct CredentialClientID {
             let second = try await authorization.signIn(browser: approveAtOnce)
 
             #expect(first.clientID == "client-2")
-            #expect(second.clientID == "client-3")
-            #expect(try authorization.credential()?.clientID == "client-3")
+            #expect(second.clientID == "client-2")
+            #expect(try authorization.credential()?.clientID == "client-2")
+            #expect(server.requests(to: "/oauth/register").count == 1)
+        }
+    }
+
+    @Test func aSecondFullSignInToAServerThatForgotTheClientCarriesTheNewRegistrationsClient() async throws {
+        let server = replacingServer(forgetting: true)
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, before) = try signedIn(server, keychain, transport: server.transport())
+            let second = try await authorization.signIn(browser: approveWhereKnown(server))
+
+            #expect(before.clientID == "client-1")
+            #expect(second.clientID == "client-2")
+            #expect(try authorization.credential()?.clientID == "client-2")
         }
     }
 
