@@ -125,8 +125,9 @@ public struct Authorization: Sendable {
     /// ask for, ``SignInError/issuerMismatch`` when the approval names another issuer than the server's,
     /// ``SignInError/noRedirect`` when the client names no redirect, and
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
-    /// keep the approval. When the server cannot be reached for the check of the kept client, or answers it with
-    /// neither, it throws ``SignInError/unavailable(message:)``, ``SignInError/refused(code:message:)`` or
+    /// keep the approval. When the check of the kept client gets no answer, or one that says neither that the
+    /// server holds the client nor that it does not, it throws ``SignInError/unavailable(message:)``,
+    /// ``SignInError/refused(code:message:)`` or
     /// ``SignInError/unreadable(message:)`` with no browser opened and nothing kept changed. When the approval
     /// cannot be kept, it asks the server to revoke it: by its refresh token, which ends its grant, or by its
     /// access token alone when it is on the kept client and the sign-in kept for the server shares, or may share,
@@ -316,7 +317,8 @@ public struct Authorization: Sendable {
     /// the same from its first request, which shows the person nothing, and registers then. A confirmation
     /// follows the server's own challenge, so the server holds the client.
     ///
-    /// Throws, opening nothing and registering nothing, when the server answers the check with neither.
+    /// Throws, opening nothing and registering nothing, when the check gets no answer, or one that says neither
+    /// that the server holds the client nor that it does not.
     private func registration(_ discovery: Discovery, for grant: String, confirming: Bool = false) async throws
         -> Registered
     {
