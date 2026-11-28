@@ -22,7 +22,7 @@ verdict="$(jq -rs '
     else
       def failure: .kind == "issueRecorded" and .issue.isFailure and (.issue.isKnown | not);
       def name: (.testID // "(outside a test)") | sub("/[^/]*:[0-9]+:[0-9]+$"; "");
-      [ $events | map(select(failure or .kind == "testCaseStarted" or .kind == "testCaseEnded"))
+      [ $events | map(select(failure or (.kind | IN("testStarted", "testEnded", "testCaseStarted", "testCaseEnded"))))
         | group_by(.testID)[]
         | (map(.iteration // 1) | max) as $last
         | (map(select(failure)) ) as $failures
