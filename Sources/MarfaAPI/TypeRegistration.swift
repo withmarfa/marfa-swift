@@ -19,6 +19,8 @@ extension Client {
     /// Set the definition's `revision` to the one the app read, so that a type changed since is refused with
     /// ``MarfaError/versionConflict(message:server:)`` and nothing is written; the error's
     /// ``MarfaError/currentRevision`` is the revision now. Leave it `nil` to replace whatever the type holds.
+    /// The `revision` comes from `getType`, `listTypes` or the answer of ``register(itemType:)`` or this call; an
+    /// ``ItemType`` from the working copy's catalog carries none.
     public func replace(itemType id: String, with definition: Components.Schemas.TypeDefinitionUpdate) async throws
         -> Components.Schemas.RegisteredType
     {
@@ -37,7 +39,8 @@ extension Client {
     ///
     /// `revision` is the revision the app read. A type changed since is refused with
     /// ``MarfaError/versionConflict(message:server:)``, even with `force`, and nothing is deleted; the error's
-    /// ``MarfaError/currentRevision`` is the revision now. Pass `nil` to delete whatever the type holds.
+    /// ``MarfaError/currentRevision`` is the revision now. Pass `nil` to delete whatever the type holds. Where the
+    /// `revision` comes from is as for ``replace(itemType:with:)``.
     public func delete(itemType id: String, force: Bool = false, revision: String?) async throws {
         try await answer("deleteType") {
             _ = try await deleteType(path: .init(id: id), query: .init(force: force ? true : nil, revision: revision))
