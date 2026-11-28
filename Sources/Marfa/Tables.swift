@@ -53,8 +53,9 @@ public struct Tables: Sendable {
     /// empty one), or finds a table past the cap sends `.refreshed(.tables)` to every held change stream.
     ///
     /// The call takes the copy's stream, so it throws ``MarfaError/invalid(message:)`` while a hydration, a catch-up,
-    /// a follow or another fill holds it. A writer with a server follows while a ``WorkingCopy/changes()`` stream is
-    /// held, so there the call is refused.
+    /// a follow or another fill holds it. A writer with a server follows while a ``WorkingCopy/changes()`` stream or
+    /// a ``WorkingCopy/updates()`` sequence is held, once its hydration is complete and until the follow stops, so
+    /// then the call is refused.
     public func fill() async throws -> TableFill {
         let fill = try await holder.runUntilCanceled { core, stop in TableFill(try core.fillTables(stop: stop)) }
         if fill.changedTables {
