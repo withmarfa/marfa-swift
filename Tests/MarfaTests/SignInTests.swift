@@ -1076,10 +1076,14 @@ struct TokenRenewal {
         #expect(try authorization.place.read()?.refreshToken == "rt-1", "the refresh token was never spent")
     }
 
-    @Test func aRenewedSignInThatCannotBeKeptEndsWhenTheServerSpentTheOldRefreshToken() async throws {
+    /// Revoking the new refresh token would end the grant, which another sign-in on the client may share.
+    @Test func aRenewedSignInThatCannotBeKeptEndsAndRevokesOnlyItsAccessTokenWhenTheServerSpentTheOldRefreshToken()
+        async throws
+    {
         let server = ScriptedAuthServer()
         let keychain = RefusesWrites()
-        marfa(server) { _ in
+        marfa(server) { request in
+            guard request.path == "/oauth/token" else { return .json(200, [:]) }
             keychain.refuse()
             return tokens("at-2", "rt-2")
         }
@@ -1093,6 +1097,8 @@ struct TokenRenewal {
         }
         keychain.allow()
         #expect(try authorization.place.read() == nil, "the spent refresh token is not kept")
+        #expect(
+            revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
     }
 
     @Test func aRenewedSignInWithNoNewRefreshTokenIsKeptWithTheOldOne() async throws {
@@ -2643,6 +2649,40 @@ struct SigningInAgainOnTheKeptClient {
             #expect(server.requests(to: "/oauth/register").isEmpty)
             #expect(revocations(server).isEmpty)
         }
+    }
+
+    /// A renewal whose tokens the keychain cannot keep ends the sign-in here, and leaves the grant standing for the
+    /// approval on the kept client that is under way.
+    @Test func aRenewalThatCannotKeepItsTokensWhileASignInOnTheKeptClientIsUnderWayLeavesThatSignInKeptAndItsGrant()
+        async throws
+    {
+        let hold = Hold()
+        let server = replacingServer(holding: holdingTheExchange(hold))
+        let refusing = RefusesWrites()
+        let (authorization, credential) = try signedIn(server, refusing.keychain, transport: server.transport())
+        let signingIn = Task { try await authorization.signIn(browser: approveAtOnce) }
+        try await eventually("the server has issued our tokens on the kept client") {
+            server.requests(to: "/oauth/token").count == 1
+        }
+        refusing.refuse()
+        await #expect {
+            try await renew(credential, refused: "at-1")
+        } throws: { error in
+            guard case RenewalError.Ended = error else { return false }
+            return true
+        }
+        refusing.allow()
+        #expect(try authorization.place.read() == nil)
+        hold.release()
+
+        let signedInAgain = try await signingIn.value
+        #expect(!signedInAgain.replacedGrantStands)
+        let kept = try #require(try authorization.place.read())
+        #expect(kept.clientId == "client-1" && kept.accessToken == "at-2" && kept.refreshToken == "rt-2")
+        #expect(server.requests(to: "/oauth/register").isEmpty)
+        // Revoking the renewal's refresh token, rt-3, would end the grant the kept sign-in holds.
+        #expect(
+            revocations(server) == [["token": "at-3", "token_type_hint": "access_token", "client_id": "client-1"]])
     }
 
     /// Whatever the keychain holds when a sign-in on the kept client cannot be kept, another approval on that

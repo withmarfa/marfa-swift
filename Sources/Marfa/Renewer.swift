@@ -15,6 +15,16 @@ import Synchronization
 /// marked ``KeptSignIn/uncertain``, under the lease, until a later renewal is answered, and
 /// ``Authorization/signOut()`` of an uncertain sign-in does not report the grant as ended, since the server may
 /// hold a grant this sign-in cannot name.
+///
+/// A renewal answered with a new refresh token that the keychain cannot keep ends, and deletes the kept sign-in,
+/// whose refresh token the server has spent, so the app is signed out. It revokes only the new access token and
+/// never the new refresh token: on Marfa that ends the grant of every sign-in on the app's client, and another
+/// sign-in on that client, such as an approval under way, may share it. So the grant, with everything the app made
+/// under it, such as its webhooks, stands at the server, and the new refresh token stays live there, held by
+/// nothing here, until it expires or the grant ends, as a replaced sign-in's does. A sign-out then finds nothing
+/// to revoke, and a later sign-in registers a new client, since the kept registration is gone. Where the keychain
+/// refuses the deletion too, the kept sign-in stays, and its spent refresh token is refused at the next renewal,
+/// which then ends it.
 final class TokenRenewer: CredentialRenewer {
     private let credential: Credential
 
@@ -109,8 +119,8 @@ final class TokenRenewer: CredentialRenewer {
                 then(Self.received($0, origin: origin))
             }
         }
-        // A 200 answer the sign-in cannot take, because it was dropped meanwhile, would leave a grant nothing
-        // holds, so it is revoked before the lease is let go.
+        // A 200 answer the sign-in cannot take leaves tokens nothing holds, so they are revoked, as `settle`
+        // decides, before the lease is let go.
         let conclude: @Sendable (Answer, Discovery?) -> Void = { answer, advertised in
             let settlement = Self.settle(
                 answer, sent: sent, kept: kept, place: place, lease: lease, advertised: advertised)
@@ -316,6 +326,11 @@ final class TokenRenewer: CredentialRenewer {
     /// keychain holds now is the answer, and where the keychain still holds the sent refresh token, the renewal
     /// is unavailable rather than answering the token the server refused.
     ///
+    /// A 200 answer the keychain cannot keep, when it carries a new refresh token, deletes the kept sign-in, whose
+    /// refresh token the server has spent, and revokes only the new access token. A 200 answer for a sign-in
+    /// deleted meanwhile, as a sign-out does, revokes the new refresh token, which ends the grant the sign-out
+    /// meant to end.
+    ///
     /// `advertised` is the metadata a renewal retried with, which its success keeps beside the new tokens. A
     /// retry that is refused with a 404 or 410 that is no OAuth error ends the sign-in: the server has no
     /// token endpoint to renew it at. Any other answer there that names no OAuth error keeps the sign-in.
@@ -335,6 +350,7 @@ final class TokenRenewer: CredentialRenewer {
                 result: .failure(
                     .Refused(reason: .unreadable, message: "\(origin) answered a renewal this package cannot read")))
         }
+        var unkept = false
         let result = written(sent: sent, place: place, lease: lease) { current in
             var renewed = current
             renewed.accessToken = token.accessToken
@@ -354,19 +370,28 @@ final class TokenRenewer: CredentialRenewer {
                         .Unavailable(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
                 }
                 // The server has spent the old refresh token, so the kept one cannot renew again.
+                unkept = true
                 try? place.drop()
                 return .failure(.Ended(message: "the renewed sign-in to \(origin) could not be kept: \(error)"))
             }
             return .success(renewed.accessToken)
         }
+        guard case .failure = result, let endpoint = advertised?.revocationEndpoint ?? kept.revocationEndpoint
+        else { return Settlement(result: result) }
+        // Revoking the new refresh token would end the grant, which another sign-in on the client may share.
+        if unkept {
+            return Settlement(
+                result: result,
+                orphan: Orphan(
+                    endpoint: endpoint, token: token.accessToken, hint: "access_token", clientId: kept.clientId))
+        }
         // Where the sign-in is gone, nothing holds the grant this answer gave, so it is ended at the server. Where
         // another holder wrote a sign-in, it may share the grant, and nothing is revoked.
-        guard case .failure = result, signInIsGone(place),
-            let endpoint = advertised?.revocationEndpoint ?? kept.revocationEndpoint
-        else { return Settlement(result: result) }
+        guard signInIsGone(place) else { return Settlement(result: result) }
         return Settlement(
             result: result,
-            orphan: Orphan(endpoint: endpoint, token: token.refreshToken ?? sent, clientId: kept.clientId))
+            orphan: Orphan(
+                endpoint: endpoint, token: token.refreshToken ?? sent, hint: "refresh_token", clientId: kept.clientId))
     }
 
     /// Whether the keychain answers that it holds no sign-in; an error proves nothing.
@@ -412,15 +437,15 @@ final class TokenRenewer: CredentialRenewer {
         var orphan: Orphan?
     }
 
-    /// A refresh token the server issued that the keychain does not hold.
+    /// A token the server issued that the keychain does not hold, and its kind.
     private struct Orphan {
         let endpoint: String
         let token: String
+        let hint: String
         let clientId: String
 
         var request: URLRequest? {
-            try? formRequest(
-                endpoint, [("token", token), ("token_type_hint", "refresh_token"), ("client_id", clientId)])
+            try? formRequest(endpoint, [("token", token), ("token_type_hint", hint), ("client_id", clientId)])
         }
     }
 
