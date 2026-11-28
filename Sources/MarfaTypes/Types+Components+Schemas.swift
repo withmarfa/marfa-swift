@@ -8778,25 +8778,33 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/ListedType/value2/own_roles`.
                 public var ownRoles: [Components.Schemas.TypeRole]
+                /// The type's `revision`, as `GET /types/{id}` answers it. Left out when the type's parent chain does not resolve.
+                ///
+                /// - Remark: Generated from `#/components/schemas/ListedType/value2/revision`.
+                public var revision: Swift.String?
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
                 ///   - provenance: The type's recorded origin and creator.
                 ///   - conflicts: The fields this type declares in another shape than a type above it. Present only while there are some, and it clears once the type declares the shape above. Items of the type stay readable.
                 ///   - ownRoles: The structural roles the type declares itself, without those it only inherits. Empty if it declares none.
+                ///   - revision: The type's `revision`, as `GET /types/{id}` answers it. Left out when the type's parent chain does not resolve.
                 public init(
                     provenance: Components.Schemas.TypeProvenance,
                     conflicts: [Components.Schemas.TypeConflict]? = nil,
-                    ownRoles: [Components.Schemas.TypeRole]
+                    ownRoles: [Components.Schemas.TypeRole],
+                    revision: Swift.String? = nil
                 ) {
                     self.provenance = provenance
                     self.conflicts = conflicts
                     self.ownRoles = ownRoles
+                    self.revision = revision
                 }
                 public enum CodingKeys: String, CodingKey {
                     case provenance
                     case conflicts
                     case ownRoles = "own_roles"
+                    case revision
                 }
             }
             /// - Remark: Generated from `#/components/schemas/ListedType/value2`.
@@ -9647,25 +9655,33 @@ extension Components {
                 ///
                 /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/ancestor_guidance`.
                 public var ancestorGuidance: [Components.Schemas.TypeGuidance]?
+                /// An opaque string for what is stored for the type: its definition, owner's icon, provenance, and its ancestors' definitions and icons. Send it as `revision` on `PUT` or `DELETE /types/{id}` to refuse a stale write.
+                ///
+                /// - Remark: Generated from `#/components/schemas/RegisteredType/value2/revision`.
+                public var revision: Swift.String
                 /// Creates a new `Value2Payload`.
                 ///
                 /// - Parameters:
                 ///   - plural: The type's plural name for people to read, such as `People`: the one the type declares, else one made from its label. Never inherited.
                 ///   - provenance: The type's recorded origin and creator.
                 ///   - ancestorGuidance: The guidance of the types above this one, nearest first. Present only where one of them carries some. The type's own guidance is `guidance`.
+                ///   - revision: An opaque string for what is stored for the type: its definition, owner's icon, provenance, and its ancestors' definitions and icons. Send it as `revision` on `PUT` or `DELETE /types/{id}` to refuse a stale write.
                 public init(
                     plural: Swift.String,
                     provenance: Components.Schemas.TypeProvenance,
-                    ancestorGuidance: [Components.Schemas.TypeGuidance]? = nil
+                    ancestorGuidance: [Components.Schemas.TypeGuidance]? = nil,
+                    revision: Swift.String
                 ) {
                     self.plural = plural
                     self.provenance = provenance
                     self.ancestorGuidance = ancestorGuidance
+                    self.revision = revision
                 }
                 public enum CodingKeys: String, CodingKey {
                     case plural
                     case provenance
                     case ancestorGuidance = "ancestor_guidance"
+                    case revision
                 }
             }
             /// - Remark: Generated from `#/components/schemas/RegisteredType/value2`.
@@ -10638,6 +10654,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/ancestor_guidance`.
             public var ancestorGuidance: [Components.Schemas.TypeGuidance]?
+            /// The `revision` you read. If the type changed since, Marfa returns `409 version_conflict` and writes nothing, even with `force=true`. Marfa never stores it. Leave it out to replace whatever the type holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/TypeDefinitionUpdate/revision`.
+            public var revision: Swift.String?
             /// Creates a new `TypeDefinitionUpdate`.
             ///
             /// - Parameters:
@@ -10659,6 +10679,7 @@ extension Components {
             ///   - provenance: The recorded origin and creator, accepted when replacing a read response. This field cannot change either value.
             ///   - id: The type's identifier, as `GET /types/{id}` returns it. The path names the type, so an identifier here changes nothing.
             ///   - ancestorGuidance: The guidance of the types above, accepted when replacing a read response. This field changes nothing.
+            ///   - revision: The `revision` you read. If the type changed since, Marfa returns `409 version_conflict` and writes nothing, even with `force=true`. Marfa never stores it. Leave it out to replace whatever the type holds.
             public init(
                 fields: Components.Schemas.TypeDefinitionUpdate.FieldsPayload,
                 tables: Components.Schemas.TypeDefinitionUpdate.TablesPayload? = nil,
@@ -10677,7 +10698,8 @@ extension Components {
                 retentionPolicy: Components.Schemas.RetentionPolicy? = nil,
                 provenance: Components.Schemas.TypeProvenance? = nil,
                 id: Swift.String? = nil,
-                ancestorGuidance: [Components.Schemas.TypeGuidance]? = nil
+                ancestorGuidance: [Components.Schemas.TypeGuidance]? = nil,
+                revision: Swift.String? = nil
             ) {
                 self.fields = fields
                 self.tables = tables
@@ -10697,6 +10719,7 @@ extension Components {
                 self.provenance = provenance
                 self.id = id
                 self.ancestorGuidance = ancestorGuidance
+                self.revision = revision
             }
             public enum CodingKeys: String, CodingKey {
                 case fields
@@ -10717,6 +10740,7 @@ extension Components {
                 case provenance
                 case id
                 case ancestorGuidance = "ancestor_guidance"
+                case revision
             }
             public init(from decoder: any Swift.Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -10792,6 +10816,10 @@ extension Components {
                     [Components.Schemas.TypeGuidance].self,
                     forKey: .ancestorGuidance
                 )
+                self.revision = try container.decodeIfPresent(
+                    Swift.String.self,
+                    forKey: .revision
+                )
                 try decoder.ensureNoAdditionalProperties(knownKeys: [
                     "fields",
                     "tables",
@@ -10810,7 +10838,8 @@ extension Components {
                     "retention_policy",
                     "provenance",
                     "id",
-                    "ancestor_guidance"
+                    "ancestor_guidance",
+                    "revision"
                 ])
             }
         }
@@ -18698,6 +18727,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/active`.
             public var active: Swift.Bool
+            /// The webhook's version. It starts at 1 and goes up by 1 each time `url`, `events`, `type_filter` or `active` changes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Webhook/version`.
+            public var version: Swift.Int
             /// When the webhook was created, in UTC.
             ///
             /// - Remark: Generated from `#/components/schemas/Webhook/created_at`.
@@ -18715,6 +18748,7 @@ extension Components {
             ///   - typeFilter: The type, with its subtypes, or the pattern whose item events Marfa sends. `null` when Marfa sends item events of every type. Edge events aren't filtered.
             ///   - secret: The key Marfa signs each delivery with. Only `POST /webhooks` returns it whole; other responses show `****` and its last four characters.
             ///   - active: `true` if Marfa sends events to the webhook.
+            ///   - version: The webhook's version. It starts at 1 and goes up by 1 each time `url`, `events`, `type_filter` or `active` changes.
             ///   - createdAt: When the webhook was created, in UTC.
             ///   - updatedAt: When the webhook last changed, in UTC.
             public init(
@@ -18724,6 +18758,7 @@ extension Components {
                 typeFilter: Swift.String? = nil,
                 secret: Swift.String,
                 active: Swift.Bool,
+                version: Swift.Int,
                 createdAt: Swift.String,
                 updatedAt: Swift.String
             ) {
@@ -18733,6 +18768,7 @@ extension Components {
                 self.typeFilter = typeFilter
                 self.secret = secret
                 self.active = active
+                self.version = version
                 self.createdAt = createdAt
                 self.updatedAt = updatedAt
             }
@@ -18743,6 +18779,7 @@ extension Components {
                 case typeFilter = "type_filter"
                 case secret
                 case active
+                case version
                 case createdAt = "created_at"
                 case updatedAt = "updated_at"
             }
@@ -18942,6 +18979,87 @@ extension Components {
             /// - Parameters:
             ///   - error: What went wrong.
             public init(error: Components.Schemas.WebhookNotFoundRefusal._ErrorPayload) {
+                self.error = error
+            }
+            public enum CodingKeys: String, CodingKey {
+                case error
+            }
+        }
+        /// An error response.
+        ///
+        /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal`.
+        public struct WebhookVersionConflictRefusal: Codable, Hashable, Sendable {
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error`.
+            public struct _ErrorPayload: Codable, Hashable, Sendable {
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error/code`.
+                @frozen public enum CodePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case versionConflict = "version_conflict"
+                }
+                /// A machine-readable code for the error. Use it in your logic.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error/code`.
+                public var code: Components.Schemas.WebhookVersionConflictRefusal._ErrorPayload.CodePayload
+                /// A description of the error for a person to read. It can change, so don't match on it.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error/message`.
+                public var message: Swift.String
+                /// The webhook's current version.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error/details`.
+                public struct DetailsPayload: Codable, Hashable, Sendable {
+                    /// The webhook's current version.
+                    ///
+                    /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error/details/version`.
+                    public var version: Swift.Int
+                    /// Creates a new `DetailsPayload`.
+                    ///
+                    /// - Parameters:
+                    ///   - version: The webhook's current version.
+                    public init(version: Swift.Int) {
+                        self.version = version
+                    }
+                    public enum CodingKeys: String, CodingKey {
+                        case version
+                    }
+                }
+                /// The webhook's current version.
+                ///
+                /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error/details`.
+                public var details: Components.Schemas.WebhookVersionConflictRefusal._ErrorPayload.DetailsPayload?
+                /// Creates a new `_ErrorPayload`.
+                ///
+                /// - Parameters:
+                ///   - code: A machine-readable code for the error. Use it in your logic.
+                ///   - message: A description of the error for a person to read. It can change, so don't match on it.
+                ///   - details: The webhook's current version.
+                public init(
+                    code: Components.Schemas.WebhookVersionConflictRefusal._ErrorPayload.CodePayload,
+                    message: Swift.String,
+                    details: Components.Schemas.WebhookVersionConflictRefusal._ErrorPayload.DetailsPayload? = nil
+                ) {
+                    self.code = code
+                    self.message = message
+                    self.details = details
+                }
+                public enum CodingKeys: String, CodingKey {
+                    case code
+                    case message
+                    case details
+                }
+            }
+            /// What went wrong.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WebhookVersionConflictRefusal/error`.
+            public var error: Components.Schemas.WebhookVersionConflictRefusal._ErrorPayload
+            /// Creates a new `WebhookVersionConflictRefusal`.
+            ///
+            /// - Parameters:
+            ///   - error: What went wrong.
+            public init(error: Components.Schemas.WebhookVersionConflictRefusal._ErrorPayload) {
                 self.error = error
             }
             public enum CodingKeys: String, CodingKey {

@@ -68179,7 +68179,7 @@ public enum Operations {
             }
         }
     }
-    /// Get a connector's state
+    /// Get a connector's controls
     ///
     /// Returns what the owner wants of a plugin's connector: whether it is paused, a run asked for, and how many rewrites and previews wait on it. Needs `connectors.manage`, or the connector's own key.
     ///
@@ -99962,25 +99962,30 @@ public enum Operations {
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
                         /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json/value1`.
-                        public var value1: Components.Schemas.LinkTakenRefusal?
+                        public var value1: Components.Schemas.VersionConflictRefusal?
                         /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.TypeInUseRefusal?
+                        public var value2: Components.Schemas.LinkTakenRefusal?
                         /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json/value3`.
-                        public var value3: Components.Schemas.InstanceChangedRefusal?
+                        public var value3: Components.Schemas.TypeInUseRefusal?
+                        /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/json/value4`.
+                        public var value4: Components.Schemas.InstanceChangedRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
                         ///   - value3:
+                        ///   - value4:
                         public init(
-                            value1: Components.Schemas.LinkTakenRefusal? = nil,
-                            value2: Components.Schemas.TypeInUseRefusal? = nil,
-                            value3: Components.Schemas.InstanceChangedRefusal? = nil
+                            value1: Components.Schemas.VersionConflictRefusal? = nil,
+                            value2: Components.Schemas.LinkTakenRefusal? = nil,
+                            value3: Components.Schemas.TypeInUseRefusal? = nil,
+                            value4: Components.Schemas.InstanceChangedRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
                             self.value3 = value3
+                            self.value4 = value4
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -99999,11 +100004,17 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value4 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
                                     self.value2,
-                                    self.value3
+                                    self.value3,
+                                    self.value4
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -100014,6 +100025,7 @@ public enum Operations {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
                             try self.value3?.encode(to: encoder)
+                            try self.value4?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/types/{id}/PUT/responses/409/content/application\/json`.
@@ -100046,8 +100058,9 @@ public enum Operations {
                     self.body = body
                 }
             }
+            /// - `version_conflict`: `revision` is stale. `details.revision` names the current one, where the type reads.
             /// - `link_taken`: the replacement names a `link_field` in which two items of the type, in any state, hold the same value.
-            /// - `type_in_use`: rows hold a table or column the replacement removes, or a column whose `type` it changes, and `force` isn't `true`. `details.tables` names each.
+            /// - `type_in_use`: rows hold a table or column the replacement removes or retypes, and `force` isn't `true`. `details.tables` names each.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/put(replaceType)/responses/409`.
             ///
@@ -100673,12 +100686,21 @@ public enum Operations {
                 ///
                 /// - Remark: Generated from `#/paths/types/{id}/DELETE/query/force`.
                 public var force: Swift.Bool?
+                /// The `revision` you read. If the type changed since, Marfa returns `409 version_conflict` and deletes nothing, even with `force=true`. Leave it out to delete whatever the type holds.
+                ///
+                /// - Remark: Generated from `#/paths/types/{id}/DELETE/query/revision`.
+                public var revision: Swift.String?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - force: Delete the type even if items of it exist, in any state, or a folder, view or webhook names it. It doesn't cover subtypes.
-                public init(force: Swift.Bool? = nil) {
+                ///   - revision: The `revision` you read. If the type changed since, Marfa returns `409 version_conflict` and deletes nothing, even with `force=true`. Leave it out to delete whatever the type holds.
+                public init(
+                    force: Swift.Bool? = nil,
+                    revision: Swift.String? = nil
+                ) {
                     self.force = force
+                    self.revision = revision
                 }
             }
             public var query: Operations.DeleteType.Input.Query
@@ -101193,20 +101215,25 @@ public enum Operations {
                     /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json`.
                     public struct JsonPayload: Codable, Hashable, Sendable {
                         /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json/value1`.
-                        public var value1: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal?
+                        public var value1: Components.Schemas.VersionConflictRefusal?
                         /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json/value2`.
-                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        public var value2: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal?
+                        /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/json/value3`.
+                        public var value3: Components.Schemas.InstanceChangedRefusal?
                         /// Creates a new `JsonPayload`.
                         ///
                         /// - Parameters:
                         ///   - value1:
                         ///   - value2:
+                        ///   - value3:
                         public init(
-                            value1: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal? = nil,
-                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                            value1: Components.Schemas.VersionConflictRefusal? = nil,
+                            value2: Components.Schemas.TypeHasSubtypesOrTypeInUseRefusal? = nil,
+                            value3: Components.Schemas.InstanceChangedRefusal? = nil
                         ) {
                             self.value1 = value1
                             self.value2 = value2
+                            self.value3 = value3
                         }
                         public init(from decoder: any Swift.Decoder) throws {
                             var errors: [any Swift.Error] = []
@@ -101220,10 +101247,16 @@ public enum Operations {
                             } catch {
                                 errors.append(error)
                             }
+                            do {
+                                self.value3 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
                             try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
                                 [
                                     self.value1,
-                                    self.value2
+                                    self.value2,
+                                    self.value3
                                 ],
                                 type: Self.self,
                                 codingPath: decoder.codingPath,
@@ -101233,6 +101266,7 @@ public enum Operations {
                         public func encode(to encoder: any Swift.Encoder) throws {
                             try self.value1?.encode(to: encoder)
                             try self.value2?.encode(to: encoder)
+                            try self.value3?.encode(to: encoder)
                         }
                     }
                     /// - Remark: Generated from `#/paths/types/{id}/DELETE/responses/409/content/application\/json`.
@@ -101265,8 +101299,9 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// - `type_has_subtypes`: other types name this one as their `parent` (`details.subtype_ids` lists them). Delete them, or give them another parent with `PUT /types/{id}`.
-            /// - `type_in_use`: an item of the type exists, in any state, or a folder, view, webhook or column names it, and `force` isn't `true`. `details` lists them. Move them with `POST /types/{id}/move`.
+            /// - `version_conflict`: `revision` is stale. `details.revision` names the current one, where the type reads.
+            /// - `type_has_subtypes`: other types name this one as `parent` (`details.subtype_ids`). Delete them or reparent them first.
+            /// - `type_in_use`: an item of the type, or a folder, view, webhook or column naming it, exists and `force` isn't `true`. Move them with `POST /types/{id}/move`.
             ///
             /// - Remark: Generated from `#/paths//types/{id}/delete(deleteType)/responses/409`.
             ///
@@ -122512,6 +122547,10 @@ public enum Operations {
                     ///
                     /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/json/active`.
                     public var active: Swift.Bool?
+                    /// The version of the webhook you read. If the webhook has changed since, Marfa refuses the change. Leave it out to change the webhook whatever its version.
+                    ///
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/requestBody/json/version`.
+                    public var version: Swift.Int?
                     /// Creates a new `JsonPayload`.
                     ///
                     /// - Parameters:
@@ -122519,22 +122558,26 @@ public enum Operations {
                     ///   - events: The events to send. Name each one: there's no wildcard.
                     ///   - typeFilter: Send item events only for this type and its subtypes, such as `core.media`, or for every type a pattern such as `app.*` matches. The type needn't be registered. Edge events aren't filtered. Blank or `null` removes it.
                     ///   - active: `false` stops sending events and cancels pending deliveries. `true` starts again.
+                    ///   - version: The version of the webhook you read. If the webhook has changed since, Marfa refuses the change. Leave it out to change the webhook whatever its version.
                     public init(
                         url: Swift.String? = nil,
                         events: Operations.UpdateWebhook.Input.Body.JsonPayload.EventsPayload? = nil,
                         typeFilter: Components.Schemas.MarfaNullableMarfaInline00404e686415370f? = nil,
-                        active: Swift.Bool? = nil
+                        active: Swift.Bool? = nil,
+                        version: Swift.Int? = nil
                     ) {
                         self.url = url
                         self.events = events
                         self.typeFilter = typeFilter
                         self.active = active
+                        self.version = version
                     }
                     public enum CodingKeys: String, CodingKey {
                         case url
                         case events
                         case typeFilter = "type_filter"
                         case active
+                        case version
                     }
                     public init(from decoder: any Swift.Decoder) throws {
                         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -122554,11 +122597,16 @@ public enum Operations {
                             Swift.Bool.self,
                             forKey: .active
                         )
+                        self.version = try container.decodeIfPresent(
+                            Swift.Int.self,
+                            forKey: .version
+                        )
                         try decoder.ensureNoAdditionalProperties(knownKeys: [
                             "url",
                             "events",
                             "type_filter",
-                            "active"
+                            "active",
+                            "version"
                         ])
                     }
                 }
@@ -123139,13 +123187,58 @@ public enum Operations {
                 public var headers: Operations.UpdateWebhook.Output.Conflict.Headers
                 /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content`.
                 @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content/json`.
+                    public struct JsonPayload: Codable, Hashable, Sendable {
+                        /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content/json/value1`.
+                        public var value1: Components.Schemas.WebhookVersionConflictRefusal?
+                        /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content/json/value2`.
+                        public var value2: Components.Schemas.InstanceChangedRefusal?
+                        /// Creates a new `JsonPayload`.
+                        ///
+                        /// - Parameters:
+                        ///   - value1:
+                        ///   - value2:
+                        public init(
+                            value1: Components.Schemas.WebhookVersionConflictRefusal? = nil,
+                            value2: Components.Schemas.InstanceChangedRefusal? = nil
+                        ) {
+                            self.value1 = value1
+                            self.value2 = value2
+                        }
+                        public init(from decoder: any Swift.Decoder) throws {
+                            var errors: [any Swift.Error] = []
+                            do {
+                                self.value1 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            do {
+                                self.value2 = try .init(from: decoder)
+                            } catch {
+                                errors.append(error)
+                            }
+                            try Swift.DecodingError.verifyAtLeastOneSchemaIsNotNil(
+                                [
+                                    self.value1,
+                                    self.value2
+                                ],
+                                type: Self.self,
+                                codingPath: decoder.codingPath,
+                                errors: errors
+                            )
+                        }
+                        public func encode(to encoder: any Swift.Encoder) throws {
+                            try self.value1?.encode(to: encoder)
+                            try self.value2?.encode(to: encoder)
+                        }
+                    }
                     /// - Remark: Generated from `#/paths/webhooks/{id}/PATCH/responses/409/content/application\/json`.
-                    case json(Components.Schemas.InstanceChangedRefusal)
+                    case json(Operations.UpdateWebhook.Output.Conflict.Body.JsonPayload)
                     /// The associated value of the enum case if `self` is `.json`.
                     ///
                     /// - Throws: An error if `self` is not `.json`.
                     /// - SeeAlso: `.json`.
-                    public var json: Components.Schemas.InstanceChangedRefusal {
+                    public var json: Operations.UpdateWebhook.Output.Conflict.Body.JsonPayload {
                         get throws {
                             switch self {
                             case let .json(body):
@@ -123169,7 +123262,8 @@ public enum Operations {
                     self.body = body
                 }
             }
-            /// `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
+            /// - `version_conflict`: `version` isn't the webhook's current version. `details.version` is. Nothing is changed. Read the webhook again and send the change over what it holds now.
+            /// - `instance_changed`: `X-Marfa-Instance-Id` names another instance. Nothing is written. Rebuild the working copy from the instance at this address.
             ///
             /// - Remark: Generated from `#/paths//webhooks/{id}/patch(updateWebhook)/responses/409`.
             ///
