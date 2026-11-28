@@ -120,9 +120,9 @@ enum Checks {
 
     /// A list against the field that declares it.
     ///
-    /// Entries are judged only for a list of objects whose members are strings, enums, booleans, integers or
-    /// numbers with no constraint beyond the core's defaults; any other list kind, member kind or constraint
-    /// throws `unsupported`.
+    /// Entries are judged only for a list of objects whose members are strings, enums, booleans, integers,
+    /// numbers, emails, dates or datetimes with no constraint beyond the core's defaults; any other
+    /// list kind, member kind or constraint throws `unsupported`.
     private static func list(_ value: JsonValue, of field: TypeField, call: String) throws {
         guard case .array(let entries) = value else {
             throw Refuse.validation("invalid_properties", "\(field.name): Expected array")
@@ -159,7 +159,7 @@ enum Checks {
                 continue
             }
             let allowed = plain.union(extra[kind] ?? [])
-            guard value != .null, ["string", "enum", "boolean", "integer", "number"].contains(kind),
+            guard value != .null, memberKinds.contains(kind),
                 definition.members.allSatisfy({ allowed.contains($0.key) })
             else { throw FakeCopyError.unsupported(call: "\(call) with a \(kind) member in a list entry") }
             if let message = try memberMessage(value, kind: kind, definition: definition, call: call) {
@@ -168,6 +168,10 @@ enum Checks {
         }
         return nil
     }
+
+    private static let memberKinds: Set<String> = [
+        "string", "enum", "boolean", "integer", "number", "email", "date", "datetime",
+    ]
 
     private static func memberMessage(
         _ value: JsonValue, kind: String, definition: JsonObject, call: String
@@ -178,6 +182,14 @@ enum Checks {
             return text.unicodeScalars.contains("\0") ? "Must not contain a null byte (U+0000)" : nil
         case ("string", _): return "Expected string"
         case ("enum", _): return try enumMessage(value, definition: definition, call: call)
+        case ("email", .string(let text)): return Formats.email(text) ? nil : "Must be a valid email address"
+        case ("date", .string(let text)): return Formats.date(text) ? nil : "Must be a calendar date (YYYY-MM-DD)"
+        case ("datetime", .string(let text)):
+            return Formats.date(text) || Formats.datetime(text)
+                ? nil : "Must be a calendar date or ISO 8601 datetime with an offset"
+        case ("email", _): return "Must be a valid email address"
+        case ("date", _): return "Must be a calendar date (YYYY-MM-DD)"
+        case ("datetime", _): return "Must be a calendar date or ISO 8601 datetime with an offset"
         case ("boolean", .bool): return nil
         case ("boolean", _): return "Expected boolean"
         case ("number", .integer), ("number", .number): return nil
