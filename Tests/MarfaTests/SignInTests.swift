@@ -1274,13 +1274,14 @@ struct TokenRenewal {
         }
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             var transport = server.transport()
-            transport.timeLimit = .seconds(5)
-            transport.requestLimit = .seconds(2)
+            // The wait outlasts a metadata read given a limit of its own, so only the request limit can end it.
+            transport.timeLimit = .seconds(15)
+            transport.requestLimit = .seconds(6)
             let (authorization, credential) = try signedIn(server, keychain, transport: transport)
             let renewing = Task { try await renew(credential, refused: "at-1") }
             try await eventually("the renewal asks the server") { server.requests(to: "/oauth/token").count == 1 }
             // The token endpoint answers after half the limit, and the metadata read that follows never does.
-            try await Task.sleep(for: .seconds(1))
+            try await Task.sleep(for: .seconds(3))
             let released = ContinuousClock.now
             first.release()
             await #expect {
@@ -1289,8 +1290,9 @@ struct TokenRenewal {
                 guard case RenewalError.Unavailable = error else { return false }
                 return true
             }
-            // The metadata read is cut off at the limit of the whole renewal, a second on, not a limit of its own.
-            #expect(ContinuousClock.now - released < .milliseconds(1600))
+            // The metadata read is cut off at the limit of the whole renewal, at most 3 seconds on, not at a limit
+            // of its own, 6 seconds on.
+            #expect(ContinuousClock.now - released < .milliseconds(4500))
             try await eventually("the lease is let go") {
                 (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
             }
@@ -1418,7 +1420,8 @@ struct TokenRenewal {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             var transport = server.transport()
             transport.timeLimit = .milliseconds(300)
-            transport.requestLimit = .seconds(1)
+            // The first request and the metadata read must leave a time limit of this for the retry to be sent.
+            transport.requestLimit = .seconds(4)
             let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain, transport: transport)
             await #expect {
                 try await renew(credential, refused: "at-1")
