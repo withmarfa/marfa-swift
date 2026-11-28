@@ -351,9 +351,10 @@ public struct Authorization: Sendable {
     /// Whether the server holds the client `clientId`, asked at its revocation endpoint (RFC 7009) with a value
     /// shaped like none of its tokens.
     ///
-    /// The server checks the client before the token: it refuses a client it does not hold as `invalid_client`,
-    /// and answers a client it holds 200, revoking nothing, since no token has that shape. Any other answer,
-    /// or none, says neither, and throws.
+    /// The server checks the client before the token: it refuses a client it does not hold as `invalid_client`
+    /// with a `400` or `401`, and answers a client it holds `200` with an empty object, revoking nothing, since no
+    /// token has that shape. Any other answer, a `200` with anything else in its body included, or none, says
+    /// neither, and throws.
     private func serverHolds(_ clientId: String, _ discovery: Discovery) async throws -> Bool {
         guard let endpoint = discovery.revocationEndpoint else {
             throw SignInError.unreadable(
@@ -362,8 +363,10 @@ public struct Authorization: Sendable {
         let answer = try await send(
             try formRequest(endpoint, [("token", "client-check"), ("client_id", clientId)]), transport)
         if answer.status == 200 {
-            guard answer.body.isEmpty || answer.object != nil else {
-                throw SignInError.unreadable(message: "the revocation endpoint answered a page, not its own answer")
+            // A captive portal or a proxy can answer 200 too, with a body of its own.
+            let blank = answer.body.allSatisfy { [0x20, 0x09, 0x0A, 0x0D].contains($0) }
+            guard blank || answer.object?.isEmpty == true else {
+                throw SignInError.unreadable(message: "the revocation endpoint answered a body that is not its own")
             }
             return true
         }

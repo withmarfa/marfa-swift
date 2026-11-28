@@ -2352,7 +2352,25 @@ struct SigningInAgainOnTheKeptClient {
         .json(403, ["error": ["code": "invalid_client", "message": "an envelope, not an OAuth error"]]),
         .raw(302, Data(), headers: ["Location": "https://elsewhere.example/oauth/revoke"]),
         .raw(200, Data("<html>signed in to the network</html>".utf8), headers: ["Content-Type": "text/html"]),
+        .json(200, ["captive": true]), .raw(200, Data("[]".utf8), headers: ["Content-Type": "application/json"]),
     ]
+
+    /// Marfa's answer to a revocation it accepts: an empty object, or nothing, with or without whitespace.
+    @Test(arguments: ["{}", " {\n} \n", "", " \n"])
+    func aCheckAnsweredWithAnEmptyObjectOrNothingReusesTheKeptClient(body: String) async throws {
+        let server = replacingServer { request in
+            request.form["token_type_hint"] == nil
+                ? .raw(200, Data(body.utf8), headers: ["Content-Type": "application/json"]) : .json(200, [:])
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            _ = try await authorization.signIn(browser: approveAtOnce)
+
+            #expect(clientChecks(server) == ["client-1"])
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+            #expect(try authorization.place.read()?.clientId == "client-1")
+        }
+    }
 
     @Test(arguments: unclearChecks)
     func aCheckWithNoClearAnswerThrowsAndRegistersNothingOpensNothingAndChangesNothingKept(
