@@ -36,6 +36,11 @@ import Synchronization
 /// ``Folders`` in the process, and across processes that share the keychain, such as an app and its extensions
 /// using one ``Keychain/init(accessGroup:)``. A renewal that finds the token already renewed uses the new one
 /// without asking the server.
+///
+/// A renewal whose new tokens the keychain cannot keep ends the sign-in, so calls throw
+/// ``MarfaError/signedOut(origin:message:)``, but it leaves the app's grant, and everything made under it, standing at
+/// the server, since another sign-in on the app's client may share it. A later sign-in then registers a new client,
+/// which does not reach what the app made under the old one; the owner can remove the old grant.
 public struct Authorization: Sendable {
     /// How the app introduces itself to the server.
     public struct Client: Sendable, Hashable {
