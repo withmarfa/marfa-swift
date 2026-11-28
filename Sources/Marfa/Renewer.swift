@@ -18,8 +18,8 @@ import Synchronization
 ///
 /// A renewal answered with a new refresh token that the keychain cannot keep ends, and deletes the kept sign-in,
 /// whose refresh token the server has spent, so the app is signed out. It revokes only the new access token and
-/// never the new refresh token: on Marfa that ends the grant of every sign-in on the app's client, and another
-/// sign-in on that client, such as an approval under way, may share it. So the grant, with everything the app made
+/// never the new refresh token, since on Marfa revoking a refresh token ends the grant of every sign-in on the
+/// app's client, and another sign-in on that client, such as an approval under way, may share it. So the grant, with everything the app made
 /// under it, such as its webhooks, stands at the server, and the new refresh token stays live there, held by
 /// nothing here, until it expires or the grant ends, as a replaced sign-in's does. A sign-out then finds nothing
 /// to revoke, and a later sign-in registers a new client, since the kept registration is gone. Where the keychain
@@ -119,8 +119,7 @@ final class TokenRenewer: CredentialRenewer {
                 then(Self.received($0, origin: origin))
             }
         }
-        // A 200 answer the sign-in cannot take leaves tokens nothing holds, so they are revoked, as `settle`
-        // decides, before the lease is let go.
+        // The token `settle` names from a 200 answer the sign-in cannot take is revoked before the lease is let go.
         let conclude: @Sendable (Answer, Discovery?) -> Void = { answer, advertised in
             let settlement = Self.settle(
                 answer, sent: sent, kept: kept, place: place, lease: lease, advertised: advertised)
@@ -431,7 +430,7 @@ final class TokenRenewer: CredentialRenewer {
         return .failure(.Refused(reason: reason, message: "\(origin) refused to renew the sign-in: \(answer.message)"))
     }
 
-    /// What a renewal came to, and the grant it received that the sign-in could not take, if any.
+    /// What a renewal came to, and the token to revoke at the server, if any.
     private struct Settlement {
         let result: Result<String, RenewalError>
         var orphan: Orphan?
