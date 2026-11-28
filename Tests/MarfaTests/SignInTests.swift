@@ -1076,10 +1076,14 @@ struct TokenRenewal {
         #expect(try authorization.place.read()?.refreshToken == "rt-1", "the refresh token was never spent")
     }
 
-    @Test func aRenewedSignInThatCannotBeKeptEndsWhenTheServerSpentTheOldRefreshToken() async throws {
+    /// Revoking the new refresh token would end the grant, which another sign-in on the client may share.
+    @Test func aRenewedSignInThatCannotBeKeptEndsAndRevokesOnlyItsAccessTokenWhenTheServerSpentTheOldRefreshToken()
+        async throws
+    {
         let server = ScriptedAuthServer()
         let keychain = RefusesWrites()
-        marfa(server) { _ in
+        marfa(server) { request in
+            guard request.path == "/oauth/token" else { return .json(200, [:]) }
             keychain.refuse()
             return tokens("at-2", "rt-2")
         }
@@ -1093,6 +1097,8 @@ struct TokenRenewal {
         }
         keychain.allow()
         #expect(try authorization.place.read() == nil, "the spent refresh token is not kept")
+        #expect(
+            revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
     }
 
     @Test func aRenewedSignInWithNoNewRefreshTokenIsKeptWithTheOldOne() async throws {
@@ -1266,29 +1272,38 @@ struct TokenRenewal {
         server.answer { request in
             request.path == "/oauth/token" ? .held(first, .json(404, [:])) : .silence
         }
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            var transport = server.transport()
-            transport.timeLimit = .seconds(5)
-            transport.requestLimit = .seconds(2)
-            let (authorization, credential) = try signedIn(server, keychain, transport: transport)
-            let renewing = Task { try await renew(credential, refused: "at-1") }
-            try await eventually("the renewal asks the server") { server.requests(to: "/oauth/token").count == 1 }
-            // The token endpoint answers after half the limit, and the metadata read that follows never does.
-            try await Task.sleep(for: .seconds(1))
-            let released = ContinuousClock.now
-            first.release()
-            await #expect {
-                try await renewing.value
-            } throws: { error in
-                guard case RenewalError.Unavailable = error else { return false }
-                return true
-            }
-            // The metadata read is cut off at the limit of the whole renewal, a second on, not a limit of its own.
-            #expect(ContinuousClock.now - released < .milliseconds(1600))
-            try await eventually("the lease is let go") {
-                (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
+        // A keychain in memory, since the lease is let go before the renewal answers, and a file keychain on a
+        // loaded machine can take seconds to do that.
+        let keychain = RefusesWrites().keychain
+        var transport = server.transport()
+        // The wait outlasts a metadata read given a limit of its own, so only the request limit can end it.
+        transport.timeLimit = .seconds(15)
+        transport.requestLimit = .seconds(6)
+        let (authorization, credential) = try signedIn(server, keychain, transport: transport)
+        let renewer = TokenRenewer(credential)
+        // The time is taken on the renewal's own thread, so a test pool kept busy by other tests delays nothing
+        // measured.
+        let renewing = Task {
+            try await background { () -> (Result<String, any Error>, ContinuousClock.Instant) in
+                (Result { try renewer.renew(refused: "at-1") }, ContinuousClock.now)
             }
         }
+        try await eventually("the renewal asks the server") { server.requests(to: "/oauth/token").count == 1 }
+        // The token endpoint answers after half the limit, and the metadata read that follows never does.
+        try await Task.sleep(for: .seconds(3))
+        let released = ContinuousClock.now
+        first.release()
+        let (result, answered) = try await renewing.value
+        #expect {
+            try result.get()
+        } throws: { error in
+            guard case RenewalError.Unavailable = error else { return false }
+            return true
+        }
+        // The metadata read is cut off at the limit of the whole renewal, at most 3 seconds on, not at a limit of
+        // its own, 6 seconds on.
+        #expect(answered - released < .milliseconds(4500))
+        #expect(try keychain.label(service: service, account: authorization.place.leaseAccount) == nil)
     }
 
     /// The same keychain file as `keychain`, reached as another process reaches it: no lock of this process's
@@ -1409,30 +1424,32 @@ struct TokenRenewal {
             default: return .json(404, [:])
             }
         }
-        try await inIsolatedKeychainAsync { keychain, _ async throws in
-            var transport = server.transport()
-            transport.timeLimit = .milliseconds(300)
-            transport.requestLimit = .seconds(1)
-            let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain, transport: transport)
-            await #expect {
-                try await renew(credential, refused: "at-1")
-            } throws: { error in
-                guard case RenewalError.Unavailable = error else { return false }
-                return true
-            }
-            try await eventually("the lease is let go", within: 30) {
-                (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
-            }
-            answer.release()
-            let kept = try #require(try authorization.place.read())
-            #expect(kept.refreshToken == "rt-1")
-            #expect(kept.uncertain, "the retry was cut off after it was sent")
-
-            #expect(try await authorization.signOut() == .notConfirmed)
-            #expect(server.requests(to: "/oauth/revoke").count == 1)
-            #expect(!ended.withLock { $0 }, "the grant stands, so the outcome must not say it ended")
-            #expect(try authorization.place.read() == nil)
+        // A keychain in memory, since the retry is sent only after the keychain is read, with a time limit left,
+        // and a file keychain on a loaded machine can take seconds to answer.
+        let keychain = RefusesWrites().keychain
+        var transport = server.transport()
+        transport.timeLimit = .milliseconds(300)
+        transport.requestLimit = .seconds(4)
+        let (authorization, credential) = try signedInAtEarlierEndpoint(server, keychain, transport: transport)
+        await #expect {
+            try await renew(credential, refused: "at-1")
+        } throws: { error in
+            guard case RenewalError.Unavailable = error else { return false }
+            return true
         }
+        try await eventually("the lease is let go", within: 30) {
+            (try? keychain.label(service: service, account: authorization.place.leaseAccount)) == .some(nil)
+        }
+        answer.release()
+        #expect(server.requests(to: "/oauth/token").count == 1, "the retry was sent")
+        let kept = try #require(try authorization.place.read())
+        #expect(kept.refreshToken == "rt-1")
+        #expect(kept.uncertain, "the retry was cut off after it was sent")
+
+        #expect(try await authorization.signOut() == .notConfirmed)
+        #expect(server.requests(to: "/oauth/revoke").count == 1)
+        #expect(!ended.withLock { $0 }, "the grant stands, so the outcome must not say it ended")
+        #expect(try authorization.place.read() == nil)
     }
 
     @Test(arguments: [
@@ -2643,6 +2660,40 @@ struct SigningInAgainOnTheKeptClient {
             #expect(server.requests(to: "/oauth/register").isEmpty)
             #expect(revocations(server).isEmpty)
         }
+    }
+
+    /// A renewal whose tokens the keychain cannot keep ends the sign-in here, and leaves the grant standing for the
+    /// approval on the kept client that is under way.
+    @Test func aRenewalThatCannotKeepItsTokensWhileASignInOnTheKeptClientIsUnderWayLeavesThatSignInKeptAndItsGrant()
+        async throws
+    {
+        let hold = Hold()
+        let server = replacingServer(holding: holdingTheExchange(hold))
+        let refusing = RefusesWrites()
+        let (authorization, credential) = try signedIn(server, refusing.keychain, transport: server.transport())
+        let signingIn = Task { try await authorization.signIn(browser: approveAtOnce) }
+        try await eventually("the server has issued our tokens on the kept client") {
+            server.requests(to: "/oauth/token").count == 1
+        }
+        refusing.refuse()
+        await #expect {
+            try await renew(credential, refused: "at-1")
+        } throws: { error in
+            guard case RenewalError.Ended = error else { return false }
+            return true
+        }
+        refusing.allow()
+        #expect(try authorization.place.read() == nil)
+        hold.release()
+
+        let signedInAgain = try await signingIn.value
+        #expect(!signedInAgain.replacedGrantStands)
+        let kept = try #require(try authorization.place.read())
+        #expect(kept.clientId == "client-1" && kept.accessToken == "at-2" && kept.refreshToken == "rt-2")
+        #expect(server.requests(to: "/oauth/register").isEmpty)
+        // Revoking the renewal's refresh token, rt-3, would end the grant the kept sign-in holds.
+        #expect(
+            revocations(server) == [["token": "at-3", "token_type_hint": "access_token", "client_id": "client-1"]])
     }
 
     /// Whatever the keychain holds when a sign-in on the kept client cannot be kept, another approval on that

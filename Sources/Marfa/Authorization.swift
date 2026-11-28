@@ -22,7 +22,7 @@ import Synchronization
 /// revokes only its own access token. If the kept sign-in is replaced by one on another client while a sign-in on
 /// its client is under way, keeping this one would overwrite that sign-in and revoke its grant, so this one keeps
 /// nothing and throws ``SignInError/keptSignInChanged``. If the kept sign-in is gone by then, because it was signed
-/// out or a renewal found its grant ended, this one is kept and revokes nothing. Where a sign-out ended the grant,
+/// out or a renewal ended it, this one is kept and revokes nothing. Where a sign-out ended the grant,
 /// the kept tokens fail on first use and the sign-in ends as it does for any ended grant. A sign-in on a new
 /// client ends the grant the replaced sign-in held, as ``signOut()`` does, so each sign-in leaves one grant
 /// standing. ``Credential/replacedGrantStands`` says when the server did not confirm the replaced grant ended.
@@ -36,6 +36,11 @@ import Synchronization
 /// ``Folders`` in the process, and across processes that share the keychain, such as an app and its extensions
 /// using one ``Keychain/init(accessGroup:)``. A renewal that finds the token already renewed uses the new one
 /// without asking the server.
+///
+/// A renewal whose new tokens the keychain cannot keep ends the sign-in, so calls throw
+/// ``MarfaError/signedOut(origin:message:)``, but it leaves the app's grant, and everything made under it, standing at
+/// the server, since another sign-in on the app's client may share it. A later sign-in then registers a new client,
+/// which does not reach what the app made under the old one; the owner can remove the old grant.
 public struct Authorization: Sendable {
     /// How the app introduces itself to the server.
     public struct Client: Sendable, Hashable {
@@ -449,7 +454,8 @@ public struct Authorization: Sendable {
                         }
                         guard admitted else { throw CancellationError() }
                         // Writing would overwrite another client's sign-in and revoke its grant. An empty slot
-                        // does not prove the grant ended: a renewal refused as `invalid_grant` empties it too.
+                        // does not prove the grant ended: a renewal refused as `invalid_grant` empties it too, and
+                        // so does one whose tokens the keychain could not keep.
                         if registered.reused, let replaced, replaced.clientId != registered.clientId {
                             throw SignInError.keptSignInChanged
                         }
@@ -488,7 +494,9 @@ public struct Authorization: Sendable {
 public enum SignOutOutcome: Sendable, Hashable {
     /// The server confirmed that the grant ended.
     case endedAtServer
-    /// The keychain held no sign-in.
+    /// The keychain held no sign-in, so nothing was revoked.
+    ///
+    /// A grant the app held may still stand at the server, such as when a renewal could not keep its tokens.
     case nothingKept
     /// The sign-in is deleted here, but the server did not confirm that the grant ended, or a renewal that was
     /// cut off with no answer may have left it holding a grant the revocation did not name.
