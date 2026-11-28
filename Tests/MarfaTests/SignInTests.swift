@@ -76,12 +76,14 @@ private func marfa(
     }
 }
 
-private func tokens(_ access: String, _ refresh: String) -> ScriptedAuthServer.Reply {
+private func tokens(
+    _ access: String, _ refresh: String, scope: String = "core.note:read offline_access"
+) -> ScriptedAuthServer.Reply {
     .json(
         200,
         [
             "access_token": access, "refresh_token": refresh, "token_type": "Bearer", "expires_in": 3600,
-            "scope": "core.note:read offline_access",
+            "scope": scope,
         ])
 }
 
@@ -357,7 +359,7 @@ struct BrowserSignIn {
         }
     }
 
-    @Test func aSignInRegistersAClientOfItsOwnAndOnlyAConfirmationReusesTheKeptOneItsGrantAllows() async throws {
+    @Test func aSignInReusesTheKeptClientWhenItsGrantAndRedirectFitAndRegistersOneOfItsOwnWhenNot() async throws {
         let server = ScriptedAuthServer()
         let origin = server.origin
         marfa(server) { request in
@@ -371,6 +373,7 @@ struct BrowserSignIn {
                         "verification_uri": "\(origin)/auth/device",
                         "expires_in": 600, "interval": 5,
                     ])
+            case "/oauth/revoke": .json(200, [:])
             default: .json(404, [:])
             }
         }
@@ -385,23 +388,22 @@ struct BrowserSignIn {
             }
             _ = try await authorization.signIn(browser: approve)
             _ = try await authorization.signIn(browser: approve)
-            #expect(server.requests(to: "/oauth/register").count == 2)
+            #expect(server.requests(to: "/oauth/register").count == 1)
 
-            // A confirmation names the grant it confirms, so it reuses the kept client.
             _ = try await authorization.signIn(maxAge: 0, browser: approve)
-            #expect(server.requests(to: "/oauth/register").count == 2)
+            #expect(server.requests(to: "/oauth/register").count == 1)
 
             _ = try await authorization.startDeviceSignIn().credential()
             let registered = server.requests(to: "/oauth/register").map(\.json)
-            #expect(registered.count == 3)
+            #expect(registered.count == 2)
             #expect(registered.last?["grant_types"] as? [String] == [deviceCodeGrant, "refresh_token"])
             #expect(registered.last?["redirect_uris"] == nil)
             _ = try await authorization.startDeviceSignIn().credential()
-            #expect(server.requests(to: "/oauth/register").count == 4)
+            #expect(server.requests(to: "/oauth/register").count == 2)
 
-            // The kept client holds the device grant, not the one a browser confirmation needs.
+            // The kept client holds the device grant, not the one a browser sign-in needs.
             _ = try await authorization.signIn(maxAge: 0, browser: approve)
-            #expect(server.requests(to: "/oauth/register").count == 5)
+            #expect(server.requests(to: "/oauth/register").count == 3)
         }
     }
 
@@ -1799,13 +1801,15 @@ struct TokenRenewal {
 }
 
 /// A Marfa server whose registrations answer `client-2`, `client-3` and so on, whose token answers are `at-2`
-/// and `rt-2`, then `at-3` and `rt-3`, and whose revocations `revocation` answers.
+/// and `rt-2`, then `at-3` and `rt-3`, each with the scope `scope` gives its number, and whose revocations
+/// `revocation` answers.
 ///
 /// With `forgetting`, it is a server replaced at the same address: it knows only the clients registered with it
 /// since, and refuses any other client as the real one does.
 private func replacingServer(
     forgetting: Bool = false,
-    revocation: @escaping @Sendable (ScriptedAuthServer.Request) -> ScriptedAuthServer.Reply = { _ in .json(200, [:]) }
+    revocation: @escaping @Sendable (ScriptedAuthServer.Request) -> ScriptedAuthServer.Reply = { _ in .json(200, [:]) },
+    scope: @escaping @Sendable (Int) -> String = { _ in "core.note:read offline_access" }
 ) -> ScriptedAuthServer {
     let server = ScriptedAuthServer()
     let origin = server.origin
@@ -1824,7 +1828,9 @@ private func replacingServer(
                 if registering { issued.clients += 1 } else { issued.tokens += 1 }
                 return registering ? issued.clients : issued.tokens
             }
-            return registering ? .json(201, ["client_id": "client-\(count)"]) : tokens("at-\(count)", "rt-\(count)")
+            return registering
+                ? .json(201, ["client_id": "client-\(count)"])
+                : tokens("at-\(count)", "rt-\(count)", scope: scope(count))
         case "/oauth/device-authorization":
             return .json(
                 200,
@@ -1837,6 +1843,16 @@ private func replacingServer(
         }
     }
     return server
+}
+
+/// The revocations a sign-in sent, each naming its token's kind: never the check of a kept client.
+private func revocations(_ server: ScriptedAuthServer) -> [[String: String]] {
+    server.requests(to: "/oauth/revoke").map(\.form).filter { $0["token_type_hint"] != nil }
+}
+
+/// The client each check of a kept client named: a revocation of a value that is no token, so it names no hint.
+private func clientChecks(_ server: ScriptedAuthServer) -> [String?] {
+    server.requests(to: "/oauth/revoke").map(\.form).filter { $0["token_type_hint"] == nil }.map { $0["client_id"] }
 }
 
 /// Whether a server replaced at the same address knows `clientId`, once it has registered `issued` clients.
@@ -1898,6 +1914,8 @@ struct SigningInAgain {
             #expect(!credential.replacedGrantStands)
             #expect(server.requests(to: "/oauth/register").isEmpty)
             #expect(try authorization.place.read()?.refreshToken == "rt-2")
+            // The server that challenges a confirmation holds its client, so no check is sent first.
+            #expect(clientChecks(server).isEmpty)
             let revoked = server.requests(to: "/oauth/revoke").map(\.form)
             #expect(revoked == [["token": "at-1", "token_type_hint": "access_token", "client_id": "client-1"]])
         }
@@ -2050,10 +2068,12 @@ struct SigningInAgain {
             #expect(kept.clientId == "client-2")
             #expect(try authorization.credential() == credential)
             #expect(try #require(server.requests(to: "/oauth/token").first).form["client_id"] == "client-2")
+            // The check of the kept client is refused, so the browser opens only once a new client is registered.
+            #expect(clientChecks(server) == ["client-1"])
             // The replaced server holds no grant for the old client, which it says by refusing it.
             #expect(!credential.replacedGrantStands)
-            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
-            #expect(revoked == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
+            #expect(
+                revocations(server) == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
         }
     }
 
@@ -2069,13 +2089,58 @@ struct SigningInAgain {
             let credential = try await authorization.startDeviceSignIn().credential()
 
             #expect(server.requests(to: "/oauth/register").count == 1)
+            // The kept client is asked first, and the request repeated once with the client registered for it.
+            let asked = server.requests(to: "/oauth/device-authorization").map { $0.form["client_id"] }
+            #expect(asked == ["client-1", "client-2"])
             #expect(try authorization.place.read()?.clientId == "client-2")
             #expect(!credential.replacedGrantStands)
         }
     }
 
-    @Test func aCancelAfterTheCodeExchangeAndBeforeTheWriteChangesNothingKeptAndEndsTheNewGrant() async throws {
+    @Test func aDeviceSignInRefusedAsAnUnknownClientAgainAfterRegisteringThrowsAndRegistersOnce() async throws {
         let server = replacingServer()
+        server.answer { [discovery = server.discovery()] request in
+            switch request.path {
+            case "/.well-known/oauth-authorization-server": discovery
+            case "/oauth/register": .json(201, ["client_id": "client-2"])
+            case "/oauth/device-authorization": oauthError("invalid_client")
+            default: .json(200, [:])
+            }
+        }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            var kept = try #require(try authorization.place.read())
+            kept.grantTypes = [deviceCodeGrant, "refresh_token"]
+            kept.redirect = nil
+            try authorization.place.keep(kept)
+            await #expect {
+                try await authorization.startDeviceSignIn()
+            } throws: { error in
+                guard case SignInError.refused(let code, _) = error else { return false }
+                return code == "invalid_client"
+            }
+
+            #expect(server.requests(to: "/oauth/register").count == 1)
+            let asked = server.requests(to: "/oauth/device-authorization").map { $0.form["client_id"] }
+            #expect(asked == ["client-1", "client-2"])
+            #expect(try authorization.place.read() == kept)
+            #expect(server.requests(to: "/oauth/revoke").isEmpty)
+        }
+    }
+
+    /// What a sign-in that cannot be kept revokes: on a new client, its refresh token, which ends its grant; on
+    /// the kept client it reused, only its access token, since its grant is the kept sign-in's too.
+    private static func revokedWhenNotKept(forgotten: Bool) -> [[String: String]] {
+        forgotten
+            ? [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]]
+            : [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]]
+    }
+
+    @Test(arguments: [false, true])
+    func aCancelAfterTheCodeExchangeAndBeforeTheWriteChangesNothingKeptAndRevokesTheNewSignIn(
+        forgotten: Bool
+    ) async throws {
+        let server = replacingServer(forgetting: forgotten)
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let probe = KeychainProbe()
             let watched = probe.on(keychain, account: server.origin)
@@ -2095,20 +2160,27 @@ struct SigningInAgain {
             await #expect(throws: CancellationError.self) { try await signingIn.value }
 
             #expect(try authorization.place.read() == before)
-            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
-            #expect(revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]])
+            #expect(revocations(server) == Self.revokedWhenNotKept(forgotten: forgotten))
         }
     }
 
-    @Test func aCancelWhileTheKeychainReadsTheReplacedSignInChangesNothingKeptAndEndsTheNewGrant() async throws {
-        let server = replacingServer()
+    @Test(arguments: [false, true])
+    func aCancelWhileTheKeychainReadsTheReplacedSignInChangesNothingKeptAndRevokesTheNewSignIn(
+        forgotten: Bool
+    ) async throws {
+        let server = replacingServer(forgetting: forgotten)
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let probe = KeychainProbe()
             let watched = probe.on(keychain, account: server.origin)
             let (authorization, _) = try signedIn(server, watched, transport: server.transport())
             let before = try authorization.place.read()
-            probe.holdNextRead()
-            let signingIn = Task { try await authorization.signIn(browser: approveAtOnce) }
+            // The read held back is the one the write makes, after the browser answers.
+            let signingIn = Task {
+                try await authorization.signIn { url, scheme in
+                    probe.holdNextRead()
+                    return try await approveAtOnce(url, scheme)
+                }
+            }
             try await eventually("the code is exchanged and the keychain read waits") {
                 server.requests(to: "/oauth/token").count == 1 && probe.holding
             }
@@ -2119,21 +2191,296 @@ struct SigningInAgain {
             await #expect(throws: CancellationError.self) { try await signingIn.value }
 
             #expect(try authorization.place.read() == before)
-            let revoked = server.requests(to: "/oauth/revoke").map(\.form)
-            #expect(revoked == [["token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-2"]])
+            #expect(revocations(server) == Self.revokedWhenNotKept(forgotten: forgotten))
         }
     }
 
-    @Test func aCanceledSignInChangesNothingAndEndsNothing() async throws {
+    @Test(arguments: [(SignInError.canceled, nil), (.denied, "access_denied")] as [(SignInError, String?)])
+    func aSignInCanceledOrDeclinedOnTheKeptClientChangesNothingAndEndsNothing(
+        outcome: (SignInError, String?)
+    ) async throws {
         let server = replacingServer()
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
             let before = try authorization.place.read()
-            await #expect(throws: SignInError.canceled) {
-                try await authorization.signIn { _, _ in throw SignInError.canceled }
+            let opened = Mutex<String?>(nil)
+            await #expect(throws: outcome.0) {
+                try await authorization.signIn { url, _ in
+                    let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                    opened.withLock { $0 = query.first { $0.name == "client_id" }?.value }
+                    guard let error = outcome.1 else { throw SignInError.canceled }
+                    let state = query.first { $0.name == "state" }?.value ?? ""
+                    return URL(string: "so.marfa.tests:/signed-in?error=\(error)&state=\(state)")!
+                }
             }
+            #expect(opened.withLock { $0 } == "client-1")
             #expect(try authorization.place.read() == before)
-            #expect(server.requests(to: "/oauth/revoke").isEmpty)
+            #expect(revocations(server).isEmpty)
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+        }
+    }
+}
+
+/// The app's client asking for more than the kept sign-in holds.
+private let widerClient = Authorization.Client(
+    name: "Sign-in tests", redirect: client.redirect, scopes: ["core.note:read", "core.note:write"],
+    permissions: [.webhooksManage])
+
+/// A sign-in that replaces one kept for the same server, on a client the server still holds, keeps that client,
+/// so the grant it holds, and what the grant made, stand.
+@Suite(.timeLimit(.minutes(1)))
+struct SigningInAgainOnTheKeptClient {
+    @Test func aBrowserSignInAskingForMoreReusesTheKeptClientOnceTheServerSaysItHoldsIt() async throws {
+        let wider = "core.note:read core.note:write webhooks.manage offline_access"
+        let server = replacingServer(scope: { $0 == 2 ? "core.note:read offline_access" : wider })
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = server.transport()
+            let first = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service, transport: transport)
+            _ = try await first.signIn(browser: approveAtOnce)
+            let widening = try Authorization(
+                server: server.url, client: widerClient, keychain: keychain, service: service, transport: transport)
+            let checkedFirst = Mutex<[String?]>([])
+            let opened = Mutex<URL?>(nil)
+            let credential = try await widening.signIn { url, scheme in
+                checkedFirst.withLock { $0 = clientChecks(server) }
+                opened.withLock { $0 = url }
+                return try await approveAtOnce(url, scheme)
+            }
+
+            #expect(server.requests(to: "/oauth/register").count == 1)
+            #expect(checkedFirst.withLock { $0 } == ["client-2"])
+            let check = try #require(server.requests(to: "/oauth/revoke").first)
+            #expect(check.headers["X-Marfa-Contract"] == String(marfaContractVersion))
+            let token = try #require(check.form["token"])
+            #expect(check.form.keys.sorted() == ["client_id", "token"])
+            #expect(!token.hasPrefix("marfa_at_") && !token.hasPrefix("marfa_rt_") && !token.isEmpty)
+            let query = try #require(
+                opened.withLock { $0 }.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) })
+            #expect(query.queryItems?.first { $0.name == "client_id" }?.value == "client-2")
+            #expect(query.queryItems?.first { $0.name == "scope" }?.value == wider)
+            let exchanges = server.requests(to: "/oauth/token").map { $0.form["client_id"] }
+            #expect(exchanges == ["client-2", "client-2"])
+            // The grant is the kept sign-in's too, so only the replaced access token is revoked.
+            #expect(
+                revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-2"]])
+            #expect(!credential.replacedGrantStands)
+            #expect(credential.scopes == wider.split(separator: " ").map(String.init))
+            let kept = try #require(try widening.place.read())
+            #expect(kept.clientId == "client-2")
+            #expect(kept.refreshToken == "rt-3")
+        }
+    }
+
+    @Test func aDeviceSignInAskingForMoreReusesTheKeptClientWithNoCheck() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let transport = server.transport()
+            let first = try Authorization(
+                server: server.url, client: deviceClient, keychain: keychain, service: service, transport: transport)
+            _ = try await first.startDeviceSignIn().credential()
+            let widening = try Authorization(
+                server: server.url, client: Authorization.Client(name: "Device", scopes: ["core.note:write"]),
+                keychain: keychain, service: service, transport: transport)
+            let credential = try await widening.startDeviceSignIn().credential()
+
+            #expect(server.requests(to: "/oauth/register").count == 1)
+            #expect(clientChecks(server).isEmpty)
+            let asked = server.requests(to: "/oauth/device-authorization").map(\.form)
+            #expect(asked.map { $0["client_id"] } == ["client-2", "client-2"])
+            #expect(asked.last?["scope"] == "core.note:write offline_access")
+            #expect(server.requests(to: "/oauth/token").allSatisfy { $0.form["client_id"] == "client-2" })
+            #expect(
+                revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-2"]])
+            #expect(!credential.replacedGrantStands)
+            #expect(try widening.place.read()?.clientId == "client-2")
+        }
+    }
+
+    /// A check the server answers with neither a known nor an unknown client: unreachable, failing, refusing
+    /// otherwise, redirecting, or answering what its revocation endpoint never does.
+    static let unclearChecks: [ScriptedAuthServer.Reply] = [
+        .failure(.notConnectedToInternet), .failure(.timedOut), .json(503, [:]), .json(500, ["error": "server_error"]),
+        .json(404, [:]), .json(400, ["error": "invalid_request"]), .json(401, [:]),
+        .json(403, ["error": ["code": "invalid_client", "message": "an envelope, not an OAuth error"]]),
+        .raw(302, Data(), headers: ["Location": "https://elsewhere.example/oauth/revoke"]),
+        .raw(200, Data("<html>signed in to the network</html>".utf8), headers: ["Content-Type": "text/html"]),
+    ]
+
+    @Test(arguments: unclearChecks)
+    func aCheckWithNoClearAnswerThrowsAndRegistersNothingOpensNothingAndChangesNothingKept(
+        answer: ScriptedAuthServer.Reply
+    ) async throws {
+        let server = replacingServer { request in request.form["token_type_hint"] == nil ? answer : .json(200, [:]) }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let before = try authorization.place.read()
+            let opened = Mutex(false)
+            await #expect {
+                try await authorization.signIn { url, scheme in
+                    opened.withLock { $0 = true }
+                    return try await approveAtOnce(url, scheme)
+                }
+            } throws: { error in
+                switch error as? SignInError {
+                case .unavailable?, .refused?, .unreadable?: true
+                default: false
+                }
+            }
+
+            #expect(clientChecks(server) == ["client-1"])
+            #expect(!opened.withLock { $0 })
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+            #expect(server.requests(to: "/oauth/token").isEmpty)
+            #expect(revocations(server).isEmpty)
+            #expect(try authorization.place.read() == before)
+        }
+    }
+
+    @Test func aDeviceSignInAfterABrowserOneRegistersAClientOfItsOwnAndEndsTheReplacedGrant() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let credential = try await Authorization(
+                server: server.url, client: deviceClient, keychain: keychain, service: service,
+                transport: server.transport()
+            ).startDeviceSignIn().credential()
+
+            #expect(server.requests(to: "/oauth/register").count == 1)
+            #expect(clientChecks(server).isEmpty)
+            #expect(try authorization.place.read()?.clientId == "client-2")
+            #expect(
+                revocations(server) == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
+            #expect(!credential.replacedGrantStands)
+        }
+    }
+
+    @Test func aBrowserSignInWithAnotherRedirectRegistersAClientOfItsOwnAndEndsTheReplacedGrant() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (kept, _) = try signedIn(server, keychain, transport: server.transport())
+            let moved = Authorization.Client(
+                name: "Sign-in tests", redirect: URL(string: "so.marfa.tests:/signed-in/again"),
+                scopes: ["core.note:read"])
+            let authorization = try Authorization(
+                server: server.url, client: moved, keychain: keychain, service: service, transport: server.transport())
+            let credential = try await authorization.signIn { url, _ in
+                let state =
+                    URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "state" }?
+                    .value ?? ""
+                return URL(string: "so.marfa.tests:/signed-in/again?code=the-code&state=\(state)")!
+            }
+
+            let registered = server.requests(to: "/oauth/register").map(\.json)
+            #expect(registered.count == 1)
+            #expect(registered.first?["redirect_uris"] as? [String] == ["so.marfa.tests:/signed-in/again"])
+            #expect(clientChecks(server).isEmpty)
+            #expect(try kept.place.read()?.clientId == "client-2")
+            #expect(
+                revocations(server) == [["token": "rt-1", "token_type_hint": "refresh_token", "client_id": "client-1"]])
+            #expect(!credential.replacedGrantStands)
+        }
+    }
+
+    @Test func aSignInOnTheKeptClientThatCannotTakeTheLeaseRevokesOnlyItsAccessToken() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            var transport = server.transport()
+            transport.leaseLifetime = .seconds(1)
+            let (authorization, _) = try signedIn(server, keychain, transport: transport)
+            let held = try await heldElsewhere(authorization.place, transport)
+            defer { held.release() }
+            await #expect(throws: SignInError.heldElsewhere) {
+                try await authorization.signIn(browser: approveAtOnce)
+            }
+
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+            #expect(try authorization.place.read()?.refreshToken == "rt-1")
+            #expect(
+                revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
+        }
+    }
+
+    @Test func aSignInOnTheKeptClientThatTheKeychainRefusesToWriteRevokesOnlyItsAccessToken() async throws {
+        let server = replacingServer()
+        let refusing = RefusesWrites()
+        let (authorization, _) = try signedIn(server, refusing.keychain, transport: server.transport())
+        refusing.refuse()
+        await #expect(throws: Keychain.Failure.self) {
+            try await authorization.signIn(browser: approveAtOnce)
+        }
+        refusing.allow()
+
+        #expect(server.requests(to: "/oauth/register").isEmpty)
+        #expect(try authorization.place.read()?.refreshToken == "rt-1")
+        #expect(
+            revocations(server) == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
+    }
+
+    @Test func anotherHolderSigningInOnAnotherClientMeanwhileHasItsGrantEndedAndOursKept() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let credential = try await authorization.signIn { url, scheme in
+                var meanwhile = try #require(try authorization.place.read())
+                meanwhile.clientId = "client-9"
+                meanwhile.refreshToken = "rt-9"
+                try authorization.place.keep(meanwhile)
+                return try await approveAtOnce(url, scheme)
+            }
+
+            #expect(!credential.replacedGrantStands)
+            let kept = try #require(try authorization.place.read())
+            #expect(kept.clientId == "client-1")
+            #expect(kept.refreshToken == "rt-2")
+            #expect(
+                revocations(server) == [["token": "rt-9", "token_type_hint": "refresh_token", "client_id": "client-9"]])
+        }
+    }
+
+    @Test func anotherHolderSigningOutMeanwhileLeavesNothingToRevoke() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            let credential = try await authorization.signIn { url, scheme in
+                try authorization.place.drop()
+                return try await approveAtOnce(url, scheme)
+            }
+
+            #expect(!credential.replacedGrantStands)
+            #expect(try authorization.place.read()?.clientId == "client-1")
+            #expect(revocations(server).isEmpty)
+        }
+    }
+
+    @Test func anOwnerWhoApprovesLessThanAskedGivesTheCredentialWhatTheTokenHoldsAndEndsNothing() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            _ = try signedIn(server, keychain, transport: server.transport())
+            let credential = try await Authorization(
+                server: server.url, client: widerClient, keychain: keychain, service: service,
+                transport: server.transport()
+            ).signIn(browser: approveAtOnce)
+
+            #expect(credential.scopes == ["core.note:read", "offline_access"])
+            #expect(!credential.grants(.webhooksManage))
+            #expect(revocations(server).allSatisfy { $0["token_type_hint"] == "access_token" })
+            #expect(revocations(server).map { $0["client_id"] } == ["client-1"])
+        }
+    }
+
+    @Test func aSignOutAfterSigningInAgainEndsTheGrantByTheNewestRefreshTokenOnTheKeptClient() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try signedIn(server, keychain, transport: server.transport())
+            _ = try await authorization.signIn(browser: approveAtOnce)
+            #expect(try await authorization.signOut() == .endedAtServer)
+
+            #expect(try authorization.place.read() == nil)
+            #expect(
+                revocations(server).last == [
+                    "token": "rt-2", "token_type_hint": "refresh_token", "client_id": "client-1",
+                ])
         }
     }
 }
@@ -2712,6 +3059,28 @@ struct SignInRequestsRefuseRedirects {
             let (authorization, _) = try origins.signedIn(keychain, endpoint: "/oauth/token")
             #expect(try await authorization.signOut() == .notConfirmed)
             #expect(try authorization.place.read() == nil)
+        }
+        try await origins.expectUntouched()
+    }
+
+    @Test(arguments: [307, 302])
+    func aCheckOfTheKeptClientAnsweredByARedirectIsRefusedBeforeTheBrowserOpens(status: Int) async throws {
+        let origins = try await Origins.start(status: status, redirected: ["/oauth/revoke"], rest: Origins.marfa())
+        defer { origins.stop() }
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, _) = try origins.signedIn(keychain, endpoint: "/oauth/token")
+            let before = try authorization.place.read()
+            let opened = Mutex(false)
+            await #expect(throws: SignInError.refused(code: "http_\(status)", message: "the server answered \(status)"))
+            {
+                try await authorization.signIn { url, _ in
+                    opened.withLock { $0 = true }
+                    return url
+                }
+            }
+            #expect(!opened.withLock { $0 })
+            #expect(try authorization.place.read() == before)
+            #expect(!origins.first.log.all.contains { $0.hasPrefix("POST /oauth/register ") })
         }
         try await origins.expectUntouched()
     }

@@ -900,8 +900,27 @@ final class OwnServer: Sendable {
         try? FileManager.default.removeItem(at: state)
     }
 
-    private static func up(_ state: URL) async throws -> [String: String] {
-        let printed = try await script("server-up.sh", [], keep: state)
+    /// Ends it and boots a server with nothing of it in its place, at the same address, as an owner who sets
+    /// Marfa up again does: it knows none of this one's clients, grants or keys.
+    func replaced() async throws -> OwnServer {
+        try await end()
+        let fresh = FileManager.default.temporaryDirectory.appending(path: "marfa-own-server-\(UUID())")
+        let exports = try await Self.up(fresh, port: url.port)
+        let replacement = try OwnServer(state: fresh, exports: exports)
+        guard replacement.url == url else {
+            try await replacement.end()
+            throw Unreplaced(at: url, came: replacement.url)
+        }
+        return replacement
+    }
+
+    struct Unreplaced: Error {
+        let at: URL
+        let came: URL
+    }
+
+    private static func up(_ state: URL, port: Int? = nil) async throws -> [String: String] {
+        let printed = try await script("server-up.sh", [], keep: state, port: port)
         var exports: [String: String] = [:]
         for line in printed.split(separator: "\n") where line.hasPrefix("export ") {
             let pair = line.dropFirst("export ".count).split(separator: "=", maxSplits: 1)
@@ -911,7 +930,7 @@ final class OwnServer: Sendable {
         return exports
     }
 
-    private static func script(_ name: String, _ arguments: [String], keep: URL)
+    private static func script(_ name: String, _ arguments: [String], keep: URL, port: Int? = nil)
         async throws -> String
     {
         let monorepo = try #require(monorepo, "MARFA_MONOREPO names no checkout")
@@ -919,6 +938,7 @@ final class OwnServer: Sendable {
         environment["MARFA_SERVER_KEEP"] = keep.path
         environment["MARFA_SERVER_ENV"] = keep.appending(path: "env").path
         environment.removeValue(forKey: "PORT")
+        environment["MARFA_PORT"] = port.map(String.init)
         return try await run(
             "/bin/bash", [monorepo.appending(path: "core/scripts/\(name)").path] + arguments,
             environment: environment)
