@@ -20,7 +20,7 @@ extension Client {
     /// ``MarfaError/versionConflict(message:server:)`` and nothing is written; the error's
     /// ``MarfaError/currentRevision`` is the revision now. Leave it `nil` to replace whatever the type holds.
     /// The `revision` comes from `getType`, `listTypes` or the answer of ``register(itemType:)`` or this call; an
-    /// ``ItemType`` from the working copy's catalog carries none.
+    /// ``Marfa/ItemType`` from the working copy's catalog carries none.
     public func replace(itemType id: String, with definition: Components.Schemas.TypeDefinitionUpdate) async throws
         -> Components.Schemas.RegisteredType
     {
