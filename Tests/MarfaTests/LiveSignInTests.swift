@@ -1,4 +1,6 @@
 import Foundation
+import MarfaAPI
+import Synchronization
 import Testing
 
 @testable import Marfa
@@ -41,6 +43,95 @@ struct LiveSignIn {
         try await own.end()
     }
 
+    @Test func widenAnAppsAccessKeepsItsGrantAndTheWebhooksItMadeUntilItSignsOut() async throws {
+        let own = try await OwnServer.boot()
+        do {
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                try await Self.widen(own, keychain)
+            }
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    private static func widen(_ own: OwnServer, _ keychain: Keychain) async throws {
+        let redirect = URL(string: "com.withmarfa.marfa-swift.tests:/signed-in")
+        let first = try Authorization(
+            server: own.url,
+            client: Authorization.Client(
+                name: "marfa-swift live tests", redirect: redirect, scopes: ["core.note:read"],
+                permissions: [.webhooksManage]),
+            keychain: keychain, service: service)
+        let credential = try await first.signIn(browser: browserApproval(on: own))
+        #expect(credential.grants(.webhooksManage))
+        let kept = try #require(try first.place.read())
+        let made = try await Client(Server(url: own.url, credential: credential)).createWebhook(
+            body: .json(.init(url: "https://example.com/marfa-swift-live-hook", events: [.item_created])))
+        let webhook = try made.created.body.json.id
+        #expect(try await webhooks(own) == [[webhook, kept.clientId]])
+        let grant = try await grantIDs(own)
+        #expect(grant.map { $0[1] } == [kept.clientId])
+
+        let widening = try Authorization(
+            server: own.url,
+            client: Authorization.Client(
+                name: "marfa-swift live tests", redirect: redirect, scopes: ["core.note:read"],
+                permissions: [.webhooksManage, .instanceRead]),
+            keychain: keychain, service: service)
+        let widened = try await widening.signIn(browser: browserApproval(on: own))
+        #expect(!widened.replacedGrantStands)
+        #expect(widened.grants(.instanceRead))
+        #expect(try widening.place.read()?.clientId == kept.clientId)
+        #expect(try await grantIDs(own) == grant)
+        #expect(try await webhooks(own) == [[webhook, kept.clientId]])
+        #expect(try await itemsStatus(kept.accessToken, own) == 401)
+        #expect(try await itemsStatus(try #require(try widening.place.read()).accessToken, own) == 200)
+
+        #expect(try await widening.signOut() == .endedAtServer)
+        #expect(try await grantIDs(own).isEmpty)
+        #expect(try await webhooks(own).isEmpty)
+    }
+
+    @Test func signingInToAServerReplacedAtTheSameAddressCompletesOnANewClientThroughEitherFlow() async throws {
+        let current = Mutex(try await OwnServer.boot())
+        do {
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                var own = current.withLock { $0 }
+                let authorization = try Self.authorization(own, keychain, service: Self.service)
+                _ = try await authorization.signIn(browser: Self.browserApproval(on: own))
+                let browser = try #require(try authorization.place.read())
+
+                // The kept client is unknown to the new server, so the check registers another.
+                own = try await own.replaced()
+                current.withLock { [own] in $0 = own }
+                let credential = try await authorization.signIn(browser: Self.browserApproval(on: own))
+                let again = try #require(try authorization.place.read())
+                #expect(again.clientId != browser.clientId)
+                #expect(try await Self.grants(own) == [again.clientId])
+                #expect(try await Self.itemsStatus(again.accessToken, own) == 200)
+                #expect(!credential.replacedGrantStands)
+
+                _ = try await Self.deviceSignIn(authorization, own)
+                let device = try #require(try authorization.place.read())
+                own = try await own.replaced()
+                current.withLock { [own] in $0 = own }
+                // The device authorization refuses the kept client, so the sign-in registers another and asks again.
+                let replaced = try await Self.deviceSignIn(authorization, own)
+                let last = try #require(try authorization.place.read())
+                #expect(last.clientId != device.clientId)
+                #expect(try await Self.grants(own) == [last.clientId])
+                #expect(try await Self.itemsStatus(last.accessToken, own) == 200)
+                #expect(!replaced.replacedGrantStands)
+            }
+        } catch {
+            try? await current.withLock { $0 }.end()
+            throw error
+        }
+        try await current.withLock { $0 }.end()
+    }
+
     private static func signInAgain(_ own: OwnServer, _ keychain: Keychain) async throws {
         let authorization = try Authorization(
             server: own.url,
@@ -62,13 +153,15 @@ struct LiveSignIn {
         #expect(try await itemsStatus(browser.accessToken, own) == 401)
         #expect(try await itemsStatus(device.accessToken, own) == 200)
 
-        // Another device sign-in registers a client of its own too, and ends the grant it replaces.
+        // Another device sign-in reuses the kept client, so the grant stays the one it was, and only the
+        // replaced access token ends.
+        let grant = try await grantIDs(own)
         let again = try await authorization.startDeviceSignIn()
         try await approve(again.userCode, on: own)
         #expect(try await again.credential().replacedGrantStands == false)
         let second = try #require(try authorization.place.read())
-        #expect(second.clientId != device.clientId)
-        #expect(try await grants(own) == [second.clientId])
+        #expect(second.clientId == device.clientId)
+        #expect(try await grantIDs(own) == grant)
         #expect(try await itemsStatus(device.accessToken, own) == 401)
         #expect(try await itemsStatus(second.accessToken, own) == 200)
         let renewal = try formRequest(
@@ -83,12 +176,29 @@ struct LiveSignIn {
 
     /// The client of every grant the owner approved, as `GET /grants` lists them.
     private static func grants(_ own: OwnServer) async throws -> [String] {
-        var request = URLRequest(url: own.url.appending(path: "grants"))
+        try await listed("grants", own).compactMap { $0["client_id"] as? String }
+    }
+
+    /// The ID and client of every grant the owner approved.
+    private static func grantIDs(_ own: OwnServer) async throws -> [[String]] {
+        try await listed("grants", own).map { [$0["id"] as? String ?? "", $0["client_id"] as? String ?? ""] }
+    }
+
+    /// Each webhook on the server, as its ID and its maker's ID, listed with the server's own key, which reaches
+    /// every maker's.
+    private static func webhooks(_ own: OwnServer) async throws -> [[String]] {
+        try await listed("webhooks", own).map {
+            [$0["id"] as? String ?? "", ($0["maker"] as? [String: Any])?["id"] as? String ?? ""]
+        }
+    }
+
+    private static func listed(_ path: String, _ own: OwnServer) async throws -> [[String: Any]] {
+        var request = URLRequest(url: own.url.appending(path: path))
         request.setValue("Bearer \(own.key)", forHTTPHeaderField: "Authorization")
         let (body, response) = try await URLSession.shared.data(for: request)
-        try #require((response as? HTTPURLResponse)?.statusCode == 200, "the grants could not be listed")
+        try #require((response as? HTTPURLResponse)?.statusCode == 200, "the \(path) could not be listed")
         let listed = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-        return (listed["data"] as? [[String: Any]] ?? []).compactMap { $0["client_id"] as? String }
+        return listed["data"] as? [[String: Any]] ?? []
     }
 
     /// The status `GET /items` answers an access token, which shows whether it still works.

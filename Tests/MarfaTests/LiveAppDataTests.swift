@@ -26,6 +26,51 @@ struct LiveAppData {
         try await own.end()
     }
 
+    @Test(.timeLimit(.minutes(5))) func anAppThatAsksForMoreKeepsItsVendorAndRegistersAnotherTypeUnderIt()
+        async throws
+    {
+        let own = try await OwnServer.boot()
+        do {
+            try await inIsolatedKeychainAsync { keychain, _ async throws in
+                try await Self.widenAndRegister(own, keychain)
+            }
+        } catch {
+            try await own.end()
+            throw error
+        }
+        try await own.end()
+    }
+
+    private static func widenAndRegister(_ own: OwnServer, _ keychain: Keychain) async throws {
+        let redirect = URL(string: "com.withmarfa.marfa-swift.tests:/signed-in")
+        let vendor = "app.swift\(UUID().uuidString.prefix(8).lowercased())"
+        let title = Components.Schemas.FieldDefinition(_type: .string)
+        let fields = Components.Schemas.TypeDefinitionInput.FieldsPayload(additionalProperties: ["title": title])
+        let first = try Authorization(
+            server: own.url,
+            client: Authorization.Client(
+                name: appName, redirect: redirect, scopes: ["content:write", "metadata.types:write"]),
+            keychain: keychain, service: service)
+        let credential = try await first.signIn(browser: LiveSignIn.browserApproval(on: own))
+        _ = try await Client(try Server(url: own.url, credential: credential))
+            .register(itemType: .init(fields: fields, id: "\(vendor).note"))
+
+        let widening = try Authorization(
+            server: own.url,
+            client: Authorization.Client(
+                name: appName, redirect: redirect, scopes: ["content:write", "metadata.types:write", "core.note:read"]),
+            keychain: keychain, service: service)
+        let widened = try await widening.signIn(browser: LiveSignIn.browserApproval(on: own))
+        #expect(widened.scopes.contains("core.note:read"))
+        _ = try await Client(try Server(url: own.url, credential: widened))
+            .register(itemType: .init(fields: fields, id: "\(vendor).task"))
+
+        let grants = try await Client(own.server).listAppGrants().ok.body.json.data.filter { $0.clientName == appName }
+        #expect(grants.count == 1)
+        #expect(grants.first?.vendors == [vendor])
+        _ = try await widening.signOut()
+    }
+
     private static func listDeleteAndDisconnect(_ own: OwnServer, _ keychain: Keychain) async throws {
         let authorization = try Authorization(
             server: own.url,
