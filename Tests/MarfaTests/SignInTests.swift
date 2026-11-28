@@ -2823,3 +2823,72 @@ struct RenewalRefusalReachesAnApp {
         }
     }
 }
+
+@Suite(.timeLimit(.minutes(1)))
+struct CredentialClientID {
+    @Test func aBrowserSignInReturnsTheClientTheServerRegisteredAndTheKeychainRestoresIt() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            let credential = try await authorization.signIn(browser: approveAtOnce)
+
+            #expect(credential.clientID == "client-2")
+            #expect(try authorization.credential()?.clientID == "client-2")
+            #expect(try #require(server.requests(to: "/oauth/token").first).form["client_id"] == "client-2")
+        }
+    }
+
+    @Test func aDeviceSignInReturnsTheClientTheServerRegistered() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: deviceClient, keychain: keychain, service: service,
+                transport: server.transport())
+            let credential = try await authorization.startDeviceSignIn().credential()
+
+            #expect(credential.clientID == "client-2")
+            #expect(try authorization.credential()?.clientID == "client-2")
+        }
+    }
+
+    @Test func aConfirmationKeepsTheClientOfTheSignInItConfirms() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, before) = try signedIn(server, keychain, transport: server.transport())
+            let confirmed = try await authorization.signIn(maxAge: 0, browser: approveAtOnce)
+
+            #expect(before.clientID == "client-1")
+            #expect(confirmed.clientID == "client-1")
+            #expect(server.requests(to: "/oauth/register").isEmpty)
+        }
+    }
+
+    @Test func aSecondFullSignInCarriesTheNewRegistrationsClient() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let authorization = try Authorization(
+                server: server.url, client: client, keychain: keychain, service: service,
+                transport: server.transport())
+            let first = try await authorization.signIn(browser: approveAtOnce)
+            let second = try await authorization.signIn(browser: approveAtOnce)
+
+            #expect(first.clientID == "client-2")
+            #expect(second.clientID == "client-3")
+            #expect(try authorization.credential()?.clientID == "client-3")
+        }
+    }
+
+    @Test func aRenewalKeepsTheClient() async throws {
+        let server = replacingServer()
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let (authorization, credential) = try signedIn(server, keychain, transport: server.transport())
+            #expect(try await renew(credential, refused: "at-1") == "at-2")
+
+            #expect(credential.clientID == "client-1")
+            #expect(try authorization.credential()?.clientID == "client-1")
+            #expect(try #require(server.requests(to: "/oauth/token").first).form["client_id"] == "client-1")
+        }
+    }
+}
