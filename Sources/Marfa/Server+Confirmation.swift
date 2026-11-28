@@ -21,7 +21,11 @@ extension Server {
     /// sign-in the first one made. A second challenge for the same call throws
     /// ``MarfaError/confirmationRequired(maxAgeSeconds:message:server:)`` and starts no more sheets, and a sheet the
     /// person closes throws ``MarfaError/canceled(message:)``. A person who declines throws
-    /// ``MarfaError/forbidden(code:message:server:)`` with the code `access_denied`.
+    /// ``MarfaError/forbidden(code:message:server:)`` with the code `access_denied`. When a sign-in on another client
+    /// is kept for the server while the sheet shows, in this process or another sharing the keychain, the
+    /// confirmation is not kept and the call is not sent again: it throws
+    /// ``MarfaError/confirmationRequired(maxAgeSeconds:message:server:)``, and calling again confirms once more, with
+    /// the sign-in kept now.
     ///
     /// Has no effect on a server made from a key, which has no sign-in to renew: the server refuses it these calls
     /// with ``MarfaError/appSignInRequired(message:server:)``. Nor does it help a sign-in made with the device grant,
@@ -105,7 +109,8 @@ extension Server {
             return token
         } catch let error as MarfaError {
             throw error
-        } catch SignInError.noRedirect {
+        } catch SignInError.noRedirect, SignInError.keptSignInChanged {
+            // After `keptSignInChanged` the keychain holds another client's sign-in, which has not confirmed.
             throw challenge
         } catch SignInError.canceled, is CancellationError {
             throw .canceled(message: "the owner closed the sign-in before confirming")

@@ -161,6 +161,37 @@ struct OwnerOperationsTests {
         }
     }
 
+    @Test func aSignInKeptOnAnotherClientDuringTheSheetLeavesTheChallengeAsTheErrorAndTheCallUnsent() async throws {
+        try await inIsolatedKeychainAsync { keychain, _ async throws in
+            let scripted = ScriptedAuthServer()
+            marfa(scripted) { $0.headers["Authorization"] == "Bearer at-2" ? tags : challenge }
+            let authorization = try Authorization(
+                server: scripted.url, client: client, keychain: keychain, service: service,
+                transport: scripted.transport())
+            let sheet = Sheet()
+            let server = try signedIn(scripted, keychain, nil).confirming { url, scheme in
+                // Another holder sharing the keychain keeps a sign-in on a client of its own meanwhile.
+                var other = try #require(try authorization.place.read())
+                other.clientId = "client-9"
+                other.accessToken = "at-9"
+                other.refreshToken = "rt-9"
+                try authorization.place.keep(other)
+                return try await sheet.approve()(url, scheme)
+            }
+            let error = await failure { try await Client(server, through: nil, timeout: .seconds(30)).listTags() }
+            guard case .confirmationRequired(let maxAge, _, _)? = error else {
+                Issue.record("expected confirmationRequired, got \(String(describing: error))")
+                return
+            }
+            #expect(maxAge == 300)
+            #expect(sheet.count == 1)
+            #expect(scripted.requests(to: "/tags").map { $0.headers["Authorization"] } == ["Bearer at-1"])
+            #expect(try authorization.place.read()?.clientId == "client-9")
+            let revoked = scripted.requests(to: "/oauth/revoke").map(\.form)
+            #expect(revoked == [["token": "at-2", "token_type_hint": "access_token", "client_id": "client-1"]])
+        }
+    }
+
     @Test func withNoWayToShowTheSheetTheChallengeIsTheError() async throws {
         try await inIsolatedKeychainAsync { keychain, _ async throws in
             let scripted = ScriptedAuthServer()

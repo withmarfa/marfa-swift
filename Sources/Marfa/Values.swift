@@ -190,8 +190,9 @@ public enum MarfaError: Error, Sendable, Hashable, LocalizedError {
     /// A ``Server`` that was told how to show the sign-in with ``Server/confirming(from:prefersEphemeralWebBrowserSession:)``
     /// signs the owner in again and sends the call once more, so an app sees this only when it gave no way to show
     /// the sheet, when the sign-in has no browser redirect, or when the server asks again after the owner confirmed.
-    /// Asking again with nothing changed does not clear it. A person who cancels the sheet gets
-    /// ``canceled(message:)`` instead.
+    /// Asking again with nothing changed does not clear it. It also comes when a sign-in on another client was kept
+    /// for the server while the sheet showed, so the confirmation was not kept; asking again confirms once more,
+    /// with the sign-in kept now. A person who cancels the sheet gets ``canceled(message:)`` instead.
     case confirmationRequired(maxAgeSeconds: UInt64?, message: String, server: ServerAnswer?)
     /// An API key made a call that only an app the owner signed in to can make (403 `app_sign_in_required`), such as
     /// restoring a backup or moving the sign-in address.
