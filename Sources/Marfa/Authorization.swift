@@ -503,6 +503,14 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     public let server: URL
     /// The scopes the owner approved, which may be fewer than the app asked for.
     public let scopes: [String]
+    /// The client ID the server registered for this sign-in, which the server reports as the maker of the records
+    /// an app makes, such as a webhook's `maker.id`.
+    ///
+    /// A renewal and a confirmation keep it. Signing in again registers a new client, so the new credential's ID
+    /// differs from the one it replaced, and records made under the old sign-in still carry the old ID. It
+    /// is read when the credential is made, so a credential held across another sign-in keeps the ID it was
+    /// made with. It identifies the client and is not a secret.
+    public let clientID: String
     /// Whether the grant of the sign-in this one replaced still stands at the server.
     ///
     /// `true` only on a credential a sign-in returned, when it replaced a sign-in kept for the server on
@@ -516,6 +524,7 @@ public struct Credential: Sendable, Hashable, CustomStringConvertible {
     init(place: SignInPlace, kept: KeptSignIn, transport: SignInTransport, replacedGrantStands: Bool = false) {
         server = URL(string: place.account) ?? URL(filePath: "/")
         scopes = (kept.scope ?? "").split(separator: " ").map(String.init)
+        clientID = kept.clientId
         self.replacedGrantStands = replacedGrantStands
         self.place = place
         self.transport = transport

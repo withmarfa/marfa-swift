@@ -68,15 +68,17 @@ public final class MemoryKeychain: Sendable {
     /// - With a `refreshToken`, a renewal reaches no server, which a stand-in has none of, so it fails as one that
     ///   cannot be reached does: ``MarfaError/network(message:)``, with the sign-in kept.
     ///
+    /// The credential's ``Credential/clientID`` is `clientID`, so a test can match it to a scripted record's maker.
+    ///
     /// Throws ``SignInError/notAServer`` for an address that is not an `http` or `https` address with a host and no
     /// user or password, and a ``Keychain/Failure`` when the keychain refuses a read or write.
     public func signIn(
         to server: URL, service: String = "com.withmarfa.marfa-testing", accessToken: String = "memory-access-token",
-        refreshToken: String? = nil, scopes: [String] = []
+        refreshToken: String? = nil, scopes: [String] = [], clientID: String = "marfa-testing"
     ) throws -> Credential {
         try Credential.keeping(
             accessToken: accessToken, refreshToken: refreshToken, scopes: scopes, server: server, keychain: keychain,
-            service: service, session: Self.unreachable)
+            service: service, session: Self.unreachable, clientID: clientID)
     }
 
     private static let unreachable: URLSession = {

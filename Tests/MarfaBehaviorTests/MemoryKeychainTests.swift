@@ -104,6 +104,17 @@ import Testing
         #expect(try other.credential() == nil)
     }
 
+    @Test func aSignInCarriesTheClientIDATestChooses() throws {
+        let memory = MemoryKeychain()
+        #expect(try memory.signIn(to: home).clientID == "marfa-testing")
+        let chosen = try memory.signIn(to: home, service: "com.example.tests", clientID: "client-of-the-app")
+        #expect(chosen.clientID == "client-of-the-app")
+        let authorization = try Authorization(
+            server: home, client: .init(name: "Tests", scopes: []), keychain: memory.keychain,
+            service: "com.example.tests")
+        #expect(try authorization.credential()?.clientID == "client-of-the-app")
+    }
+
     @Test func aCredentialIsRefusedForAnotherServerAndForUserInfo() throws {
         let credential = try MemoryKeychain().signIn(to: home)
         #expect(throws: SignInError.otherServer) {
