@@ -30,10 +30,7 @@ extension LiveWorkingCopies {
                 let stale = await #expect(throws: MarfaError.self) {
                     try await api.updateWebhook(path: .init(id: id), body: .json(.init(active: true, version: first)))
                 }
-                guard case .versionConflict? = stale else {
-                    Issue.record("\(String(describing: stale))")
-                    return
-                }
+                guard case .versionConflict? = stale else { throw NotAConflict(answer: stale) }
                 #expect(stale?.currentVersion == first + 1)
                 let held = try await api.getWebhook(path: .init(id: id)).ok.body.json
                 #expect(held.value1.active == false, "the stale change wrote nothing")
@@ -58,7 +55,18 @@ extension LiveWorkingCopies {
             let registered = try await api.register(
                 itemType: .init(fields: .init(additionalProperties: ["title": title]), id: id))
             let first = registered.value2.revision
+            do {
+                try await staleRevisionsAreRefused(api, id, first, title, notes)
+            } catch {
+                _ = try? await api.delete(itemType: id, force: true, revision: nil)
+                throw error
+            }
+        }
 
+        private func staleRevisionsAreRefused(
+            _ api: Client, _ id: String, _ first: String,
+            _ title: Components.Schemas.FieldDefinition, _ notes: Components.Schemas.FieldDefinition
+        ) async throws {
             let replaced = try await api.replace(
                 itemType: id,
                 with: .init(fields: .init(additionalProperties: ["title": title, "notes": notes]), revision: first))
@@ -68,10 +76,7 @@ extension LiveWorkingCopies {
             let staleReplace = await #expect(throws: MarfaError.self) {
                 try await api.replace(itemType: id, with: .init(fields: .init(), revision: first))
             }
-            guard case .versionConflict? = staleReplace else {
-                Issue.record("\(String(describing: staleReplace))")
-                return
-            }
+            guard case .versionConflict? = staleReplace else { throw NotAConflict(answer: staleReplace) }
             #expect(staleReplace?.currentRevision == second)
 
             let staleDelete = await #expect(throws: MarfaError.self) {
@@ -89,6 +94,10 @@ extension LiveWorkingCopies {
             try await api.delete(itemType: id, revision: held.value2.revision)
             let gone = await #expect(throws: MarfaError.self) { try await api.delete(itemType: id, revision: nil) }
             #expect(gone?.code() == "not_found", "\(String(describing: gone))")
+        }
+
+        private struct NotAConflict: Error {
+            let answer: MarfaError?
         }
     }
 }
