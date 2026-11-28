@@ -9,17 +9,21 @@ import Synchronization
 /// same grant and, for a browser sign-in, the same redirect. The owner's approval then widens or renews the grant
 /// that client holds, which keeps its ID and everything the app made under it, such as its webhooks and its
 /// `app.<vendor>` namespace. A browser sign-in first asks the server whether it still holds the kept client, and a
-/// device sign-in learns it from its first request, so a sign-in after the server was reset, restored or replaced
-/// at the same address registers a new client and works as the first one did.
+/// device sign-in learns it from its first request, which the server refuses as `invalid_client` for a client it
+/// does not hold. So a sign-in after the server was reset, restored or replaced at the same address registers a new
+/// client and works as the first one did. Any other answer registers nothing and is thrown.
 ///
 /// A reused client can be approved for no more than the scopes it registered and the scopes the server offers
 /// every client. A scope outside both, such as a type the owner made or another app's namespace, is left out of a
 /// browser sign-in's approval and refused for a device sign-in as `invalid_scope`.
 ///
 /// Signing in again replaces the sign-in kept for the server. A sign-in on the kept client shares that sign-in's
-/// grant, so only the replaced access token is revoked. A sign-in on a new client then ends the grant the replaced
-/// sign-in held, as ``signOut()`` does, so each sign-in leaves one grant standing.
-/// ``Credential/replacedGrantStands`` says when the server did not confirm the replaced grant ended.
+/// grant, so only the replaced access token is revoked, and a sign-in on the kept client that cannot be kept
+/// revokes only its own access token. If the kept sign-in is signed out, or replaced by one on another client,
+/// while a sign-in on its client is under way, that grant may have ended, so the sign-in keeps nothing and throws
+/// ``SignInError/keptSignInChanged``. A sign-in on a new client ends the grant the replaced sign-in held, as
+/// ``signOut()`` does, so each sign-in leaves one grant standing. ``Credential/replacedGrantStands`` says when the
+/// server did not confirm the replaced grant ended.
 ///
 /// Sign in with a browser through ``signIn(presentingFrom:prefersEphemeralWebBrowserSession:)`` or
 /// ``signIn(using:)``, or, without a browser, through ``startDeviceSignIn()``. Then open a copy with
@@ -123,15 +127,16 @@ public struct Authorization: Sendable {
     /// Throws ``SignInError/canceled`` when the person closes the browser, ``SignInError/denied`` when they
     /// decline, ``SignInError/stateMismatch`` when the browser returns an approval this sign-in did not
     /// ask for, ``SignInError/issuerMismatch`` when the approval names another issuer than the server's,
-    /// ``SignInError/noRedirect`` when the client names no redirect, and
+    /// ``SignInError/noRedirect`` when the client names no redirect,
     /// ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in too long to
-    /// keep the approval. When the check of the kept client gets no answer, or one that says neither that the
-    /// server holds the client nor that it does not, it throws ``SignInError/unavailable(message:)``,
-    /// ``SignInError/refused(code:message:)`` or
+    /// keep the approval, and ``SignInError/keptSignInChanged``, keeping nothing, when the approval is on the kept
+    /// client and the kept sign-in was signed out or replaced by one on another client meanwhile. When the check of
+    /// the kept client gets no answer, or one that says neither that the server holds the client nor that it does
+    /// not, it throws ``SignInError/unavailable(message:)``, ``SignInError/refused(code:message:)`` or
     /// ``SignInError/unreadable(message:)`` with no browser opened and nothing kept changed. When the approval
-    /// cannot be kept, it asks the server to revoke it: by its refresh token, which ends its grant, or by its
-    /// access token alone when it is on the kept client and the sign-in kept for the server shares, or may share,
-    /// that grant. The error does not say whether the server confirmed it.
+    /// cannot be kept, it asks the server to revoke it: by its refresh token, which ends its grant, on a new client,
+    /// or by its access token alone on the kept client, whose grant other sign-ins on that client may share. The
+    /// error does not say whether the server confirmed it.
     @MainActor
     public func signIn(
         presentingFrom anchor: ASPresentationAnchor, prefersEphemeralWebBrowserSession: Bool = false
@@ -423,6 +428,11 @@ public struct Authorization: Sendable {
                 try await background {
                     try place.exclusively(transport) { () throws -> KeptSignIn? in
                         let replaced = try place.read()
+                        // Signing out, or keeping a sign-in on another client, revokes the kept client's refresh
+                        // token, which ends every token of that client, the ones this sign-in holds included.
+                        if registered.reused, replaced?.clientId != registered.clientId {
+                            throw SignInError.keptSignInChanged
+                        }
                         let admitted = admission.withLock { admission in
                             guard admission == .open else { return false }
                             admission = .admitted
@@ -439,19 +449,12 @@ public struct Authorization: Sendable {
                 }
             }
         } catch {
-            // The person approved a grant the app cannot use; ending it keeps it from standing at the server,
-            // unless the sign-in kept now, or one the keychain cannot read, may share it on the kept client.
-            var shared = false
-            if registered.reused {
-                do {
-                    shared = try await background { try place.read() }?.clientId == kept.clientId
-                } catch {
-                    shared = true
-                }
-            }
+            // The person approved a grant the app cannot use; ending it keeps it from standing at the server. On the
+            // kept client the grant is not this sign-in's alone, whatever the keychain holds now: another approval
+            // on that client may be under way and about to keep it.
             // A canceled task cannot send, so the revocation runs in a task that is not canceled with it.
             let authorization = self
-            _ = await Task.detached { await authorization.revoke(kept, endingGrant: !shared) }.value
+            _ = await Task.detached { await authorization.revoke(kept, endingGrant: !registered.reused) }.value
             throw error
         }
         var replacedGrantStands = false
@@ -513,11 +516,12 @@ public struct DeviceSignIn: Sendable {
     /// grant still stands.
     ///
     /// Throws ``SignInError/denied`` when the person declines, ``SignInError/expired`` once the code
-    /// expires, and ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
-    /// too long to keep the approval. When the approval cannot be kept, for that or a keychain error, it asks
-    /// the server to revoke it: by its refresh token, which ends its grant, or by its access token alone when it
-    /// is on the kept client and the sign-in kept for the server shares, or may share, that grant. The error does
-    /// not say whether the server confirmed it.
+    /// expires, ``SignInError/heldElsewhere`` when another process sharing the keychain holds the sign-in
+    /// too long to keep the approval, and ``SignInError/keptSignInChanged``, keeping nothing, when the approval is
+    /// on the kept client and the kept sign-in was signed out or replaced by one on another client meanwhile. When
+    /// the approval cannot be kept, for those or a keychain error, it asks the server to revoke it: by its refresh
+    /// token, which ends its grant, on a new client, or by its access token alone on the kept client, whose grant
+    /// other sign-ins on that client may share. The error does not say whether the server confirmed it.
     /// Cancel the task to stop waiting; it throws `CancellationError`.
     public func credential() async throws -> Credential {
         let transport = polling.authorization.transport
@@ -720,6 +724,13 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
     /// Another process sharing the keychain, such as an app extension, held the sign-in too long, so the
     /// keychain was left as it was.
     case heldElsewhere
+    /// While this sign-in was on the client of the sign-in kept for the server, that sign-in was signed out or
+    /// replaced by one on another client, in this process or another sharing the keychain.
+    ///
+    /// Either may have ended, at the server, the grant this sign-in's tokens belong to, so this sign-in was not
+    /// kept and only its access token was revoked. The keychain holds what the sign-out or the other sign-in left,
+    /// which a new sign-in replaces.
+    case keptSignInChanged
     /// The server answered something this package cannot use, or named another server as the one that signs
     /// in to it.
     case unreadable(message: String)
@@ -736,6 +747,7 @@ public enum SignInError: Error, Sendable, Hashable, CustomStringConvertible {
         case .otherServer: "The sign-in is for another server."
         case .noRedirect: "The app names no redirect address for a browser sign-in."
         case .heldElsewhere: "Another process is using the sign-in."
+        case .keptSignInChanged: "The app signed out or signed in again elsewhere while this sign-in was approved."
         case .refused(let code, let message): "The server refused the sign-in (\(code)): \(message)"
         case .discoveryTransport(let reason): reason.description
         case .unavailable(let message), .unreadable(let message): message
